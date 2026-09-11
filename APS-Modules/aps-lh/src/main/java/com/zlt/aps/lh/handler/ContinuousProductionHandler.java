@@ -8,6 +8,7 @@ import com.zlt.aps.lh.engine.strategy.IProductionStrategy;
 import com.zlt.aps.lh.engine.strategy.ISkuPriorityStrategy;
 import com.zlt.aps.lh.engine.strategy.ITypeBlockProductionStrategy;
 import com.zlt.aps.lh.service.impl.LhMaintenanceScheduleService;
+import com.zlt.aps.lh.service.impl.PreviousAlternatePlanReuseService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -39,6 +40,9 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
     private ITypeBlockProductionStrategy typeBlockProductionStrategy;
     @Resource
     private LhMaintenanceScheduleService maintenanceScheduleService;
+    /** 续作真实释放时间确定后，先消费可复用交替关系的一份机台需求。 */
+    @Resource
+    private PreviousAlternatePlanReuseService previousAlternatePlanReuseService;
 
     @Override
     protected void doHandle(LhScheduleContext context) {
@@ -92,6 +96,9 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
 
         // 续作最终数量、真实收尾和物理交接时间已经稳定，按精度优先级统一分配每日一台额度。
         maintenanceScheduleService.finalizeMaintenancePlanWindows(context);
+
+        // 独立复用阶段覆盖全部剩余产能机台，完成后换活字块只处理实时剩余资源与需求。
+        previousAlternatePlanReuseService.reuse(context);
 
         // S4.4.5 收尾后换活字块衔接排产：只读取均衡后的最终机台可用时间。
         typeBlockProductionStrategy.scheduleTypeBlockChange(context);

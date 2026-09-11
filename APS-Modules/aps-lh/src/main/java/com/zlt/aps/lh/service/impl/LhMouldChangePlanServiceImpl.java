@@ -13,10 +13,19 @@ import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.itf.mes.IMesItfService;
+import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
+import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
+import com.zlt.aps.lh.api.domain.entity.LhParams;
+import com.zlt.aps.lh.api.domain.entity.LhSharedMouldPat;
+import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
 import com.zlt.aps.lh.component.OrderNoGenerator;
+import com.zlt.aps.lh.mapper.LhMachineOnlineInfoMapper;
 import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
+import com.zlt.aps.lh.mapper.LhSharedMouldPatEntityMapper;
 import com.zlt.aps.lh.service.ILhMouldChangePlanService;
+import com.zlt.aps.lh.service.ILhParamsService;
+import com.zlt.aps.lh.util.LhMouldCodeUtil;
 import com.zlt.aps.maindata.mapper.LhMachineInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
@@ -53,6 +62,15 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
     @Resource
     private LhMouldChangePlanEntityMapper lhMouldChangePlanMapper;
 
+    @Resource
+    private LhMachineOnlineInfoMapper lhMachineOnlineInfoMapper;
+
+    @Resource
+    private LhSharedMouldPatEntityMapper lhSharedMouldPatEntityMapper;
+
+    @Autowired
+    private ILhParamsService lhParamsService;
+
     @Autowired
     private LhMachineInfoEntityMapper lhMachineInfoEntityMapper;
 
@@ -76,6 +94,282 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
                 "beforeMaterialDesc->getcolvalue(T_MDM_MATERIAL_INFO, MATERIAL_DESC, MATERIAL_CODE, beforeMaterialCode)",
                 "afterMaterialDesc->getcolvalue(T_MDM_MATERIAL_INFO, MATERIAL_DESC, MATERIAL_CODE, afterMaterialCode)"
         };
+    }
+
+    /**
+     * 解析模具交替计划最终展示的模具号。
+     *
+     * <p>该方法集中复用导出模具号取值规则，换活字块计划取在机模具号，
+     * 其他计划取共享模具花纹配置，供导出展示和库表回写使用。</p>
+     *
+     * <p>按计划记录的分厂和排程日期分组匹配来源数据，并将计划原模具号与匹配模具号
+     * 按原值优先的顺序取并集后回填至原列表。</p>
+     *
+     * @param planList 模具交替计划列表
+     * @return 回填最终模具号后的模具交替计划列表
+     */
+    @Override
+    public List<LhMouldChangePlan> resolveMouldCode(List<LhMouldChangePlan> planList) {
+        if (CollectionUtils.isEmpty(planList)) {
+            return planList == null ? Collections.emptyList() : planList;
+        }
+
+        Map<String, Map<String, List<LhMouldChangePlan>>> factorySchedulePlanMap = planList.stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.groupingBy(plan -> StringUtils.defaultIfBlank(plan.getFactoryCode(), ""),
+                        LinkedHashMap::new, Collectors.groupingBy(plan -> plan.getScheduleDate() == null
+                                        ? "" : DateUtil.formatDate(plan.getScheduleDate()),
+                                LinkedHashMap::new, Collectors.toList())));
+        for (Map.Entry<String, Map<String, List<LhMouldChangePlan>>> factoryEntry : factorySchedulePlanMap.entrySet()) {
+            String currentFactoryCode = factoryEntry.getKey();
+            for (List<LhMouldChangePlan> currentPlanList : factoryEntry.getValue().values()) {
+                Date currentScheduleDate = currentPlanList.get(0).getScheduleDate() == null ? null
+                        : DateUtil.beginOfDay(currentPlanList.get(0).getScheduleDate());
+                Map<String, List<LhMachineOnlineInfo>> onlineInfoMap =
+                        this.buildOnlineInfoMap(currentPlanList, currentFactoryCode, currentScheduleDate);
+                Map<String, List<LhSharedMouldPat>> sharedMouldPatMap =
+                        this.buildSharedMouldPatMap(currentPlanList, currentFactoryCode);
+                for (LhMouldChangePlan plan : currentPlanList) {
+                    String matchedMouldCode = MouldChangeTypeEnum.containsCode(
+                            plan.getChangeMouldType(), MouldChangeTypeEnum.TYPE_BLOCK.getCode())
+                            ? this.resolveOnlineMouldCode(plan, onlineInfoMap)
+                            : this.resolveSharedMouldCode(plan, sharedMouldPatMap);
+                    plan.setMouldCode(this.mergeMouldCode(plan.getMouldCode(), matchedMouldCode,
+                            plan.getChangeMouldType()));
+                }
+            }
+        }
+        return planList;
+    }
+
+    /**
+     * 刷新指定分厂、排程日期和硫化结果批次的模具号。
+     *
+     * @param factoryCode     工厂编码
+     * @param scheduleDate    排程日期
+     * @param lhResultBatchNo 硫化结果批次号
+     */
+    @Override
+    public void refreshMouldCode(String factoryCode, Date scheduleDate, String lhResultBatchNo) {
+        if (StringUtils.isBlank(factoryCode) || scheduleDate == null || StringUtils.isBlank(lhResultBatchNo)) {
+            return;
+        }
+        List<LhMouldChangePlan> planList = lhMouldChangePlanMapper.selectList(
+                new LambdaQueryWrapper<LhMouldChangePlan>()
+                        .eq(LhMouldChangePlan::getFactoryCode, factoryCode)
+                        .eq(LhMouldChangePlan::getScheduleDate, scheduleDate)
+                        .eq(LhMouldChangePlan::getLhResultBatchNo, lhResultBatchNo));
+        if (CollectionUtils.isEmpty(planList)) {
+            return;
+        }
+
+        this.baseDao.updateBatch(this.resolveMouldCode(planList));
+    }
+
+    /**
+     * 合并计划原模具号和匹配模具号。
+     *
+     * <p>原模具号在前、匹配模具号在后，去除空值和重复值；共享模具计划保留原有换行展示格式。</p>
+     *
+     * @param originalMouldCode 原模具号
+     * @param matchedMouldCode  匹配模具号
+     * @param changeMouldType   换模类型
+     * @return 合并后的模具号
+     */
+    private String mergeMouldCode(String originalMouldCode, String matchedMouldCode, String changeMouldType) {
+        LinkedHashSet<String> mouldCodeSet = LhMouldCodeUtil.splitMouldCode(originalMouldCode);
+        mouldCodeSet.addAll(LhMouldCodeUtil.splitMouldCode(matchedMouldCode));
+        if (CollectionUtils.isEmpty(mouldCodeSet)) {
+            return "";
+        }
+        if (MouldChangeTypeEnum.containsCode(changeMouldType, MouldChangeTypeEnum.TYPE_BLOCK.getCode())) {
+            return LhMouldCodeUtil.joinMouldCode(mouldCodeSet);
+        }
+        return mouldCodeSet.stream().collect(Collectors.joining(",\n"));
+    }
+
+    /**
+     * 构建指定计划对应的在机模具信息映射。
+     *
+     * @param planList     模具交替计划列表
+     * @param factoryCode  工厂编码
+     * @param scheduleDate 排程日期
+     * @return 机台前缀到在机信息列表的映射
+     */
+    private Map<String, List<LhMachineOnlineInfo>> buildOnlineInfoMap(List<LhMouldChangePlan> planList,
+                                                                      String factoryCode,
+                                                                      Date scheduleDate) {
+        Map<String, List<LhMachineOnlineInfo>> onlineInfoMap = new HashMap<>();
+        List<String> machinePrefixList = planList.stream()
+                .map(LhMouldChangePlan::getLhMachineCode)
+                .filter(StringUtils::isNotBlank)
+                .map(this::stripLeftRightSuffix)
+                .distinct()
+                .collect(Collectors.toList());
+        Date onlineDateEnd = this.getMouldOnlineDateEnd(factoryCode, scheduleDate);
+        if (CollectionUtils.isEmpty(machinePrefixList) || onlineDateEnd == null) {
+            return onlineInfoMap;
+        }
+
+        LambdaQueryWrapper<LhMachineOnlineInfo> wrapper = new LambdaQueryWrapper<>();
+        if (StringUtils.isNotBlank(factoryCode)) {
+            wrapper.eq(LhMachineOnlineInfo::getFactoryCode, factoryCode);
+        }
+        wrapper.and(prefixWrapper -> {
+            for (String machinePrefix : machinePrefixList) {
+                prefixWrapper.or().likeRight(LhMachineOnlineInfo::getLhCode, machinePrefix);
+            }
+        });
+        wrapper.isNotNull(LhMachineOnlineInfo::getOnlineDate)
+                .le(LhMachineOnlineInfo::getOnlineDate, onlineDateEnd)
+                .isNotNull(LhMachineOnlineInfo::getInMachineMouldCode)
+                .ne(LhMachineOnlineInfo::getInMachineMouldCode, "");
+        List<LhMachineOnlineInfo> onlineInfoList = lhMachineOnlineInfoMapper.selectList(wrapper);
+        if (CollectionUtils.isEmpty(onlineInfoList)) {
+            return onlineInfoMap;
+        }
+
+        onlineInfoList.stream()
+                .filter(item -> StringUtils.isNotBlank(item.getLhCode()))
+                .filter(item -> item.getOnlineDate() != null && !item.getOnlineDate().after(onlineDateEnd))
+                .sorted(Comparator.comparing(LhMachineOnlineInfo::getLhCode,
+                                Comparator.nullsLast(String::compareTo))
+                        .thenComparing(LhMachineOnlineInfo::getOnlineDate,
+                                Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparing(LhMachineOnlineInfo::getUpdateTime,
+                                Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparing(LhMachineOnlineInfo::getId,
+                                Comparator.nullsLast(Comparator.reverseOrder())))
+                .forEach(onlineInfo -> onlineInfoMap.computeIfAbsent(
+                        this.stripLeftRightSuffix(onlineInfo.getLhCode()), key -> new ArrayList<>()).add(onlineInfo));
+        return onlineInfoMap;
+    }
+
+    /**
+     * 批量查询共享模具花纹配置并按物料描述分组。
+     *
+     * @param planList    模具交替计划列表
+     * @param factoryCode 工厂编码
+     * @return 后物料描述到共享模具配置列表的映射
+     */
+    private Map<String, List<LhSharedMouldPat>> buildSharedMouldPatMap(List<LhMouldChangePlan> planList,
+                                                                       String factoryCode) {
+        List<String> materialDescList = planList.stream()
+                .map(LhMouldChangePlan::getAfterMaterialDesc)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(materialDescList)) {
+            return new HashMap<>();
+        }
+        LambdaQueryWrapper<LhSharedMouldPat> wrapper = new LambdaQueryWrapper<>();
+        if (StringUtils.isNotBlank(factoryCode)) {
+            wrapper.eq(LhSharedMouldPat::getFactoryCode, factoryCode);
+        }
+        wrapper.in(LhSharedMouldPat::getMaterialDesc, materialDescList);
+        List<LhSharedMouldPat> sharedMouldPatList = lhSharedMouldPatEntityMapper.selectList(wrapper);
+        if (CollectionUtils.isEmpty(sharedMouldPatList)) {
+            return new HashMap<>();
+        }
+        return sharedMouldPatList.stream().collect(Collectors.groupingBy(LhSharedMouldPat::getMaterialDesc));
+    }
+
+    /**
+     * 解析计划对应的在机模具号。
+     *
+     * @param plan          模具交替计划
+     * @param onlineInfoMap 机台前缀到在机信息的映射
+     * @return 去重后的在机模具号，多个模具号以英文逗号分隔
+     */
+    private String resolveOnlineMouldCode(LhMouldChangePlan plan,
+                                          Map<String, List<LhMachineOnlineInfo>> onlineInfoMap) {
+        String machinePrefix = this.stripLeftRightSuffix(plan.getLhMachineCode());
+        List<LhMachineOnlineInfo> matchedInfoList = onlineInfoMap.get(machinePrefix);
+        if (CollectionUtils.isEmpty(matchedInfoList)) {
+            return "";
+        }
+        Map<String, LhMachineOnlineInfo> latestByMachine = new LinkedHashMap<>();
+        matchedInfoList.forEach(onlineInfo -> latestByMachine.putIfAbsent(onlineInfo.getLhCode(), onlineInfo));
+        return latestByMachine.values().stream()
+                .map(LhMachineOnlineInfo::getInMachineMouldCode)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .collect(Collectors.joining(","));
+    }
+
+    /**
+     * 解析计划对应的共享模具号和花纹块。
+     *
+     * @param plan              模具交替计划
+     * @param sharedMouldPatMap 共享模具配置映射
+     * @return 共享模具展示值，多个配置以换行分隔
+     */
+    private String resolveSharedMouldCode(LhMouldChangePlan plan,
+                                          Map<String, List<LhSharedMouldPat>> sharedMouldPatMap) {
+        List<LhSharedMouldPat> sharedMouldPatList = sharedMouldPatMap.get(plan.getAfterMaterialDesc());
+        if (CollectionUtils.isEmpty(sharedMouldPatList)) {
+            return "";
+        }
+        return sharedMouldPatList.stream()
+                .map(sharedMouldPat -> StringUtils.defaultIfBlank(sharedMouldPat.getMouldNo(), "") + "/"
+                        + StringUtils.defaultIfBlank(sharedMouldPat.getPatternBlock(), ""))
+                .collect(Collectors.joining(",\n"));
+    }
+
+    /**
+     * 获取模具交替计划模具号追溯天数。
+     *
+     * @param factoryCode 工厂编码
+     * @return 追溯天数，参数不存在或无效时返回默认值2
+     */
+    private int getMouldChangePlanLookbackDays(String factoryCode) {
+        int lookbackDays = 2;
+        if (StringUtils.isBlank(factoryCode)) {
+            return lookbackDays;
+        }
+        LhParams lookbackParam = lhParamsService.selectOneByParamCode(
+                LhScheduleParamConstant.MOULD_CHANGE_PLAN_LOOKBACK_DAYS, factoryCode);
+        if (lookbackParam == null || StringUtils.isBlank(lookbackParam.getParamValue())) {
+            return lookbackDays;
+        }
+        try {
+            return Integer.parseInt(lookbackParam.getParamValue().trim());
+        } catch (NumberFormatException exception) {
+            log.warn("模具交替计划模具号追溯天数参数无效，使用默认值2，工厂编码：{}", factoryCode);
+            return lookbackDays;
+        }
+    }
+
+    /**
+     * 计算在机模具信息截止时间。
+     *
+     * @param factoryCode  工厂编码
+     * @param scheduleDate 排程日期
+     * @return 在机信息截止时间，排程日期为空时返回null
+     */
+    private Date getMouldOnlineDateEnd(String factoryCode, Date scheduleDate) {
+        if (scheduleDate == null) {
+            return null;
+        }
+        return DateUtil.offsetDay(DateUtil.endOfDay(scheduleDate),
+                -this.getMouldChangePlanLookbackDays(factoryCode));
+    }
+
+    /**
+     * 去除机台编码末尾的左右模后缀。
+     *
+     * @param machineCode 机台编码
+     * @return 去除后缀后的机台前缀
+     */
+    private String stripLeftRightSuffix(String machineCode) {
+        if (StringUtils.isBlank(machineCode)) {
+            return machineCode;
+        }
+        String normalizedMachineCode = machineCode.trim().toUpperCase();
+        if (normalizedMachineCode.endsWith("L") || normalizedMachineCode.endsWith("R")) {
+            return normalizedMachineCode.substring(0, normalizedMachineCode.length() - 1);
+        }
+        return normalizedMachineCode;
     }
 
     @Override

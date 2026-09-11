@@ -150,7 +150,7 @@ public class SharedMouldSubstitutionCoordinator {
                 if (!CollectionUtils.isEmpty(
                         mouldResourceContext.resolveFreeValidMouldCodes(
                                 targetSku.getMaterialCode(),
-                                Collections.<String>emptySet()))) {
+                                Collections.<String>emptySet(), dateResolution.getTakeoverTargetTime()))) {
                     finalFailureReason = TARGET_HAS_FREE_MOULD_REASON;
                     break;
                 }
@@ -328,7 +328,7 @@ public class SharedMouldSubstitutionCoordinator {
         List<String> remainingMouldCodeList =
                 mouldResourceContext.resolveFreeValidMouldCodes(
                         continuationSku.getMaterialCode(),
-                        transferredMouldCodeSet);
+                        transferredMouldCodeSet, dateResolution.getTakeoverTargetTime());
         if (CollectionUtils.isEmpty(remainingMouldCodeList)) {
             log.info("共用模具置换候选跳过，B 无剩余空闲有效模具, targetMaterialCode: {}, "
                             + "continuationMaterialCode: {}, physicalMachineCode: {}, transferredMouldCodes: {}",
@@ -580,7 +580,7 @@ public class SharedMouldSubstitutionCoordinator {
                             .resolveFreeValidMouldCodes(
                                     plan.getContinuationSku()
                                             .getMaterialCode(),
-                                    transferredMouldCodeSet));
+                                    transferredMouldCodeSet, plan.getContinuationOfflineTime()));
         }
         return directive;
     }

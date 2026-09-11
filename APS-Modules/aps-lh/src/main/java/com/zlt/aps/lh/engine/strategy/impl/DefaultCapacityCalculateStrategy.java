@@ -3,15 +3,12 @@
  */
 package com.zlt.aps.lh.engine.strategy.impl;
 
-import com.zlt.aps.lh.api.constant.LhScheduleConstant;
-import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
 import com.zlt.aps.lh.service.impl.LhMaintenanceScheduleService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
-import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -49,31 +46,26 @@ public class DefaultCapacityCalculateStrategy implements ICapacityCalculateStrat
         // 语义调整为“机台准备就绪时间”，仅表达机台从何时开始可以继续安排换模/首检/生产
         Date baseReadyTime = endingTime;
 
-        // 判断机台是否有保养/维修计划，若有则取最晚时间。
+        // 判断机台是否有精度保养计划，若有则取其就绪时间。
         // 清洗与换模/换活字块的重叠判定已下沉到后续切换链路，不在这里提前固化 readyTime。
         Date maintenanceStartTime = calculateMaintenanceStartTime(context, machineCode, baseReadyTime);
-        Date repairStartTime = calculateRepairStartTime(context, machineCode);
         Date capsuleReplacementReadyTime = ShiftCapacityResolverUtil.resolveCapsuleReplacementReadyTime(
                 context, machineCode, baseReadyTime);
 
-        // 取四者最大值：基础可用时间、保养后可用时间、维修后可用时间、换胶囊后可用时间。
+        // 取基础可用、保养后可用及换胶囊后可用时间的最大值；05/06只通过各自产能时间轴生效。
         Date maxStartTime = baseReadyTime;
         if (maintenanceStartTime != null && maintenanceStartTime.after(maxStartTime)) {
             maxStartTime = maintenanceStartTime;
-        }
-        if (repairStartTime != null && repairStartTime.after(maxStartTime)) {
-            maxStartTime = repairStartTime;
         }
         if (capsuleReplacementReadyTime != null && capsuleReplacementReadyTime.after(maxStartTime)) {
             maxStartTime = capsuleReplacementReadyTime;
         }
 
         if (context == null || !context.isNewSpecProposalPreview()) {
-            log.debug("计算机台准备就绪时间, 机台: {}, 收尾时间: {}, 保养后就绪时间: {}, 维修后就绪时间: {}, "
+            log.debug("计算机台准备就绪时间, 机台: {}, 收尾时间: {}, 保养后就绪时间: {}, "
                             + "换胶囊后就绪时间: {}, 最终就绪时间: {}",
                     machineCode, LhScheduleTimeUtil.formatDateTime(endingTime),
                     LhScheduleTimeUtil.formatDateTime(maintenanceStartTime),
-                    LhScheduleTimeUtil.formatDateTime(repairStartTime),
                     LhScheduleTimeUtil.formatDateTime(capsuleReplacementReadyTime),
                     LhScheduleTimeUtil.formatDateTime(maxStartTime));
         }
@@ -123,49 +115,4 @@ public class DefaultCapacityCalculateStrategy implements ICapacityCalculateStrat
         return maintenanceScheduleService.resolveMaintenanceResumeProductionTime(context, machineDTO, baseReadyTime);
     }
 
-    /**
-     * 计算设备维修后的开产时间
-     * <p>
-     * 维修规则：<br/>
-     * 本方法只返回维修完成后的机台就绪时间；换模、换活字块和首检统一由
-     * 后续切换时间轴计算，换模总时长已包含首检，此处不再重复追加首检时长。
-     * </p>
-     *
-     * @param context     排程上下文
-     * @param machineCode 机台编号
-     * @return 维修后的开产时间，null表示无维修计划
-     */
-    private Date calculateRepairStartTime(LhScheduleContext context, String machineCode) {
-        MachineScheduleDTO machineDTO = context.getMachineScheduleMap().get(machineCode);
-        if (machineDTO == null || !machineDTO.isHasRepairPlan()) {
-            return null;
-        }
-
-        Date repairPlanTime = machineDTO.getRepairPlanTime();
-        if (repairPlanTime == null) {
-            return null;
-        }
-
-        // 维修固定从8:00开始
-        int maintenanceStartHour = context.getParamIntValue(LhScheduleParamConstant.MAINTENANCE_START_HOUR,
-                LhScheduleConstant.MAINTENANCE_START_HOUR);
-        Date repairStart = LhScheduleTimeUtil.buildTime(repairPlanTime, maintenanceStartHour, 0, 0);
-
-        // 从设备停机计划中获取维修时长（暂用8小时作为默认）
-        int repairDurationHours = 8;
-        for (MdmDevicePlanShut planShut : context.getDevicePlanShutList()) {
-            if (machineCode.equals(planShut.getMachineCode()) && planShut.getBeginDate() != null) {
-                if (planShut.getEndDate() != null) {
-                    long durationHours = LhScheduleTimeUtil.diffHours(planShut.getBeginDate(), planShut.getEndDate());
-                    repairDurationHours = (int) Math.max(1, durationHours);
-                }
-                break;
-            }
-        }
-
-        Date repairEnd = LhScheduleTimeUtil.addHours(repairStart, repairDurationHours);
-
-        // 语义为机台维修完成后的就绪时间
-        return repairEnd;
-    }
 }

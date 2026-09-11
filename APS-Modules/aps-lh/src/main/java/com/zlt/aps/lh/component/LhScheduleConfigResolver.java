@@ -291,11 +291,6 @@ public class LhScheduleConfigResolver {
         // 试制量试参与新增排产开关只允许0/1，非法配置统一回到默认（新增排产不参与，续作不受影响）。
         putTrialMassTrialSchedulingEnabled(resolvedParamMap, lhParamsMap);
 
-        // 本参数仅控制T+1资源日的历史交替匹配，不复用提前生产或机台资源归班参数。
-        this.putIntValue(resolvedParamMap, lhParamsMap,
-                LhScheduleParamConstant.NEXT_DAY_PREVIOUS_ALTERNATION_PRIORITY_ENABLED,
-                LhScheduleConstant.NEXT_DAY_PREVIOUS_ALTERNATION_PRIORITY_ENABLED);
-
         return new LhScheduleConfig(resolvedParamMap);
     }
 

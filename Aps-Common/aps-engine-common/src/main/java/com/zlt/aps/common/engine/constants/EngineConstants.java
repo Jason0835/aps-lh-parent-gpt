@@ -569,4 +569,7 @@ public class EngineConstants {
 
     /** SYS1101034：胎圈备库二次触发阈值（S5.8滚动重估时班初库存低于 阈值×班N需求 触发二次备库），默认0.7 */
     public static String TQ_BACKUP_TRIGGER_THRESHOLD_CLASS = "SYS1101034";
+
+    /** SYS1101035：胎圈收尾判定容差（月计划剩余量与6班成型毛需求比较的容差，差值≤容差时仍判定为收尾；收尾规格6班合计与月剩余差额≤容差时补排到月剩余），默认100 */
+    public static String TQ_CLOSE_OUT_TOLERANCE = "SYS1101035";
 }

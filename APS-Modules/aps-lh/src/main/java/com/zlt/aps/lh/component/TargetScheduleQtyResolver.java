@@ -1393,7 +1393,7 @@ public class TargetScheduleQtyResolver {
         if (CollectionUtils.isEmpty(inspections)) {
             return this.resolveAllocatedShiftQty(context, sku, allocationQty, shiftMaxQty, mouldQty);
         }
-        int inspectionQty = inspections.stream().mapToInt(MachineCleaningWindowDTO::getSandBlastFirstInspectionQty).sum();
+        int inspectionQty = inspections.stream().mapToInt(window -> ShiftCapacityResolverUtil.resolveSandBlastInspectionQty(context, window)).sum();
         return this.resolveSandBlastAllocatedQty(allocationQty, shiftMaxQty, mouldQty,
                 inspectionQty, this.isEmbryoStockEnding(context, sku));
     }
@@ -1418,7 +1418,7 @@ public class TargetScheduleQtyResolver {
         if (CollectionUtils.isEmpty(inspections)) {
             return this.resolveAllocatedShiftQty(context, result, allocationQty, shiftMaxQty, mouldQty);
         }
-        int inspectionQty = inspections.stream().mapToInt(MachineCleaningWindowDTO::getSandBlastFirstInspectionQty).sum();
+        int inspectionQty = inspections.stream().mapToInt(window -> ShiftCapacityResolverUtil.resolveSandBlastInspectionQty(context, window)).sum();
         return this.resolveSandBlastAllocatedQty(allocationQty, shiftMaxQty, mouldQty,
                 inspectionQty, this.isEmbryoStockEnding(context, result));
     }
@@ -1557,7 +1557,7 @@ public class TargetScheduleQtyResolver {
         int inspectionQty = CleaningScheduleRuleUtil.resolveSandBlastInspectionWindows(
                 machine.getCleaningWindowList(), ShiftFieldUtil.getShiftStartTime(result, shift.getShiftIndex()),
                 shift.getShiftEndDateTime()).stream()
-                .mapToInt(MachineCleaningWindowDTO::getSandBlastFirstInspectionQty).sum();
+                .mapToInt(window -> ShiftCapacityResolverUtil.resolveSandBlastInspectionQty(context, window)).sum();
         if (inspectionQty <= 0) {
             return this.resolveRetainedShiftQty(context, sku, retainedQty, mouldQty);
         }
@@ -1802,8 +1802,7 @@ public class TargetScheduleQtyResolver {
                         scheduleType, machine.getMachineCode(), null);
         Map<Integer, Integer> firstInspectionQtyMap =
                 FirstInspectionAllocationUtil.toShiftQtyMap(firstInspectionAllocationPlan);
-        boolean crossShiftInspection = firstInspectionAllocationPlan.isValid()
-                && firstInspectionAllocationPlan.getInspectionQty() > 0;
+        boolean crossShiftInspection = firstInspectionAllocationPlan.hasQuantityTimeline();
         cursorStartTime = FirstInspectionQtyUtil.resolveProductionStartAfterFirstInspection(
                 sku, scheduleType, cursorStartTime, firstInspectionAllocationPlan);
         int firstInspectionQty = crossShiftInspection

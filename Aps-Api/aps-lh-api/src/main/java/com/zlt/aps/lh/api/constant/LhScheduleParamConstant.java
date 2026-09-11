@@ -167,6 +167,8 @@ public final class LhScheduleParamConstant {
     public static final String CLEANING_SKIP_ENDING_DAY_THRESHOLD = "SYS0308003";
     /** 计划性维修固定排产量（条），维修开始班次固定只排该数量，不按时间折算 */
     public static final String PLANNED_REPAIR_FIXED_QTY = "SYS0308010";
+    /** 计划性维修独立开始时刻（HH:mm），不联动精度保养开始小时。 */
+    public static final String PLANNED_REPAIR_START_TIME = "SYS0308011";
     /** 胶囊预警次数 */
     public static final String CAPSULE_WARNING_COUNT = "SYS0309001";
     /** 胶囊使用次数上限；本批按左右最大值初始化，仅首次严格跨限时触发扣量 */
@@ -257,6 +259,4 @@ public final class LhScheduleParamConstant {
     public static final String SMALL_ENDING_SURPLUS_KEEP_RATIO_PERCENT = "SYS0304033";
     /** 优先续作硫化机台前缀，多个前缀使用英文逗号分隔 */
     public static final String PRIORITY_CONTINUATION_MACHINE_PREFIXES = "SYS0304034";
-    /** T+1日机台是否优先匹配前一次交替计划的物料（1-是，0-否，默认1） */
-    public static final String NEXT_DAY_PREVIOUS_ALTERNATION_PRIORITY_ENABLED = "SYS0304035";
 }

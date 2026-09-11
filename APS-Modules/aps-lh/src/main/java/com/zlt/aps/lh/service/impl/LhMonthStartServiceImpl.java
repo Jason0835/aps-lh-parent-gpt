@@ -3,6 +3,7 @@ package com.zlt.aps.lh.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.google.common.collect.Lists;
 import com.zlt.aps.common.engine.domain.LhMonthStartDayResult;
+import com.zlt.aps.common.engine.utils.DateUtil;
 import com.zlt.aps.common.engine.utils.MonthPlanSurplusCalculator;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.lh.handler.SkuMonthPlanCalculator;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.Date;
 import java.util.List;
@@ -57,6 +59,9 @@ public class LhMonthStartServiceImpl implements ILhMonthStartService {
         Date maxDate = findStartDateList.get(endIndex);
         YearMonth maxDateYearMonth = YearMonth.from(MonthPlanSurplusCalculator.getDate(maxDate));
         if (maxDateYearMonth.equals(yearMonth)) {
+            //20260910+ 去除时分秒
+            LocalDate maxDateLocal = SkuMonthPlanCalculator.getDate(maxDate);
+            maxDate = DateUtil.getDate(maxDateLocal.getYear(), maxDateLocal.getMonthValue(), maxDateLocal.getDayOfMonth());
             return new LhMonthStartDayResult(maxDate, false);
         }
         Date startDate = SkuMonthPlanCalculator.getDate(yearMonth.atDay(BigDecimal.ONE.intValue()));

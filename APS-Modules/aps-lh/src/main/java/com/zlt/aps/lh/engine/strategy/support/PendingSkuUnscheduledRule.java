@@ -2,7 +2,6 @@ package com.zlt.aps.lh.engine.strategy.support;
 
 import com.zlt.aps.lh.api.domain.dto.SkuDailyPlanQuotaDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
-import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.api.enums.ConstructionStageEnum;
 import com.zlt.aps.lh.api.enums.UnscheduledReasonEnum;
@@ -31,9 +30,9 @@ import java.util.Objects;
 @Slf4j
 public final class PendingSkuUnscheduledRule {
 
-    /** 非续作SKU在排程及提前生产范围内无日计划、且无前日交替承接关系的统一未排原因 */
+    /** 非续作SKU在排程及提前生产范围内无日计划的统一未排原因 */
     public static final String DAILY_PLAN_ADMISSION_UNSCHEDULED_REASON =
-            "排程窗口及提前生产范围内无日计划量，且无前日排程T+1交替计划";
+            "排程窗口及提前生产范围内无日计划量";
 
     /** 续作试制、量试SKU完整判断范围无日计划量的统一未排原因 */
     public static final String CONTINUOUS_TRIAL_DAILY_PLAN_ADMISSION_UNSCHEDULED_REASON =
@@ -87,17 +86,15 @@ public final class PendingSkuUnscheduledRule {
     }
 
     /**
-     * 评估非续作SKU是否因完整准入范围无日计划量且无前日交替承接关系而直接进入未排。
+     * 评估非续作SKU是否因完整准入范围无日计划量而直接进入未排。
      * <p>判断范围由两部分组成：SKU已初始化的排程窗口计划量覆盖窗口首日至窗口末日；窗口结束日之后
-     * 复用提前生产判断器，按硫化参数配置的提前生产天数阈值继续向后查找。完整范围无正计划量时，
-     * 再按“后物料”检查前日排程生成的T+1交替计划；任一条件放行仅代表继续进入现有排产流程，
-     * 不代表必须生成排程结果。</p>
+     * 复用提前生产判断器，按硫化参数配置的提前生产天数阈值继续向后查找。
+     * 完整范围无正计划量时拒绝本次排产，历史交替关系不授予额外资格。</p>
      * <p>试制、量试SKU为特殊分支：不叠加提前生产天数阈值，仅按排程窗口首日~窗口末日判断日计划量，
      * 窗口内有正计划量即放行；窗口内全为0时退出续作、换活字块和真实机台新增排产并先写未排，
      * 且不检查前日T+1交替计划。调用方可在清理前仅为有硫化余量的试制/量试保留S4.5.3虚拟机台快照，
      * 但不得将其重新放回其他排产阶段。</p>
-     * <p>日计划严格沿用物料编码和产品状态复合维度；历史交替计划没有产品状态字段，因此承接关系
-     * 只按物料编码匹配。前日排程的T+1日对应当前排程窗口首日，仅该日计划可作为本次准入依据。</p>
+     * <p>日计划严格沿用物料编码和产品状态复合维度，不以历史交替日期替代本次实际需求日期。</p>
      * <p>本方法只负责判断和构造未排结果，不修改SKU目标量、排产集合、胎胚库存或日计划账本。</p>
      *
      * @param context 排程上下文，提供排程窗口、提前生产参数和跨月月计划数据
@@ -128,32 +125,24 @@ public final class PendingSkuUnscheduledRule {
             return null;
         }
 
-        // 前日排程T+1日交替计划已明确安排当前物料承接时，保留SKU并继续复用历史反选和普通新增主链。
-        // 试制、量试SKU窗口全零时直接未排，不检查T+1交替计划，斩断历史换模承接计划的滚动续排链。
-        if (!isTrialSku && hasPreviousT1MouldChangePlan(context, sku.getMaterialCode())) {
-            return null;
-        }
-
         // 试制、量试不适用提前生产天数阈值，判断截止日即窗口末日；其余SKU复用提前生产参数。
         int earlyProductionDaysThreshold = isTrialSku ? 0
                 : EarlyProductionChecker.resolveEarlyProductionDaysThreshold(context);
         LocalDate admissionEndDate = windowEndDate.plusDays(earlyProductionDaysThreshold);
-        // 试制量试跳过T+1检查，日志如实标注检查方式，避免误读为"检查过且未命中"。
-        String t1CheckDesc = isTrialSku ? "跳过（试制量试）" : "否";
         String detail = String.format("工厂: %s, 批次: %s, 物料: %s, 产品状态: %s, 施工阶段: %s, "
                         + "排程窗口: %s～%s, 窗口原始计划量: %d, 提前生产天数: %d, 准入截止日: %s, "
-                        + "T+1交替计划命中: %s, 原因: %s",
+                        + "原因: %s",
                 context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(), sku.getProductStatus(),
                 sku.getConstructionStage(), windowStartDate, windowEndDate, sku.getOriginalWindowPlanQty(),
-                earlyProductionDaysThreshold, admissionEndDate, t1CheckDesc,
+                earlyProductionDaysThreshold, admissionEndDate,
                 DAILY_PLAN_ADMISSION_UNSCHEDULED_REASON);
         log.info("非续作SKU日计划准入拦截, factoryCode: {}, batchNo: {}, materialCode: {}, "
                         + "productStatus: {}, constructionStage: {}, windowStartDate: {}, windowEndDate: {}, "
                         + "originalWindowPlanQty: {}, earlyProductionDaysThreshold: {}, admissionEndDate: {}, "
-                        + "previousT1ChangeoverMatched: {}, reason: {}",
+                        + "reason: {}",
                 context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(), sku.getProductStatus(),
                 sku.getConstructionStage(), windowStartDate, windowEndDate, sku.getOriginalWindowPlanQty(),
-                earlyProductionDaysThreshold, admissionEndDate, t1CheckDesc,
+                earlyProductionDaysThreshold, admissionEndDate,
                 DAILY_PLAN_ADMISSION_UNSCHEDULED_REASON);
         PriorityTraceLogHelper.appendProcessLog(context, "SKU无计划量不排产", detail);
         LhUnscheduledResult unscheduledResult = buildUnscheduledResult(
@@ -234,7 +223,7 @@ public final class PendingSkuUnscheduledRule {
     /**
      * 评估硫化参数SYS0311004=0时，新增排产链路的试制、量试SKU是否直接进入未排。
      * <p>该参数仅控制新增排产：参数=0时施工阶段为试制（01）、量试（02）的SKU不得通过
-     * 换活字块、前日交替反选和普通新增选机排产，统一在S4.5新增排产入口拦截并写未排记录；
+     * 换活字块和普通新增选机排产，前置复用也必须读取相同参数资格；
      * 续作排产不受该参数影响，续作试制量试及同物料多状态续作切换照常参与。</p>
      * <p>续作加机台补偿SKU由S4.4从已排续作SKU复制生成，属于续作衍生的产能承接，
      * 不视为新增排产试制量试，本方法对其放行。</p>
@@ -329,31 +318,6 @@ public final class PendingSkuUnscheduledRule {
         return Objects.nonNull(sku)
                 && (StringUtils.equals(ConstructionStageEnum.TRIAL.getCode(), sku.getConstructionStage())
                 || StringUtils.equals(ConstructionStageEnum.MASS_TRIAL.getCode(), sku.getConstructionStage()));
-    }
-
-    /**
-     * 判断前日排程生成的T+1模具交替计划是否由当前物料承接。
-     * <p>基础数据层已将查询日期固定为当前业务目标日前一日，并只加载换模、换活字块类型；
-     * 此处继续校验交替实际日期必须属于当前窗口首日，避免把历史窗口其他日期的计划误当成T+1承接。</p>
-     *
-     * @param context 排程上下文
-     * @param materialCode 当前SKU物料编码
-     * @return true-存在以后物料匹配的T+1交替计划；false-不存在
-     */
-    private static boolean hasPreviousT1MouldChangePlan(LhScheduleContext context, String materialCode) {
-        if (Objects.isNull(context) || StringUtils.isEmpty(materialCode)
-                || Objects.isNull(context.getScheduleDate())
-                || CollectionUtils.isEmpty(context.getHistoricalReverseMouldChangePlanList())) {
-            return false;
-        }
-        for (LhMouldChangePlan plan : context.getHistoricalReverseMouldChangePlanList()) {
-            if (Objects.nonNull(plan)
-                    && StringUtils.equals(materialCode, plan.getAfterMaterialCode())
-                    && LhScheduleTimeUtil.isSameDay(plan.getPlanDate(), context.getScheduleDate())) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /**

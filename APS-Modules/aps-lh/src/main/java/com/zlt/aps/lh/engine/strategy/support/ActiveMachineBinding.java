@@ -4,6 +4,7 @@ import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 
 import java.util.Date;
+import java.time.LocalDate;
 import java.util.Objects;
 
 /**
@@ -37,6 +38,24 @@ public class ActiveMachineBinding {
     private final boolean endingTarget;
     /** 当前日收口后机台预计结束时间 */
     private Date estimatedEndTime;
+    /** 已由前置执行完成的最后业务日；后续编排不得再次消费这些日期的产能和需求。 */
+    private LocalDate preparedThroughDate;
+
+    /**
+     * 读取前置执行已处理的业务日上界。
+     * @return 已处理日期，普通首次新增为空
+     */
+    public LocalDate getPreparedThroughDate() {
+        return preparedThroughDate;
+    }
+
+    /**
+     * 登记前置执行完成的业务日，数量仍由原结果及统一账本保存。
+     * @param date 已完成的业务日
+     */
+    public void setPreparedThroughDate(LocalDate date) {
+        this.preparedThroughDate = date;
+    }
 
     /**
      * 创建跨日在机绑定。

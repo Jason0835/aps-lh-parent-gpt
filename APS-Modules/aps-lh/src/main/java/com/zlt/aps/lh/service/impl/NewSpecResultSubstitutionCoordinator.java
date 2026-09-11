@@ -570,7 +570,6 @@ public class NewSpecResultSubstitutionCoordinator {
         context.getPrecisionPreInsertInspectionTimeMap().remove(result);
         context.getPrecisionPreInsertMouldChangeTimeMap().remove(result);
         context.getPrecisionPreInsertInspectionShiftIndexMap().remove(result);
-        context.getHistoricalReverseProtectedResultSet().remove(result);
         List<LhScheduleResult> assignmentList = context.getMachineAssignmentMap()
                 .get(result.getLhMachineCode());
         if (Objects.nonNull(assignmentList)) {

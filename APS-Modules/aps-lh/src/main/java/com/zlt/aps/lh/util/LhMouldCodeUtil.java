@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * 硫化模具号解析工具。
@@ -28,6 +29,12 @@ import java.util.Set;
 public final class LhMouldCodeUtil {
 
     private static final String MOULD_CODE_SEPARATOR = ",";
+
+    /** 同一套模具内模具号分隔符。 */
+    private static final String MOULD_CODE_SET_SEPARATOR = "/";
+
+    /** 月计划备注中的模具号前缀。 */
+    private static final String MONTH_PLAN_MOULD_CODE_REMARK_PREFIX = "模具号";
 
     private LhMouldCodeUtil() {
     }
@@ -98,6 +105,109 @@ public final class LhMouldCodeUtil {
             return null;
         }
         return StringUtils.join(mouldCodeCollection, MOULD_CODE_SEPARATOR);
+    }
+
+    /**
+     * 判断月计划备注是否属于模具号备注。
+     *
+     * <p>保持硫化排程结果保存的既有口径：备注去除首尾空格后以“模具号”开头即命中。</p>
+     *
+     * @param monthPlanRemark 月计划备注
+     * @return true-模具号备注；false-非模具号备注
+     */
+    public static boolean isMonthPlanMouldCodeRemark(String monthPlanRemark) {
+        String normalizedRemark = StringUtils.trim(monthPlanRemark);
+        return StringUtils.isNotEmpty(normalizedRemark)
+                && normalizedRemark.startsWith(MONTH_PLAN_MOULD_CODE_REMARK_PREFIX);
+    }
+
+    /**
+     * 从月计划备注中提取模具号。
+     *
+     * <p>备注命中“模具号”前缀后，去除前缀及紧随其后的半角或全角冒号，
+     * 再按英文逗号和斜杠拆分，返回去空、去重后的模具号集合。</p>
+     *
+     * @param monthPlanRemark 月计划备注
+     * @return 月计划备注中的模具号集合
+     */
+    public static LinkedHashSet<String> extractMonthPlanMouldCodes(String monthPlanRemark) {
+        if (!isMonthPlanMouldCodeRemark(monthPlanRemark)) {
+            return new LinkedHashSet<String>(0);
+        }
+        String normalizedRemark = StringUtils.trim(monthPlanRemark);
+        String mouldCodeText = StringUtils.trim(
+                normalizedRemark.substring(MONTH_PLAN_MOULD_CODE_REMARK_PREFIX.length()));
+        if (StringUtils.startsWithAny(mouldCodeText, ":", "：")) {
+            mouldCodeText = StringUtils.trim(mouldCodeText.substring(1));
+        }
+        return splitMouldCodeSetText(mouldCodeText);
+    }
+
+    /**
+     * 将多个来源的模具号按升序整理并按每两个组成一套。
+     *
+     * <p>同一套的两个模具号使用“/”分隔，不同套之间使用英文逗号分隔；
+     * 模具号为奇数个时，最后一个模具号单独保留，避免有效关系模具号丢失。</p>
+     *
+     * @param mouldCodeCollection 待格式化的模具号集合，单项中允许包含英文逗号或斜杠
+     * @return 两两组套后的模具号文本；无有效模具号时返回空字符串
+     */
+    public static String formatMouldCodeSets(Collection<String> mouldCodeCollection) {
+        List<String> sortedMouldCodeList = normalizeAndSortMouldCodes(mouldCodeCollection);
+        if (CollectionUtils.isEmpty(sortedMouldCodeList)) {
+            return "";
+        }
+        StringBuilder mouldCodeBuilder = new StringBuilder(sortedMouldCodeList.size() * 12);
+        for (int index = 0; index < sortedMouldCodeList.size(); index++) {
+            if (index > 0) {
+                mouldCodeBuilder.append(index % 2 == 0
+                        ? MOULD_CODE_SEPARATOR : MOULD_CODE_SET_SEPARATOR);
+            }
+            mouldCodeBuilder.append(sortedMouldCodeList.get(index));
+        }
+        return mouldCodeBuilder.toString();
+    }
+
+    /**
+     * 统一拆分、去空、去重并升序整理多个来源的模具号。
+     *
+     * @param mouldCodeCollection 待整理的模具号集合
+     * @return 升序排列的唯一模具号列表
+     */
+    public static List<String> normalizeAndSortMouldCodes(Collection<String> mouldCodeCollection) {
+        if (CollectionUtils.isEmpty(mouldCodeCollection)) {
+            return new ArrayList<String>(0);
+        }
+        Set<String> sortedMouldCodeSet = new TreeSet<String>();
+        for (String mouldCodeText : mouldCodeCollection) {
+            sortedMouldCodeSet.addAll(splitMouldCodeSetText(mouldCodeText));
+        }
+        return new ArrayList<String>(sortedMouldCodeSet);
+    }
+
+    /**
+     * 拆分待组套的模具号文本。
+     *
+     * @param mouldCodeText 模具号文本
+     * @return 按英文逗号或斜杠拆分并去空、去重后的模具号集合
+     */
+    private static LinkedHashSet<String> splitMouldCodeSetText(String mouldCodeText) {
+        LinkedHashSet<String> mouldCodeSet = new LinkedHashSet<String>(4);
+        if (StringUtils.isEmpty(mouldCodeText)) {
+            return mouldCodeSet;
+        }
+        String[] mouldCodeArray = StringUtils.split(mouldCodeText,
+                MOULD_CODE_SEPARATOR + MOULD_CODE_SET_SEPARATOR);
+        if (Objects.isNull(mouldCodeArray)) {
+            return mouldCodeSet;
+        }
+        for (String mouldCode : mouldCodeArray) {
+            String normalizedMouldCode = StringUtils.trim(mouldCode);
+            if (StringUtils.isNotEmpty(normalizedMouldCode)) {
+                mouldCodeSet.add(normalizedMouldCode);
+            }
+        }
+        return mouldCodeSet;
     }
 
     /**

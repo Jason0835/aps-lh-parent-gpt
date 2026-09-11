@@ -249,6 +249,8 @@ public final class LhScheduleConstant {
 
     /** 计划性维修固定排产量（条），维修开始班次固定只排该数量，不按时间折算 */
     public static final int PLANNED_REPAIR_FIXED_QTY = 2;
+    /** 计划性维修默认开始时刻。 */
+    public static final String PLANNED_REPAIR_START_TIME = "08:00";
 
     // ======================== 胶囊相关 ========================
 
@@ -423,8 +425,6 @@ public final class LhScheduleConstant {
     /** 新增排产机台资源按机台收尾时间归属班次 */
     public static final int NEW_SPEC_MACHINE_RESOURCE_SHIFT_BY_ENDING_TIME = 0;
 
-    /** T+1资源日默认启用前次交替优先，T日固定规则不受此参数影响。 */
-    public static final int NEXT_DAY_PREVIOUS_ALTERNATION_PRIORITY_ENABLED = 1;
 
     /** 新增排产机台资源按实际可开产时间归属班次 */
     public static final int NEW_SPEC_MACHINE_RESOURCE_SHIFT_BY_ACTUAL_AVAILABLE_TIME = 1;

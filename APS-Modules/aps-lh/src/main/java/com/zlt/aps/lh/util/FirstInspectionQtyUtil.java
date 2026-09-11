@@ -592,7 +592,7 @@ public final class FirstInspectionQtyUtil {
             FirstInspectionAllocationPlan plan,
             String scheduleType) {
         if (Objects.isNull(result) || Objects.isNull(plan) || !plan.isValid()
-                || plan.getInspectionQty() <= 0 || Objects.isNull(plan.getCountingShift())) {
+                || !plan.hasQuantityTimeline() || Objects.isNull(plan.getCountingShift())) {
             return 0;
         }
         int currentSequence = resolveNextFirstInspectionSequence(context, plan.getCountingShift());
@@ -1481,7 +1481,7 @@ public final class FirstInspectionQtyUtil {
         if (Objects.isNull(productionStartTime)
                 || Objects.isNull(plan)
                 || !plan.isValid()
-                || plan.getInspectionQty() <= 0
+                || !plan.hasQuantityTimeline()
                 || Objects.isNull(plan.getInspectionEndTime())) {
             return productionStartTime;
         }

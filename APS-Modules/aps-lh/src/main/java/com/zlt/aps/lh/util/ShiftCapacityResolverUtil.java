@@ -12,6 +12,7 @@ import com.zlt.aps.lh.api.enums.MachineStopTypeEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.api.enums.ShiftEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.service.impl.LhTemporaryFaultService;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
 import org.apache.commons.lang3.StringUtils;
@@ -1265,9 +1266,16 @@ public final class ShiftCapacityResolverUtil {
         if (Objects.isNull(windowStartTime) || Objects.isNull(windowEndTime) || !windowStartTime.before(windowEndTime)) {
             return 0;
         }
-        // 计划性维修(05)固定排产量：维修计划开始时间落在当前班次窗口时，该班次固定只排 plannedRepairFixedQty 条，不按时间折算
-        if (isPlannedRepairStartShift(devicePlanShutList, machineCode, windowStartTime, windowEndTime)) {
-            return Math.max(0, plannedRepairFixedQty);
+        // 05固定量归维修当天早班，且只允许在维修前的合法生产时间内产出；06禁产优先。
+        Date repairStart = resolveFixedQtyRepairStart(devicePlanShutList, maintenanceWindowList,
+                machineCode, windowStartTime, windowEndTime);
+        if (Objects.nonNull(repairStart)) {
+            Date fixedQtyEnd = earlier(repairStart, windowEndTime);
+            long productiveSeconds = resolveNetProductiveSeconds(devicePlanShutList, cleaningWindowList,
+                    maintenanceWindowList, machineCode, windowStartTime, fixedQtyEnd);
+            int availableQty = resolveShiftCapacity(shiftCapacity, lhTimeSeconds, mouldQty,
+                    shiftDurationSeconds, productiveSeconds);
+            return Math.min(Math.max(0, plannedRepairFixedQty), availableQty);
         }
         // 喷砂首检是独立产出，正常生产仍按净可生产时长和原有模数规则折算。
         List<MachineCleaningWindowDTO> inspectionWindows = CleaningScheduleRuleUtil.resolveSandBlastInspectionWindows(
@@ -1278,7 +1286,7 @@ public final class ShiftCapacityResolverUtil {
             int normalQty = resolveShiftCapacity(shiftCapacity, lhTimeSeconds, mouldQty,
                     shiftDurationSeconds, productiveSeconds);
             int inspectionQty = inspectionWindows.stream()
-                    .mapToInt(MachineCleaningWindowDTO::getSandBlastFirstInspectionQty).sum();
+                    .mapToInt(window -> resolveSandBlastInspectionQty(maintenanceWindowList, window)).sum();
             int fullShiftCapacity = resolveShiftCapacity(shiftCapacity, lhTimeSeconds, mouldQty,
                     shiftDurationSeconds, shiftDurationSeconds);
             return Math.min(fullShiftCapacity, normalQty + inspectionQty);
@@ -1363,42 +1371,109 @@ public final class ShiftCapacityResolverUtil {
 
 
     /**
-     * 判断当前班次是否为计划性维修(05)开始班次。
-     * <p>当设备停机计划中存在 05-计划性维修 且其计划开始时间落在当前班次窗口内时，返回 true。
-     * 命中的班次固定只排 plannedRepairFixedQty 条（由硫化参数 PLANNED_REPAIR_FIXED_QTY 配置，默认 2 条），
-     * 不按时间折算，排完后机台进入维修。</p>
-     *
-     * @param devicePlanShutList 设备停机计划列表
-     * @param machineCode 机台编号
-     * @param windowStartTime 班次窗口开始时间
-     * @param windowEndTime 班次窗口结束时间
-     * @return true-当前班次为计划性维修开始班次；false-否
+     * 解析维修当天早班的维修起点。现代容量窗口携带完整早班边界，残班也不能再次按普通班产排满。
+     * @param stops 普通设备停机
+     * @param windows 公共容量窗口
+     * @param machineCode 当前机台
+     * @param start 计算起点
+     * @param end 计算终点
+     * @return 当前窗口受05固定量限制时的维修开始，否则为空
      */
-    private static boolean isPlannedRepairStartShift(List<MdmDevicePlanShut> devicePlanShutList,
-                                                      String machineCode,
-                                                      Date windowStartTime,
-                                                      Date windowEndTime) {
-        if (CollectionUtils.isEmpty(devicePlanShutList)) {
-            return false;
-        }
-        for (MdmDevicePlanShut planShut : devicePlanShutList) {
-            if (Objects.isNull(planShut) || !StringUtils.equals(machineCode, planShut.getMachineCode())) {
-                continue;
-            }
-            // 只匹配计划性维修(05)停机计划
-            if (!StringUtils.equals(MachineStopTypeEnum.PLANNED_REPAIR.getCode(), planShut.getMachineStopType())) {
-                continue;
-            }
-            Date beginDate = planShut.getBeginDate();
-            if (Objects.isNull(beginDate)) {
-                continue;
-            }
-            // 计划开始时间落在当前班次窗口 [windowStartTime, windowEndTime) 内时，该班次为维修开始班次
-            if (!beginDate.before(windowStartTime) && beginDate.before(windowEndTime)) {
-                return true;
+    private static Date resolveFixedQtyRepairStart(List<MdmDevicePlanShut> stops,
+            List<MachineMaintenanceWindowDTO> windows, String machineCode, Date start, Date end) {
+        boolean hasRepairWindow = false;
+        Date repairStart = null;
+        if (!CollectionUtils.isEmpty(windows)) {
+            for (MachineMaintenanceWindowDTO window : windows) {
+                if (Objects.isNull(window) || !StringUtils.equals(PLANNED_REPAIR_CAPACITY_WINDOW_TYPE,
+                        window.getMaintenanceType())) {
+                    continue;
+                }
+                hasRepairWindow |= !window.getRepairFixedQtyShiftWindowMap().isEmpty();
+                for (Map.Entry<Date, Date> fixedShift : window.getRepairFixedQtyShiftWindowMap().entrySet()) {
+                    if (start.before(fixedShift.getValue()) && end.after(fixedShift.getKey())) {
+                        repairStart = earlier(repairStart, window.getMaintenanceStartTime());
+                    }
+                }
             }
         }
-        return false;
+        return hasRepairWindow ? repairStart : resolvePlannedRepairStartTime(stops, machineCode, start, end);
+    }
+
+    /**
+     * 故障只扣原产出区间内的时间比例，不顺延首检、清洗或补偿到其他班次。
+     * @param context 排程上下文
+     * @param machineCode 运行态机台
+     * @param start 原产出区间开始
+     * @param end 原产出区间结束
+     * @param quantity 原数量
+     * @return 扣除故障覆盖时间后的数量
+     */
+    public static int resolveFaultAdjustedQty(LhScheduleContext context, String machineCode,
+            Date start, Date end, int quantity) {
+        return resolveFaultAdjustedQty(LhTemporaryFaultService.resolveCapacityWindows(context, machineCode),
+                start, end, quantity);
+    }
+
+    /**
+     * 用公共区间并集扣除故障时间，不对重叠的多个故障重复扣减。
+     * @param windows 仅计算使用的容量窗口
+     * @param start 原产出开始
+     * @param end 原产出结束
+     * @param quantity 原产量
+     * @return 向下取整的合法产量，无故障时保持原值
+     */
+    private static int resolveFaultAdjustedQty(List<MachineMaintenanceWindowDTO> windows,
+            Date start, Date end, int quantity) {
+        if (quantity <= 0 || Objects.isNull(start) || Objects.isNull(end) || !start.before(end)) {
+            return Math.max(0, quantity);
+        }
+        List<MachineMaintenanceWindowDTO> faults = new ArrayList<>(4);
+        if (!CollectionUtils.isEmpty(windows)) {
+            for (MachineMaintenanceWindowDTO window : windows) {
+                if (Objects.nonNull(window) && StringUtils.equals(LhTemporaryFaultService.FAULT_CAPACITY_WINDOW_TYPE,
+                        window.getMaintenanceType())) {
+                    faults.add(window);
+                }
+            }
+        }
+        long unavailableMillis = 0L;
+        for (Date[] interval : collectMergedMaintenanceIntervals(faults, start, end)) {
+            unavailableMillis += interval[1].getTime() - interval[0].getTime();
+        }
+        long durationMillis = end.getTime() - start.getTime();
+        return (int) ((long) quantity * (durationMillis - unavailableMillis) / durationMillis);
+    }
+
+    /**
+     * 查询原生产区间中未被故障覆盖的秒数，仅用于最终禁产校验。
+     * @param context 排程上下文
+     * @param machineCode 机台
+     * @param start 原区间开始
+     * @param end 原区间结束
+     * @return 可生产秒数，重叠故障仅扣一次
+     */
+    public static long resolveFaultFreeSeconds(LhScheduleContext context, String machineCode, Date start, Date end) {
+        return resolveNetProductiveSeconds(java.util.Collections.emptyList(), java.util.Collections.emptyList(),
+                LhTemporaryFaultService.resolveCapacityWindows(context, machineCode), machineCode, start, end);
+    }
+
+    /**
+     * 喷砂首检的产量与容量、完工时间共用同一故障扣减口径，原清洗及首检窗口不变。
+     * @param context 排程上下文
+     * @param window 已安排的喷砂窗口
+     * @return 故障扣减后的首检量
+     */
+    public static int resolveSandBlastInspectionQty(LhScheduleContext context, MachineCleaningWindowDTO window) {
+        return resolveSandBlastInspectionQty(
+                LhTemporaryFaultService.resolveCapacityWindows(context, window.getLhCode()), window);
+    }
+
+    /** @param windows 容量窗口 @param window 喷砂窗口 @return 扣故障后的首检量 */
+    private static int resolveSandBlastInspectionQty(List<MachineMaintenanceWindowDTO> windows,
+            MachineCleaningWindowDTO window) {
+        return resolveFaultAdjustedQty(windows, window.getCleanEndTime(), window.getReadyTime(),
+                window.getSandBlastFirstInspectionQty());
     }
 
     /**
@@ -1429,6 +1504,8 @@ public final class ShiftCapacityResolverUtil {
                 context, devicePlanShutList, machineCode));
         // 换胶囊只作为产能和时间推进的运行态占用，不写入机台保养列表，避免污染精度业务。
         capacityWindowList.addAll(capsuleReplacementWindowList);
+        // 06仅适配为计算区间，不写入机台精度列表、不抬高换模或清洗的就绪时间。
+        capacityWindowList.addAll(LhTemporaryFaultService.resolveCapacityWindows(context, machineCode));
         return capacityWindowList;
     }
 
@@ -1533,16 +1610,45 @@ public final class ShiftCapacityResolverUtil {
             repairWindow.setProductionResumeTime(
                     LhScheduleTimeUtil.addMinutes(repairInterval[1], preheatMinutes));
             repairWindow.setTriggerReason("计划性维修结束后按SYS0307009执行预热");
+            if (Objects.nonNull(context) && Objects.nonNull(context.getScheduleDate())) {
+                for (LhShiftConfigVO shift : LhScheduleTimeUtil.getScheduleShifts(context, context.getScheduleDate())) {
+                    if (ShiftEnum.MORNING_SHIFT == shift.resolveShiftTypeEnum()
+                            && hasRepairStartingOnWorkDate(devicePlanShutList, machineCode, repairInterval, shift.getWorkDate())) {
+                        repairWindow.getRepairFixedQtyShiftWindowMap().put(
+                                shift.getShiftStartDateTime(), shift.getShiftEndDateTime());
+                    }
+                }
+            }
             repairWindowList.add(repairWindow);
         }
         return repairWindowList;
     }
 
     /**
+     * 跨日合并维修仍按每条来源计划日期识别固定量早班，不能只保留合并区间的第一天。
+     * @param stops 实际维修列表
+     * @param machineCode 机台
+     * @param mergedInterval 已合并维修区间
+     * @param workDate 当前业务日期
+     * @return 该日期是否有归属于本合并区间的维修开始
+     */
+    private static boolean hasRepairStartingOnWorkDate(List<MdmDevicePlanShut> stops, String machineCode,
+            Date[] mergedInterval, Date workDate) {
+        return stops.stream().filter(Objects::nonNull)
+                .filter(plan -> StringUtils.equals(MachineStopTypeEnum.PLANNED_REPAIR.getCode(), plan.getMachineStopType()))
+                .filter(plan -> StringUtils.equals(LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode),
+                        LhSingleControlMachineUtil.resolvePhysicalMachineCode(plan.getMachineCode())))
+                .filter(plan -> Objects.nonNull(plan.getBeginDate()))
+                .anyMatch(plan -> !plan.getBeginDate().before(mergedInterval[0])
+                        && plan.getBeginDate().before(mergedInterval[1])
+                        && Objects.equals(LhScheduleTimeUtil.clearTime(plan.getBeginDate()), workDate));
+    }
+
+    /**
      * 计算 SKU 切换命中计划性维修后的最早开产时间。
      * <p>只处理“上一段生产尚未跨过维修恢复点，且本次切换完成前已经命中维修”的窗口。
-     * 切换允许与 05 维修并行，准备完成时刻取维修结束和切换结束的最大值，随后完整追加
-     * SYS0307009 预热；预热不会被维修或切换重叠抵消，也不额外增加首检等待小时。</p>
+     * 切换允许与05维修并行，维修独立完成SYS0307009预热后，与切换自身完成点取最大值，
+     * 重叠时不重复追加预热，也不额外增加首检等待小时。</p>
      *
      * @param context 排程上下文，用于读取 SYS0307009 预热配置
      * @param devicePlanShutList 设备停机计划
@@ -1550,7 +1656,7 @@ public final class ShiftCapacityResolverUtil {
      * @param previousProductionEndTime 切换前机台上一段生产结束时间
      * @param switchStartTime 按现有规则分配的切换开始时间
      * @param switchEndTime 按现有换模或换活字块时长计算出的切换完成时间
-     * @return 命中维修时返回“max(维修结束, 切换结束)+预热”，否则原样返回切换完成时间
+     * @return 命中维修时返回“max(维修结束+预热, 切换自身完成时间)”，否则原样返回切换完成时间
      */
     public static Date resolvePlannedRepairProductionReadyTime(
             LhScheduleContext context,
@@ -1596,10 +1702,8 @@ public final class ShiftCapacityResolverUtil {
                 // 后续独立维修未落入已计算的预热区间，不属于本次切换时间轴。
                 break;
             }
-            Date overlapPreparationEndTime = repairEndTime.after(switchEndTime)
-                    ? repairEndTime : switchEndTime;
-            Date candidateReadyTime = LhScheduleTimeUtil.addMinutes(
-                    overlapPreparationEndTime, preheatMinutes);
+            // 两个业务先各自算完恢复点，再取最大值，禁止对较晚的切换完成点重复追加维修预热。
+            Date candidateReadyTime = later(repairResumeTime, switchEndTime);
             if (candidateReadyTime.after(productionReadyTime)) {
                 productionReadyTime = candidateReadyTime;
             }
@@ -1671,7 +1775,8 @@ public final class ShiftCapacityResolverUtil {
         }
         for (MdmDevicePlanShut planShut : devicePlanShutList) {
             if (Objects.isNull(planShut)
-                    || !StringUtils.equals(machineCode, planShut.getMachineCode())
+                    || !StringUtils.equals(LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode),
+                            LhSingleControlMachineUtil.resolvePhysicalMachineCode(planShut.getMachineCode()))
                     || !StringUtils.equals(MachineStopTypeEnum.PLANNED_REPAIR.getCode(),
                     planShut.getMachineStopType())
                     || Objects.isNull(planShut.getBeginDate())
@@ -1785,8 +1890,11 @@ public final class ShiftCapacityResolverUtil {
         if (Objects.isNull(effectiveStartTime) || Objects.isNull(shiftEndTime) || allocationQty <= 0 || shiftMaxQty <= 0) {
             return effectiveStartTime;
         }
+        Date repairStartTime = resolveFixedQtyRepairStart(
+                devicePlanShutList, maintenanceWindowList, machineCode, effectiveStartTime, shiftEndTime);
+        Date productionLimit = Objects.nonNull(repairStartTime) ? earlier(repairStartTime, shiftEndTime) : shiftEndTime;
         long netProductiveSeconds = resolveNetProductiveSeconds(
-                devicePlanShutList, cleaningWindowList, maintenanceWindowList, machineCode, effectiveStartTime, shiftEndTime);
+                devicePlanShutList, cleaningWindowList, maintenanceWindowList, machineCode, effectiveStartTime, productionLimit);
         if (netProductiveSeconds <= 0) {
             return effectiveStartTime;
         }
@@ -1797,8 +1905,6 @@ public final class ShiftCapacityResolverUtil {
         Date completionTime = resolveCompletionTimeWithDowntimes(
                 devicePlanShutList, cleaningWindowList, maintenanceWindowList, machineCode, effectiveStartTime,
                 requiredProductiveSeconds);
-        Date repairStartTime = resolvePlannedRepairStartTime(
-                devicePlanShutList, machineCode, effectiveStartTime, shiftEndTime);
         // 维修开始班次固定量不按净生产秒数折算；其结果结束时间最多只能落到维修开始时刻。
         // 该校正只影响时间字段，不改变已受真实余量、日计划和胎胚库存约束的最终排产量。
         return Objects.nonNull(repairStartTime) && completionTime.after(repairStartTime)
@@ -1894,7 +2000,8 @@ public final class ShiftCapacityResolverUtil {
         List<MachineCleaningWindowDTO> inspections = CleaningScheduleRuleUtil.resolveSandBlastInspectionWindows(
                 cleaningWindowList, effectiveStartTime, shiftEndTime);
         if (CollectionUtils.isEmpty(inspections) || allocationQty <= 0 || shiftMaxQty <= 0
-                || isPlannedRepairStartShift(devicePlanShutList, machineCode, effectiveStartTime, shiftEndTime)) {
+                || Objects.nonNull(resolveFixedQtyRepairStart(devicePlanShutList, maintenanceWindowList,
+                        machineCode, effectiveStartTime, shiftEndTime))) {
             return resolveShiftPlanEndTime(devicePlanShutList, cleaningWindowList, maintenanceWindowList,
                     machineCode, effectiveStartTime, shiftEndTime, allocationQty, shiftMaxQty);
         }
@@ -1914,7 +2021,7 @@ public final class ShiftCapacityResolverUtil {
                         baseShiftCapacity, lhTimeSeconds, mouldQty, shiftDurationSeconds);
             }
             remainingQty -= beforeQty;
-            remainingQty -= Math.min(remainingQty, inspection.getSandBlastFirstInspectionQty());
+            remainingQty -= Math.min(remainingQty, resolveSandBlastInspectionQty(maintenanceWindowList, inspection));
             cursor = inspection.getReadyTime();
             if (remainingQty <= 0) {
                 return cursor;

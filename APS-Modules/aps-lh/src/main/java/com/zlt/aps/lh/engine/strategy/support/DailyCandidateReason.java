@@ -20,8 +20,6 @@ public enum DailyCandidateReason {
     HISTORY_SHORTAGE_OR_ENDING,
     /** 当前业务日满足现有提前生产准入规则 */
     EARLY_PRODUCTION,
-    /** 前日交替计划已经形成当前 SKU 的指定机台反选指令 */
-    ALTERNATE_PLAN_REVERSE_SELECT,
     /** 换活字块、续作释放或其他现有主链明确转入新增排产 */
     TYPE_BLOCK_TRANSFER,
     /** 前一业务日因时间或资源暂时不足而延期 */

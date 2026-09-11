@@ -223,10 +223,6 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         MachineFilterTrace trace = new MachineFilterTrace(context.getMachineScheduleMap().size());
 
         for (MachineScheduleDTO machine : context.getMachineScheduleMap().values()) {
-            if (isHistoricalReverseSelectedMachine(context, sku, machine.getMachineCode())) {
-                trace.recordFilteredMachine(machine, "同状态SKU已在该反选机台排产");
-                continue;
-            }
             if (isNotAllowedMachine(notAllowedMachineCodes, machine)) {
                 trace.notAllowedMachineFilteredCount++;
                 trace.recordFilteredMachine(machine, "定点机台不可作业");
@@ -289,7 +285,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
      *
      * <p>普通机台只校验自身；正规单控整机只额外校验同一物理机台的配对侧。
      * 本方法不会为了单控判断再次扫描 {@code machineScheduleMap}，正向和反向入口共同复用
-     * {@link #resolveMachineAvailabilityReason} 以及相同的定点、历史反选和占用约束。</p>
+     * {@link #resolveMachineAvailabilityReason} 以及相同的定点和占用约束。</p>
      *
      * @param context 排程上下文
      * @param machine 指定机台
@@ -380,9 +376,6 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         if (Objects.isNull(machine) || StringUtils.isEmpty(machine.getMachineCode())) {
             return MachineSkuMatchResult.failed(machine, sku, "指定机台不存在");
         }
-        if (isHistoricalReverseSelectedMachine(context, sku, machine.getMachineCode())) {
-            return MachineSkuMatchResult.failed(machine, sku, "同状态SKU已在该反选机台排产");
-        }
         if (isNotAllowedMachine(notAllowedMachineCodes, machine)) {
             return MachineSkuMatchResult.failed(machine, sku, "指定机台命中SKU定点不可作业限制");
         }
@@ -443,8 +436,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
             if (StringUtils.equals(targetPhysicalMachineCode, physicalMachineCode)) {
                 continue;
             }
-            if (isHistoricalReverseSelectedMachine(context, sku, machine.getMachineCode())
-                    || isNotAllowedMachine(notAllowedMachineCodes, machine)
+            if (isNotAllowedMachine(notAllowedMachineCodes, machine)
                     || hasPlanStopExceededTimeout(context, sku, machine)) {
                 continue;
             }
@@ -488,7 +480,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     }
 
     /**
-     * 校验历史交替计划指定的机台。
+     * 校验调用方指定的机台，供置换等已有固定组合入口复用。
      *
      * <p>本方法只跳过普通选机的八层软排序和新增主链逐班筛选，定点不可作业、
      * 机台状态、寸口、模套、特殊材料、模具占用以及单控整机/单边规则仍与普通新增选机一致。
@@ -521,42 +513,6 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
             return SpecifiedMachineMatchResult.failed(reverseMatch.getFailureReason());
         }
         return SpecifiedMachineMatchResult.success(reverseMatch.getMachine());
-    }
-
-    /**
-     * 判断同一状态SKU是否已经在当前反选机台生成受保护结果。
-     *
-     * <p>普通机台和单边粒度按机台编码精确判断；正规双模SKU使用单控整机时按物理机台判断，
-     * 避免历史指定右侧、现有选机以左侧代表时再次重复占用同一物理整机。</p>
-     *
-     * @param context 排程上下文
-     * @param sku 当前SKU
-     * @param machineCode 待判断机台编码
-     * @return true-同状态SKU已完成该机台反选
-     */
-    private boolean isHistoricalReverseSelectedMachine(LhScheduleContext context,
-                                                       SkuScheduleDTO sku,
-                                                       String machineCode) {
-        Set<String> selectedMachineCodes = context.getHistoricalReverseSelectedMachineCodes(
-                sku.getMaterialCode(), sku.getProductStatus());
-        if (CollectionUtils.isEmpty(selectedMachineCodes)) {
-            return false;
-        }
-        if (selectedMachineCodes.contains(machineCode)) {
-            return true;
-        }
-        if (!LhSingleControlMachineUtil.isWholeMachineGranularitySku(context, sku)) {
-            return false;
-        }
-        String currentPhysicalMachineCode =
-                LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode);
-        for (String selectedMachineCode : selectedMachineCodes) {
-            if (StringUtils.equals(currentPhysicalMachineCode,
-                    LhSingleControlMachineUtil.resolvePhysicalMachineCode(selectedMachineCode))) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /**
@@ -1742,9 +1698,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                     context, sku, machine, occupiedMachineCodes)) {
                 continue;
             }
-            if (isHistoricalReverseSelectedMachine(
-                    context, sku, machine.getMachineCode())
-                    || isNotAllowedMachine(notAllowedMachineCodes, machine)) {
+            if (isNotAllowedMachine(notAllowedMachineCodes, machine)) {
                 continue;
             }
             MachineAvailabilityReason availabilityReason =
@@ -3062,7 +3016,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         if (MachineAvailabilityReason.AVAILABLE != specialSupportReason) {
             return specialSupportReason;
         }
-        return isMouldCompatible(sku, machine, mouldResourceContext)
+        return this.isMouldCompatible(context, sku, machine, mouldResourceContext)
                 ? MachineAvailabilityReason.AVAILABLE
                 : MachineAvailabilityReason.MOULD_CONFLICT;
     }
@@ -3313,17 +3267,33 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     }
 
     /**
+     * 选择调用方当前所处的查询范围：日循环外排序是窗口预检，日循环内使用实际业务日。
+     * <p>不回写currentScheduleDate；模具资源层收到的始终是已经解析的非空时刻。</p>
+     * @param context 排程上下文
+     * @param machine 当前候选机台
+     * @return 明确的模具预检时刻
+     */
+    private Date resolveMouldReferenceTime(LhScheduleContext context, MachineScheduleDTO machine) {
+        Date businessDate = context.getCurrentScheduleDate();
+        if (Objects.isNull(businessDate)) {
+            return LhScheduleTimeUtil.resolveWindowResourceReferenceTime(context, machine);
+        }
+        return LhScheduleTimeUtil.resolveDayResourceReferenceTime(context, businessDate, machine);
+    }
+
+    /**
      * 检查SKU模具是否与已占用模具兼容。
      *
      * <p>候选预检与正式分配共用当前绑定、可释放旧模具、已占用模具和机台模数口径。
      * 历史结果仅用于初始化机台最新绑定，不再将已换下的模具持续判定为占用。</p>
      *
+     * @param context 当前窗口或业务日上下文
      * @param sku 待排SKU
      * @param machine 候选机台
      * @param mouldResourceContext 本批次模具运行态
      * @return true-按机台模数可分配，false-模具资源不足
      */
-    private boolean isMouldCompatible(SkuScheduleDTO sku,
+    private boolean isMouldCompatible(LhScheduleContext context, SkuScheduleDTO sku,
                                       MachineScheduleDTO machine,
                                       MouldResourceContext mouldResourceContext) {
         if (!mouldResourceContext.hasMouldResourceDefinition(sku.getMaterialCode())) {
@@ -3331,7 +3301,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
             return true;
         }
         MouldResourceAllocationResult previewResult = mouldResourceContext.previewAllocate(
-                sku.getMaterialCode(), machine.getMachineCode());
+                sku.getMaterialCode(), machine.getMachineCode(), this.resolveMouldReferenceTime(context, machine));
         return previewResult.isAllowed();
     }
 
@@ -3729,7 +3699,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
             return targetMouldCodeSet;
         }
         MouldResourceAllocationResult previewResult = mouldResourceContext.previewAllocate(
-                sku.getMaterialCode(), machine.getMachineCode());
+                sku.getMaterialCode(), machine.getMachineCode(), this.resolveMouldReferenceTime(context, machine));
         if (previewResult.isAllowed()
                 && !CollectionUtils.isEmpty(previewResult.getAllocatedMouldCodeList())) {
             targetMouldCodeSet.addAll(previewResult.getAllocatedMouldCodeList());

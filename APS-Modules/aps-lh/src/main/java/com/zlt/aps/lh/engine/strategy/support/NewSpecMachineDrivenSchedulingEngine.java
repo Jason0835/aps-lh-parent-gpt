@@ -6,7 +6,6 @@ import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.ConstructionStageEnum;
 import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
-import com.zlt.aps.lh.service.impl.PreviousAlternationPreferenceService;
 import com.zlt.aps.lh.engine.strategy.IMachineMatchStrategy;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
@@ -44,10 +43,6 @@ import java.util.function.Predicate;
 @Slf4j
 @Component
 public class NewSpecMachineDrivenSchedulingEngine {
-
-    /** 只负责撤回不可排的历史偏好，不参与机台或SKU比较。 */
-    private final PreviousAlternationPreferenceService previousAlternationPreferenceService =
-            new PreviousAlternationPreferenceService();
 
     /** 普通动态最佳匹配作用域。 */
     private static final String COMPETITION_SCOPE_DYNAMIC = "动态最佳匹配";
@@ -167,7 +162,7 @@ public class NewSpecMachineDrivenSchedulingEngine {
                 continue;
             }
             /*
-             * 固定机台、历史反选和续作原机台属于独立指令作用域。只有固定组合完整不可排时，
+             * 固定机台和续作原机台属于独立指令作用域。只有固定组合完整不可排时，
              * 才允许进入普通动态竞争，避免把固定指令作为普通匹配分值污染 bestSku 比较。
              */
             if (!CollectionUtils.isEmpty(fixedPhysicalMachineCodeSet)) {
@@ -321,36 +316,11 @@ public class NewSpecMachineDrivenSchedulingEngine {
                     || !this.isResourceReadyBeforeShiftEnd(machineResource, shift)) {
                 continue;
             }
-            NewSpecScheduleProposal proposal = null;
-            DayTypeBlockReverseSelectionDirective preference = standardDynamicCompetition ? null
-                    : previousAlternationPreferenceService.findDayTypeBlockPreference(
-                            context, machineResource.getMachine().getMachineCode());
-            if (Objects.nonNull(preference)) {
-                // 日期优先只在本机原候选范围生效；当前班次首条不可排时，继续下一历史关系。
-                for (String skuKey : preference.getPreviousAlternationCandidateKeys()) {
-                    if (!previousAlternationPreferenceService.selectDayTypeBlockPreference(context, preference, skuKey)) {
-                        continue;
-                    }
-                    proposal = machineSkuCompetitionService.findBestSkuForMachine(
-                            context, dayContext, shift, machineResource, orderedPoolDates, candidatePoolMap,
-                            machineMatch, failedAssignmentKeySet, availabilityResolver, actualAvailableTimeMode,
-                            pendingSkuIdentitySet, candidateScopeResolver.apply(machineResource), roundCache, false);
-                    if (Objects.nonNull(proposal)) {
-                        break;
-                    }
-                }
-                if (Objects.isNull(proposal)) {
-                    previousAlternationPreferenceService.restoreDayTypeBlockPreference(
-                            context, machineResource.getMachine().getMachineCode());
-                }
-            }
-            if (Objects.isNull(proposal)) {
-                proposal = machineSkuCompetitionService.findBestSkuForMachine(
-                        context, dayContext, shift, machineResource, orderedPoolDates, candidatePoolMap,
-                        machineMatch, failedAssignmentKeySet, availabilityResolver, actualAvailableTimeMode,
-                        pendingSkuIdentitySet, candidateScopeResolver.apply(machineResource), roundCache,
-                        standardDynamicCompetition);
-            }
+            NewSpecScheduleProposal proposal = machineSkuCompetitionService.findBestSkuForMachine(
+                    context, dayContext, shift, machineResource, orderedPoolDates, candidatePoolMap,
+                    machineMatch, failedAssignmentKeySet, availabilityResolver, actualAvailableTimeMode,
+                    pendingSkuIdentitySet, candidateScopeResolver.apply(machineResource), roundCache,
+                    standardDynamicCompetition);
             if (Objects.nonNull(proposal)) {
                 proposalList.add(proposal);
             }
@@ -1017,21 +987,6 @@ public class NewSpecMachineDrivenSchedulingEngine {
                 physicalMachineCode, sku.getPreferredContinuousMachineCode())) {
             return "续作原机台";
         }
-        if (!CollectionUtils.isEmpty(context.getHistoricalReverseSelectionDirectiveList())) {
-            for (HistoricalReverseSelectionDirective directive
-                    : context.getHistoricalReverseSelectionDirectiveList()) {
-                if (Objects.nonNull(directive) && !directive.isAttempted()
-                        && !directive.isAlreadySatisfied()
-                        && this.isSameSku(directive.getMaterialCode(),
-                        directive.getProductStatus(), sku)
-                        && this.isSamePhysicalMachine(
-                        physicalMachineCode,
-                        StringUtils.isNotEmpty(directive.getEffectiveMachineCode())
-                                ? directive.getEffectiveMachineCode() : directive.getMachineCode())) {
-                    return "历史交替计划反选";
-                }
-            }
-        }
         if (Objects.nonNull(dayTypeBlockDirective)) {
             return "按天换活字块反选";
         }
@@ -1195,20 +1150,6 @@ public class NewSpecMachineDrivenSchedulingEngine {
                 context.resolveSubstitutionSpecifiedMachineCode(sku));
         this.addFixedMachineCode(
                 fixedPhysicalMachineCodes, sku.getPreferredContinuousMachineCode());
-        if (!CollectionUtils.isEmpty(context.getHistoricalReverseSelectionDirectiveList())) {
-            for (HistoricalReverseSelectionDirective directive
-                    : context.getHistoricalReverseSelectionDirectiveList()) {
-                if (Objects.isNull(directive) || directive.isAttempted()
-                        || directive.isAlreadySatisfied()
-                        || !this.isSameSku(directive.getMaterialCode(),
-                        directive.getProductStatus(), sku)) {
-                    continue;
-                }
-                this.addFixedMachineCode(fixedPhysicalMachineCodes,
-                        StringUtils.isNotEmpty(directive.getEffectiveMachineCode())
-                                ? directive.getEffectiveMachineCode() : directive.getMachineCode());
-            }
-        }
         if (!CollectionUtils.isEmpty(context.getDayTypeBlockReverseSelectionDirectiveList())) {
             for (DayTypeBlockReverseSelectionDirective directive
                     : context.getDayTypeBlockReverseSelectionDirectiveList()) {

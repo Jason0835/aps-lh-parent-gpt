@@ -22,6 +22,7 @@ import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.mapper.LhUnscheduledResultMapper;
 import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
+import com.zlt.aps.lh.util.LhMouldCodeUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -75,9 +76,6 @@ public class SchedulePersistenceService {
 
     /** 胎胚收尾班次原因分析备注 */
     private static final String EMBRYO_ENDING_ANALYSIS = "胎胚收尾";
-
-    /** 月计划定稿备注模具号前缀：仅备注以该前缀开头时同步到新增排产结果 */
-    private static final String MOULD_NO_REMARK_PREFIX = "模具号";
 
     /** 结果备注追加分隔符，与提前生产备注追加口径一致 */
     private static final String REMARK_SEPARATOR = "；";
@@ -208,6 +206,8 @@ public class SchedulePersistenceService {
         // S4.6.6.1 清洗计划排程日期回填：将清洗实际安排日期或因收尾跳过的收尾日期回填到设备停机计划，
         // 与排程结果落库同事务，回填异常随事务回滚，保证排程结果与清洗排程日期一致。
         deviceStopPlanScheduleService.batchFillCleaningScheduleDate(context.getCleaningScheduleDateFillList());
+        // 05/06使用实际执行日期回填，与结果落库同事务，不提前写入未来计划。
+        deviceStopPlanScheduleService.batchFillStopScheduleDates(context);
 
         log.info("目标日排程原子替换完成, 工厂: {}, 日期: {}, 删除结果: {}, 删除未排: {}, 删除换模: {}, 删除日志: {}, 新结果: {}, 新未排: {}, 新换模: {}, 新日志: {}",
                 factoryCode, LhScheduleTimeUtil.formatDate(targetDate),
@@ -786,8 +786,7 @@ public class SchedulePersistenceService {
             }
             // 月计划定稿备注必须以"模具号"开头才同步
             String monthPlanRemark = StringUtils.trim(sourceSku.getMonthPlanRemark());
-            if (StringUtils.isEmpty(monthPlanRemark)
-                    || !monthPlanRemark.startsWith(MOULD_NO_REMARK_PREFIX)) {
+            if (!LhMouldCodeUtil.isMonthPlanMouldCodeRemark(monthPlanRemark)) {
                 continue;
             }
             // 结果行已包含同片段时跳过，避免滚动/重复排程重复追加

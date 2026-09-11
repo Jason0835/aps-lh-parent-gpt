@@ -301,6 +301,20 @@ public final class FirstInspectionAllocationUtil {
             return FirstInspectionAllocationPlan.invalid(
                     "首检取整尾差无法按真实时间顺序完成补偿", countingShift, inspectionEndTime);
         }
+        // 故障仅减少原首检时间段的产出，不改变首检起止、计数日期，也不把损失量补到其他班次。
+        if (Objects.nonNull(context) && !context.getTemporaryFaultWindowMap().isEmpty()) {
+            List<FirstInspectionShiftAllocation> faultAdjustedAllocations = new ArrayList<>(allocations.size());
+            for (FirstInspectionShiftAllocation allocation : allocations) {
+                int availableQty = ShiftCapacityResolverUtil.resolveFaultAdjustedQty(context, machineCode,
+                        allocation.getOverlapStartTime(), allocation.getOverlapEndTime(), allocation.getQuantity());
+                faultAdjustedAllocations.add(new FirstInspectionShiftAllocation(allocation.getShift(),
+                        allocation.getOverlapStartTime(), allocation.getOverlapEndTime(), allocation.getOverlapMillis(),
+                        allocation.getFractionalRemainder(), allocation.getCapacityLimit(), availableQty));
+            }
+            allocations = faultAdjustedAllocations;
+        }
+        int faultAdjustedInspectionQty = allocations.stream()
+                .mapToInt(FirstInspectionShiftAllocation::getQuantity).sum();
         boolean capacityExceeded = allocations.stream()
                 .anyMatch(allocation -> allocation.getQuantity() > allocation.getCapacityLimit());
         if (capacityExceeded) {
@@ -314,12 +328,12 @@ public final class FirstInspectionAllocationUtil {
         int finalQty = positiveAllocations.stream()
                 .mapToInt(FirstInspectionShiftAllocation::getQuantity)
                 .sum();
-        if (finalQty != inspectionQty) {
+        if (finalQty != faultAdjustedInspectionQty) {
             return FirstInspectionAllocationPlan.invalid(
                     "首检跨班分摊总量不守恒", countingShift, inspectionEndTime);
         }
         return FirstInspectionAllocationPlan.valid(
-                sequence, inspectionQty, hourlyOutput, durationSeconds,
+                sequence, faultAdjustedInspectionQty, hourlyOutput, durationSeconds,
                 inspectionStartTime, inspectionEndTime, countingShift, positiveAllocations);
     }
 

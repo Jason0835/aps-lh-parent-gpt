@@ -15,6 +15,7 @@ import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.PriorityTraceLogHelper;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
+import com.zlt.aps.lh.api.enums.MachineStopTypeEnum;
 import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -1351,7 +1352,11 @@ public class LhMaintenanceScheduleService {
         String physicalMachineCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode);
         if (!CollectionUtils.isEmpty(context.getDevicePlanShutList())) {
             for (MdmDevicePlanShut planShut : context.getDevicePlanShutList()) {
-                if (Objects.isNull(planShut) || Objects.isNull(planShut.getBeginDate())
+                // 05与精度允许并行，恢复点由公共容量时间轴取最大值；06已在加载时隔离。
+                if (Objects.isNull(planShut)
+                        || StringUtils.equals(MachineStopTypeEnum.PLANNED_REPAIR.getCode(),
+                                planShut.getMachineStopType())
+                        || Objects.isNull(planShut.getBeginDate())
                         || Objects.isNull(planShut.getEndDate())
                         || !StringUtils.equals(physicalMachineCode,
                         LhSingleControlMachineUtil.resolvePhysicalMachineCode(planShut.getMachineCode()))) {

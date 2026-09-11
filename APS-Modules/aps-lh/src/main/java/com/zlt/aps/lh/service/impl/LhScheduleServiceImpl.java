@@ -1484,7 +1484,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public AjaxResult importScheduleTemplate(List<LhScheduleResultTemplateImportVO> list, LhScheduleResult result, boolean updateSupport, Long id) {
-        log.info(JSONUtil.toJsonStr(list));
+
         if (Objects.isNull(result) || StringUtils.isBlank(result.getFactoryCode()) || Objects.isNull(result.getScheduleDate())) {
             return AjaxResult.error("导入条件中的工厂和排程日期不能为空");
         }
@@ -1501,6 +1501,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         list.stream()
                 .filter(Objects::nonNull)
                 .forEach(this::fillImportChangedTrialStatus);
+        // 先按模板中的物料描述和胎胚描述反显编码，再执行编码及描述必填校验。
+        AppUtils.formatData(list.stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList()), getQueryFormulasByDesc());
         // 第一轮：注解必填和Excel内重复校验（模板数据从第6行开始）
         for (int i = 0; i < list.size(); i++) {
             int rowNum = i + LH_SCHEDULE_IMPORT_DATA_START_ROW;
@@ -1521,7 +1525,6 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 importErrorLogs.addAll(validated);
             }
         }
-
         Map<Integer, Date[]> shiftTimeMap = buildShiftTimeMap(scheduleDate);
         Set<String> importUniqueKeys = new HashSet<>();
 
@@ -4535,6 +4538,15 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     public String[] getQueryFormulas() {
         return new String[]{
                 "embryoCode,structureName,mainMaterialDesc->getcolsvaluewithcondition(T_MDM_MATERIAL_INFO, [EMBRYO_CODE,STRUCTURE_NAME,EMBRYO_DESC], MATERIAL_CODE, materialCode, IS_DELETE=0)"
+        };
+    }
+
+
+    @Override
+    public String[] getQueryFormulasByDesc() {
+        return new String[]{
+                "materialCode->getcolvaluewithcondition(T_MDM_MATERIAL_INFO, MATERIAL_CODE, MATERIAL_DESC, materialDesc, IS_DELETE=0)",
+                "embryoCode->getcolvaluewithcondition(T_MDM_MATERIAL_INFO, EMBRYO_CODE, EMBRYO_DESC, mainMaterialDesc, IS_DELETE=0)"
         };
     }
 

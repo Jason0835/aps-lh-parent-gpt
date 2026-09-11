@@ -84,6 +84,10 @@ public class LhNextShiftNewPlanService {
     /** 班次9结果固定备注。 */
     private static final String NEXT_SHIFT_PLAN_REMARK = "班次9提前生成计划";
 
+    /** 设备停机时间转换与故障分流。 */
+    @Resource
+    private LhDeviceStopPlanScheduleService deviceStopPlanScheduleService;
+
     @Resource
     private DefaultProductionShutdownStrategy productionShutdownStrategy;
     @Resource
@@ -130,6 +134,7 @@ public class LhNextShiftNewPlanService {
                 releaseTimeMap.size(), remainingSkuList.size());
 
         List<LhNextShiftNewPlan> planList = Collections.emptyList();
+        Map<Long, Date> stopScheduleDates = Collections.emptyMap();
         if (!CollectionUtils.isEmpty(releaseTimeMap)
                 && !CollectionUtils.isEmpty(remainingSkuList)) {
             LhScheduleContext isolatedContext = this.buildIsolatedContext(
@@ -137,6 +142,8 @@ public class LhNextShiftNewPlanService {
                     targetBusinessDate, releaseTimeMap, remainingSkuList);
             planList = this.scheduleNextShift(
                     isolatedContext, targetBusinessDate);
+            // 与原8班分开回填，只记录已执行的独立窗口；不触发任何故障业务补偿。
+            stopScheduleDates = deviceStopPlanScheduleService.resolveScheduledStopDates(isolatedContext);
         } else if (CollectionUtils.isEmpty(releaseTimeMap)) {
             log.info("班次9计划为空, factoryCode: {}, batchNo: {}, reason: 班次8无真实收尾释放机台",
                     sourceContext.getFactoryCode(), sourceContext.getBatchNo());
@@ -152,7 +159,7 @@ public class LhNextShiftNewPlanService {
         int savedCount = persistenceService.replaceByScope(
                 sourceContext.getFactoryCode(),
                 LhScheduleTimeUtil.clearTime(sourceContext.getScheduleTargetDate()),
-                sourceContext.getBatchNo(), validPlanList, sourceContext.getOperator());
+                sourceContext.getBatchNo(), validPlanList, sourceContext.getOperator(), stopScheduleDates);
         log.info("班次9计划生成完成, factoryCode: {}, scheduleDate: {}, batchNo: {}, "
                         + "targetBusinessDate: {}, planCount: {}, savedCount: {}",
                 sourceContext.getFactoryCode(),
@@ -259,6 +266,9 @@ public class LhNextShiftNewPlanService {
             List<SkuScheduleDTO> remainingSkuList) {
         LhScheduleContext isolatedContext = new LhScheduleContext();
         BeanUtil.copyProperties(sourceContext, isolatedContext);
+        // 扩展窗口只能写独立副本的停机索引，不能污染原8班已经完成的回填范围。
+        isolatedContext.setPlannedRepairSourcePlanMap(new LinkedHashMap<>(sourceContext.getPlannedRepairSourcePlanMap()));
+        isolatedContext.setTemporaryFaultWindowMap(new LinkedHashMap<>(sourceContext.getTemporaryFaultWindowMap()));
         // 快照恢复会重建全部可变资源；先切断机台Map引用，避免恢复时清理原上下文。
         isolatedContext.setMachineScheduleMap(new LinkedHashMap<String, MachineScheduleDTO>());
         ScheduleSubstitutionAttemptSnapshot.capture(
@@ -374,6 +384,8 @@ public class LhNextShiftNewPlanService {
      * @param skuList 已深拷贝日计划和模具列表的班次9候选
      */
     private void detachIndependentViews(LhScheduleContext context, List<SkuScheduleDTO> skuList) {
+        context.setPreScheduledMachineBindingList(new ArrayList<>(0));
+        context.setPreScheduledMouldReleaseTimeMap(new LinkedHashMap<>(0));
         context.setNextShiftNewPlanCandidateList(new ArrayList<>(skuList));
         context.setNextShiftNewPlanPoolDateMap(new LinkedHashMap<>(context.getNextShiftNewPlanPoolDateMap()));
         context.setContinuousSkuList(new ArrayList<>(0));
@@ -387,11 +399,8 @@ public class LhNextShiftNewPlanService {
         context.setEarlyProductionDecisionLogCollectorMap(new LinkedHashMap<>(4));
         context.setStructureEarlyProductionAdmissionMap(new LinkedHashMap<>(4));
         context.setStructureShiftInMachineIndex(null);
-        context.setHistoricalReverseSelectionDirectiveList(new ArrayList<>(0));
         context.setDayTypeBlockReverseSelectionDirectiveList(new ArrayList<>(0));
         context.setDayTypeBlockReverseSelectedSkuKeyMap(new LinkedHashMap<>(0));
-        context.setHistoricalReverseSelectedMachineCodeMap(new LinkedHashMap<>(0));
-        context.setHistoricalReverseProtectedResultSet(new LinkedHashSet<>(0));
         context.setSpecialMaterialContinuationResultSnapshot(new LinkedHashSet<>(0));
         context.setSpecialMaterialSubstitutionRecordList(new ArrayList<>(0));
         context.setSharedMouldSubstitutionRecordList(new ArrayList<>(0));
@@ -640,6 +649,7 @@ public class LhNextShiftNewPlanService {
         return remainingQtyMap;
     }
 
+    /** 扩展设备计划仍复用05/06的统一分流。 */
     private void extendDevicePlanWindow(
             LhScheduleContext context,
             LhShiftConfigVO preparationShift,
@@ -658,7 +668,9 @@ public class LhNextShiftNewPlanService {
         for (MdmDevicePlanShut plan : additionalPlanList) {
             planMap.putIfAbsent(this.buildDevicePlanKey(plan), plan);
         }
-        context.setDevicePlanShutList(new ArrayList<MdmDevicePlanShut>(planMap.values()));
+        // 班次9与主排程使用相同维修转换和故障隔离，禁止原始06重新进入普通业务列表。
+        context.setDevicePlanShutList(deviceStopPlanScheduleService.prepareStopPlans(
+                context, new ArrayList<MdmDevicePlanShut>(planMap.values())));
         log.info("班次9设备计划加载完成, factoryCode: {}, targetWindow: [{}, {}), "
                         + "additionalCount: {}, mergedCount: {}",
                 context.getFactoryCode(),

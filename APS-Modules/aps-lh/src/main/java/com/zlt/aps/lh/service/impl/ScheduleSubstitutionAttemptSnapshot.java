@@ -15,11 +15,11 @@ import com.zlt.aps.lh.context.EmbryoStockConsumeLedger;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.component.StructureEarlyProductionAdmission;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionRuntimePlan;
+import com.zlt.aps.lh.engine.strategy.support.ActiveMachineBinding;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionDecision;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionDecisionLogEntry;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceContext;
 import com.zlt.aps.lh.engine.strategy.support.ScheduleSubstitutionDirective;
-import com.zlt.aps.lh.engine.strategy.support.HistoricalReverseSelectionDirective;
 import com.zlt.aps.lh.engine.strategy.support.DayTypeBlockReverseSelectionDirective;
 import com.zlt.aps.lh.engine.strategy.support.SharedMouldSubstitutionRecord;
 import com.zlt.aps.lh.engine.strategy.support.SpecialMaterialSubstitutionRecord;
@@ -149,14 +149,14 @@ final class ScheduleSubstitutionAttemptSnapshot {
 
     /** 置换前模具交替计划；换活字块或局部策略不得在失败预演中残留。 */
     private List<LhMouldChangePlan> mouldChangePlanList;
+    /** 前置组合的绑定及未来模具释放记录随失败尝试一起恢复。 */
+    private List<ActiveMachineBinding> preScheduledMachineBindingList;
+    private Map<String, Date> preScheduledMouldReleaseTimeMap;
     /** 置换前持久化过程日志；预演日志必须随快照回滚。 */
     private List<LhScheduleProcessLog> scheduleLogList;
-    /** 历史反选、按天换活字块反选及结构待排视图 */
-    private List<HistoricalReverseSelectionDirective> historicalReverseSelectionDirectiveList;
+    /** 按天换活字块反选及结构待排视图 */
     private List<DayTypeBlockReverseSelectionDirective> dayTypeBlockReverseSelectionDirectiveList;
     private Map<String, String> dayTypeBlockReverseSelectedSkuKeyMap;
-    private Map<String, Set<String>> historicalReverseSelectedMachineCodeMap;
-    private Set<LhScheduleResult> historicalReverseProtectedResultSet;
     private Map<String, List<SkuScheduleDTO>> structureSkuMap;
     private Map<LocalDate, Map<String, StructureEarlyProductionAdmission>>
             structureEarlyProductionAdmissionMap;
@@ -334,19 +334,12 @@ final class ScheduleSubstitutionAttemptSnapshot {
                 new ArrayList<LhMouldChangePlan>(context.getMouldChangePlanList());
         snapshot.scheduleLogList =
                 new ArrayList<LhScheduleProcessLog>(context.getScheduleLogList());
-        snapshot.historicalReverseSelectionDirectiveList = copyBeanList(
-                context.getHistoricalReverseSelectionDirectiveList(),
-                HistoricalReverseSelectionDirective.class);
         snapshot.dayTypeBlockReverseSelectionDirectiveList = copyBeanList(
                 context.getDayTypeBlockReverseSelectionDirectiveList(),
                 DayTypeBlockReverseSelectionDirective.class);
         snapshot.dayTypeBlockReverseSelectedSkuKeyMap =
                 new LinkedHashMap<String, String>(
                         context.getDayTypeBlockReverseSelectedSkuKeyMap());
-        snapshot.historicalReverseSelectedMachineCodeMap =
-                copyStringSetMap(context.getHistoricalReverseSelectedMachineCodeMap());
-        snapshot.historicalReverseProtectedResultSet =
-                copyIdentityResultSet(context.getHistoricalReverseProtectedResultSet());
         snapshot.structureSkuMap = copySkuListMap(context.getStructureSkuMap());
         snapshot.structureEarlyProductionAdmissionMap =
                 copyStructureAdmissionMap(
@@ -406,6 +399,8 @@ final class ScheduleSubstitutionAttemptSnapshot {
                 snapshot.skuDailyQuotaMap.put(sku, copyDailyQuotaMap(sku.getDailyPlanQuotaMap()));
             }
         }
+        snapshot.preScheduledMachineBindingList = new ArrayList<>(context.getPreScheduledMachineBindingList());
+        snapshot.preScheduledMouldReleaseTimeMap = new LinkedHashMap<>(context.getPreScheduledMouldReleaseTimeMap());
         return snapshot;
     }
 
@@ -435,6 +430,8 @@ final class ScheduleSubstitutionAttemptSnapshot {
      * @param restoreSourceObjects 是否恢复原结果和SKU对象
      */
     private void restore(LhScheduleContext context, boolean restoreSourceObjects) {
+        context.setPreScheduledMachineBindingList(new ArrayList<>(preScheduledMachineBindingList));
+        context.setPreScheduledMouldReleaseTimeMap(new LinkedHashMap<>(preScheduledMouldReleaseTimeMap));
         if (restoreSourceObjects) {
             for (Map.Entry<LhScheduleResult, LhScheduleResult> entry : scheduleResultStateMap.entrySet()) {
                 BeanUtil.copyProperties(entry.getValue(), entry.getKey());
@@ -534,18 +531,11 @@ final class ScheduleSubstitutionAttemptSnapshot {
         context.setNextShiftNewPlanPoolDateMap(new LinkedHashMap<>(nextShiftNewPlanPoolDateMap));
         context.setMouldChangePlanList(new ArrayList<LhMouldChangePlan>(mouldChangePlanList));
         context.setScheduleLogList(new ArrayList<LhScheduleProcessLog>(scheduleLogList));
-        context.setHistoricalReverseSelectionDirectiveList(copyBeanList(
-                historicalReverseSelectionDirectiveList,
-                HistoricalReverseSelectionDirective.class));
         context.setDayTypeBlockReverseSelectionDirectiveList(copyBeanList(
                 dayTypeBlockReverseSelectionDirectiveList,
                 DayTypeBlockReverseSelectionDirective.class));
         context.setDayTypeBlockReverseSelectedSkuKeyMap(
                 new LinkedHashMap<String, String>(dayTypeBlockReverseSelectedSkuKeyMap));
-        context.setHistoricalReverseSelectedMachineCodeMap(
-                copyStringSetMap(historicalReverseSelectedMachineCodeMap));
-        context.setHistoricalReverseProtectedResultSet(
-                copyIdentityResultSet(historicalReverseProtectedResultSet));
         context.setStructureSkuMap(copySkuListMap(structureSkuMap));
         context.setStructureEarlyProductionAdmissionMap(
                 copyStructureAdmissionMap(structureEarlyProductionAdmissionMap));

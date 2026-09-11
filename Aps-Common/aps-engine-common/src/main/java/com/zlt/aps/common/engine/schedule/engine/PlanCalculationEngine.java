@@ -414,7 +414,7 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
         evidence.put("groupMinStartAdjustQty", taskGroup.getGroupMinStartAdjustQty());
         evidence.put("groupRoundAdjustQty", taskGroup.getGroupRoundAdjustQty());
         evidence.put("groupFinalPlanQty", taskGroup.getGroupFinalPlanQty());
-        evidence.put("tailDecisionMode", "LEGACY_TAIL_FLAG");
+        evidence.put("tailDecisionMode", "PRODUCT_CODE_NORMAL_FIRST");
         return evidence;
     }
 

@@ -6,6 +6,7 @@ import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.dto.ShiftProductionControlDTO;
 import com.zlt.aps.lh.api.domain.dto.ShiftRuntimeState;
+import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.ShiftEnum;
@@ -42,6 +43,53 @@ public final class LhScheduleTimeUtil {
     private static final ZoneId DEFAULT_ZONE = ZoneId.systemDefault();
 
     private LhScheduleTimeUtil() {
+    }
+
+    /**
+     * 窗口级资源预检使用窗口首班与机台真实释放时刻的较晚值，不依赖日循环状态。
+     * @param context 已初始化班次的排程上下文
+     * @param machine 指定机台；查询公共空闲资源时为空
+     * @return 非空资源查询时刻
+     */
+    public static Date resolveWindowResourceReferenceTime(LhScheduleContext context, MachineScheduleDTO machine) {
+        return resolveResourceReferenceTime(context, null, machine);
+    }
+
+    /**
+     * 日级资源预检使用明确业务日首班与机台真实释放时刻的较晚值。
+     * @param context 已初始化班次的排程上下文
+     * @param businessDate 调用方明确的实际业务日，不能传历史计划日期
+     * @param machine 指定机台；查询公共空闲资源时为空
+     * @return 非空资源查询时刻
+     */
+    public static Date resolveDayResourceReferenceTime(
+            LhScheduleContext context, Date businessDate, MachineScheduleDTO machine) {
+        Objects.requireNonNull(businessDate, "日级资源查询必须指定业务日");
+        return resolveResourceReferenceTime(context, businessDate, machine);
+    }
+
+    /**
+     * 从调用方选择的窗口或业务日解析资源起点，缺少班次属于初始化错误，不能默默放行。
+     * @param context 排程上下文
+     * @param businessDate 为空表示调用方明确选择整个窗口，否则只取指定业务日
+     * @param machine 当前资源机台
+     * @return 班次起点和机台释放时刻的较晚值
+     */
+    private static Date resolveResourceReferenceTime(
+            LhScheduleContext context, Date businessDate, MachineScheduleDTO machine) {
+        Objects.requireNonNull(context, "资源查询必须提供排程上下文");
+        Date referenceTime = getScheduleShifts(context, context.getScheduleDate()).stream()
+                .filter(Objects::nonNull)
+                .filter(shift -> Objects.isNull(businessDate) || (Objects.nonNull(shift.getWorkDate())
+                        && isSameDay(shift.getWorkDate(), businessDate)))
+                .map(LhShiftConfigVO::getShiftStartDateTime)
+                .filter(Objects::nonNull).min(Date::compareTo)
+                .orElseThrow(() -> new IllegalStateException("资源查询范围没有有效班次起点，业务日=" + businessDate));
+        if (Objects.nonNull(machine) && Objects.nonNull(machine.getEstimatedEndTime())
+                && machine.getEstimatedEndTime().after(referenceTime)) {
+            return machine.getEstimatedEndTime();
+        }
+        return referenceTime;
     }
 
     /**

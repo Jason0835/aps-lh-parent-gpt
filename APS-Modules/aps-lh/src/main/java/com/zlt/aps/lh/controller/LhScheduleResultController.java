@@ -852,8 +852,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
      * - 3-5班：T+1日的夜、早、中班（排程日期当天，更新）
      * - 6-8班：T+2日的夜、早、中班（窗口第三日，下发）
      * 3. 中间表映射：1班=夜班，2班=早班，3班=中班
-     * 4. T日、T+1日数据更新（存在则更新，不存在则插入）
-     * 5. T+2日数据下发（先删除后插入）
+     * 4. T日、T+1日、T+2日数据均为更新（存在则更新，不存在则插入）
      *
      * @param scheduleDate 排程日期（T+1日）
      * @return 下发结果

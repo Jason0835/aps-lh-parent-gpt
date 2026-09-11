@@ -38,9 +38,13 @@ import com.zlt.aps.lh.engine.strategy.support.ContinuationEndingHandoffAudit;
 import com.zlt.aps.lh.engine.strategy.support.SpecialMaterialSubstitutionRecord;
 import com.zlt.aps.lh.exception.ScheduleErrorCode;
 import com.zlt.aps.lh.exception.ScheduleException;
+import com.zlt.aps.lh.service.ILhMouldChangePlanService;
 import com.zlt.aps.lh.service.impl.SchedulePersistenceService;
 import com.zlt.aps.lh.service.impl.LhNextShiftNewPlanService;
+import com.zlt.aps.lh.service.impl.LhTemporaryFaultService;
 import com.zlt.aps.lh.util.*;
+import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
@@ -81,6 +85,11 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
 
     @Resource
     private SchedulePersistenceService schedulePersistenceService;
+
+    /** 交替计划保存前补充现有派生模具号。 */
+    @Resource
+    private ILhMouldChangePlanService lhMouldChangePlanService;
+
 
     /** 原8班落库成功后生成班次9独立计划。 */
     @Resource
@@ -143,7 +152,13 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             finalizeCleaningDisposition(context);
 
             // S4.6.2 生成模具交替计划：基于结果真实换模开始时间和机台滚动状态生成前后规格。
-            generateMouldChangePlan(context);
+            Map<LhMouldChangePlan, String> mouldChangePlanProductStatusMap =
+                    this.generateMouldChangePlan(context);
+            // 生成完成后统一重建规则模具号，禁止保留排程结果或清洗窗口携带的旧模具号。
+            this.correctMouldChangePlanMouldCode(context, mouldChangePlanProductStatusMap);
+            // 规则模具号修正完成后再执行现有派生逻辑，resolveMouldCode 内部实现保持不变。
+            lhMouldChangePlanService.resolveMouldCode(context.getMouldChangePlanList());
+            this.logFinalMouldChangePlanMouldCodes(context);
             /*
              * 换模/换活字块均已全部落定，此处按最终实际生效计划复核早8/中7/日15。
              * 班次参考上限可能因总量守恒或产能硬约束无法完全消除，因此校验只记录问题，
@@ -184,6 +199,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             addSummaryLog(context);
 
             // S4.6.6 保存排程结果到数据库：由持久化服务统一做目标日原子替换。
+            // 故障只读校验仅输出应用日志，不改变结果或阻断保存。
+            LhTemporaryFaultService.validateProductionWindows(context);
             schedulePersistenceService.replaceScheduleAtomically(context);
 
             /*
@@ -448,7 +465,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                 Objects.isNull(result.getLhTime()) ? 0 : result.getLhTime(),
                 Objects.isNull(result.getMouldQty()) ? 0 : result.getMouldQty(),
                 ShiftCapacityResolverUtil.resolveShiftDurationSeconds(shift), beforeSeconds);
-        int inspectionQty = Math.min(Math.max(0, planQty - beforeQty), window.getSandBlastFirstInspectionQty());
+        int inspectionQty = Math.min(Math.max(0, planQty - beforeQty),
+                ShiftCapacityResolverUtil.resolveSandBlastInspectionQty(context, window));
         if (beforeSeconds <= 0) {
             ShiftFieldUtil.setShiftPlanQty(result, shiftIndex, planQty,
                     window.getCleanEndTime(), ShiftFieldUtil.getShiftEndTime(result, shiftIndex));
@@ -2178,8 +2196,9 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
      * </p>
      *
      * @param context 排程上下文
+     * @return 本次生成计划对应的产品状态，供保存前精确匹配月计划
      */
-    private void generateMouldChangePlan(LhScheduleContext context) {
+    private Map<LhMouldChangePlan, String> generateMouldChangePlan(LhScheduleContext context) {
         List<LhScheduleResult> changeResults = context.getScheduleResultList().stream()
                 .filter(r -> "1".equals(r.getIsChangeMould())
                         && r.getDailyPlanQty() != null
@@ -2191,6 +2210,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         log.info("生成模具交替计划, 换模排程结果数: {}", changeResults.size());
 
         List<LhMouldChangePlan> plans = context.getMouldChangePlanList();
+        Map<LhMouldChangePlan, String> planProductStatusMap = new IdentityHashMap<LhMouldChangePlan, String>();
         // rollingStateMap 用于在同一机台连续换模时逐条推进前规格。
         Map<String, RollingMachineState> rollingStateMap = new HashMap<>();
         int planOrder = plans.size() + 1;
@@ -2248,13 +2268,111 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             appendSubstitutionRemark(
                     context, plan, result, plannedMouldChangeStartTime);
             plans.add(plan);
+            planProductStatusMap.put(plan, result.getProductStatus());
 
             updateRollingState(state, result);
         }
 
-        planOrder = appendCleaningMouldChangePlans(context, plans, planOrder, changeResults);
+        planOrder = this.appendCleaningMouldChangePlans(
+                context, plans, planOrder, changeResults, planProductStatusMap);
         logOutOfWindowMouldChangePlans(context, plans);
         log.info("生成模具交替计划完成, 共 {} 条", plans.size());
+        return planProductStatusMap;
+    }
+
+    /**
+     * 统一修正本次自动排程生成的模具交替计划模具号。
+     *
+     * <p>先清除生成过程中携带的原模具号；月计划满足“型腔数大于活块数且活块数等于2”时，
+     * 直接复用排程上下文中当前物料的全部SKU模具关系；月计划备注以“模具号”开头时，
+     * 复用公共备注解析口径提取模具号。两个来源合并后统一去空、去重、升序并按每两个组成一套。</p>
+     *
+     * @param context 排程上下文
+     * @param planProductStatusMap 交替计划对应的产品状态，使用对象身份精确关联
+     */
+    private void correctMouldChangePlanMouldCode(LhScheduleContext context,
+                                                   Map<LhMouldChangePlan, String> planProductStatusMap) {
+        if (Objects.isNull(context) || CollectionUtils.isEmpty(context.getMouldChangePlanList())) {
+            return;
+        }
+        LocalDate scheduleDate = context.getScheduleTargetDate().toInstant()
+                .atZone(ZoneId.systemDefault()).toLocalDate();
+        for (LhMouldChangePlan plan : context.getMouldChangePlanList()) {
+            if (Objects.isNull(plan)) {
+                continue;
+            }
+            String productStatus = CollectionUtils.isEmpty(planProductStatusMap)
+                    ? null : planProductStatusMap.get(plan);
+            FactoryMonthPlanProductionFinalResult monthPlan = MonthPlanDateResolver.resolvePlan(
+                    context, plan.getAfterMaterialCode(), productStatus, scheduleDate);
+            List<String> skuRelationMouldCodeList = this.resolveSkuRelationMouldCodes(context, plan, monthPlan);
+            LinkedHashSet<String> remarkMouldCodeSet = LhMouldCodeUtil.extractMonthPlanMouldCodes(
+                    Objects.isNull(monthPlan) ? null : monthPlan.getRemark());
+            List<String> mergedMouldCodeList = new ArrayList<String>(
+                    skuRelationMouldCodeList.size() + remarkMouldCodeSet.size());
+            mergedMouldCodeList.addAll(skuRelationMouldCodeList);
+            mergedMouldCodeList.addAll(remarkMouldCodeSet);
+            List<String> mergedDistinctMouldCodeList =
+                    LhMouldCodeUtil.normalizeAndSortMouldCodes(mergedMouldCodeList);
+            String correctedMouldCode = LhMouldCodeUtil.formatMouldCodeSets(mergedMouldCodeList);
+            // 无规则来源时显式清空，禁止保留排程结果或清洗窗口原有模具号。
+            plan.setMouldCode(correctedMouldCode);
+            log.info("交替计划模具号修正完成, factoryCode: {}, batchNo: {}, materialCode: {}, "
+                            + "productStatus: {}, skuRelationMouldCodes: {}, monthPlanRemarkMouldCodes: {}, "
+                            + "mergedDistinctMouldCodes: {}, correctedMouldCode: {}",
+                    context.getFactoryCode(), context.getBatchNo(), plan.getAfterMaterialCode(), productStatus,
+                    skuRelationMouldCodeList, remarkMouldCodeSet,
+                    mergedDistinctMouldCodeList, correctedMouldCode);
+        }
+    }
+
+    /**
+     * 解析满足月计划型腔/活块条件的SKU关系模具号。
+     *
+     * @param context 排程上下文
+     * @param plan 模具交替计划
+     * @param monthPlan 当前物料对应月计划
+     * @return 当前物料全部非空关系模具号
+     */
+    private List<String> resolveSkuRelationMouldCodes(LhScheduleContext context,
+                                                       LhMouldChangePlan plan,
+                                                       FactoryMonthPlanProductionFinalResult monthPlan) {
+        if (Objects.isNull(monthPlan)
+                || Objects.isNull(monthPlan.getMouldCavityQty())
+                || Objects.isNull(monthPlan.getTypeBlockQty())
+                || monthPlan.getMouldCavityQty() <= monthPlan.getTypeBlockQty()
+                || monthPlan.getTypeBlockQty() != 2
+                || CollectionUtils.isEmpty(context.getSkuMouldRelMap())) {
+            return Collections.emptyList();
+        }
+        List<MdmSkuMouldRel> mouldRelList = context.getSkuMouldRelMap().get(plan.getAfterMaterialCode());
+        if (CollectionUtils.isEmpty(mouldRelList)) {
+            return Collections.emptyList();
+        }
+        return mouldRelList.stream()
+                .filter(Objects::nonNull)
+                .map(MdmSkuMouldRel::getMouldCode)
+                .filter(StringUtils::isNotEmpty)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 输出调用现有模具号解析逻辑后的最终保存值。
+     *
+     * @param context 排程上下文
+     */
+    private void logFinalMouldChangePlanMouldCodes(LhScheduleContext context) {
+        if (Objects.isNull(context) || CollectionUtils.isEmpty(context.getMouldChangePlanList())) {
+            return;
+        }
+        for (LhMouldChangePlan plan : context.getMouldChangePlanList()) {
+            if (Objects.nonNull(plan)) {
+                log.info("交替计划最终保存模具号, factoryCode: {}, batchNo: {}, materialCode: {}, "
+                                + "machineCode: {}, mouldCode: {}",
+                        context.getFactoryCode(), context.getBatchNo(), plan.getAfterMaterialCode(),
+                        plan.getLhMachineCode(), plan.getMouldCode());
+            }
+        }
     }
 
     /**
@@ -2527,12 +2645,15 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
      * @param context 排程上下文
      * @param plans 模具交替计划列表
      * @param planOrder 当前计划顺序
+     * @param changeResults 最终换模排程结果
+     * @param planProductStatusMap 交替计划对应产品状态
      * @return 下一个计划顺序
      */
     private int appendCleaningMouldChangePlans(LhScheduleContext context,
                                                List<LhMouldChangePlan> plans,
                                                int planOrder,
-                                               List<LhScheduleResult> changeResults) {
+                                               List<LhScheduleResult> changeResults,
+                                               Map<LhMouldChangePlan, String> planProductStatusMap) {
         List<Map.Entry<MachineScheduleDTO, MachineCleaningWindowDTO>> cleaningPlanItems = collectCleaningPlanItems(context);
         for (Map.Entry<MachineScheduleDTO, MachineCleaningWindowDTO> item : cleaningPlanItems) {
             MachineScheduleDTO machine = item.getKey();
@@ -2587,6 +2708,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                     cleaningState.getCurrentMaterialCode(), cleaningState.getCurrentProductStatus(),
                     cleaningWindow.getCleanStartTime()));
             plans.add(plan);
+            planProductStatusMap.put(plan, cleaningState.getCurrentProductStatus());
         }
         return planOrder;
     }

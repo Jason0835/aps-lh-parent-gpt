@@ -38,6 +38,8 @@ public final class NewSpecMachineAssignmentPlan {
     private final NewSpecMachineAvailabilityPlan availabilityPlan;
     /** 是否按实际可开产时间归属机台资源班次 */
     private final boolean actualAvailableTimeMode;
+    /** 组合已由调用方明确，仅执行资源分配，不再次进行机台选型。 */
+    private boolean fixedMachineExecution;
     /** 对象身份映射，避免同物料补偿 DTO 互相覆盖 */
     private final Map<SkuScheduleDTO, String> assignedMachineCodeMap =
             new IdentityHashMap<SkuScheduleDTO, String>(1);
@@ -80,6 +82,23 @@ public final class NewSpecMachineAssignmentPlan {
 
     public boolean isActualAvailableTimeMode() {
         return actualAvailableTimeMode;
+    }
+
+    /**
+     * 标记调用方已确定的组合；标记不包含来源或历史计划信息。
+     * @return 当前唯一组合
+     */
+    public NewSpecMachineAssignmentPlan asFixedMachineExecution() {
+        this.fixedMachineExecution = true;
+        return this;
+    }
+
+    /**
+     * 判断本次是否只执行已经确定的机台组合。
+     * @return 是否跳过重复选型
+     */
+    public boolean isFixedMachineExecution() {
+        return fixedMachineExecution;
     }
 
     public boolean isAssigned(SkuScheduleDTO sku) {

@@ -109,6 +109,7 @@ public class LhScheduleResultTemplateImportVO extends BaseEntity {
     /**
      * 物料描述
      */
+    @ImportExcelValidated(required = true)
     @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.materialDesc")
     @ApiModelProperty(value = "物料描述", name = "materialDesc")
     @TableField(value = "MATERIAL_DESC")
@@ -117,6 +118,7 @@ public class LhScheduleResultTemplateImportVO extends BaseEntity {
     /**
      * 主物料(胎胚描述)
      */
+    @ImportExcelValidated(required = true)
     @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.mainMaterialDesc")
     @ApiModelProperty(value = "胎胚描述", name = "mainMaterialDesc")
     @TableField(value = "MAIN_MATERIAL_DESC")

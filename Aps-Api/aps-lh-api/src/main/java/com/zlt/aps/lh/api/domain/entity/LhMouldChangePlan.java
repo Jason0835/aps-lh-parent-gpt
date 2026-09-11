@@ -125,7 +125,7 @@ public class LhMouldChangePlan extends BaseEntity implements Serializable {
     private String mouldCode;
 
     /**
-     * 页面展示模具号，按照当前排程日期、在机信息及共享模具配置动态解析，不落库。
+     * 页面展示模具号，直接取库表模具号字段。
      */
     @ApiModelProperty(value = "展示模具号")
     @TableField(exist = false)

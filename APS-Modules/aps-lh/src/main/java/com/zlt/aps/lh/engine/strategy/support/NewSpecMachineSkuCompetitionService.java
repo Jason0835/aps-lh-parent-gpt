@@ -1,16 +1,13 @@
 package com.zlt.aps.lh.engine.strategy.support;
 
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
-import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
-import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
 import com.zlt.aps.lh.api.enums.ConstructionStageEnum;
 import com.zlt.aps.lh.api.enums.UnscheduledReasonEnum;
 import com.zlt.aps.lh.component.UnscheduledResultCollector;
 import com.zlt.aps.lh.context.LhScheduleContext;
-import com.zlt.aps.lh.service.impl.PreviousAlternationPreferenceService;
 import com.zlt.aps.lh.engine.strategy.IMachineMatchStrategy;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -46,10 +43,6 @@ import java.util.function.Predicate;
 @Component
 @Slf4j
 public class NewSpecMachineSkuCompetitionService {
-
-    /** 无共享状态的历史关系查询服务；不参与跨机台比较。 */
-    private final PreviousAlternationPreferenceService previousAlternationPreferenceService =
-            new PreviousAlternationPreferenceService();
 
     /** 单台机台硬匹配失败，仅代表当前机台不可用 */
     private static final int HARD_MATCH_FAILURE_PRIORITY = 10;
@@ -208,9 +201,6 @@ public class NewSpecMachineSkuCompetitionService {
                 ? Collections.<String>emptySet() : failedAssignmentKeySet;
         NewSpecScheduleProposal bestOrdinaryProposal = null;
         NewSpecScheduleProposal bestCrossDayProposal = null;
-        // 每台机台本轮只查询一次历史列表；资源日开关关闭和辅助入口直接沿用原池顺序。
-        List<LhMouldChangePlan> previousPlans = this.findPreviousPlansForMachine(
-                context, dayContext, machineResource.getMachine(), standardDynamicCompetition);
         for (LocalDate poolDate : orderedPoolDates) {
             List<DailyNewSpecCandidate> poolCandidates = candidatePoolMap.get(poolDate);
             if (CollectionUtils.isEmpty(poolCandidates)) {
@@ -218,29 +208,7 @@ public class NewSpecMachineSkuCompetitionService {
             }
             NewSpecScheduleProposal ordinaryProposalOfDate = null;
             NewSpecScheduleProposal crossDayProposalOfDate = null;
-            Map<DailyNewSpecCandidate, String> actionTypes = new IdentityHashMap<DailyNewSpecCandidate, String>();
-            List<DailyNewSpecCandidate> preferredCandidates = previousAlternationPreferenceService
-                    .mapHistoricalCandidates(previousPlans, poolCandidates, DailyNewSpecCandidate::getSku,
-                            (candidate, plan) -> StringUtils.equals(plan.getChangeMouldType(),
-                                    actionTypes.computeIfAbsent(candidate, current -> previousAlternationPreferenceService
-                                            .resolveChangeType(context, machineResource.getMachine(), current.getSku()))));
-            Map<DailyNewSpecCandidate, Integer> historicalOrder =
-                    new IdentityHashMap<DailyNewSpecCandidate, Integer>(preferredCandidates.size());
-            for (DailyNewSpecCandidate preferred : preferredCandidates) {
-                historicalOrder.put(preferred, historicalOrder.size());
-            }
-            List<DailyNewSpecCandidate> attemptCandidates = poolCandidates;
-            if (!CollectionUtils.isEmpty(historicalOrder)) {
-                attemptCandidates = new ArrayList<DailyNewSpecCandidate>(poolCandidates.size());
-                preferredCandidates.stream().filter(historicalOrder::containsKey).forEach(attemptCandidates::add);
-                // 历史候选全部不可排后才进入原选择；已尝试失败的历史候选不重复预演。
-                for (DailyNewSpecCandidate original : poolCandidates) {
-                    if (!historicalOrder.containsKey(original)) {
-                        attemptCandidates.add(original);
-                    }
-                }
-            }
-            for (DailyNewSpecCandidate candidate : attemptCandidates) {
+            for (DailyNewSpecCandidate candidate : poolCandidates) {
                 if (!effectiveScope.test(candidate)) {
                     continue;
                 }
@@ -347,19 +315,15 @@ public class NewSpecMachineSkuCompetitionService {
                         && proposal.getAvailabilityPlan().isSourceDayCrossDayPreparation();
                 if (crossDayPreparation) {
                     if (Objects.isNull(crossDayProposalOfDate)
-                            || this.compareSkuOnCurrentMachine(
-                            context, proposal, crossDayProposalOfDate, standardDynamicCompetition, historicalOrder) < 0) {
+                            || this.compareCandidateProposal(
+                            context, proposal, crossDayProposalOfDate, standardDynamicCompetition) < 0) {
                         crossDayProposalOfDate = proposal;
                     }
                 } else {
                     if (Objects.isNull(ordinaryProposalOfDate)
-                            || this.compareSkuOnCurrentMachine(
-                            context, proposal, ordinaryProposalOfDate, standardDynamicCompetition, historicalOrder) < 0) {
+                            || this.compareCandidateProposal(
+                            context, proposal, ordinaryProposalOfDate, standardDynamicCompetition) < 0) {
                         ordinaryProposalOfDate = proposal;
-                    }
-                    if (historicalOrder.containsKey(candidate)) {
-                        // 当前普通桶首个可排历史后物料已确定，不再预演后续历史或普通SKU。
-                        break;
                     }
                 }
             }
@@ -733,57 +697,6 @@ public class NewSpecMachineSkuCompetitionService {
         return Comparator.nullsLast(String::compareTo).compare(
                 left.getMatchResult().getMachine().getMachineCode(),
                 right.getMatchResult().getMachine().getMachineCode());
-    }
-
-    /**
-     * 仅在单机、同日期池内叠加历史优先，跨机台继续调用原比较器。
-     *
-     * @param context 排程上下文
-     * @param left 已通过完整硬约束的候选提案
-     * @param right 当前机台原最佳提案
-     * @param standardDynamicCompetition 标准新增作用域；固定指令和辅助入口不改序
-     * @param historicalOrder 本机当前日期池按历史列表得到的尝试顺序
-     * @return 负数表示左侧优先，相同历史命中状态时沿用原完整比较
-     */
-    private int compareSkuOnCurrentMachine(LhScheduleContext context,
-                                           NewSpecScheduleProposal left, NewSpecScheduleProposal right,
-                                           boolean standardDynamicCompetition,
-                                           Map<DailyNewSpecCandidate, Integer> historicalOrder) {
-        // 只消费已建立的列表顺序，不在比较器中按候选后物料反查历史。
-        int order = Comparator.nullsLast(Integer::compareTo).compare(
-                historicalOrder.get(left.getCandidate()), historicalOrder.get(right.getCandidate()));
-        if (order != 0) {
-            return order;
-        }
-        return this.compareCandidateProposal(context, left, right, standardDynamicCompetition);
-    }
-
-    /**
-     * 在扫描当前SKU前按三维查询两类历史关系，合并为计划日期有序列表。
-     *
-     * @param context 排程上下文
-     * @param dayContext 资源日
-     * @param machine 当前机台及切换前物料
-     * @param standardDynamicCompetition 是否为标准新增选择
-     * @return 按PLAN_DATE排序的历史关系；其他入口或关闭时返回空列表
-     */
-    private List<LhMouldChangePlan> findPreviousPlansForMachine(LhScheduleContext context,
-            DayScheduleContext dayContext, MachineScheduleDTO machine, boolean standardDynamicCompetition) {
-        if (!standardDynamicCompetition
-                || !StringUtils.equals(ScheduleStepEnum.S4_5_NEW_PRODUCTION.getCode(), context.getCurrentStep())
-                || dayContext.getCurrentPhase() != DailySchedulePhase.NORMAL_RESOURCE_COMPETITION
-                || !previousAlternationPreferenceService.isEnabled(context, dayContext.getScheduleDate())) {
-            return Collections.emptyList();
-        }
-        List<LhMouldChangePlan> mouldPlans = previousAlternationPreferenceService.findPreviousPlans(
-                context, dayContext.getScheduleDate(), machine, MouldChangeTypeEnum.REGULAR.getCode());
-        List<LhMouldChangePlan> typeBlockPlans = previousAlternationPreferenceService.findPreviousPlans(
-                context, dayContext.getScheduleDate(), machine, MouldChangeTypeEnum.TYPE_BLOCK.getCode());
-        List<LhMouldChangePlan> plans = new ArrayList<LhMouldChangePlan>(mouldPlans.size() + typeBlockPlans.size());
-        plans.addAll(mouldPlans);
-        plans.addAll(typeBlockPlans);
-        plans.sort(previousAlternationPreferenceService::comparePlans);
-        return plans;
     }
 
     /**
@@ -1226,15 +1139,6 @@ public class NewSpecMachineSkuCompetitionService {
                 .toString();
         if (!candidate.recordFirstDecisionTrace(traceKey, traceValue)) {
             return;
-        }
-        if (!context.isIsolatedNextShiftPlan()
-                && dayContext.getCurrentPhase() == DailySchedulePhase.NORMAL_RESOURCE_COMPETITION && StringUtils.equals(
-                ScheduleStepEnum.S4_5_NEW_PRODUCTION.getCode(), context.getCurrentStep())) {
-            log.info("机台选SKU前次交替判断, batchNo: {}, {}, 阶段={}, 可排性说明={}, 是否最终复用=待提交",
-                    context.getBatchNo(), previousAlternationPreferenceService.describe(
-                            context, dayContext.getScheduleDate(), machine,
-                            previousAlternationPreferenceService.resolveChangeType(context, machine, candidate.getSku()),
-                            candidate.getSku().getMaterialCode()), decisionStage, reason);
         }
         if (!StringUtils.equals("PROPOSAL_GENERATED", decisionStage)
                 && Objects.nonNull(unscheduledResultCollector)) {

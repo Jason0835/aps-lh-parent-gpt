@@ -242,6 +242,10 @@ public class LhScheduleContext {
      * 设备停机计划列表
      */
     private List<MdmDevicePlanShut> devicePlanShutList = new ArrayList<>();
+    /** 05 原始计划快照：与固定时刻转换后的运行态列表分离，扩展窗口时禁止重复转换。 */
+    private Map<Long, MdmDevicePlanShut> plannedRepairSourcePlanMap = new LinkedHashMap<>(16);
+    /** 06 独立故障窗口，按来源计划主键去重；不进入普通设备停机业务列表。 */
+    private Map<Long, MachineFaultWindowDTO> temporaryFaultWindowMap = new LinkedHashMap<>(16);
     /**
      * 本次排程已加载的清洗类设备停机候选列表。
      * <p>仅保存计划开始时间不早于排程日期 T 日、尚未实际完成且未删除的干冰/喷砂清洗候选。
@@ -435,21 +439,12 @@ public class LhScheduleContext {
      */
     private List<LhScheduleResult> previousCureFormulaResultList = new ArrayList<>();
     /**
-     * 业务目标日前一日模具交替计划列表，仅供“前日交替计划机台反选SKU”使用。
+     * 业务目标日前一日模具交替计划列表，仅供独立的前次交替计划复用阶段使用。
      * <p>该列表固定按 {@link #scheduleTargetDate} 前一日查询，与前日排程结果加载的
      * 窗口起点口径互相隔离。</p>
      */
     private List<LhMouldChangePlan> historicalReverseMouldChangePlanList = new ArrayList<>();
-    /** 本次排程只读历史关系索引，首次启用匹配时构建；不随资源账本变化重建。 */
-    private Map<String, List<LhMouldChangePlan>> previousAlternationPlanIndex;
 
-    /**
-     * 解析、去重并绑定当前产品状态后的反选指令。
-     * <p>换活字块指令在S4.4内立即委托既有换活字块主链；其余指令由S4.5新增主链在普通候选
-     * 排序前优先尝试指定机台。失败指令不会删除SKU，后续仍按普通新增候选继续排产。</p>
-     */
-    private List<HistoricalReverseSelectionDirective> historicalReverseSelectionDirectiveList =
-            new ArrayList<HistoricalReverseSelectionDirective>();
     /**
      * 按天换活字块机台反选指令（S4.5 新增排产当天有效）。
      * <p>由每天正常资源竞争阶段开始前的“换活字块检测 + 机台反选物料”生成，
@@ -778,23 +773,15 @@ public class LhScheduleContext {
     private Map<LhScheduleResult, Integer> precisionPreInsertInspectionShiftIndexMap =
             new IdentityHashMap<LhScheduleResult, Integer>();
     /**
-     * 前日交替计划反选成功的机台集合。
-     * <p>key=物料+产品状态复合键，value=本阶段已经成功占用的机台编码。
-     * 后续普通新增排产只排除同一SKU重复选择这些机台，不会永久锁定机台给其他SKU。</p>
-     */
-    private Map<String, Set<String>> historicalReverseSelectedMachineCodeMap =
-            new LinkedHashMap<String, Set<String>>(8);
-    /**
-     * 前日交替计划反选成功且必须保留的结果集合。
-     * <p>使用对象身份保存，防止同SKU多机台尾量收口再次搬空或删除反选结果，
-     * 同时不改变其他普通新增结果的收口规则。</p>
-     */
-    private Set<LhScheduleResult> historicalReverseProtectedResultSet =
-            Collections.newSetFromMap(new IdentityHashMap<LhScheduleResult, Boolean>());
-    /**
-     * S4.5新增链路模具资源运行态，只限制新增机台数量，不反向裁剪S4.4续作结果
+     * 前置指定组合与S4.5新增共用模具资源运行态，不反向裁剪续作结果
      */
     private MouldResourceContext mouldResourceContext;
+
+    /** 前置指定组合已提交的在机绑定；后续日驱动直接接续同一结果与需求对象。 */
+    private List<ActiveMachineBinding> preScheduledMachineBindingList = new ArrayList<ActiveMachineBinding>(16);
+
+    /** 前置结果换下的旧模具最早释放时刻，防止后续从窗口首日开始排产时提前使用未来资源。 */
+    private Map<String, Date> preScheduledMouldReleaseTimeMap = new LinkedHashMap<String, Date>(16);
 
     // ========== 机台分配状态 ==========
 
@@ -1792,105 +1779,6 @@ public class LhScheduleContext {
                             .append('=').append(entry.getValue());
                 });
         return orderTextBuilder.toString();
-    }
-
-    /**
-     * 登记前日交替计划反选成功的机台。
-     *
-     * @param materialCode  物料编码
-     * @param productStatus 产品状态
-     * @param machineCode   机台编码
-     */
-    public void registerHistoricalReverseSelectedMachine(String materialCode,
-                                                         String productStatus,
-                                                         String machineCode) {
-        if (StringUtils.isEmpty(materialCode) || StringUtils.isEmpty(machineCode)) {
-            return;
-        }
-        String normalizedProductStatus = StringUtils.isEmpty(productStatus)
-                ? FORMAL_PRODUCT_STATUS : productStatus;
-        String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
-                materialCode, normalizedProductStatus);
-        historicalReverseSelectedMachineCodeMap
-                .computeIfAbsent(skuKey, key -> new LinkedHashSet<String>(2))
-                .add(machineCode);
-    }
-
-    /**
-     * 获取前日交替计划已为指定SKU反选成功的机台。
-     *
-     * @param materialCode  物料编码
-     * @param productStatus 产品状态
-     * @return 已成功机台编码集合；没有时返回空集合
-     */
-    public Set<String> getHistoricalReverseSelectedMachineCodes(String materialCode,
-                                                                String productStatus) {
-        if (StringUtils.isEmpty(materialCode)) {
-            return Collections.emptySet();
-        }
-        String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(materialCode, productStatus);
-        Set<String> machineCodeSet = historicalReverseSelectedMachineCodeMap.get(skuKey);
-        return CollectionUtils.isEmpty(machineCodeSet)
-                ? Collections.<String>emptySet() : machineCodeSet;
-    }
-
-    /**
-     * 撤销后置资源裁剪后已经失效的反选机台登记。
-     *
-     * @param materialCode  物料编码
-     * @param productStatus 产品状态
-     * @param machineCode   历史指定机台编码
-     */
-    public void unregisterHistoricalReverseSelectedMachine(String materialCode,
-                                                           String productStatus,
-                                                           String machineCode) {
-        if (StringUtils.isEmpty(materialCode) || StringUtils.isEmpty(machineCode)) {
-            return;
-        }
-        String normalizedProductStatus = StringUtils.isEmpty(productStatus)
-                ? FORMAL_PRODUCT_STATUS : productStatus;
-        String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
-                materialCode, normalizedProductStatus);
-        Set<String> machineCodeSet = historicalReverseSelectedMachineCodeMap.get(skuKey);
-        if (CollectionUtils.isEmpty(machineCodeSet)) {
-            return;
-        }
-        machineCodeSet.remove(machineCode);
-        if (machineCodeSet.isEmpty()) {
-            historicalReverseSelectedMachineCodeMap.remove(skuKey);
-        }
-    }
-
-    /**
-     * 保护前日交替计划反选成功的排程结果。
-     *
-     * @param result 反选成功结果
-     */
-    public void protectHistoricalReverseResult(LhScheduleResult result) {
-        if (Objects.nonNull(result)) {
-            historicalReverseProtectedResultSet.add(result);
-        }
-    }
-
-    /**
-     * 判断结果是否为前日交替计划反选成功结果。
-     *
-     * @param result 排程结果
-     * @return true-需要保持原机台关系；false-普通结果
-     */
-    public boolean isHistoricalReverseProtectedResult(LhScheduleResult result) {
-        return Objects.nonNull(result) && historicalReverseProtectedResultSet.contains(result);
-    }
-
-    /**
-     * 取消后置资源裁剪后已经失效结果的反选保护。
-     *
-     * @param result 已失效排程结果
-     */
-    public void unprotectHistoricalReverseResult(LhScheduleResult result) {
-        if (Objects.nonNull(result)) {
-            historicalReverseProtectedResultSet.remove(result);
-        }
     }
 
     /**

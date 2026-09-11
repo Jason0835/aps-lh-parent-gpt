@@ -429,7 +429,7 @@ public class SpecialMaterialMachineSubstitutionService {
         MachineScheduleDTO machine = context.getMachineScheduleMap().get(result.getLhMachineCode());
         return Objects.nonNull(machine)
                 && LhMachineHardMatchUtil.isMachineHardMatched(context, specialSku, machine)
-                && isMouldAvailable(context, specialSku, result.getLhMachineCode());
+                && this.isMouldAvailable(context, specialSku, result.getLhMachineCode(), targetDate);
     }
 
     /**
@@ -499,17 +499,21 @@ public class SpecialMaterialMachineSubstitutionService {
      * @param context 排程上下文
      * @param sku 特殊材料 SKU
      * @param machineCode 候选机台
+     * @param targetDate 本次置换的实际接管业务日
      * @return true-模具可用；false-模具不足或状态不可用
      */
     private boolean isMouldAvailable(LhScheduleContext context,
                                      SkuScheduleDTO sku,
-                                     String machineCode) {
+                                     String machineCode, LocalDate targetDate) {
         MouldResourceContext mouldResourceContext = context.getMouldResourceContext();
         if (Objects.isNull(mouldResourceContext)) {
             return true;
         }
         MouldResourceAllocationResult allocationResult =
-                mouldResourceContext.previewAllocate(sku.getMaterialCode(), machineCode);
+                mouldResourceContext.previewAllocate(sku.getMaterialCode(), machineCode,
+                        LhScheduleTimeUtil.resolveDayResourceReferenceTime(context,
+                                Date.from(targetDate.atStartOfDay(ZoneId.systemDefault()).toInstant()),
+                                context.getMachineScheduleMap().get(machineCode)));
         if (allocationResult.isAllowed()) {
             return true;
         }

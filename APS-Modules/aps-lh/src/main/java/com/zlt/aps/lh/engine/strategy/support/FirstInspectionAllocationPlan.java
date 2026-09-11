@@ -115,6 +115,14 @@ public class FirstInspectionAllocationPlan {
                 countingShift, Collections.<FirstInspectionShiftAllocation>emptyList());
     }
 
+    /**
+     * 是否已有计件首检时间计划。故障可使产量归零，但不能重新触发旧首检或改变原时间安排。
+     * @return 有效且原计件时长大于零
+     */
+    public boolean hasQuantityTimeline() {
+        return valid && inspectionDurationSeconds > 0L;
+    }
+
     public boolean isValid() {
         return valid;
     }

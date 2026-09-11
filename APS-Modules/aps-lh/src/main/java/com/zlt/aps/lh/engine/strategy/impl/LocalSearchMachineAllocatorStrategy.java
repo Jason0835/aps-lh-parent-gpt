@@ -518,8 +518,7 @@ public class LocalSearchMachineAllocatorStrategy {
                 ? Collections.<Integer, Integer>emptyMap()
                 : FirstInspectionAllocationUtil.toShiftQtyMap(firstInspectionAllocationPlan);
         boolean crossShiftInspection = Objects.nonNull(firstInspectionAllocationPlan)
-                && firstInspectionAllocationPlan.isValid()
-                && firstInspectionAllocationPlan.getInspectionQty() > 0;
+                && firstInspectionAllocationPlan.hasQuantityTimeline();
         cursorStartTime = FirstInspectionQtyUtil.resolveProductionStartAfterFirstInspection(
                 sku, ScheduleTypeEnum.NEW_SPEC.getCode(), cursorStartTime,
                 firstInspectionAllocationPlan);

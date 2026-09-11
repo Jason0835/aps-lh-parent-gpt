@@ -792,16 +792,6 @@ public class LhScheduleConfig {
     }
 
     /**
-     * T+1资源日是否启用前次交替优先；T日固定规则由公共匹配服务独立判断。
-     *
-     * @return true-启用；缺失或空值按业务默认1处理
-     */
-    public boolean isNextDayPreviousAlternationPriorityEnabled() {
-        return this.getParamIntValue(LhScheduleParamConstant.NEXT_DAY_PREVIOUS_ALTERNATION_PRIORITY_ENABLED,
-                LhScheduleConstant.NEXT_DAY_PREVIOUS_ALTERNATION_PRIORITY_ENABLED) == 1;
-    }
-
-    /**
      * 判断新增排产机台资源是否按实际可开产时间归属班次。
      * <p>实际可开产时间包含机台收尾、换模/换活字块、首检、胎胚门禁、设备计划和生产门禁；
      * 配置为0时只改变机台资源首次进入竞争的班次，正式排产仍执行完整时间轴校验。</p>

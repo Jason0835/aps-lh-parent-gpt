@@ -3,6 +3,8 @@ package com.zlt.aps.lh.api.domain.dto;
 import lombok.Data;
 
 import java.util.Date;
+import java.util.Map;
+import java.util.LinkedHashMap;
 
 /**
  * 机台精度保养时间窗口。
@@ -32,6 +34,8 @@ public class MachineMaintenanceWindowDTO {
     private Date maintenanceEndTime;
     /** 保养结束并完成胶囊预热后的最早开产时间 */
     private Date productionResumeTime;
+    /** 仅05容量窗口使用：每个来源维修日期的早班起止，跨日合并维修仍保留各自固定量班别。 */
+    private Map<Date, Date> repairFixedQtyShiftWindowMap = new LinkedHashMap<>(3);
     /** 精度执行日前生产、换模、换活字块和首检必须全部完成的截止时间，固定为执行日06:00 */
     private Date productionCutoffTime;
     /** 是否允许在前SKU自然收尾后、生产截止时间前插排完整小余量SKU */

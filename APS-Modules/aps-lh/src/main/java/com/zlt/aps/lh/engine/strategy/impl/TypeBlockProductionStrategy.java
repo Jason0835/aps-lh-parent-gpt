@@ -32,8 +32,6 @@ import com.zlt.aps.lh.component.StructureEndingAlignmentService;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.component.UnscheduledResultCollector;
 import com.zlt.aps.lh.context.LhScheduleContext;
-import com.zlt.aps.lh.service.impl.NewSpecScheduleCommitService;
-import com.zlt.aps.lh.service.impl.PreviousAlternationPreferenceService;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
 import com.zlt.aps.lh.engine.strategy.IEndingJudgmentStrategy;
 import com.zlt.aps.lh.engine.strategy.IFirstInspectionBalanceStrategy;
@@ -102,7 +100,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.function.BiPredicate;
 
 /**
  * 换活字块排产子策略。
@@ -123,14 +120,6 @@ import java.util.function.BiPredicate;
 @Slf4j
 @Component("typeBlockProductionStrategy")
 public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy {
-
-    /** 历史优先只查询关系，原候选过滤和机台顺序保持不变。 */
-    private final PreviousAlternationPreferenceService previousAlternationPreferenceService =
-            new PreviousAlternationPreferenceService();
-
-    /** 历史候选额外试排失败时复用完整运行态恢复。 */
-    @Resource
-    private NewSpecScheduleCommitService newSpecScheduleCommitService;
 
     private static final String CONTINUOUS_SCHEDULE_TYPE = ScheduleTypeEnum.CONTINUOUS.getCode();
     private static final String TYPE_BLOCK_DRY_ICE_CLEANING_ANALYSIS = "干冰清洗+换活字块";
@@ -331,25 +320,6 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                         .hasOpenPrecisionPreInsertWindow(machine);
                 SkuScheduleDTO typeBlockSku = null;
                 boolean success = false;
-                LocalDate resourceDate = this.resolveTypeBlockEndingBusinessDate(context, machine);
-                // 只在原硬过滤候选中额外尝试历史关系；失败完整恢复后继续下面原选择循环。
-                for (SkuScheduleDTO preferredSku : previousAlternationPreferenceService.preferredCandidates(
-                        context, resourceDate, machine, MouldChangeTypeEnum.TYPE_BLOCK.getCode(), typeBlockCandidates)) {
-                    String preferenceEvidence = previousAlternationPreferenceService.describe(context, resourceDate,
-                            machine, MouldChangeTypeEnum.TYPE_BLOCK.getCode(), preferredSku.getMaterialCode());
-                    success = newSpecScheduleCommitService.tryPreviousAlternation(context, () ->
-                            !this.shouldReserveMachineForNewSpecPath(context, machine, preferredSku, shifts)
-                                    && this.tryTypeBlockCandidate(context, machine, preferredSku, shifts,
-                                    activeMachines, typeBlockCandidates, matchedLayer,
-                                    machineTriggerSourceMap.get(machineCode)));
-                    log.info("换活字块前次交替匹配, batchNo: {}, {}, 是否最终复用={}, 处理结果={}",
-                            context.getBatchNo(), preferenceEvidence, success,
-                            success ? "原排产约束下成功落地" : "历史候选不可排，运行态已恢复，继续原选择");
-                    if (success) {
-                        typeBlockSku = preferredSku;
-                        break;
-                    }
-                }
                 for (SkuScheduleDTO candidateSku : typeBlockCandidates) {
                     if (success) {
                         break;
@@ -404,7 +374,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
     }
 
     /**
-     * 执行原有单个换活字块候选计算；历史优先与原选择共用同一约束和账本链。
+     * 执行单个换活字块候选计算，统一切换时间、首检、产能和账本更新。
      *
      * @param context 排程上下文
      * @param machine 候选机台
@@ -420,12 +390,6 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                                            SkuScheduleDTO sku, List<LhShiftConfigVO> shifts,
                                            List<MachineScheduleDTO> activeMachines, List<SkuScheduleDTO> candidateSkus,
                                            String matchedLayer, String triggerSource) {
-        String preferenceEvidence = previousAlternationPreferenceService.describe(context,
-                this.resolveTypeBlockEndingBusinessDate(context, machine), machine,
-                MouldChangeTypeEnum.TYPE_BLOCK.getCode(), sku.getMaterialCode());
-        boolean historyMatched = Objects.nonNull(previousAlternationPreferenceService.match(context,
-                this.resolveTypeBlockEndingBusinessDate(context, machine), machine,
-                MouldChangeTypeEnum.TYPE_BLOCK.getCode(), sku.getMaterialCode()));
         if (endingJudgmentStrategy.isCurrentWindowEnding(context, sku)) {
             getMaintenanceScheduleService().tryAttachMaintenanceAfterFirstEnding(
                     context, machine, machine.getEstimatedEndTime());
@@ -446,8 +410,6 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                 sku, matchedLayer, success, typeBlockSwitchStartTime,
                 typeBlockStartTime, triggerSource,
                 failureReason.toString());
-        log.info("换活字块机台选SKU, batchNo: {}, {}, 是否最终复用={}, 可排性说明={}",
-                context.getBatchNo(), preferenceEvidence, success && historyMatched, failureReason);
         if (!success) {
             log.warn("换活字块排产失败, 机台: {}, materialCode: {}, 结构: {}, 开始时间: {}, 匹配层级: {}, 失败原因: {}",
                     machine.getMachineCode(), sku.getMaterialCode(), sku.getStructureName(),
@@ -479,24 +441,6 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             LocalDate scheduleDate,
             List<SkuScheduleDTO> dayMaterials,
             List<MachineScheduleDTO> dayMachines) {
-        return this.matchDayTypeBlockReversePairs(context, scheduleDate, dayMaterials, dayMachines, null);
-    }
-
-    /**
-     * 正常按天换活字块在原首选确定后查询历史偏好，优先候选必须通过调用方完整预演。
-     *
-     * @param context 排程上下文
-     * @param scheduleDate 资源业务日
-     * @param dayMaterials 原日期候选池
-     * @param dayMachines 原候选机台顺序
-     * @param historicalEligibility 历史候选完整预演；为空表示不启用
-     * @return 按原机台顺序形成的配对
-     */
-    @Override
-    public List<DayTypeBlockReverseSelectionDirective> matchDayTypeBlockReversePairs(
-            LhScheduleContext context, LocalDate scheduleDate, List<SkuScheduleDTO> dayMaterials,
-            List<MachineScheduleDTO> dayMachines,
-            BiPredicate<MachineScheduleDTO, SkuScheduleDTO> historicalEligibility) {
         if (Objects.isNull(context) || Objects.isNull(scheduleDate)
                 || CollectionUtils.isEmpty(dayMaterials) || CollectionUtils.isEmpty(dayMachines)) {
             return Collections.emptyList();
@@ -539,9 +483,6 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                 directive.setProductStatus(sku.getProductStatus());
                 directive.setSkuSortRank(sku.getSortRank());
                 directive.setMatchedLayer("同胎胚+同模具");
-                // 原首选不变时直接保留原指令；历史不可排不产生额外机台或物料锁定。
-                this.applyPreviousAlternationPreference(context, scheduleDate, machine, dayMaterials,
-                        lockedMaterialKeySet, historicalEligibility, directive);
                 result.add(directive);
                 lockedMaterialKeySet.add(MonthPlanDateResolver.buildMaterialStatusKey(
                         directive.getMaterialCode(), directive.getProductStatus()));
@@ -552,157 +493,10 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
     }
 
     /**
-     * 在同机台原候选池中找完整可排的历史关系；不改变物料归属的原机台推进顺序。
-     *
-     * @param context 排程上下文
-     * @param resourceDate 资源日
-     * @param machine 当前机台
-     * @param candidates 原候选池
-     * @param lockedKeys 已被前序机台选中的物料状态键
-     * @param eligibility 完整预演
-     * @param directive 本机原首选指令
-     */
-    private void applyPreviousAlternationPreference(LhScheduleContext context, LocalDate resourceDate,
-            MachineScheduleDTO machine, List<SkuScheduleDTO> candidates, Set<String> lockedKeys,
-            BiPredicate<MachineScheduleDTO, SkuScheduleDTO> eligibility,
-            DayTypeBlockReverseSelectionDirective directive) {
-        if (Objects.isNull(eligibility) || !previousAlternationPreferenceService.isEnabled(context, resourceDate)) {
-            return;
-        }
-        List<SkuScheduleDTO> preferredCandidates = previousAlternationPreferenceService.preferredCandidates(
-                context, resourceDate, machine, MouldChangeTypeEnum.TYPE_BLOCK.getCode(), candidates).stream()
-                .filter(candidate -> candidate.resolveTargetScheduleQty() > 0)
-                .filter(candidate -> !lockedKeys.contains(MonthPlanDateResolver.buildMaterialStatusKey(
-                        candidate.getMaterialCode(), candidate.getProductStatus())))
-                .filter(candidate -> this.isTypeBlockCandidate(context, machine, candidate, false))
-                .collect(Collectors.toList());
-        for (SkuScheduleDTO candidate : preferredCandidates) {
-            if (!eligibility.test(machine, candidate)) {
-                continue;
-            }
-            directive.setPreviousAlternationCandidateKeys(preferredCandidates.stream()
-                    .map(preferred -> MonthPlanDateResolver.buildMaterialStatusKey(
-                            preferred.getMaterialCode(), preferred.getProductStatus()))
-                    .collect(Collectors.toList()));
-            directive.setPreviousAlternationPreferred(true);
-            directive.setOriginalMaterialCode(directive.getMaterialCode());
-            directive.setOriginalProductStatus(directive.getProductStatus());
-            directive.setOriginalSkuSortRank(directive.getSkuSortRank());
-            directive.setMaterialCode(candidate.getMaterialCode());
-            directive.setProductStatus(candidate.getProductStatus());
-            directive.setSkuSortRank(candidate.getSortRank());
-            return;
-        }
-    }
-
-    /**
-     * 在历史指定机台上尝试换活字块排产。
-     *
-     * <p>历史计划的交替类型只用于检索范围，不直接继承。本方法先按当前机台物料、胎胚、
-     * 模具和活字块关系重新判断实际是否属于换活字块；不满足时返回“不适用”，由反选策略
-     * 转交新增换模主链。满足后继续复用现有切换资源、首检、班次产能、结果构建及账本更新。
-     * 历史映射班次是切换开始班次硬约束，历史具体时间不会参与计算。</p>
-     *
-     * @param context 排程上下文
-     * @param machine 历史指定机台
-     * @param sku 当前实际账本选中的SKU状态
-     * @param mappedShiftIndex 历史班次映射后的当前班次
-     * @return 指定机台换活字块执行结果
-     */
-    @Override
-    public SpecifiedMachineScheduleResult tryScheduleSpecifiedMachine(
-            LhScheduleContext context,
-            MachineScheduleDTO machine,
-            SkuScheduleDTO sku,
-            int mappedShiftIndex) {
-        if (Objects.isNull(context) || Objects.isNull(machine) || Objects.isNull(sku)) {
-            return SpecifiedMachineScheduleResult.failed(
-                    MouldChangeTypeEnum.TYPE_BLOCK.getCode(),
-                    "排程上下文、指定机台或目标SKU为空");
-        }
-        if (!isTypeBlockCandidate(context, machine, sku)) {
-            return SpecifiedMachineScheduleResult.notApplicable("当前机台物料与目标SKU不满足换活字块条件");
-        }
-        LhShiftConfigVO mappedShift = LhScheduleTimeUtil.getShiftByIndex(
-                context, context.getScheduleDate(), mappedShiftIndex);
-        if (Objects.isNull(mappedShift) || Objects.isNull(mappedShift.getShiftStartDateTime())
-                || Objects.isNull(mappedShift.getShiftEndDateTime())) {
-            return SpecifiedMachineScheduleResult.failed(
-                    MouldChangeTypeEnum.TYPE_BLOCK.getCode(),
-                    "历史班次无法映射到本批次有效班次");
-        }
-        Date machineEndTime = machine.getEstimatedEndTime();
-        if (Objects.isNull(machineEndTime)) {
-            return SpecifiedMachineScheduleResult.failed(
-                    MouldChangeTypeEnum.TYPE_BLOCK.getCode(),
-                    "历史指定机台没有可用于重新计算的收尾时间");
-        }
-        Date alignedEndTime = machineEndTime.before(mappedShift.getShiftStartDateTime())
-                ? mappedShift.getShiftStartDateTime() : machineEndTime;
-        if (!alignedEndTime.before(mappedShift.getShiftEndDateTime())) {
-            return SpecifiedMachineScheduleResult.failed(
-                    MouldChangeTypeEnum.TYPE_BLOCK.getCode(),
-                    "历史指定机台在映射班次内已无可用切换时间");
-        }
-
-        List<LhShiftConfigVO> shifts =
-                LhScheduleTimeUtil.getScheduleShifts(context, context.getScheduleDate());
-        int resultStartIndex = context.getScheduleResultList().size();
-        int unscheduledStartIndex = context.getUnscheduledResultList().size();
-        boolean pendingBefore = context.getNewSpecSkuList().contains(sku);
-        Integer originalTargetQty = sku.getTargetScheduleQty();
-        Integer originalRemainingQty = sku.getRemainingScheduleQty();
-
-        Date switchStartTime = allocateTypeBlockSwitchStartTime(
-                context, machine, sku, alignedEndTime);
-        if (Objects.isNull(switchStartTime)
-                || switchStartTime.before(mappedShift.getShiftStartDateTime())
-                || !switchStartTime.before(mappedShift.getShiftEndDateTime())) {
-            if (Objects.nonNull(switchStartTime)) {
-                getMouldChangeBalanceStrategy().rollbackMouldChange(context, switchStartTime);
-            }
-            return SpecifiedMachineScheduleResult.failed(
-                    MouldChangeTypeEnum.TYPE_BLOCK.getCode(),
-                    "按本批机台状态重新分配后，换活字块开始时间未落在历史映射班次");
-        }
-        Date productionStartTime = resolveTypeBlockProductionStartTime(
-                context, machine, sku, alignedEndTime, switchStartTime, shifts);
-        StringBuilder failureReason = new StringBuilder(128);
-        boolean success = appendTypeBlockResultWithRollback(
-                context, machine, sku, productionStartTime, switchStartTime, shifts,
-                true, failureReason);
-        if (!success) {
-            /*
-             * 指定机台失败只代表本次反选失败，不得提前写入未排或把SKU移出普通新增队列。
-             * 换活字块主链已经回滚切换配额，这里只恢复其可能写入的待排上下文。
-             */
-            clearAddedUnscheduledResults(context, unscheduledStartIndex);
-            sku.setTargetScheduleQty(originalTargetQty);
-            sku.setRemainingScheduleQty(originalRemainingQty);
-            if (pendingBefore && !context.getNewSpecSkuList().contains(sku)) {
-                context.getNewSpecSkuList().add(sku);
-            }
-            return SpecifiedMachineScheduleResult.failed(
-                    MouldChangeTypeEnum.TYPE_BLOCK.getCode(),
-                    StringUtils.isNotEmpty(failureReason.toString())
-                            ? failureReason.toString() : "换活字块主链未生成有效排程结果");
-        }
-        LhScheduleResult result = findSpecifiedTypeBlockResult(
-                context, machine, sku, resultStartIndex);
-        if (Objects.isNull(result)) {
-            return SpecifiedMachineScheduleResult.failed(
-                    MouldChangeTypeEnum.TYPE_BLOCK.getCode(),
-                    "换活字块主链返回成功但未找到对应排程结果");
-        }
-        return SpecifiedMachineScheduleResult.success(
-                result, MouldChangeTypeEnum.TYPE_BLOCK.getCode());
-    }
-
-    /**
      * 在特殊材料置换选定的续作机台上尝试换活字块排产。
      *
      * <p>候选关系、切换均衡、20:00 后禁换模、设备停机、首检、班次产能和账本扣减全部复用
-     * 正式换活字块主链。与历史反选不同，本入口不锁死某一个班次，允许现有切换规则从
+     * 正式换活字块主链。本入口允许现有切换规则从
      * {@code earliestSwitchTime} 起继续顺延到下一个合法班次。</p>
      *
      * @param context 排程上下文
@@ -1717,7 +1511,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         Date productionStartTime;
         if (plannedRepairAffectingSwitch) {
             /*
-             * 计划性维修与换活字块允许并行，完成点取两者最大值后完整追加SYS0307009预热。
+             * 计划性维修与换活字块允许并行，维修独立完成SYS0307009预热后，与换活字块完成点取最大值。
              * 预热完成时刻只作为正式生产下限；首检时间区间仍以真实换活字块完成点为终点
              * 向前倒推，不再沿用精度保养重叠的额外1小时等待。
              */
@@ -1809,7 +1603,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
     /**
      * 解析换活字块后试制生产门禁使用的兼容基准时刻。
      * <p>该方法只服务试制固定中班开产例外：命中计划性维修时按
-     * max(维修结束, 换活字块结束)+SYS0307009 确定正式生产下限。普通首检数量、计数班次
+     * max(维修结束+SYS0307009, 换活字块自身完成时间) 确定正式生产下限。普通首检数量、计数班次
      * 和跨班分摊不读取该时刻，始终以真实换活字块完成时间为首检区间终点。</p>
      *
      * @param context 排程上下文
@@ -1878,7 +1672,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
 
     /**
      * 根据停机窗口顺延换活字块切换起点。
-     * <p>05计划性维修允许与换活字块并行，实际开产点由统一维修时间轴在切换完成后追加预热；
+     * <p>05计划性维修允许与换活字块并行，实际开产点取维修预热完成时间与切换自身完成时间的最大值；
      * 其他停机类型仍按原逻辑顺延到停机结束。</p>
      *
      * @param context 排程上下文
@@ -4651,7 +4445,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         int firstInspectionQty = Objects.isNull(firstInspectionAllocationPlan)
                 ? 0 : firstInspectionAllocationPlan.getInspectionQty();
         boolean crossShiftInspection = Objects.nonNull(firstInspectionAllocationPlan)
-                && firstInspectionAllocationPlan.isValid() && firstInspectionQty > 0;
+                && firstInspectionAllocationPlan.hasQuantityTimeline();
         if (crossShiftInspection) {
             /*
              * 首检先于正式计划量一次性写入真实覆盖班次并扣减目标量。写入方法同时保证

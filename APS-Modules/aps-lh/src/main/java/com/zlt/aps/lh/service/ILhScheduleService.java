@@ -136,4 +136,5 @@ public interface ILhScheduleService extends IDocService<LhScheduleResult> {
 
     String[] getQueryFormulas();
 
+    String[] getQueryFormulasByDesc();
 }

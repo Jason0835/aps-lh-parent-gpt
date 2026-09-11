@@ -3,6 +3,13 @@ package com.zlt.aps.lh.service.impl;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.dto.CleaningScheduleDateFillItem;
+import com.zlt.aps.lh.api.domain.dto.MachineFaultWindowDTO;
+import com.zlt.aps.lh.api.domain.dto.MachineMaintenanceWindowDTO;
+import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
+import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
+import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
+import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
+import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.api.enums.CleaningTypeEnum;
 import com.zlt.aps.lh.api.enums.MachineStopTypeEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
@@ -13,6 +20,7 @@ import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
+import cn.hutool.core.bean.BeanUtil;
 import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
@@ -25,6 +33,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.time.format.DateTimeFormatter;
+import java.time.format.ResolverStyle;
+import java.time.format.DateTimeParseException;
+import java.time.LocalTime;
+import java.time.ZoneId;
 
 /**
  * 设备停机计划排程公共服务。
@@ -43,10 +56,266 @@ public class LhDeviceStopPlanScheduleService {
     private static final int ENABLED = 1;
     /** 多值参数分隔符 */
     private static final String VALUE_SEPARATOR = ",";
+    /** 05独立时刻使用严格HH:mm校验，不将非法值替换成隐式默认值。 */
+    private static final DateTimeFormatter REPAIR_START_TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm")
+            .withResolverStyle(ResolverStyle.STRICT);
 
     /** 设备停机计划 Mapper：用于回填清洗实际排程日期到 T_MDM_DEVICE_PLAN_SHUT.SCHEDULE_DATE */
     @Resource
     private MdmDevicePlanShutMapper mdmDevicePlanShutMapper;
+
+    /** 故障独立登记，禁止混入清洗、精度或切换调度。 */
+    @Resource
+    private LhTemporaryFaultService temporaryFaultService;
+
+    /**
+     * 按来源日期准备05维修及06故障，其他类型保留原有对象和处理规则。
+     * @param context 排程上下文
+     * @param sourcePlans 本次加载或扩展的设备停机计划
+     * @return 普通业务列表，05为实际维修时间，06已剥离为独立禁产窗口
+     */
+    public List<MdmDevicePlanShut> prepareStopPlans(LhScheduleContext context,
+                                                   List<MdmDevicePlanShut> sourcePlans) {
+        List<MdmDevicePlanShut> businessPlans = new ArrayList<>(sourcePlans.size());
+        Date startDate = LhScheduleTimeUtil.clearTime(context.getScheduleDate());
+        for (MdmDevicePlanShut plan : sourcePlans) {
+            if (Objects.isNull(plan)) {
+                continue;
+            }
+            boolean repair = StringUtils.equals(MachineStopTypeEnum.PLANNED_REPAIR.getCode(),
+                    plan.getMachineStopType());
+            boolean fault = StringUtils.equals(MachineStopTypeEnum.TEMPORARY_FAULT.getCode(),
+                    plan.getMachineStopType());
+            if (!repair && !fault) {
+                businessPlans.add(plan);
+                continue;
+            }
+            if (Objects.isNull(plan.getId()) || StringUtils.isEmpty(plan.getMachineCode())
+                    || Objects.isNull(plan.getBeginDate()) || Objects.isNull(plan.getEndDate())
+                    || !plan.getBeginDate().before(plan.getEndDate())) {
+                log.warn("设备停机计划缺少有效主键、机台或起止时间，本条不登记，不阻断排程, 计划ID: {}, 机台: {}, 类型: {}, 开始: {}, 结束: {}",
+                        plan.getId(), plan.getMachineCode(), plan.getMachineStopType(), plan.getBeginDate(), plan.getEndDate());
+                continue;
+            }
+            if (plan.getBeginDate().before(startDate)) {
+                continue;
+            }
+            if (fault) {
+                // 原始故障严格按自身起止时间登记，不设置机台全局维修标记。
+                temporaryFaultService.registerFault(context, plan);
+            } else {
+                // 原始快照在扩展窗口时继续复用，防止已转换的时间再次作为来源时间。
+                context.getPlannedRepairSourcePlanMap().putIfAbsent(plan.getId(), plan);
+                MdmDevicePlanShut actual = this.buildActualRepairPlan(context,
+                        context.getPlannedRepairSourcePlanMap().get(plan.getId()));
+                if (Objects.nonNull(actual)) {
+                    businessPlans.add(actual);
+                }
+            }
+        }
+        return businessPlans;
+    }
+
+    /**
+     * 按维修独立开始时刻平移原始时长；不覆盖设备计划原始起止字段。
+     * @param context 排程上下文
+     * @param source 原始05计划
+     * @return 仅用于本轮计算的实际维修计划
+     */
+    private MdmDevicePlanShut buildActualRepairPlan(LhScheduleContext context, MdmDevicePlanShut source) {
+        String configuredTime = context.getParamValue(
+                LhScheduleParamConstant.PLANNED_REPAIR_START_TIME, LhScheduleConstant.PLANNED_REPAIR_START_TIME);
+        LocalTime startTime;
+        if (StringUtils.isEmpty(configuredTime)) {
+            log.warn("计划性维修开始时刻为空，本条不登记，不阻断排程, 计划ID: {}", source.getId());
+            return null;
+        }
+        try {
+            startTime = LocalTime.parse(configuredTime, REPAIR_START_TIME_FORMAT);
+        } catch (DateTimeParseException exception) {
+            log.warn("计划性维修开始时刻配置非法，本条不登记，不阻断排程, 计划ID: {}, 参数: {}, 配置值: {}",
+                    source.getId(), LhScheduleParamConstant.PLANNED_REPAIR_START_TIME, configuredTime);
+            return null;
+        }
+        Date actualStart = Date.from(source.getBeginDate().toInstant().atZone(ZoneId.systemDefault())
+                .toLocalDate().atTime(startTime).atZone(ZoneId.systemDefault()).toInstant());
+        long durationMillis = source.getEndDate().getTime() - source.getBeginDate().getTime();
+        MdmDevicePlanShut actual = new MdmDevicePlanShut();
+        BeanUtil.copyProperties(source, actual);
+        actual.setBeginDate(actualStart);
+        actual.setEndDate(new Date(actualStart.getTime() + durationMillis));
+        return actual;
+    }
+
+    /**
+     * 在结果保存事务中回填实际纳入排程的05/06；窗口外计划和不存在的机台不回填。
+     * @param context 已完成排程的上下文
+     * @return 实际更新条数
+     */
+    public int batchFillStopScheduleDates(LhScheduleContext context) {
+        return this.batchFillStopScheduleDates(this.resolveScheduledStopDates(context));
+    }
+
+    /**
+     * 回填已确认的来源日期，也供班次9复用其独立保存事务。
+     * @param scheduleDates 来源计划主键到实际执行日期
+     * @return 实际更新条数
+     */
+    public int batchFillStopScheduleDates(Map<Long, Date> scheduleDates) {
+        int updatedCount = 0;
+        for (Map.Entry<Long, Date> entry : scheduleDates.entrySet()) {
+            MdmDevicePlanShut update = new MdmDevicePlanShut();
+            update.setId(entry.getKey());
+            update.setScheduleDate(entry.getValue());
+            // 仅更新来源日期，更新条数异常只记录应用日志，不把校验升级为排程中断。
+            int affectedRows = mdmDevicePlanShutMapper.updateById(update);
+            if (affectedRows != 1) {
+                log.warn("设备停机排程日期回填条数异常，不阻断排程, 计划ID: {}, 排程日期: {}, 更新条数: {}",
+                        entry.getKey(), entry.getValue(), affectedRows);
+            }
+            updatedCount += affectedRows;
+        }
+        return updatedCount;
+    }
+
+    /**
+     * 计算本轮已锁定设备窗口的回填日期。无SKU产出也可实际安排维修或发生故障。
+     * @param context 完成排程的上下文
+     * @return 来源计划ID到实际开始日期，不使用本次请求日期替代
+     */
+    public Map<Long, Date> resolveScheduledStopDates(LhScheduleContext context) {
+        Map<Long, MdmDevicePlanShut> sources = new LinkedHashMap<>(context.getPlannedRepairSourcePlanMap());
+        for (MachineFaultWindowDTO fault : context.getTemporaryFaultWindowMap().values()) {
+            MdmDevicePlanShut source = new MdmDevicePlanShut();
+            source.setId(fault.getPlanId());
+            source.setMachineCode(fault.getMachineCode());
+            source.setMachineStopType(MachineStopTypeEnum.TEMPORARY_FAULT.getCode());
+            source.setBeginDate(fault.getStartTime());
+            source.setEndDate(fault.getEndTime());
+            sources.put(source.getId(), source);
+        }
+        Map<Long, Date> dates = new LinkedHashMap<>(sources.size());
+        for (MdmDevicePlanShut source : sources.values()) {
+            boolean repair = StringUtils.equals(MachineStopTypeEnum.PLANNED_REPAIR.getCode(), source.getMachineStopType());
+            MdmDevicePlanShut actual = repair ? this.buildActualRepairPlan(context, source) : source;
+            if (Objects.isNull(actual)) {
+                continue;
+            }
+            boolean machineExists = context.getMachineScheduleMap().keySet().stream()
+                    .anyMatch(code -> this.isSamePhysicalMachine(code, source.getMachineCode()));
+            boolean inWindow = LhScheduleTimeUtil.getScheduleShifts(context, context.getScheduleDate()).stream()
+                    .anyMatch(shift -> actual.getBeginDate().before(shift.getShiftEndDateTime())
+                            && actual.getEndDate().after(shift.getShiftStartDateTime()));
+            if (!machineExists || !inWindow) {
+                continue;
+            }
+            Date scheduleDate = LhScheduleTimeUtil.clearTime(actual.getBeginDate());
+            dates.put(source.getId(), scheduleDate);
+            Date readyTime = repair ? LhScheduleTimeUtil.addMinutes(actual.getEndDate(),
+                    LhScheduleTimeUtil.getCapsulePreheatMinutes(context)) : actual.getEndDate();
+            // 这里只记录已排业务的重叠证据，不修改任何业务计划或触发补偿。
+            this.logStopExecution(context, source, actual, readyTime, scheduleDate);
+        }
+        return dates;
+    }
+
+    /**
+     * 输出停机来源、实际窗口和与已排业务的重叠证据；06的预热明确为不适用。
+     * @param context 排程上下文
+     * @param source 原始计划
+     * @param actual 实际执行窗口
+     * @param readyTime 本场景的可生产时间
+     * @param scheduleDate 回填日期
+     */
+    private void logStopExecution(LhScheduleContext context, MdmDevicePlanShut source,
+            MdmDevicePlanShut actual, Date readyTime, Date scheduleDate) {
+        Map<String, Date[]> occupations = this.collectLogOccupations(context, source);
+        List<String> overlaps = new ArrayList<>(occupations.size());
+        Date finalReadyTime = readyTime;
+        List<Map.Entry<String, Date[]>> orderedOccupations = new ArrayList<>(occupations.entrySet());
+        orderedOccupations.sort(Comparator.comparing(entry -> entry.getValue()[0], Comparator.nullsLast(Date::compareTo)));
+        for (Map.Entry<String, Date[]> entry : orderedOccupations) {
+            Date[] window = entry.getValue();
+            if (Objects.nonNull(window[0]) && Objects.nonNull(window[1])
+                    && !window[0].after(finalReadyTime) && window[1].after(actual.getBeginDate())) {
+                overlaps.add(entry.getKey());
+                if (window[1].after(finalReadyTime)) {
+                    finalReadyTime = window[1];
+                }
+            }
+        }
+        log.info("设备停机实际安排, 批次: {}, 计划ID: {}, 机台编码: {}, 停机类型: {}, 原计划开始时间: {}, "
+                        + "原计划结束时间: {}, 计划日期: {}, 实际开始时间: {}, 实际结束时间: {}, "
+                        + "预热结束/本场景可开产时间: {}, 排程日期: {}, 是否存在重叠: {}, 重叠业务类型: {}, "
+                        + "最终机台可开产时间: {}, 故障仅扣时间产能: {}",
+                context.getBatchNo(), source.getId(), source.getMachineCode(), source.getMachineStopType(),
+                source.getBeginDate(), source.getEndDate(), LhScheduleTimeUtil.clearTime(source.getBeginDate()),
+                actual.getBeginDate(), actual.getEndDate(), readyTime, scheduleDate, !overlaps.isEmpty(), overlaps,
+                finalReadyTime, StringUtils.equals(MachineStopTypeEnum.TEMPORARY_FAULT.getCode(), source.getMachineStopType()));
+    }
+
+    /**
+     * 读取已安排业务窗口用于日志；故障自身不进入普通业务窗口。
+     * @param context 排程上下文
+     * @param source 来源停机计划，用于排除事件自身
+     * @return 业务类型及实际占用起止
+     */
+    private Map<String, Date[]> collectLogOccupations(LhScheduleContext context, MdmDevicePlanShut source) {
+        String machineCode = source.getMachineCode();
+        Map<String, Date[]> occupations = new LinkedHashMap<>(16);
+        for (MdmDevicePlanShut plan : context.getDevicePlanShutList()) {
+            if (Objects.equals(source.getId(), plan.getId())
+                    || !this.isSamePhysicalMachine(machineCode, plan.getMachineCode())) {
+                continue;
+            }
+            Date end = plan.getEndDate();
+            if (StringUtils.equals(MachineStopTypeEnum.PLANNED_REPAIR.getCode(), plan.getMachineStopType())) {
+                end = LhScheduleTimeUtil.addMinutes(end, LhScheduleTimeUtil.getCapsulePreheatMinutes(context));
+            }
+            occupations.put("设备停机:" + plan.getMachineStopType() + ":" + plan.getId(),
+                    new Date[]{plan.getBeginDate(), end});
+        }
+        for (MachineFaultWindowDTO fault : context.getTemporaryFaultWindowMap().values()) {
+            if (!Objects.equals(source.getId(), fault.getPlanId())
+                    && this.isSamePhysicalMachine(machineCode, fault.getMachineCode())) {
+                occupations.put("临时故障:" + fault.getPlanId(), new Date[]{fault.getStartTime(), fault.getEndTime()});
+            }
+        }
+        for (MachineScheduleDTO machine : context.getMachineScheduleMap().values()) {
+            if (!this.isSamePhysicalMachine(machineCode, machine.getMachineCode())) {
+                continue;
+            }
+            for (MachineMaintenanceWindowDTO window : CollectionUtils.isEmpty(machine.getMaintenanceWindowList())
+                    ? Collections.<MachineMaintenanceWindowDTO>emptyList() : machine.getMaintenanceWindowList()) {
+                occupations.put("精度/维保:" + machine.getMachineCode() + ":" + occupations.size(),
+                        new Date[]{window.getMaintenanceStartTime(), window.getProductionResumeTime()});
+            }
+            for (MachineCleaningWindowDTO window : CollectionUtils.isEmpty(machine.getCleaningWindowList())
+                    ? Collections.<MachineCleaningWindowDTO>emptyList() : machine.getCleaningWindowList()) {
+                occupations.put("清洗:" + window.getCleanType() + ":" + occupations.size(),
+                        new Date[]{window.getCleanStartTime(), window.getReadyTime()});
+            }
+        }
+        for (LhScheduleResult result : context.getScheduleResultList()) {
+            if (!this.isSamePhysicalMachine(machineCode, result.getLhMachineCode())
+                    || Objects.isNull(result.getMouldChangeStartTime())) {
+                continue;
+            }
+            boolean typeBlock = StringUtils.equals(ScheduleTypeEnum.TYPE_BLOCK.getCode(), result.getScheduleType());
+            int hours = typeBlock ? LhScheduleTimeUtil.getTypeBlockChangeTotalHours(context)
+                    : LhScheduleTimeUtil.getMouldChangeTotalHours(context);
+            occupations.put((typeBlock ? "换活字块:" : "换模:") + occupations.size(),
+                    new Date[]{result.getMouldChangeStartTime(),
+                            LhScheduleTimeUtil.addHours(result.getMouldChangeStartTime(), hours)});
+        }
+        return occupations;
+    }
+
+    /** @param first 第一机台 @param second 第二机台 @return 是否同一物理机台 */
+    private boolean isSamePhysicalMachine(String first, String second) {
+        return StringUtils.equals(LhSingleControlMachineUtil.resolvePhysicalMachineCode(first),
+                LhSingleControlMachineUtil.resolvePhysicalMachineCode(second));
+    }
 
     /**
      * 从设备停机计划中过滤干冰/喷砂清洗候选，并按计划开始时间、机台编码升序返回。

@@ -30,21 +30,18 @@ import com.zlt.aps.common.core.utils.ApsCommonUtil;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
-import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.dto.LhScheduleImportDTO;
-import com.zlt.aps.lh.api.domain.entity.*;
+import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
+import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
+import com.zlt.aps.lh.api.domain.entity.LhSharedMouldPat;
 import com.zlt.aps.lh.api.domain.vo.LhMouldChangePlanVo;
-import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
 import com.zlt.aps.lh.api.enums.ReleaseStatusEnum;
 import com.zlt.aps.lh.component.OrderNoGenerator;
-import com.zlt.aps.lh.mapper.LhMachineOnlineInfoMapper;
 import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.mapper.LhSharedMouldPatEntityMapper;
-import com.zlt.aps.lh.service.ILhMachineOnlineInfoService;
 import com.zlt.aps.lh.service.ILhMouldChangePlanService;
-import com.zlt.aps.lh.service.ILhParamsService;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
 import com.zlt.aps.utils.AppUtils;
 import com.zlt.bill.common.controller.AbstractDocBizController;
@@ -112,19 +109,10 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
     private IImportLogService iImportLogService;
 
     @Autowired
-    private ILhMachineOnlineInfoService lhMachineOnlineInfoService;
-
-    @Autowired
     private ISysDictDataCacheService iSysDictDataCacheService;
 
     @Autowired
     private LhSharedMouldPatEntityMapper lhSharedMouldPatEntityMapper;
-
-    @Autowired
-    private LhMachineOnlineInfoMapper lhMachineOnlineInfoMapper;
-
-    @Autowired
-    private ILhParamsService lhParamsService;
 
     @Autowired
     private LhScheduleResultMapper lhScheduleResultMapper;
@@ -150,7 +138,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
     @Override
     public TableDataInfo list(@RequestBody LhMouldChangePlan queryVO) {
         TableDataInfo tableDataInfo = super.list(queryVO);
-        this.fillDisplayMouldCode(tableDataInfo, queryVO);
+        this.fillDisplayMouldCode(tableDataInfo);
         return tableDataInfo;
     }
 
@@ -158,9 +146,8 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
      * 为列表当前页数据补充最终展示模具号。
      *
      * @param tableDataInfo 分页查询结果
-     * @param queryVO       查询条件
      */
-    private void fillDisplayMouldCode(TableDataInfo tableDataInfo, LhMouldChangePlan queryVO) {
+    private void fillDisplayMouldCode(TableDataInfo tableDataInfo) {
         if (tableDataInfo == null || CollectionUtils.isEmpty(tableDataInfo.getRows())) {
             return;
         }
@@ -172,12 +159,8 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             return;
         }
 
-        List<LhMouldChangePlanVo> planVoList = this.buildLhMouldChangePlanVoList(planList, queryVO);
-        Map<String, List<LhSharedMouldPat>> sharedMouldPatMap = this.buildSharedMouldPatMap(planVoList, queryVO);
-        for (int index = 0; index < planList.size(); index++) {
-            planList.get(index).setDisplayMouldCode(
-                    this.resolveDisplayMouldCode(planVoList.get(index), sharedMouldPatMap));
-        }
+        planList.forEach(plan -> plan.setDisplayMouldCode(
+                StringUtils.defaultIfBlank(plan.getMouldCode(), "")));
     }
 
     /**
@@ -488,110 +471,6 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
     }
 
     /**
-     * 添加派生模具号查询条件，查询值与页面展示及导出值保持一致。
-     * <p>该条件在数据库分页前执行，避免先分页后过滤造成漏数。</p>
-     *
-     * @param queryWrapper 查询条件构造器
-     * @param queryVO      查询条件
-     */
-    private void applyDisplayMouldCodeCondition(QueryWrapper<LhMouldChangePlan> queryWrapper,
-                                                LhMouldChangePlan queryVO) {
-        if (queryVO == null || StringUtils.isBlank(queryVO.getMouldCode())) {
-            return;
-        }
-
-        String mouldCodeKeyword = queryVO.getMouldCode().trim();
-        String planTable = "t_lh_mould_change_plan";
-        String machinePrefixSql = "CASE WHEN RIGHT(UPPER(TRIM(" + planTable + ".LH_MACHINE_CODE)), 1) IN ('L', 'R')"
-                + " THEN LEFT(UPPER(TRIM(" + planTable + ".LH_MACHINE_CODE)), LENGTH(TRIM(" + planTable
-                + ".LH_MACHINE_CODE)) - 1) ELSE UPPER(TRIM(" + planTable + ".LH_MACHINE_CODE)) END";
-        String sharedMouldExistsSql = "EXISTS (SELECT 1 FROM T_LH_SHARED_MOULD_PAT shared_mould "
-                + "WHERE shared_mould.IS_DELETE = 0 "
-                + "AND shared_mould.FACTORY_CODE = " + planTable + ".FACTORY_CODE "
-                + "AND shared_mould.MATERIAL_DESC = " + planTable + ".AFTER_MATERIAL_DESC "
-                + "AND CONCAT(CASE WHEN TRIM(COALESCE(shared_mould.MOULD_NO, '')) = '' THEN '' "
-                + "ELSE shared_mould.MOULD_NO END, '/', "
-                + "CASE WHEN TRIM(COALESCE(shared_mould.PATTERN_BLOCK, '')) = '' THEN '' "
-                + "ELSE shared_mould.PATTERN_BLOCK END) "
-                + "LIKE CONCAT('%', {3}, '%'))";
-        String sharedMouldBranch = "(COALESCE(FIND_IN_SET({0}, " + planTable + ".CHANGE_MOULD_TYPE), 0) = 0 AND "
-                + sharedMouldExistsSql + ")";
-        Date mouldOnlineDateEnd = this.getMouldOnlineDateEnd(queryVO, this.getMouldChangePlanLookbackDays(queryVO));
-        if (mouldOnlineDateEnd == null) {
-            queryWrapper.and(wrapper -> wrapper.apply(sharedMouldBranch, MouldChangeTypeEnum.TYPE_BLOCK.getCode(),
-                    mouldCodeKeyword, null, mouldCodeKeyword));
-            return;
-        }
-
-        String onlineMouldExistsSql = "EXISTS (SELECT 1 FROM T_LH_MACHINE_ONLINE_INFO online_mould "
-                + "WHERE online_mould.IS_DELETE = 0 "
-                + "AND online_mould.FACTORY_CODE = " + planTable + ".FACTORY_CODE "
-                + "AND UPPER(online_mould.LH_CODE) LIKE CONCAT(" + machinePrefixSql + ", '%') "
-                + "AND online_mould.ONLINE_DATE IS NOT NULL "
-                + "AND online_mould.ONLINE_DATE <= {2} "
-                + "AND online_mould.IN_MACHINE_MOULD_CODE IS NOT NULL "
-                + "AND TRIM(online_mould.IN_MACHINE_MOULD_CODE) <> '' "
-                + "AND online_mould.IN_MACHINE_MOULD_CODE LIKE CONCAT('%', {1}, '%') "
-                + "AND NOT EXISTS (SELECT 1 FROM T_LH_MACHINE_ONLINE_INFO newer_mould "
-                + "WHERE newer_mould.IS_DELETE = 0 "
-                + "AND newer_mould.FACTORY_CODE = online_mould.FACTORY_CODE "
-                + "AND newer_mould.LH_CODE = online_mould.LH_CODE "
-                + "AND newer_mould.ONLINE_DATE IS NOT NULL "
-                + "AND newer_mould.ONLINE_DATE <= {2} "
-                + "AND (newer_mould.ONLINE_DATE > online_mould.ONLINE_DATE "
-                + "OR (newer_mould.ONLINE_DATE = online_mould.ONLINE_DATE AND ("
-                + "(online_mould.UPDATE_TIME IS NULL AND newer_mould.UPDATE_TIME IS NOT NULL) "
-                + "OR (online_mould.UPDATE_TIME IS NOT NULL AND newer_mould.UPDATE_TIME IS NOT NULL "
-                + "AND newer_mould.UPDATE_TIME > online_mould.UPDATE_TIME) "
-                + "OR ((newer_mould.UPDATE_TIME = online_mould.UPDATE_TIME "
-                + "OR (newer_mould.UPDATE_TIME IS NULL AND online_mould.UPDATE_TIME IS NULL)) "
-                + "AND newer_mould.ID > online_mould.ID))))))";
-        String replaceBlockBranch = "(FIND_IN_SET({0}, " + planTable + ".CHANGE_MOULD_TYPE) > 0 AND "
-                + onlineMouldExistsSql + ")";
-        queryWrapper.and(wrapper -> wrapper.apply("(" + replaceBlockBranch + " OR " + sharedMouldBranch + ")",
-                MouldChangeTypeEnum.TYPE_BLOCK.getCode(), mouldCodeKeyword, mouldOnlineDateEnd, mouldCodeKeyword));
-    }
-
-    /**
-     * 获取模具交替计划模具号追溯天数。
-     *
-     * @param queryVO 查询条件
-     * @return 追溯天数，参数不存在或无效时返回默认值2
-     */
-    private int getMouldChangePlanLookbackDays(LhMouldChangePlan queryVO) {
-        int lookbackDays = 2;
-        if (queryVO == null || StringUtils.isBlank(queryVO.getFactoryCode())) {
-            return lookbackDays;
-        }
-        LhParams lookbackParam = lhParamsService.selectOneByParamCode(
-                LhScheduleParamConstant.MOULD_CHANGE_PLAN_LOOKBACK_DAYS, queryVO.getFactoryCode());
-        if (lookbackParam == null || StringUtils.isBlank(lookbackParam.getParamValue())) {
-            return lookbackDays;
-        }
-        try {
-            return Integer.parseInt(lookbackParam.getParamValue().trim());
-        } catch (NumberFormatException exception) {
-            log.warn("模具交替计划模具号追溯天数参数无效，使用默认值2，工厂编码：{}",
-                    queryVO.getFactoryCode());
-            return lookbackDays;
-        }
-    }
-
-    /**
-     * 计算在机模具信息的截止时间。
-     *
-     * @param queryVO      查询条件
-     * @param lookbackDays 模具号追溯天数
-     * @return 在机信息截止时间，排程日期为空时返回null
-     */
-    private Date getMouldOnlineDateEnd(LhMouldChangePlan queryVO, int lookbackDays) {
-        if (queryVO == null || queryVO.getScheduleDate() == null) {
-            return null;
-        }
-        return DateUtils.addDays(DateUtil.endOfDay(queryVO.getScheduleDate()), -lookbackDays);
-    }
-
-    /**
      * 批量查询共享模具配置并按后物料描述分组。
      *
      * @param list    模具交替计划导出视图列表
@@ -624,23 +503,11 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
     /**
      * 解析模具交替计划最终展示的模具号。
      *
-     * @param item              模具交替计划导出视图
-     * @param sharedMouldPatMap 共享模具配置映射
+     * @param item 模具交替计划导出视图
      * @return 最终展示模具号
      */
-    private String resolveDisplayMouldCode(LhMouldChangePlanVo item,
-                                           Map<String, List<LhSharedMouldPat>> sharedMouldPatMap) {
-        if (YesOrNoEnum.YES.getCode().equals(item.getIsReplaceBlock())) {
-            return StringUtils.defaultIfBlank(item.getMouldCode(), "");
-        }
-        List<LhSharedMouldPat> sharedMouldPatList = sharedMouldPatMap.get(item.getAfterMaterialDesc());
-        if (CollectionUtils.isEmpty(sharedMouldPatList)) {
-            return "";
-        }
-        return sharedMouldPatList.stream()
-                .map(sharedMouldPat -> StringUtils.defaultIfBlank(sharedMouldPat.getMouldNo(), "") + "/"
-                        + StringUtils.defaultIfBlank(sharedMouldPat.getPatternBlock(), ""))
-                .collect(Collectors.joining(",\n"));
+    private String resolveDisplayMouldCode(LhMouldChangePlanVo item) {
+        return StringUtils.defaultIfBlank(item.getMouldCode(), "");
     }
 
     /**
@@ -802,11 +669,11 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
                 }
             }
 
-            row.put("mouldCode", this.resolveDisplayMouldCode(item, lhSharedMouldPatMap));
+            row.put("mouldCode", this.resolveDisplayMouldCode(item));
 
             row.put("remark", item.getRemark());
 
-            // 当前交替计划在前日不存在且计划日期处于排程日及次日时，仅将后物料描述字体标红。
+            // 当前交替计划在前日不存在且计划日期处于排程日-1日时，仅将后物料描述字体标红。
             if (previousDayPlanKeySet != null
                     && !previousDayPlanKeySet.contains(this.buildMouldChangePlanKey(item))
                     && this.isPlanDateInExportRange(item.getPlanDate(),
@@ -841,13 +708,13 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
      * 根据模具交替计划实体构建前日比较唯一标识。
      *
      * @param mouldChangePlan 模具交替计划实体
-     * @return 计划日期、机台、前物料编码和后物料编码组成的唯一标识
+     * @return 机台、前物料编码和后物料编码组成的唯一标识
      */
     private String buildMouldChangePlanKey(LhMouldChangePlan mouldChangePlan) {
         if (mouldChangePlan == null) {
             return "";
         }
-        return this.buildMouldChangePlanKey(mouldChangePlan.getPlanDate(), mouldChangePlan.getLhMachineCode(),
+        return this.buildMouldChangePlanKey(mouldChangePlan.getLhMachineCode(),
                 mouldChangePlan.getBeforeMaterialCode(), mouldChangePlan.getAfterMaterialCode());
     }
 
@@ -870,36 +737,34 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
      * 根据模具交替计划导出视图构建前日比较唯一标识。
      *
      * @param mouldChangePlanVo 模具交替计划导出视图
-     * @return 计划日期、机台、前物料编码和后物料编码组成的唯一标识
+     * @return 机台、前物料编码和后物料编码组成的唯一标识
      */
     private String buildMouldChangePlanKey(LhMouldChangePlanVo mouldChangePlanVo) {
         if (mouldChangePlanVo == null) {
             return "";
         }
-        return this.buildMouldChangePlanKey(mouldChangePlanVo.getPlanDate(), mouldChangePlanVo.getLhMachineCode(),
+        return this.buildMouldChangePlanKey(mouldChangePlanVo.getLhMachineCode(),
                 mouldChangePlanVo.getBeforeMaterialCode(), mouldChangePlanVo.getAfterMaterialCode());
     }
 
     /**
      * 按统一字段顺序组装模具交替计划比较唯一标识。
      *
-     * @param planDate           计划日期
      * @param lhMachineCode      硫化机台编码
      * @param beforeMaterialCode 前物料编码
      * @param afterMaterialCode  后物料编码
      * @return 使用竖线分隔的计划唯一标识
      */
-    private String buildMouldChangePlanKey(Date planDate, String lhMachineCode,
-                                           String beforeMaterialCode, String afterMaterialCode) {
-        String planDateText = planDate == null ? "" : DateUtil.format(planDate, "yyyy-MM-dd");
-        return String.join("|", planDateText,
+    private String buildMouldChangePlanKey(String lhMachineCode, String beforeMaterialCode,
+                                           String afterMaterialCode) {
+        return String.join("|",
                 StringUtils.defaultIfBlank(lhMachineCode, ""),
                 StringUtils.defaultIfBlank(beforeMaterialCode, ""),
                 StringUtils.defaultIfBlank(afterMaterialCode, ""));
     }
 
     /**
-     * 判断计划日期是否处于排程日期当天或排程日期次日范围内。
+     * 判断计划日期是否处于排程日期当天或排程日期-1日范围内。
      *
      * @param planDate     计划日期
      * @param scheduleDate 排程日期
@@ -910,7 +775,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             return false;
         }
         return DateUtil.isSameDay(planDate, scheduleDate)
-                || DateUtil.isSameDay(planDate, DateUtil.offsetDay(scheduleDate, 1));
+                || DateUtil.isSameDay(planDate, DateUtil.offsetDay(scheduleDate, -1));
     }
 
     /**
@@ -929,90 +794,20 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
 
     /**
      * 构建模具交替计划导出视图列表。
-     * <p>模具号取自 T_LH_MACHINE_ONLINE_INFO 在机信息：按机台（去除末尾 L/R 后缀做模糊匹配，
-     * 使 K1501L 同时命中 K1501L、K1501R）取排程日期往前追溯 N 天内（含当日）最近一条在机记录的在机模号，
-     * 多条命中时按机台编码 + 上机日期排序去重后英文逗号拼接，回写模具号字段。
-     * 追溯天数 N 由硫化参数 MOULD_CHANGE_PLAN_LOOKBACK_DAYS（SYS0302012）控制，默认 3 天。</p>
+     * <p>模具号直接取模具交替计划库表字段 MOULD_CODE，不在导出过程中重新匹配在线模具或共享模具配置。</p>
      *
-     * @param list     模具交替计划列表
-     * @param queryVO 查询条件（含排程日期、分厂）
+     * @param list    模具交替计划列表
+     * @param queryVO 查询条件，保留现有导出调用参数
      * @return 导出视图列表
      */
     public List<LhMouldChangePlanVo> buildLhMouldChangePlanVoList(List<LhMouldChangePlan> list, LhMouldChangePlan queryVO) {
         List<LhMouldChangePlanVo> resultList = new ArrayList<>();
         int seq = 1;
 
-        // 读取硫化参数：模具交替计划模具号往前追溯天数，默认 2 天。
-        int lookbackDays = this.getMouldChangePlanLookbackDays(queryVO);
-
-        // 收集机台编码前缀（去除末尾 L/R 后缀），用于模糊匹配在机信息的左右模机台
-        List<String> machinePrefixList = new ArrayList<>();
-        for (LhMouldChangePlan mouldChangePlan : list) {
-            String machineCode = mouldChangePlan.getLhMachineCode();
-            if (StringUtils.isNotBlank(machineCode) && !machinePrefixList.contains(machineCode)) {
-                // 机台编码可能带 L/R 左右模后缀，去除后缀得到前缀用于模糊匹配（K1501L -> K1501）
-                String prefix = stripLeftRightSuffix(machineCode);
-                if (!machinePrefixList.contains(prefix)) {
-                    machinePrefixList.add(prefix);
-                }
-            }
-        }
-
-        // 机台前缀 -> 命中的在机记录（按机台 + 上机日期排序、去重后拼接模号）
-        Map<String, List<LhMachineOnlineInfo>> lhMachineOnlineInfoMap = new HashMap<>();
-        if (CollectionUtils.isNotEmpty(machinePrefixList) && queryVO != null && queryVO.getScheduleDate() != null) {
-            Date scheduleDateEnd = this.getMouldOnlineDateEnd(queryVO, lookbackDays);
-            LambdaQueryWrapper<LhMachineOnlineInfo> wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(StringUtils.isNotBlank(queryVO.getFactoryCode()), LhMachineOnlineInfo::getFactoryCode, queryVO.getFactoryCode());
-            wrapper.and(prefixWrapper -> {
-                for (String prefix : machinePrefixList) {
-                    // 模糊匹配：K1501 命中 K1501L、K1501R 等左右模机台
-                    prefixWrapper.or().likeRight(LhMachineOnlineInfo::getLhCode, prefix);
-                }
-            });
-            wrapper.isNotNull(LhMachineOnlineInfo::getOnlineDate);
-            wrapper.le(LhMachineOnlineInfo::getOnlineDate, scheduleDateEnd);
-            wrapper.eq(LhMachineOnlineInfo::getIsDelete, DeleteFlagEnum.NORMAL.getCode());
-            List<LhMachineOnlineInfo> lhMachineOnlineInfoList = lhMachineOnlineInfoMapper.selectList(wrapper);
-            if (CollectionUtils.isNotEmpty(lhMachineOnlineInfoList)) {
-                // 按机台编码 + 上机日期（倒序）+ 更新时间（倒序）排序，保证取每个机台最近一条
-                List<LhMachineOnlineInfo> sortedOnlineInfoList = lhMachineOnlineInfoList.stream()
-                        .filter(item -> StringUtils.isNotBlank(item.getLhCode()))
-                        .filter(item -> item.getOnlineDate() != null && !item.getOnlineDate().after(scheduleDateEnd))
-                        .sorted(Comparator.comparing(LhMachineOnlineInfo::getLhCode, Comparator.nullsLast(String::compareTo))
-                                .thenComparing(LhMachineOnlineInfo::getOnlineDate, Comparator.nullsLast(Comparator.reverseOrder()))
-                                .thenComparing(LhMachineOnlineInfo::getUpdateTime, Comparator.nullsLast(Comparator.reverseOrder()))
-                                .thenComparing(LhMachineOnlineInfo::getId, Comparator.nullsLast(Comparator.reverseOrder())))
-                        .collect(Collectors.toList());
-                for (LhMachineOnlineInfo onlineInfo : sortedOnlineInfoList) {
-                    String prefix = stripLeftRightSuffix(onlineInfo.getLhCode());
-                    lhMachineOnlineInfoMap.computeIfAbsent(prefix, k -> new ArrayList<>()).add(onlineInfo);
-                }
-            }
-        }
         for (LhMouldChangePlan lhMouldChangePlan : list) {
             LhMouldChangePlanVo lhMouldChangePlanVo = new LhMouldChangePlanVo();
             BeanUtil.copyProperties(lhMouldChangePlan, lhMouldChangePlanVo);
-
-            // 按机台前缀匹配在机信息，将命中记录（可能同时含 L/R 左右模）的在机模号排序去重后逗号拼接
-            String machinePrefix = stripLeftRightSuffix(lhMouldChangePlan.getLhMachineCode());
-            List<LhMachineOnlineInfo> matchedOnlineInfoList = lhMachineOnlineInfoMap.get(machinePrefix);
-            if (CollectionUtils.isNotEmpty(matchedOnlineInfoList)) {
-                // 每个机台取最近一条（已按上机日期倒序），按机台编码 + 上机日期排序去重拼接
-                Map<String, LhMachineOnlineInfo> latestByMachine = new LinkedHashMap<>();
-                for (LhMachineOnlineInfo onlineInfo : matchedOnlineInfoList) {
-                    latestByMachine.putIfAbsent(onlineInfo.getLhCode(), onlineInfo);
-                }
-                List<String> mouldCodeList = latestByMachine.values().stream()
-                        .map(LhMachineOnlineInfo::getInMachineMouldCode)
-                        .filter(StringUtils::isNotBlank)
-                        .distinct()
-                        .collect(Collectors.toList());
-                lhMouldChangePlanVo.setMouldCode(CollUtil.isNotEmpty(mouldCodeList) ? String.join(",", mouldCodeList) : "");
-            } else {
-                // 从模具变更计划赋值过来的要清空
-                lhMouldChangePlanVo.setMouldCode("");
-            }
+            lhMouldChangePlanVo.setMouldCode(StringUtils.defaultIfBlank(lhMouldChangePlan.getMouldCode(), ""));
 
             lhMouldChangePlanVo.setSeq(seq++);
 
@@ -1034,24 +829,6 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             resultList.add(lhMouldChangePlanVo);
         }
         return resultList;
-    }
-
-    /**
-     * 去除机台编码末尾的左右模后缀（L/R）。
-     * <p>示例：K1501L -> K1501，K1501R -> K1501，无后缀原样返回。</p>
-     *
-     * @param machineCode 机台编码
-     * @return 去除后缀后的机台前缀
-     */
-    private String stripLeftRightSuffix(String machineCode) {
-        if (StringUtils.isBlank(machineCode)) {
-            return machineCode;
-        }
-        String code = machineCode.trim().toUpperCase();
-        if (code.endsWith("L") || code.endsWith("R")) {
-            return code.substring(0, code.length() - 1);
-        }
-        return code;
     }
 
     @Override
@@ -1108,7 +885,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         }
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getAfterMaterialCode()), "AFTER_MATERIAL_CODE", queryVO.getAfterMaterialCode());
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getAfterMaterialDesc()), "AFTER_MATERIAL_DESC", queryVO.getAfterMaterialDesc());
-        this.applyDisplayMouldCodeCondition(queryWrapper, queryVO);
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMouldCode()), "MOULD_CODE", queryVO.getMouldCode());
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getIsRelease()), "IS_RELEASE", queryVO.getIsRelease());
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getMouldStatus()), "MOULD_STATUS", queryVO.getMouldStatus());
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getRemark()), "REMARK", queryVO.getRemark());
@@ -1192,6 +969,27 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         }
         List<Long> ids = list.stream().map(LhMouldChangePlan::getId).collect(Collectors.toList());
         return lhMouldChangePlanService.issueSchedule(ids);
+    }
+
+    /**
+     * 手工刷新指定分厂、排程日期和硫化结果批次的模具号。
+     *
+     * @param requestVO 请求参数，使用 factoryCode、scheduleDate 和 lhResultBatchNo
+     * @return 刷新结果
+     */
+    @Log(title = "ui.data.column.lhMouldChangePlan.modelName", businessType = BusinessType.UPDATE)
+    @ApiOperation("手工刷新模具号")
+    @PostMapping("/refreshMouldCode")
+    public AjaxResult refreshMouldCode(@RequestBody LhMouldChangePlan requestVO) {
+        if (requestVO == null
+                || StringUtils.isBlank(requestVO.getFactoryCode())
+                || requestVO.getScheduleDate() == null
+                || StringUtils.isBlank(requestVO.getLhResultBatchNo())) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.message.param.error"));
+        }
+        lhMouldChangePlanService.refreshMouldCode(requestVO.getFactoryCode(),
+                requestVO.getScheduleDate(), requestVO.getLhResultBatchNo());
+        return AjaxResult.success(I18nUtil.getMessage("ui.message.operation.success"));
     }
 
 }

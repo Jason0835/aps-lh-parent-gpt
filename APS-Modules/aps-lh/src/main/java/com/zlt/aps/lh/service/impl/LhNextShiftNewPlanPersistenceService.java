@@ -13,6 +13,8 @@ import org.springframework.util.CollectionUtils;
 import javax.annotation.Resource;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
+import java.util.Collections;
 import java.util.Objects;
 
 /**
@@ -33,6 +35,10 @@ public class LhNextShiftNewPlanPersistenceService {
     @Resource
     private LhNextShiftNewPlanMapper nextShiftNewPlanMapper;
 
+    /** 在班次9已有独立事务中回填实际故障或维修日期。 */
+    @Resource
+    private LhDeviceStopPlanScheduleService deviceStopPlanScheduleService;
+
     /**
      * 原子刷新班次9结果。
      *
@@ -49,6 +55,23 @@ public class LhNextShiftNewPlanPersistenceService {
                               String batchNo,
                               List<LhNextShiftNewPlan> planList,
                               String operator) {
+        return this.replaceByScope(factoryCode, scheduleDate, batchNo, planList, operator,
+                Collections.<Long, Date>emptyMap());
+    }
+
+    /**
+     * 复用班次9原事务，同时保存本次独立计算真实覆盖的设备停机日期。
+     * @param factoryCode 工厂
+     * @param scheduleDate 请求日期
+     * @param batchNo 批次
+     * @param planList 班次9结果
+     * @param operator 操作人
+     * @param stopScheduleDates 实际执行的设备计划日期，不能使用请求日期替代
+     * @return 保存数量
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    public int replaceByScope(String factoryCode, Date scheduleDate, String batchNo,
+            List<LhNextShiftNewPlan> planList, String operator, Map<Long, Date> stopScheduleDates) {
         if (StringUtils.isEmpty(factoryCode) || Objects.isNull(scheduleDate)
                 || StringUtils.isEmpty(batchNo)) {
             throw new IllegalArgumentException("班次9计划持久化范围不能为空");
@@ -57,6 +80,10 @@ public class LhNextShiftNewPlanPersistenceService {
                 new LambdaQueryWrapper<LhNextShiftNewPlan>()
                         .eq(LhNextShiftNewPlan::getFactoryCode, factoryCode)
                         .eq(LhNextShiftNewPlan::getScheduleDate, scheduleDate));
+        if (!CollectionUtils.isEmpty(stopScheduleDates)) {
+            // 无产出也可能因故障整班禁产；日期回填依赖实际覆盖窗口，不依赖正量结果。
+            deviceStopPlanScheduleService.batchFillStopScheduleDates(stopScheduleDates);
+        }
         if (CollectionUtils.isEmpty(planList)) {
             log.info("班次9计划幂等刷新完成, factoryCode: {}, scheduleDate: {}, batchNo: {}, "
                             + "deletedCount: {}, savedCount: 0",
