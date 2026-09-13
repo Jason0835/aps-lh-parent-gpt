@@ -43,6 +43,8 @@ public enum ScheduleErrorCode {
     CONTINUOUS_MACHINE_NOT_FOUND("S4401", "ui.data.column.lhScheduleResult.errorCode.continuousMachineNotFound"),
     SHIFT_ALLOCATION_FAILED("S4402", "ui.data.column.lhScheduleResult.errorCode.shiftAllocationFailed"),
     EMBRYO_STOCK_INSUFFICIENT("S4403", "ui.data.column.lhScheduleResult.errorCode.embryoStockInsufficient"),
+    CONTINUOUS_ONLINE_MOULD_MISMATCH("S4404",
+            "ui.data.column.lhScheduleResult.errorCode.continuousOnlineMouldMismatch"),
 
     // ==================== S4.5 新增排产错误 ====================
     NO_MACHINE_AVAILABLE("S4501", "ui.data.column.lhScheduleResult.errorCode.noMachineAvailable"),

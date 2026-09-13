@@ -31,7 +31,11 @@ public abstract class AbsScheduleStepHandler {
             if (shouldPropagateException()) {
                 throw e;
             }
-            log.warn("[{}] 排程业务异常: {}", getStepName(), e.getMessage(), e);
+            /*
+             * 业务异常（如基础数据校验、续作在机模具校验不通过）属于可预期的排程失败，
+             * 只记录一行可读原因，不再打印异常堆栈；失败明细通过上下文写入中断响应返回接口。
+             */
+            log.warn("[{}] 排程业务异常: {}", getStepName(), e.getMessage());
             context.interruptSchedule(e.getMessage());
         } catch (Exception e) {
             if (shouldPropagateException()) {

@@ -128,5 +128,15 @@ public class LhMachineOnlineInfo extends BaseEntity implements Serializable {
     @Excel(name = "ui.data.column.lhMachineOnlineInfo.productStatus", dictType = "lh_trial_status")
     @TableField(value = "PRODUCT_STATUS")
     private String productStatus;
+
+    /**
+     * 班次编码
+     * <p>MES侧同步中间表新增字段，MES存储口径：01早班、02中班、03夜班
+     * （注意：与APS三班字典 class_num_three_plan 的编码01夜班正好相反，本字段存MES原始值，不可用该字典反显）；
+     * APS从MES抓取时只抓班次为空或值为03（夜班）的数据，01/02班次数据不落APS库</p>
+     */
+    @ApiModelProperty(value = "班次编码", name = "shiftCode")
+    @TableField(value = "SHIFT_CODE")
+    private String shiftCode;
 }
 

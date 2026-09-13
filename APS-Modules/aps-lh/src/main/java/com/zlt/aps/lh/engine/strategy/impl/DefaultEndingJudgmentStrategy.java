@@ -114,15 +114,35 @@ public class DefaultEndingJudgmentStrategy implements IEndingJudgmentStrategy {
         return currentWindowTailFlag;
     }
 
+    /**
+     * 判断 SKU 排后最终是否收尾。
+     * <p>isEnd 只标识硫化余量收尾：把本 SKU 的硫化余量排完才标识为收尾，
+     * 不因胎胚收尾（胎胚库存清空）而提前标识。因此余量大于胎胚库存且命中胎胚收尾时，
+     * 胎胚库存排完但余量仍有剩余，必须判定为非收尾。</p>
+     * <p>硫化余量为 0（月计划已完成）时视为余量已排完，本次只要仍有实际排产量即标识收尾。</p>
+     *
+     * @param context 排程上下文
+     * @param sku SKU排程DTO
+     * @param actualScheduledQty 本次窗口实际总排产量
+     * @return true-最终收尾；false-最终非收尾
+     */
     @Override
     public boolean isFinalEnding(LhScheduleContext context, SkuScheduleDTO sku, int actualScheduledQty) {
         if (Objects.isNull(sku)) {
             return false;
         }
+        int actualQty = Math.max(0, actualScheduledQty);
         int tailTargetQty = resolveFinalReviewTailTargetQty(context, sku);
-        boolean finalTailFlag = tailTargetQty > 0 && Math.max(0, actualScheduledQty) >= tailTargetQty;
-        log.info("SKU排后最终收尾判断, materialCode: {}, actualScheduledQty: {}, tailTargetQty: {}, finalTailFlag: {}",
-                sku.getMaterialCode(), Math.max(0, actualScheduledQty), tailTargetQty, finalTailFlag);
+        boolean finalTailFlag;
+        if (tailTargetQty <= 0) {
+            // 无硫化余量：本次有实际排产量即视为余量已收尾，避免0量占位结果行被误标收尾。
+            finalTailFlag = actualQty > 0;
+        } else {
+            finalTailFlag = actualQty >= tailTargetQty;
+        }
+        log.info("SKU排后最终收尾判断, materialCode: {}, actualScheduledQty: {}, tailTargetQty: {}, "
+                        + "rule: 仅按硫化余量判定, finalTailFlag: {}",
+                sku.getMaterialCode(), actualQty, tailTargetQty, finalTailFlag);
         return finalTailFlag;
     }
 
@@ -274,14 +294,53 @@ public class DefaultEndingJudgmentStrategy implements IEndingJudgmentStrategy {
     }
 
     /**
-     * 解析排后最终复核使用的收尾目标量。
-     * <p>排后复核必须按胎胚静态关系判断共用/单胎胚，避免运行态活跃集合在排产中被消耗后误判。</p>
+     * 解析排后最终复核使用的余量收尾比较目标量。
+     * <p>isEnd 只标识硫化余量是否排完，因此排后复核固定按硫化余量口径，不再读取胎胚库存、
+     * 也不按模台数归整；胎胚静态关系只服务于排产控量阶段的胎胚收尾判断，
+     * 不参与 isEnd 目标量，避免"胎胚库存排完但余量仍有剩余"被误标为收尾。</p>
      *
      * @param context 排程上下文
      * @param sku SKU排程DTO
-     * @return 排后最终收尾比较目标量
+     * @return 排后最终收尾比较目标量；0 表示无硫化余量
      */
     private int resolveFinalReviewTailTargetQty(LhScheduleContext context, SkuScheduleDTO sku) {
+        return getTargetScheduleQtyResolver().resolveSurplusEndingTargetQty(context, sku);
+    }
+
+    /**
+     * 判断 SKU 排产过程中的运行态收尾标识。
+     * <p>仅供排产过程中读取结果行 isEnd 的既有逻辑使用，沿用改动前的胎胚库存硬目标口径，
+     * 保证共用胎胚活跃集合、收尾均衡、结构保机和结果替换等行为与改动前一致。
+     * 该标识不落库，排产结束后由 {@link #isFinalEnding} 按硫化余量口径统一覆写。</p>
+     *
+     * @param context 排程上下文
+     * @param sku SKU排程DTO
+     * @param actualScheduledQty 当前已汇总的实际排产量
+     * @return true-运行态收尾；false-运行态非收尾
+     */
+    @Override
+    public boolean isRuntimeEnding(LhScheduleContext context, SkuScheduleDTO sku, int actualScheduledQty) {
+        if (Objects.isNull(sku)) {
+            return false;
+        }
+        int tailTargetQty = resolveRuntimeEndingTailTargetQty(context, sku);
+        boolean runtimeTailFlag = tailTargetQty > 0 && Math.max(0, actualScheduledQty) >= tailTargetQty;
+        log.debug("SKU运行态收尾标识判断, materialCode: {}, actualScheduledQty: {}, tailTargetQty: {}, "
+                        + "rule: 运行态沿用胎胚库存硬目标口径, runtimeTailFlag: {}",
+                sku.getMaterialCode(), Math.max(0, actualScheduledQty), tailTargetQty, runtimeTailFlag);
+        return runtimeTailFlag;
+    }
+
+    /**
+     * 解析运行态收尾标识使用的比较目标量。
+     * <p>按胎胚静态关系判断共用/单胎胚，命中胎胚库存硬目标时取精确硬目标，
+     * 普通收尾按模台数归整；该口径只服务运行态标识，不参与最终落库判定。</p>
+     *
+     * @param context 排程上下文
+     * @param sku SKU排程DTO
+     * @return 运行态收尾比较目标量
+     */
+    private int resolveRuntimeEndingTailTargetQty(LhScheduleContext context, SkuScheduleDTO sku) {
         return getTargetScheduleQtyResolver().resolveFinalEndingTargetQtyByStaticRelation(context, sku);
     }
 

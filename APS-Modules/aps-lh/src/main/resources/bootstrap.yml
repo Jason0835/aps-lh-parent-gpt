@@ -45,6 +45,9 @@ spring:
 
 aps:
   lh:
+    validation:
+      # 续作在机模具校验默认开启；仅隔离验证时允许临时关闭。
+      continuation-online-mould-enabled: true
     data-init:
       executor:
         core-pool-size: 4

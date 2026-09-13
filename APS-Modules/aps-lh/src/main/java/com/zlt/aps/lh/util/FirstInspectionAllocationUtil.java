@@ -429,7 +429,10 @@ public final class FirstInspectionAllocationUtil {
         return FirstInspectionTimelinePlan.of(
                 allocationPlan, decision.getTimingMode(), decision.getModeReason(),
                 changeoverStartTime, changeoverEndTime, productionReadyTime,
-                formalProductionStartTime, formalProductionShift);
+                formalProductionStartTime, formalProductionShift,
+                FirstInspectionQtyUtil.resolveAttributionShift(
+                        shifts, allocationPlan.getInspectionQty() > 0
+                                ? allocationPlan.getInspectionStartTime() : formalProductionStartTime));
     }
 
     /**

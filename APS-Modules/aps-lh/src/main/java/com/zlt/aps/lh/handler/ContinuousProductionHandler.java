@@ -3,6 +3,7 @@ package com.zlt.aps.lh.handler;
 import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.engine.chain.validators.ContinuationOnlineMouldValidator;
 import com.zlt.aps.lh.engine.factory.ScheduleStrategyFactory;
 import com.zlt.aps.lh.engine.strategy.IProductionStrategy;
 import com.zlt.aps.lh.engine.strategy.ISkuPriorityStrategy;
@@ -43,6 +44,9 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
     /** 续作真实释放时间确定后，先消费可复用交替关系的一份机台需求。 */
     @Resource
     private PreviousAlternatePlanReuseService previousAlternatePlanReuseService;
+    /** S4.4 续作排产前校验 MES 实际在机模具与续作 SKU 模具关系。 */
+    @Resource
+    private ContinuationOnlineMouldValidator continuationOnlineMouldValidator;
 
     @Override
     protected void doHandle(LhScheduleContext context) {
@@ -50,6 +54,8 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
                 context.getFactoryCode(), LhScheduleTimeUtil.formatDate(context.getScheduleTargetDate()),
                 context.getContinuousSkuList().size(), context.getNewSpecSkuList().size(),
                 context.getScheduleResultList().size());
+        // S4.4正式排产前校验真实在机模具，失败时不进入续作、换活字块及新增排产链路。
+        continuationOnlineMouldValidator.validate(context);
         ISkuPriorityStrategy priorityStrategy = strategyFactory.getSkuPriorityStrategy();
         /*
          * S4.4排序调用：排序策略从S4.2独立的结构排序日期快照读取最大END_DAY，按结构只计算一次

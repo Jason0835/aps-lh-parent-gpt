@@ -151,7 +151,14 @@ public abstract class AbsLhScheduleTemplate {
             if (StringUtils.isEmpty(batchNo)) {
                 batchNo = e.getBatchNo();
             }
-            return LhScheduleResponseDTO.fail(batchNo, e.getMessage());
+            /*
+             * 领域异常直接向上传播时，也必须把已收集的校验明细和提示信息带回接口，
+             * 避免调用方只拿到一行摘要而必须翻日志堆栈才能定位具体机台、物料或模具。
+             */
+            LhScheduleResponseDTO response = LhScheduleResponseDTO.fail(batchNo, e.getMessage());
+            this.fillValidationProblems(context, response);
+            this.fillWarningMessages(context, response);
+            return response;
         } catch (Exception e) {
             log.error("硫化排程执行异常, 当前步骤:{}", context.getCurrentStep(), e);
             return LhScheduleResponseDTO.fail(context.getBatchNo(), "排程执行异常: " + e.getMessage());

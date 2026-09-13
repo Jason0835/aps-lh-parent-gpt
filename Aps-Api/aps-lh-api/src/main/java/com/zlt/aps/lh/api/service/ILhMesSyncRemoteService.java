@@ -36,6 +36,17 @@ public interface ILhMesSyncRemoteService {
     @PostMapping("/mesSync/logicDeleteAndSaveMachineOnlineInfo")
     AjaxResult logicDeleteAndSaveMachineOnlineInfo(@RequestParam("factoryCode") String factoryCode, @RequestParam("onlineDate") String onlineDate, @RequestParam("updateBy") String updateBy, @RequestBody List<LhMachineOnlineInfo> list);
 
+    /**
+     * 按维度键UPSERT批量保存硫化在机信息（MES同步新模式）
+     * 维度键 = 工厂 + 机台 + 日期；键存在则更新（含复活已逻辑删除行），不存在则插入
+     *
+     * @param list 待保存的数据列表
+     * @return 结果
+     */
+    @ApiOperation("按维度键UPSERT批量保存硫化在机信息（键存在更新/不存在插入）")
+    @PostMapping("/mesSync/upsertMachineOnlineInfoBatch")
+    AjaxResult upsertMachineOnlineInfoBatch(@RequestBody List<LhMachineOnlineInfo> list);
+
     @ApiOperation("批量删除胶囊已使用次数")
     @PostMapping("/mesSync/deleteRepairCapsule")
     AjaxResult deleteRepairCapsule(@RequestParam("factoryCode") String factoryCode);

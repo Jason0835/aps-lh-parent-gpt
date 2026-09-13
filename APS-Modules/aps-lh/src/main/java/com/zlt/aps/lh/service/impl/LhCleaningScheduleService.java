@@ -12,6 +12,7 @@ import com.zlt.aps.lh.api.enums.TrialStatusEnum;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.util.LeftRightMouldUtil;
+import com.zlt.aps.lh.util.LhMouldCodeUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
@@ -27,6 +28,7 @@ import javax.annotation.Resource;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -199,6 +201,10 @@ public class LhCleaningScheduleService {
         if (StringUtils.isEmpty(cleanType)) {
             return null;
         }
+        // 清洗窗口真正占用机台、影响首检和排产前，先校验设备停机计划维护的在机模具。
+        if (!this.isCleaningPlanMouldMatched(context, cleaningPlan, cleanType)) {
+            return null;
+        }
         int cleanDurationHours = resolveCleanDurationHours(context, cleanType);
         if (cleanDurationHours <= 0) {
             log.warn("设备停机清洗时长配置非法，跳过清洗, 机台: {}, 清洗类型: {}, 计划开始: {}",
@@ -237,7 +243,7 @@ public class LhCleaningScheduleService {
             cleaningWindow.setSandBlastSequence(sandBlastDailyCountMap.get(LhScheduleTimeUtil.formatDate(cleanStartTime)));
         }
         log.info("设备停机清洗纳入本次窗口, 机台: {}, 类型: {}, 计划开始: {}, 实际清洗开始: {}, "
-                        + "清洗结束: {}, 机台释放: {}, 清洗时长小时: {}, 喷砂首检时长小时: {}",
+                        + "清洗结束: {}, 机台释放: {}, 清洗时长小时: {}, 喷砂首检时长小时: {}, 是否纳入清洗窗口: {}",
                 cleaningPlan.getMachineCode(), cleanType,
                 LhScheduleTimeUtil.formatDateTime(cleaningPlan.getBeginDate()),
                 LhScheduleTimeUtil.formatDateTime(cleanStartTime),
@@ -245,10 +251,69 @@ public class LhCleaningScheduleService {
                 LhScheduleTimeUtil.formatDateTime(cleaningWindow.getReadyTime()), cleanDurationHours,
                 CleaningTypeEnum.SAND_BLAST.getCode().equals(cleanType)
                         ? context.getParamIntValue(LhScheduleParamConstant.SAND_BLAST_FIRST_INSPECTION_HOURS,
-                        LhScheduleConstant.SAND_BLAST_FIRST_INSPECTION_HOURS) : 0);
+                        LhScheduleConstant.SAND_BLAST_FIRST_INSPECTION_HOURS) : 0, true);
         // 清洗成功排程：回填实际清洗开始时间到设备停机计划排程日期
         collectCleaningScheduleDateFill(context, cleaningPlan, cleanType, cleanStartTime, "清洗成功");
         return cleaningWindow;
+    }
+
+    /**
+     * 校验设备停机清洗计划与当前实际在机模具是否一致。
+     *
+     * <p>实际值只使用本次排程加载的 MES 在机模具快照，不根据在机物料回查 SKU 模具关系，
+     * 避免把可用模具误当成当前实际在机模具。喷砂和干冰均从统一清洗入口调用本方法。</p>
+     * <p>计划未维护有效模具号时，仅免除本次一致性校验，后续清洗时间、名额、收尾及窗口逻辑保持不变。</p>
+     *
+     * @param context 排程上下文
+     * @param cleaningPlan 设备停机清洗计划
+     * @param cleanType 清洗类型
+     * @return true-计划未维护模具或模具完全一致，可继续执行原清洗逻辑；false-实际模具缺失或不一致，跳过计划
+     */
+    private boolean isCleaningPlanMouldMatched(LhScheduleContext context,
+                                               MdmDevicePlanShut cleaningPlan,
+                                               String cleanType) {
+        String plannedMouldCode = cleaningPlan.getInMachineMouldCode();
+        boolean plannedMouldMissing = CollectionUtils.isEmpty(LhMouldCodeUtil.normalizeAndSortMouldCodes(
+                Collections.singletonList(plannedMouldCode)));
+        if (plannedMouldMissing) {
+            // 计划未维护模具号时保持原清洗逻辑，不以缺失字段阻断喷砂或干冰清洗。
+            log.info("清洗计划未维护 IN_MACHINE_MOULD_CODE，跳过在机模具一致性校验，继续按原清洗规则处理, "
+                            + "机台编码: {}, 清洗类型: {}, 清洗计划ID: {}, 是否纳入清洗窗口: {}",
+                    cleaningPlan.getMachineCode(), cleanType, cleaningPlan.getId(), "待后续规则确认");
+            return true;
+        }
+        String actualMouldCode = LhMouldCodeUtil.resolveInMachineMouldCode(
+                context, cleaningPlan.getMachineCode());
+        boolean matched = LhMouldCodeUtil.isSameMouldCodeSet(actualMouldCode, plannedMouldCode);
+        if (!matched) {
+            String skipReason = this.resolveCleaningPlanMouldSkipReason(actualMouldCode);
+            log.info("跳过清洗计划：当前在机模具与清洗计划维护的 IN_MACHINE_MOULD_CODE 不一致, "
+                            + "机台编码: {}, 清洗类型: {}, 清洗计划ID: {}, 实际在机模具: {}, "
+                            + "IN_MACHINE_MOULD_CODE: {}, 是否匹配: {}, 是否纳入清洗窗口: {}, 跳过原因: {}",
+                    cleaningPlan.getMachineCode(), cleanType, cleaningPlan.getId(), actualMouldCode,
+                    plannedMouldCode, false, false, skipReason);
+            return false;
+        }
+        log.info("清洗计划在机模具校验通过, 机台编码: {}, 清洗类型: {}, 清洗计划ID: {}, "
+                        + "实际在机模具: {}, IN_MACHINE_MOULD_CODE: {}, 是否匹配: {}, 是否纳入清洗窗口: {}",
+                cleaningPlan.getMachineCode(), cleanType, cleaningPlan.getId(), actualMouldCode,
+                plannedMouldCode, true, "待后续规则确认");
+        return true;
+    }
+
+    /**
+     * 解析清洗计划在机模具校验失败原因。
+     *
+     * @param actualMouldCode 实际在机模具号
+     * @return 校验失败原因
+     */
+    private String resolveCleaningPlanMouldSkipReason(String actualMouldCode) {
+        boolean actualMouldMissing = CollectionUtils.isEmpty(LhMouldCodeUtil.normalizeAndSortMouldCodes(
+                Collections.singletonList(actualMouldCode)));
+        if (actualMouldMissing) {
+            return "实际在机模具缺失";
+        }
+        return "模具集合不一致";
     }
 
     /**

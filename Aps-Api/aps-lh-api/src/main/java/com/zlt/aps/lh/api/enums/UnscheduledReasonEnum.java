@@ -3,6 +3,7 @@
  */
 package com.zlt.aps.lh.api.enums;
 
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.apache.commons.lang3.StringUtils;
@@ -48,6 +49,8 @@ public enum UnscheduledReasonEnum {
     CHANGEOVER_OUT_OF_BUSINESS_DAY("CHANGEOVER_OUT_OF_BUSINESS_DAY", "S4.4/S4.5", "切换超出业务日", 140, false),
     CHANGEOVER_OUT_OF_WINDOW("CHANGEOVER_OUT_OF_WINDOW", "S4.4/S4.5", "切换超出排产窗口", 145, false),
     EMBRYO_AVAILABLE_OUT_OF_WINDOW("EMBRYO_AVAILABLE_OUT_OF_WINDOW", "S4.4/S4.5", "胎胚可供时间超出排产窗口", 185, false),
+    /** 仅表示本机本轮等待胎胚超限，不是SKU永久不可排。 */
+    EMBRYO_AVAILABLE_TIME_GAP("EMBRYO_AVAILABLE_TIME_GAP", "S4.5", "ui.lh.machineSku.embryoTimeGapSummary", 180, false),
     BASE_DATA_MISSING("BASE_DATA_MISSING", "S4.3/S4.5", "基础数据缺失", 125, false),
     OPEN_PRODUCTION_CONTROL_SHORTAGE("OPEN_PRODUCTION_CONTROL_SHORTAGE", "S4.3", "开产管控产生未排缺口", 170, false),
     PRECISION_FORCE_DOWN("PRECISION_FORCE_DOWN", "S4.4", "精度计划强制下机", 205, false),
@@ -71,12 +74,21 @@ public enum UnscheduledReasonEnum {
     private final boolean retainZeroQty;
 
     /**
+     * 获取可读摘要，新选料原因按当前语言解析，其他已有原因保持原文。
+     *
+     * @return 当前原因摘要
+     */
+    public String getSummary() {
+        return this == EMBRYO_AVAILABLE_TIME_GAP ? I18nUtil.getMessage(summary) : summary;
+    }
+
+    /**
      * 兼容既有调用方获取原因描述。
      *
      * @return 可读摘要
      */
     public String getDescription() {
-        return summary;
+        return this.getSummary();
     }
 
     /**

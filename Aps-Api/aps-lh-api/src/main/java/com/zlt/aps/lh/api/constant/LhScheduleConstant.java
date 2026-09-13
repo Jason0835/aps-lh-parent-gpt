@@ -1,5 +1,7 @@
 package com.zlt.aps.lh.api.constant;
 
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
+
 import java.math.BigDecimal;
 
 /**
@@ -412,6 +414,12 @@ public final class LhScheduleConstant {
 
     /** 在机模具下机时前后计划校验最大天数 */
     public static final int MAX_CONTINUOUS_MOULD_OFFLINE_CHECK_DAYS = 3;
+
+    /** 续作月计划降模停产保机胎胚可供硫化时长豁免阈值默认值，小于0表示不启用 */
+    public static final BigDecimal CONTINUOUS_STOP_HOLD_EMBRYO_AVAILABLE_HOURS_THRESHOLD = BigDecimal.valueOf(-1);
+
+    /** 机台选SKU允许等待胎胚的最大小时数；首检开始即开产，默认4小时 */
+    public static final BigDecimal MACHINE_SKU_EMBRYO_MAX_WAIT_HOURS = BigDecimalUtils.valueOf(4);
 
     /** 奇数班产计划量加一班别默认值，空值表示不启用 */
     public static final String ODD_SHIFT_CAPACITY_PLUS_SHIFT_TYPE = "";

@@ -771,7 +771,11 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
         // 节点2：兼容查询结果为空的场景，后续表头仍可根据 scheduleDate 回填日期，
         // 明细区域则保持为空，避免空指针影响模板导出。
-        List<LhScheduleResult> exportList = Objects.isNull(list) ? Collections.emptyList() : list;
+        List<LhScheduleResult> exportList = Objects.isNull(list)
+                ? Collections.emptyList()
+                : list.stream()
+                .filter(resultItem -> !isVirtualMachineCode(resultItem.getLhMachineCode()))
+                .collect(Collectors.toList());
 
         // 明细行统一按导出顺序排序（机台升序 → 同机台收尾班次序号升序 → 物料编码升序）。
         // 该顺序同时用于 buildExportDataList 填充明细和 fillExportSummaryFormulas 按行匹配收尾标识。
@@ -1074,17 +1078,19 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                     } else {
                         setNumericCell(row, dailyPlanQtyCol, dailyPlanValue);
                     }
-                    // 20260831+ 余量收尾淡橙标识只判断主字段 isEnd=1，
-                    // 不再扫描 classXIsEnd 的收尾、量试和试验标识。
-                    // 胎胚库存收尾标识（isEmbryoEnding=1）时，淡橙标记在“胎胚库存”列。
-                    int highlightCol = ApsConstant.APS_STRING_1.equals(rowResult.getIsEmbryoEnding())
-                            ? this.resolveExportColorColumn(placeholderMap, "embryoStock", dailyPlanQtyCol)
-                            : dailyPlanQtyCol;
-                    boolean shouldHighlightEnding = ApsConstant.APS_STRING_1.equals(rowResult.getIsEnd())
-                            || ApsConstant.APS_STRING_1.equals(rowResult.getIsEmbryoEnding());
-                    if (shouldHighlightEnding && highlightCol >= 0) {
-                        this.applyRowForegroundColor(workbook, row, highlightCol,
-                                new byte[]{(byte) 0xFC, (byte) 0xD5, (byte) 0xB4});
+                    // 20260911+ 余量收尾只判断主字段 isEnd=1，命中时标记“合计余量”列；
+                    // 胎胚库存收尾只判断 isEmbryoEnding=1，命中时标记“胎胚库存”列。
+                    // 两个主字段同时为1时，两列都需要标记颜色。
+                    byte[] endingHighlightColor = new byte[]{(byte) 0xFC, (byte) 0xD5, (byte) 0xB4};
+                    if (ApsConstant.APS_STRING_1.equals(rowResult.getIsEnd()) && dailyPlanQtyCol >= 0) {
+                        this.applyRowForegroundColor(workbook, row, dailyPlanQtyCol, endingHighlightColor);
+                    }
+                    if (ApsConstant.APS_STRING_1.equals(rowResult.getIsEmbryoEnding())) {
+                        int embryoStockCol = this.resolveExportColorColumn(placeholderMap, "embryoStock",
+                                dailyPlanQtyCol);
+                        if (embryoStockCol >= 0) {
+                            this.applyRowForegroundColor(workbook, row, embryoStockCol, endingHighlightColor);
+                        }
                     }
                 }
 
@@ -2776,6 +2782,17 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                         .thenComparingInt(this::findFirstPlannedShift)
                         .thenComparing(r -> StringUtils.defaultString(r.getMaterialCode())))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 判断机台编码是否为虚拟机台。
+     * <p>导出时过滤掉以 V 开头的虚拟机台，数据库原始排程数据不做删除。</p>
+     *
+     * @param machineCode 机台编码
+     * @return true-虚拟机台；false-实体机台或编码为空
+     */
+    private static boolean isVirtualMachineCode(String machineCode) {
+        return StringUtils.startsWithIgnoreCase(StringUtils.trimToEmpty(machineCode), "V");
     }
 
     /**

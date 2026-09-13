@@ -3,6 +3,7 @@ package com.zlt.aps.lh.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import com.zlt.aps.lh.api.domain.dto.CapsuleReplacementTimeWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.CleaningScheduleDateFillItem;
+import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuDailyPlanQuotaDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
@@ -152,6 +153,10 @@ final class ScheduleSubstitutionAttemptSnapshot {
     /** 前置组合的绑定及未来模具释放记录随失败尝试一起恢复。 */
     private List<ActiveMachineBinding> preScheduledMachineBindingList;
     private Map<String, Date> preScheduledMouldReleaseTimeMap;
+    /** 置换前仅喷砂续作下机窗口，失败回滚后仍需保持旧SKU及模具释放事实。 */
+    private Map<String, MachineCleaningWindowDTO> onlySandBlastContinuationReleaseWindowMap;
+    /** 置换前仅喷砂下机真实余量。 */
+    private Map<String, Integer> onlySandBlastContinuationRemainingQtyMap;
     /** 置换前持久化过程日志；预演日志必须随快照回滚。 */
     private List<LhScheduleProcessLog> scheduleLogList;
     /** 按天换活字块反选及结构待排视图 */
@@ -401,6 +406,10 @@ final class ScheduleSubstitutionAttemptSnapshot {
         }
         snapshot.preScheduledMachineBindingList = new ArrayList<>(context.getPreScheduledMachineBindingList());
         snapshot.preScheduledMouldReleaseTimeMap = new LinkedHashMap<>(context.getPreScheduledMouldReleaseTimeMap());
+        snapshot.onlySandBlastContinuationReleaseWindowMap = new LinkedHashMap<>(
+                context.getOnlySandBlastContinuationReleaseWindowMap());
+        snapshot.onlySandBlastContinuationRemainingQtyMap = new LinkedHashMap<>(
+                context.getOnlySandBlastContinuationRemainingQtyMap());
         return snapshot;
     }
 
@@ -432,6 +441,10 @@ final class ScheduleSubstitutionAttemptSnapshot {
     private void restore(LhScheduleContext context, boolean restoreSourceObjects) {
         context.setPreScheduledMachineBindingList(new ArrayList<>(preScheduledMachineBindingList));
         context.setPreScheduledMouldReleaseTimeMap(new LinkedHashMap<>(preScheduledMouldReleaseTimeMap));
+        context.setOnlySandBlastContinuationReleaseWindowMap(new LinkedHashMap<>(
+                onlySandBlastContinuationReleaseWindowMap));
+        context.setOnlySandBlastContinuationRemainingQtyMap(new LinkedHashMap<>(
+                onlySandBlastContinuationRemainingQtyMap));
         if (restoreSourceObjects) {
             for (Map.Entry<LhScheduleResult, LhScheduleResult> entry : scheduleResultStateMap.entrySet()) {
                 BeanUtil.copyProperties(entry.getValue(), entry.getKey());

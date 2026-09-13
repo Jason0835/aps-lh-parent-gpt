@@ -214,7 +214,7 @@ public class LhIncreaseMouldStartPlanService {
      */
     private void recalculateShiftPlanQty(LhScheduleResult scheduleResult) {
         validateCalculationFields(scheduleResult);
-        syncConstructionStage(scheduleResult);
+        MdmSkuConstructionRef constructionRef = syncConstructionStage(scheduleResult);
 
         BigDecimal mouldChangeHours = getMouldChangeTotalHours(scheduleResult.getFactoryCode());
         Date middleShiftStartTime = Optional.ofNullable(ShiftFieldUtil.getShiftStartTime(scheduleResult, MIDDLE_SHIFT_INDEX))
@@ -243,6 +243,12 @@ public class LhIncreaseMouldStartPlanService {
             ShiftFieldUtil.setShiftPlanQty(scheduleResult, shiftIndex, planQty,
                     ShiftFieldUtil.getShiftStartTime(scheduleResult, shiftIndex),
                     ShiftFieldUtil.getShiftEndTime(scheduleResult, shiftIndex));
+            // 更新后续班次的硫化示方类型和硫化示方号
+            if (Objects.nonNull(constructionRef)) {
+                ShiftFieldUtil.setShiftCureFormula(scheduleResult, shiftIndex,
+                        constructionRef.getLhNo(),
+                        constructionRef.getLhType());
+            }
             if (Objects.nonNull(planQty) && planQty > 0) {
                 lastUpdatedShiftIndex = shiftIndex;
             }
@@ -266,9 +272,9 @@ public class LhIncreaseMouldStartPlanService {
      *
      * @param scheduleResult 当前排程结果
      */
-    private void syncConstructionStage(LhScheduleResult scheduleResult) {
+    private MdmSkuConstructionRef syncConstructionStage(LhScheduleResult scheduleResult) {
         if (StringUtils.isAnyBlank(scheduleResult.getFactoryCode(), scheduleResult.getMaterialCode())) {
-            return;
+            return null;
         }
         MdmSkuConstructionRef skuConstructionRef = Optional.ofNullable(mdmSkuConstructionRefEntityMapper.selectList(
                         new LambdaQueryWrapper<MdmSkuConstructionRef>()
@@ -280,10 +286,11 @@ public class LhIncreaseMouldStartPlanService {
                 .map(list -> list.get(0))
                 .orElse(null);
         if (Objects.isNull(skuConstructionRef)) {
-            return;
+            return null;
         }
         // 主数据表当前保存的是硫化示方类型标记（S/T/X）
         scheduleResult.setChangedTrialStatus(skuConstructionRef.getLhType());
+        return skuConstructionRef;
     }
 
     /**

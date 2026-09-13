@@ -674,6 +674,16 @@ public class LhScheduleContext {
      */
     private Set<String> releasedContinuousMachineCodeSet = new LinkedHashSet<>();
     /**
+     * 续作阶段因“仅喷砂清洗”主动下机的实际清洗窗口，key=运行态机台编码。
+     * <p>该快照同时承载三项运行态事实：旧SKU及模具从cleanStartTime释放、喷砂机台到readyTime后
+     * 才能重新参与排产、剩余需求必须转入后续换活字块/新增排产。喷砂与其他停机重叠时禁止写入。</p>
+     */
+    private Map<String, MachineCleaningWindowDTO> onlySandBlastContinuationReleaseWindowMap =
+            new LinkedHashMap<String, MachineCleaningWindowDTO>(4);
+    /** 仅喷砂实际下机时仍需转入后续排产的真实余量，key=运行态机台编码。 */
+    private Map<String, Integer> onlySandBlastContinuationRemainingQtyMap =
+            new LinkedHashMap<String, Integer>(4);
+    /**
      * 已按降模规则释放过续作机台的物料集合，避免后续补偿链路把降模机台重新补回
      */
     private Set<String> reducedContinuationGroupKeySet = new LinkedHashSet<>();
@@ -1332,7 +1342,7 @@ public class LhScheduleContext {
     /**
      * 登记已排硫化机台。
      * <p>结构和 SKU 集合均保留运行态机台编码；结构计数时统一按物理机台去重，
-     * SKU 继续按原编码统计，避免改变既有 SKU 级节奏和双模规则。</p>
+     * SKU 计数同样按物理机台去重；保留侧别编码供模具分配、产能和释放使用。</p>
      *
      * @param productionDate 业务日期
      * @param structureName  产品结构
@@ -1587,7 +1597,7 @@ public class LhScheduleContext {
      *
      * @param productionDate 业务日期
      * @param structureName  产品结构
-     * @return 已排机台数
+     * @return 已排结构物理机台数
      */
     public int getStructureScheduledMachineCount(LocalDate productionDate, String structureName) {
         if (Objects.isNull(productionDate) || StringUtils.isEmpty(structureName)
@@ -1718,17 +1728,109 @@ public class LhScheduleContext {
      * @param productionDate 业务日期
      * @param materialCode   SKU物料编码
      * @param productStatus  产品状态
-     * @return 已排机台数
+     * @return 已排物理机台数，同物料同状态的L/R双模只计一台
      */
     public int getSkuScheduledMachineCount(LocalDate productionDate,
                                            String materialCode,
                                            String productStatus) {
+        return this.getSkuScheduledMachineCountExcluding(
+                productionDate, materialCode, productStatus, Collections.<String>emptySet());
+    }
+
+    /**
+     * 获取指定业务日、指定SKU排除部分物理机台后的已排机台数。
+     *
+     * @param productionDate 业务日期
+     * @param materialCode SKU物料编码
+     * @param productStatus 产品状态
+     * @param excludedPhysicalMachineCodeSet 不再视为在机的物理机台编码
+     * @return 排除后的已排物理机台数
+     */
+    public int getSkuScheduledMachineCountExcluding(
+            LocalDate productionDate,
+            String materialCode,
+            String productStatus,
+            Set<String> excludedPhysicalMachineCodeSet) {
         // 历史交替计划没有产品状态，项目统一口径要求空状态按正规S归一化。
         String normalizedProductStatus = StringUtils.isEmpty(productStatus)
                 ? FORMAL_PRODUCT_STATUS : productStatus;
         String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
                 materialCode, normalizedProductStatus);
-        return this.getScheduledMachineCount(skuScheduledMachineCodeMap, productionDate, skuKey);
+        if (Objects.isNull(productionDate)) {
+            return 0;
+        }
+        Map<String, Set<String>> dayMachines = skuScheduledMachineCodeMap.get(productionDate);
+        Set<String> machineCodes = CollectionUtils.isEmpty(dayMachines) ? null : dayMachines.get(skuKey);
+        if (CollectionUtils.isEmpty(machineCodes)) {
+            return 0;
+        }
+        // 目标Map使用物理机台份数，读取时统一去重，不能将同一整机的两侧当作两份需求。
+        return (int) machineCodes.stream()
+                .filter(StringUtils::isNotEmpty)
+                .map(LhSingleControlMachineUtil::resolvePhysicalMachineCode)
+                .filter(machineCode -> CollectionUtils.isEmpty(excludedPhysicalMachineCodeSet)
+                        || !excludedPhysicalMachineCodeSet.contains(machineCode))
+                .distinct()
+                .count();
+    }
+
+    /**
+     * 解析当前SKU因仅喷砂主动下机而释放的物理机台。
+     *
+     * @param sku 当前续作来源或共享同一日计划账本的补偿SKU
+     * @return 已释放物理机台编码集合
+     */
+    public Set<String> resolveOnlySandBlastReleasedPhysicalMachineCodes(SkuScheduleDTO sku) {
+        Set<String> physicalMachineCodeSet = new LinkedHashSet<String>(2);
+        if (Objects.isNull(sku) || CollectionUtils.isEmpty(continuousSkuList)
+                || CollectionUtils.isEmpty(onlySandBlastContinuationReleaseWindowMap)) {
+            return physicalMachineCodeSet;
+        }
+        for (SkuScheduleDTO continuousSku : continuousSkuList) {
+            if (Objects.isNull(continuousSku)
+                    || continuousSku.getDailyPlanQuotaMap() != sku.getDailyPlanQuotaMap()
+                    || !StringUtils.equals(continuousSku.getMaterialCode(), sku.getMaterialCode())
+                    || !StringUtils.equals(StringUtils.trimToEmpty(continuousSku.getProductStatus()),
+                    StringUtils.trimToEmpty(sku.getProductStatus()))
+                    || StringUtils.isEmpty(continuousSku.getContinuousMachineCode())
+                    || !onlySandBlastContinuationReleaseWindowMap.containsKey(
+                    continuousSku.getContinuousMachineCode())) {
+                continue;
+            }
+            physicalMachineCodeSet.add(LhSingleControlMachineUtil.resolvePhysicalMachineCode(
+                    continuousSku.getContinuousMachineCode()));
+        }
+        return physicalMachineCodeSet;
+    }
+
+    /**
+     * 解析仅喷砂剩余需求重新进入后续排产的最早时刻。
+     *
+     * @param sku 当前续作来源或共享同一日计划账本的补偿SKU
+     * @return 所有关联释放机台中最晚的喷砂实际开始时间；非本场景返回null
+     */
+    public Date resolveOnlySandBlastRequeueNotBeforeTime(SkuScheduleDTO sku) {
+        Date requeueNotBeforeTime = null;
+        Set<String> releasedPhysicalMachineCodeSet =
+                this.resolveOnlySandBlastReleasedPhysicalMachineCodes(sku);
+        if (CollectionUtils.isEmpty(releasedPhysicalMachineCodeSet)) {
+            return null;
+        }
+        for (Map.Entry<String, MachineCleaningWindowDTO> entry
+                : onlySandBlastContinuationReleaseWindowMap.entrySet()) {
+            MachineCleaningWindowDTO releaseWindow = entry.getValue();
+            if (!releasedPhysicalMachineCodeSet.contains(
+                    LhSingleControlMachineUtil.resolvePhysicalMachineCode(entry.getKey()))
+                    || Objects.isNull(releaseWindow)
+                    || Objects.isNull(releaseWindow.getCleanStartTime())) {
+                continue;
+            }
+            if (Objects.isNull(requeueNotBeforeTime)
+                    || releaseWindow.getCleanStartTime().after(requeueNotBeforeTime)) {
+                requeueNotBeforeTime = releaseWindow.getCleanStartTime();
+            }
+        }
+        return requeueNotBeforeTime;
     }
 
     /**

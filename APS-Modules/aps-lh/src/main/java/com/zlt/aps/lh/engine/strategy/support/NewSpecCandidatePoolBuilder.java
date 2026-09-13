@@ -131,7 +131,7 @@ public class NewSpecCandidatePoolBuilder {
     }
 
     /**
-     * 按当前正式结果刷新候选剩余物理机台机会。
+     * 按当前正式结果及有效前置绑定刷新候选剩余物理机台机会。
      *
      * @param context 排程上下文
      * @param currentDate 当前竞争业务日
@@ -158,11 +158,9 @@ public class NewSpecCandidatePoolBuilder {
                     sku.getContinuationActiveMachineCount()
                             + sku.getContinuationShortageMachineCount());
         }
-        // 换活字块后的补机机会使用同日统一 Map 和物理机台数，不能再放大冻结补偿缺口。
-        int scheduledMachineCount = typeBlockScheduled
-                ? DailyMachineExpansionPlanner.countScheduledPhysicalMachines(context, sku, currentDate)
-                : context.getSkuScheduledMachineCount(
-                        currentDate, sku.getMaterialCode(), sku.getProductStatus());
+        // 新开机台按已落实需求计数，包含尚未在当前日生产的有效前置绑定，且排除仅喷砂已释放机台。
+        int scheduledMachineCount = DailyMachineExpansionPlanner.countCommittedMachineDemand(
+                context, sku, currentDate);
         if (!typeBlockScheduled && requiredMachineCount <= 0
                 && candidate.isStrictEndingClearance()
                 && sku.getRemainingScheduleQty() > 0) {

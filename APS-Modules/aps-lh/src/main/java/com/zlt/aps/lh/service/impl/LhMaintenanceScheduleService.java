@@ -14,6 +14,7 @@ import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.PriorityTraceLogHelper;
+import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.aps.lh.api.enums.MachineStopTypeEnum;
 import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
@@ -143,9 +144,13 @@ public class LhMaintenanceScheduleService {
             orderLog.append(order).append(':').append(physicalMachineCode)
                     .append('(').append(plan.getDaysToDue()).append("天)");
 
+            Date knownEndingTime = resolvePhysicalKnownEndingTime(context, machine);
+            // 普通精度先按真实生产收尾班过滤，避免中班收尾后提前占用后续夜班。
+            if (this.shouldDelayAccuracyPlanByFinishShift(context, machine, plan, knownEndingTime)) {
+                continue;
+            }
             Date firstCandidateDate = resolveAvailableMaintenanceDate(context,
                     LhScheduleTimeUtil.clearTime(context.getScheduleDate()), machine.getMachineCode(), plan);
-            Date knownEndingTime = resolvePhysicalKnownEndingTime(context, machine);
             Date firstCutoffTime = buildProductionCutoffTime(firstCandidateDate);
             boolean preInsertAllowed = false;
             Date finalPlanDate = firstCandidateDate;
@@ -493,6 +498,91 @@ public class LhMaintenanceScheduleService {
     }
 
     /**
+     * 普通精度遇到当前SKU中班真实收尾时，本轮跳过挂窗以保留后续夜班生产机会。
+     *
+     * @param context 已完成续作收口的上下文
+     * @param machine 当前运行态机台
+     * @param plan 未完成的精度候选计划
+     * @param endingTime 物理机台两侧最晚真实收尾时间
+     * @return true表示本轮跳过精度；其他情况继续原有精度规则
+     */
+    private boolean shouldDelayAccuracyPlanByFinishShift(LhScheduleContext context,
+                                                         MachineScheduleDTO machine,
+                                                         LhPrecisionPlan plan,
+                                                         Date endingTime) {
+        int forceDays = this.getParamInt(context, LhScheduleParamConstant.MAINTENANCE_FORCE_CHECK_DAYS,
+                LhScheduleConstant.MAINTENANCE_FORCE_CHECK_DAYS);
+        Integer daysToDue = this.resolveDaysToDue(plan);
+        // 沿用数据源到期天数和已有硬优先参数；本次新增范围固定不超过30天。
+        boolean ordinaryPlan = Objects.nonNull(daysToDue)
+                && daysToDue > LhScheduleConstant.MAINTENANCE_FORCE_CHECK_DAYS
+                && daysToDue > forceDays && daysToDue <= LhScheduleConstant.MAINTENANCE_WARNING_DAYS;
+        // 只接受与物理机台最终收尾一致的有量生产结果，不用空闲或零量释放时间推断班次。
+        LhScheduleResult endingResult = this.resolveAccuracyEndingResult(context, machine, endingTime);
+        int shiftIndex = ShiftFieldUtil.resolveLastPlannedShiftIndex(endingResult);
+        LhShiftConfigVO shift = shiftIndex > 0
+                ? LhScheduleTimeUtil.getShiftByIndex(context, context.getScheduleDate(), shiftIndex) : null;
+        boolean delay = ordinaryPlan && Objects.nonNull(shift) && shift.isAfternoonShift();
+        String reason;
+        if (!ordinaryPlan) {
+            reason = "不属于本次普通精度过滤范围，保留原精度规则";
+        } else if (Objects.isNull(shift)) {
+            reason = "未确认当前SKU真实有量收尾班次，保留原精度规则";
+        } else {
+            reason = delay ? "当前SKU中班收尾，本轮跳过精度以保留后续夜班产能"
+                    : "当前SKU非中班收尾，继续原06:00截止及少量SKU补排规则";
+        }
+        String decision = delay ? "本轮不触发精度" : "继续原规则，是否触发由后续挂窗决定";
+        StringBuilder detail = new StringBuilder(192);
+        detail.append("收尾侧=").append(Objects.nonNull(endingResult)
+                        ? endingResult.getLhMachineCode() : machine.getMachineCode())
+                .append("，当前SKU=").append(Objects.nonNull(endingResult)
+                        ? endingResult.getMaterialCode() : machine.getCurrentMaterialCode())
+                .append("，收尾时间=").append(LhScheduleTimeUtil.formatDateTime(endingTime))
+                .append("，收尾班次=").append(Objects.nonNull(shift) ? shift.getShiftName() : "未确认")
+                .append("，原因=").append(reason);
+        log.info("精度收尾班次过滤, 机台: {}, 精度日期: {}, 距到期天数: {}, {}, 结论: {}",
+                machine.getMachineCode(), LhScheduleTimeUtil.formatDate(plan.getPlanDate()),
+                daysToDue, detail, decision);
+        this.appendMaintenanceProcessLog(context, MAINTENANCE_PROCESS_LOG_TITLE,
+                machine.getMachineCode(), plan, endingTime, detail.toString(), decision);
+        return delay;
+    }
+
+    /**
+     * 定位物理机台当前SKU最终有量收尾结果，班末完成仍归最后生产班而非下一班。
+     *
+     * @param context 排程上下文
+     * @param machine 当前运行态机台
+     * @param endingTime 两侧最晚真实收尾时间
+     * @return 对应的最终生产结果；缺少真实生产依据时返回null
+     */
+    private LhScheduleResult resolveAccuracyEndingResult(LhScheduleContext context,
+                                                         MachineScheduleDTO machine,
+                                                         Date endingTime) {
+        if (Objects.isNull(endingTime) || CollectionUtils.isEmpty(context.getScheduleResultList())) {
+            return null;
+        }
+        String physicalMachineCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(machine.getMachineCode());
+        // 按当前在机物料和物理机台匹配，避免同机历史结果、其他物料或提前释放结果参与判断。
+        return context.getScheduleResultList().stream()
+                .filter(Objects::nonNull)
+                .filter(result -> Objects.equals(physicalMachineCode,
+                        LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode())))
+                .filter(result -> {
+                    MachineScheduleDTO resultMachine = context.getMachineScheduleMap().get(result.getLhMachineCode());
+                    return Objects.nonNull(resultMachine) && resultMachine.isEnding()
+                            && StringUtils.isNotEmpty(resultMachine.getCurrentMaterialCode())
+                            && Objects.equals(resultMachine.getCurrentMaterialCode(), result.getMaterialCode());
+                })
+                .filter(result -> ShiftFieldUtil.resolveLastPlannedShiftIndex(result) > 0)
+                .filter(result -> endingTime.equals(ShiftFieldUtil.getShiftEndTime(result,
+                        ShiftFieldUtil.resolveLastPlannedShiftIndex(result))))
+                .max(Comparator.comparingInt(ShiftFieldUtil::resolveLastPlannedShiftIndex))
+                .orElse(null);
+    }
+
+    /**
      * 首个规格收尾后尝试挂载保养窗口。
      *
      * @param context 排程上下文
@@ -529,6 +619,10 @@ public class LhMaintenanceScheduleService {
         if (Objects.isNull(physicalEndingTime)) {
             appendMaintenanceProcessLog(context, MAINTENANCE_PROCESS_LOG_TITLE, lookupMachineCode, plan,
                     endingTime, "单控配对侧尚未收尾", "等待自然收尾");
+            return false;
+        }
+        // 独立收尾入口与中心决策复用同一过滤，强制精度入口不接入本规则。
+        if (this.shouldDelayAccuracyPlanByFinishShift(context, machine, plan, physicalEndingTime)) {
             return false;
         }
         appendMaintenanceProcessLog(context, MAINTENANCE_PROCESS_LOG_TITLE, lookupMachineCode, plan,

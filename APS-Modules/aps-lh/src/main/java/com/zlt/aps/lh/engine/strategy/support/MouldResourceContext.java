@@ -1,11 +1,14 @@
 package com.zlt.aps.lh.engine.strategy.support;
 
+import com.zlt.aps.lh.api.constant.LhScheduleConstant;
+import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.util.LhMouldCodeUtil;
 import com.zlt.aps.lh.util.MouldStatusUtil;
 import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
+import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmModelInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import lombok.extern.slf4j.Slf4j;
@@ -651,10 +654,10 @@ public class MouldResourceContext {
             return resultMap;
         }
         appendMachineBoundMouldCodeFromCurrentMaterial(resultMap, context);
-        appendMachineBoundMouldCodeFromResults(resultMap, context.getScheduleResultList());
+        appendMachineBoundMouldCodeFromResults(resultMap, context, context.getScheduleResultList());
         if (!CollectionUtils.isEmpty(context.getMachineAssignmentMap())) {
             for (List<LhScheduleResult> resultList : context.getMachineAssignmentMap().values()) {
-                appendMachineBoundMouldCodeFromResults(resultMap, resultList);
+                appendMachineBoundMouldCodeFromResults(resultMap, context, resultList);
             }
         }
         return resultMap;
@@ -669,6 +672,11 @@ public class MouldResourceContext {
         for (MachineScheduleDTO machine : context.getMachineScheduleMap().values()) {
             if (Objects.isNull(machine)
                     || StringUtils.isEmpty(machine.getMachineCode())) {
+                continue;
+            }
+            if (context.getOnlySandBlastContinuationReleaseWindowMap()
+                    .containsKey(machine.getMachineCode())) {
+                // MES在机信息是排程前快照；仅喷砂已经在本批明确下机时，禁止继续据此占用旧模具。
                 continue;
             }
             LinkedHashSet<String> inMachineMouldCodeSet = LhMouldCodeUtil.resolveInMachineMouldCodeSet(
@@ -692,6 +700,7 @@ public class MouldResourceContext {
     }
 
     private static void appendMachineBoundMouldCodeFromResults(Map<String, LinkedHashSet<String>> resultMap,
+                                                               LhScheduleContext context,
                                                                List<LhScheduleResult> resultList) {
         if (CollectionUtils.isEmpty(resultList)) {
             return;
@@ -700,11 +709,61 @@ public class MouldResourceContext {
             if (Objects.isNull(result) || StringUtils.isEmpty(result.getLhMachineCode())) {
                 continue;
             }
+            if (isReleasedByOnlySandBlast(context, result)) {
+                // 喷砂开始前的旧SKU结果只保留生产事实，不再代表排程结束时的模具占用关系。
+                continue;
+            }
             LinkedHashSet<String> mouldCodeSet = LhMouldCodeUtil.splitMouldCode(result.getMouldCode());
             if (!CollectionUtils.isEmpty(mouldCodeSet)) {
                 resultMap.put(result.getLhMachineCode(), mouldCodeSet);
             }
         }
+    }
+
+    /**
+     * 判断结果是否属于仅喷砂释放时间及之前的旧SKU生产结果。
+     *
+     * @param context 排程上下文
+     * @param result 待判断结果
+     * @return true-结果对应模具已经释放；false-仍代表当前机台模具占用
+     */
+    private static boolean isReleasedByOnlySandBlast(LhScheduleContext context,
+                                                     LhScheduleResult result) {
+        if (Objects.isNull(context) || Objects.isNull(result)
+                || StringUtils.isEmpty(result.getLhMachineCode())
+                || CollectionUtils.isEmpty(context.getOnlySandBlastContinuationReleaseWindowMap())) {
+            return false;
+        }
+        MachineCleaningWindowDTO releaseWindow = context
+                .getOnlySandBlastContinuationReleaseWindowMap()
+                .get(result.getLhMachineCode());
+        if (Objects.isNull(releaseWindow) || Objects.isNull(releaseWindow.getCleanStartTime())) {
+            return false;
+        }
+        Date resultEndTime = resolveResultProductionEndTime(result);
+        return Objects.nonNull(resultEndTime)
+                && !resultEndTime.after(releaseWindow.getCleanStartTime());
+    }
+
+    /**
+     * 解析结果最后一段真实生产结束时间。
+     *
+     * @param result 排程结果
+     * @return 最后生产结束时间；无法解析时返回规格结束时间
+     */
+    private static Date resolveResultProductionEndTime(LhScheduleResult result) {
+        Date latestEndTime = null;
+        for (int shiftIndex = 1;
+             shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT;
+             shiftIndex++) {
+            Integer planQty = ShiftFieldUtil.getShiftPlanQty(result, shiftIndex);
+            Date shiftEndTime = ShiftFieldUtil.getShiftEndTime(result, shiftIndex);
+            if (Objects.nonNull(planQty) && planQty > 0 && Objects.nonNull(shiftEndTime)
+                    && (Objects.isNull(latestEndTime) || shiftEndTime.after(latestEndTime))) {
+                latestEndTime = shiftEndTime;
+            }
+        }
+        return Objects.nonNull(latestEndTime) ? latestEndTime : result.getSpecEndTime();
     }
 
     private static LinkedHashSet<String> buildOccupiedMouldCodeSet(

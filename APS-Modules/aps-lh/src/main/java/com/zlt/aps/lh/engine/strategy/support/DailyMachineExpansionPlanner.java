@@ -1,6 +1,8 @@
 package com.zlt.aps.lh.engine.strategy.support;
 
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
+import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
+import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.dto.SkuDailyPlanQuotaDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
@@ -9,6 +11,7 @@ import com.zlt.aps.lh.component.EarlyProductionQuantityCalculator;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.context.LhScheduleConfig;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.handler.SkuMonthPlanCalculator;
 import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
 import com.zlt.aps.lh.service.impl.LhDailyMouldCalcServiceImpl;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
@@ -24,6 +27,7 @@ import java.time.ZoneId;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -44,6 +48,9 @@ public final class DailyMachineExpansionPlanner {
      */
     private static final ILhDailyMouldCalcService TEST_COMPATIBLE_REQUIRED_MACHINE_READER =
             new LhDailyMouldCalcServiceImpl();
+
+    /** 历史交替关系的空产品状态沿用正规状态口径。 */
+    private static final String FORMAL_PRODUCT_STATUS = "S";
 
     private DailyMachineExpansionPlanner() {
     }
@@ -79,24 +86,153 @@ public final class DailyMachineExpansionPlanner {
     public static int countScheduledPhysicalMachines(LhScheduleContext context,
                                                       SkuScheduleDTO sku,
                                                       LocalDate productionDate) {
-        Map<String, Set<String>> dayMachines = context.getSkuScheduledMachineCodeMap().get(productionDate);
-        if (CollectionUtils.isEmpty(dayMachines)) {
-            return 0;
+        // 与普通候选、提前生产和结果展示共用读取口径，同时沿用空产品状态归一化。
+        return context.getSkuScheduledMachineCount(
+                productionDate, sku.getMaterialCode(), sku.getProductStatus());
+    }
+
+    /**
+     * 计算新开机台判断使用的已落实需求份数，不改写逐日生产机台索引。
+     * <p>当日已排机台与同一需求的有效前置绑定取物理机台并集；仅喷砂已释放机台仍予排除。</p>
+     * @param context 排程上下文
+     * @param sku 物料及产品状态
+     * @param productionDate 当前竞争业务日
+     * @return 已落实物理机台数
+     */
+    public static int countCommittedMachineDemand(LhScheduleContext context,
+                                                  SkuScheduleDTO sku,
+                                                  LocalDate productionDate) {
+        Set<String> committedMachines = resolvePreScheduledDemandMachines(context, sku, productionDate);
+        Set<String> excludedMachines = new LinkedHashSet<String>(committedMachines);
+        excludedMachines.addAll(context.resolveOnlySandBlastReleasedPhysicalMachineCodes(sku));
+        // 已排集合排除绑定后再相加，避免同一天或左右侧已登记时重复占用需求。
+        return committedMachines.size() + context.getSkuScheduledMachineCountExcluding(
+                productionDate, sku.getMaterialCode(), sku.getProductStatus(), excludedMachines);
+    }
+
+    /**
+     * 将前置需求接入已有数量分配上限；没有相关绑定的SKU保持原有效机台口径。
+     * @param context 排程上下文
+     * @param sku 当前SKU
+     * @param productionDate 当前竞争业务日
+     * @param existingMachineCount 原数量策略统计的有效机台数
+     * @return 合并前置需求后的有效机台数
+     */
+    public static int countCommittedMachineDemand(LhScheduleContext context, SkuScheduleDTO sku,
+                                                  LocalDate productionDate, int existingMachineCount) {
+        boolean hasPreScheduledDemand = context.getPreScheduledMachineBindingList().stream()
+                .filter(Objects::nonNull)
+                .map(ActiveMachineBinding::getScheduleResult)
+                .filter(Objects::nonNull)
+                .anyMatch(result -> StringUtils.equals(sku.getMaterialCode(), result.getMaterialCode())
+                        && StringUtils.equals(StringUtils.defaultIfEmpty(sku.getProductStatus(), FORMAL_PRODUCT_STATUS),
+                                StringUtils.defaultIfEmpty(result.getProductStatus(), FORMAL_PRODUCT_STATUS)));
+        // 有前置记录时由统一有效性规则重新计算；失效或尚未生效的绑定不能被旧全窗口统计重新带回。
+        return hasPreScheduledDemand
+                ? countCommittedMachineDemand(context, sku, productionDate) : existingMachineCount;
+    }
+
+    /**
+     * 前置复用已经满足目标时统一阻止其他入口新开机台，保留原绑定的跨日生产。
+     * @param service 统一目标机台查询服务
+     * @param context 排程上下文
+     * @param sku 当前候选
+     * @param productionDate 当前业务日
+     * @return 是否应停止新开机台；没有有效前置绑定时沿用原准入
+     */
+    public static boolean isPreScheduledMachineDemandSatisfied(ILhDailyMouldCalcService service,
+                                                               LhScheduleContext context,
+                                                               SkuScheduleDTO sku,
+                                                               LocalDate productionDate) {
+        Set<String> committedMachines = resolvePreScheduledDemandMachines(context, sku, productionDate);
+        if (CollectionUtils.isEmpty(committedMachines)) {
+            return false;
         }
-        Set<String> machineCodes = dayMachines.get(MonthPlanDateResolver.buildMaterialStatusKey(
-                sku.getMaterialCode(), sku.getProductStatus()));
-        if (CollectionUtils.isEmpty(machineCodes)) {
-            return 0;
+        LocalDate requiredDate = EarlyProductionQuantityCalculator.resolveRequiredMachineCountDate(
+                context, sku, null, productionDate);
+        int targetCount = service.getRequiredMachineCount(
+                context, sku.getMaterialCode(), sku.getProductStatus(), requiredDate);
+        int committedCount = countCommittedMachineDemand(context, sku, productionDate);
+        boolean satisfied = targetCount > 0 && committedCount >= targetCount;
+        if (satisfied) {
+            log.info("前置复用已落实目标机台需求，停止新开机台, factoryCode: {}, batchNo: {}, "
+                            + "businessDate: {}, requiredDate: {}, materialCode: {}, productStatus: {}, "
+                            + "targetMachineCount: {}, dailyScheduledCount: {}, committedMachines: {}, "
+                            + "committedMachineCount: {}, remainingMachineCount: 0",
+                    context.getFactoryCode(), context.getBatchNo(), productionDate, requiredDate,
+                    sku.getMaterialCode(), sku.getProductStatus(), targetCount,
+                    countScheduledPhysicalMachines(context, sku, productionDate), committedMachines, committedCount);
         }
-        return (int) machineCodes.stream()
-                .filter(StringUtils::isNotEmpty)
-                .map(LhSingleControlMachineUtil::resolvePhysicalMachineCode)
-                .distinct().count();
+        return satisfied;
+    }
+
+    /**
+     * 读取当前需求已被前置成功提交的机台，不将其他未来需求或已失效绑定计入。
+     * @param context 排程上下文
+     * @param sku 当前候选
+     * @param productionDate 当前竞争业务日
+     * @return 按物理机台去重的有效绑定集合
+     */
+    private static Set<String> resolvePreScheduledDemandMachines(LhScheduleContext context,
+                                                                SkuScheduleDTO sku,
+                                                                LocalDate productionDate) {
+        Set<String> machines = new LinkedHashSet<String>(4);
+        if (Objects.isNull(productionDate)) {
+            return machines;
+        }
+        Set<String> releasedMachines = context.resolveOnlySandBlastReleasedPhysicalMachineCodes(sku);
+        for (ActiveMachineBinding binding : context.getPreScheduledMachineBindingList()) {
+            if (Objects.isNull(binding) || Objects.isNull(binding.getMachineDemandStartDate())
+                    || productionDate.isBefore(binding.getMachineDemandStartDate())
+                    || !isDemandBindingResultValid(context, sku, binding.getScheduleResult(), productionDate)) {
+                continue;
+            }
+            // 双模绑定必须整组仍有效，不能只剩单侧时继续占用完整机台份数。
+            if (binding.hasPairMachine()
+                    && !isDemandBindingResultValid(context, sku, binding.getPairScheduleResult(), productionDate)) {
+                continue;
+            }
+            String physicalMachine = LhSingleControlMachineUtil.resolvePhysicalMachineCode(binding.getMachineCode());
+            if (!releasedMachines.contains(physicalMachine)) {
+                machines.add(physicalMachine);
+            }
+        }
+        return machines;
+    }
+
+    /**
+     * 核实绑定结果仍在本批、物料状态一致、机台未切走且当前日或后续仍有正量生产。
+     * @param context 排程上下文
+     * @param sku 当前候选
+     * @param result 绑定对应结果
+     * @param productionDate 当前竞争业务日
+     * @return 该结果是否仍承接本次需求
+     */
+    private static boolean isDemandBindingResultValid(LhScheduleContext context, SkuScheduleDTO sku,
+                                                       LhScheduleResult result, LocalDate productionDate) {
+        if (Objects.isNull(result) || StringUtils.isEmpty(result.getLhMachineCode())
+                || !StringUtils.equals(sku.getMaterialCode(), result.getMaterialCode())
+                || !StringUtils.equals(StringUtils.defaultIfEmpty(sku.getProductStatus(), FORMAL_PRODUCT_STATUS),
+                        StringUtils.defaultIfEmpty(result.getProductStatus(), FORMAL_PRODUCT_STATUS))
+                || context.getScheduleResultList().stream().noneMatch(current -> current == result)) {
+            return false;
+        }
+        MachineScheduleDTO machine = context.getMachineScheduleMap().get(result.getLhMachineCode());
+        if (Objects.isNull(machine) || !StringUtils.equals(machine.getCurrentMaterialCode(), sku.getMaterialCode())) {
+            return false;
+        }
+        return context.getScheduleWindowShifts().stream()
+                .filter(Objects::nonNull)
+                .filter(shift -> Objects.nonNull(shift.getWorkDate()) && Objects.nonNull(shift.getShiftIndex()))
+                .filter(shift -> !SkuMonthPlanCalculator.getDate(shift.getWorkDate()).isBefore(productionDate))
+                .map(shift -> ShiftFieldUtil.getShiftPlanQty(result, shift.getShiftIndex()))
+                .filter(Objects::nonNull)
+                .anyMatch(quantity -> quantity > 0);
     }
 
     /**
      * 普通换活字块与续作增机补偿共用的窗口内首次补机日期。
-     * 已排结果和消费账本保持原样，只比较同一业务日的统一 Map 与已排物理机台数。
+     * 已排结果和消费账本保持原样，比较同一业务日的统一 Map 与已落实机台需求。
      *
      * @param service 统一目标机台查询服务
      * @param context 排程上下文
@@ -135,14 +271,14 @@ public final class DailyMachineExpansionPlanner {
                 || (Objects.nonNull(runtimePlan) && runtimePlan.isActive());
         for (LocalDate productionDate = startDate; !productionDate.isAfter(endDate);
              productionDate = productionDate.plusDays(1)) {
-            // 提前生产只投影目标来源日；已排机台仍属于实际业务日，避免把未来机台当作今日供给。
+            // 提前生产只投影目标来源日；额外占用仅来自同一需求的有效前置绑定，不作为今日生产量。
             LocalDate requiredDate = projected
                     ? EarlyProductionQuantityCalculator.resolveRequiredMachineCountDate(
                             context, sku, previewPlan, productionDate) : productionDate;
             // Map 缺失继续由统一查询入口记录，不以余量或产能推算目标台数。
             int targetCount = service.getRequiredMachineCount(
                     context, sku.getMaterialCode(), sku.getProductStatus(), requiredDate);
-            if (targetCount > countScheduledPhysicalMachines(context, sku, productionDate)) {
+            if (targetCount > countCommittedMachineDemand(context, sku, productionDate)) {
                 return productionDate;
             }
         }

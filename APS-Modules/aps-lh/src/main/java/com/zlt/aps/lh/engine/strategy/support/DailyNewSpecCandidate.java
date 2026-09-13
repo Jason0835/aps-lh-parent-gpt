@@ -33,7 +33,7 @@ public class DailyNewSpecCandidate {
     private int originalDayPlanQty;
     /** 当前SKU是否仅允许进入提前生产阶段 */
     private boolean futureOnlyEarlyProductionCandidate;
-    /** 当前业务日正式结果中已排物理机台数 */
+    /** 新开机台判断的已落实份数，包含当日已排及同一需求的有效前置绑定。 */
     private int scheduledMachineCount;
     /** 当前业务日中心目标物理机台数 */
     private int targetMachineCount;

@@ -56,6 +56,10 @@ public interface IEndingJudgmentStrategy {
 
     /**
      * 判断 SKU 排后最终是否收尾。
+     * <p>isEnd 只标识硫化余量收尾：排完全部硫化余量才标识为收尾，不因胎胚收尾（胎胚库存清空）
+     * 而提前标识。因此硫化余量大于胎胚库存且命中胎胚收尾时，胎胚库存排完但余量仍有剩余，
+     * 必须判定为非收尾。</p>
+     * <p>硫化余量为 0（月计划已完成）时视为余量已排完，本次只要仍有实际排产量即标识收尾。</p>
      *
      * @param context 排程上下文
      * @param sku SKU排程DTO
@@ -66,10 +70,13 @@ public interface IEndingJudgmentStrategy {
         if (Objects.isNull(sku)) {
             return false;
         }
+        int actualQty = Math.max(0, actualScheduledQty);
         int surplusQty = Math.max(0, sku.getSurplusQty());
-        int embryoStock = Math.max(0, sku.getEmbryoStock());
-        int endingDemandQty = Math.max(surplusQty, embryoStock);
-        return endingDemandQty > 0 && Math.max(0, actualScheduledQty) >= endingDemandQty;
+        if (surplusQty <= 0) {
+            // 无硫化余量：本次有实际排产量即视为余量已收尾。
+            return actualQty > 0;
+        }
+        return actualQty >= surplusQty;
     }
 
     /**
@@ -82,6 +89,31 @@ public interface IEndingJudgmentStrategy {
      */
     default boolean isStructureEndingForPriority(LhScheduleContext context, SkuScheduleDTO sku) {
         return isExpectedEnding(context, sku) && calculateEndingDaysForStructurePriority(context, sku) >= 0;
+    }
+
+    /**
+     * 判断 SKU 排产过程中的运行态收尾标识。
+     * <p>该标识只写入结果行供排产过程中读取 isEnd 的既有逻辑使用（共用胎胚活跃集合、
+     * 收尾均衡、结构保机、结果替换等），沿用改动前的胎胚库存硬目标口径：
+     * 非共用胎胚取 {@code max(硫化余量, 胎胚库存)}。命中胎胚库存硬目标时由具体实现
+     * 优先取精确硬目标。</p>
+     * <p>运行态标识不落库，排产全部结束后会由 {@link #isFinalEnding} 按
+     * “只按硫化余量”口径统一覆写。因此本方法 MUST NOT 用于最终落库判定，
+     * 保留旧口径只为保证排产行为与改动前一致。</p>
+     *
+     * @param context 排程上下文
+     * @param sku SKU排程DTO
+     * @param actualScheduledQty 当前已汇总的实际排产量
+     * @return true-运行态收尾；false-运行态非收尾
+     */
+    default boolean isRuntimeEnding(LhScheduleContext context, SkuScheduleDTO sku, int actualScheduledQty) {
+        if (Objects.isNull(sku)) {
+            return false;
+        }
+        int surplusQty = Math.max(0, sku.getSurplusQty());
+        int embryoStock = Math.max(0, sku.getEmbryoStock());
+        int endingDemandQty = Math.max(surplusQty, embryoStock);
+        return endingDemandQty > 0 && Math.max(0, actualScheduledQty) >= endingDemandQty;
     }
 
     /**

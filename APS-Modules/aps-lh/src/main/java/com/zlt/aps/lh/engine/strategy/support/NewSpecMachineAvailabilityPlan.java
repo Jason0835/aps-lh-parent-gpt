@@ -93,8 +93,8 @@ public class NewSpecMachineAvailabilityPlan {
     private final LhShiftConfigVO currentDayResourceShift;
 
     /**
-     * 不使用换模均衡配额时，经过停机、维修、清洗、禁换模和首检资源校验后的准备完成时间。
-     * <p>该时间只服务候选机台的准备班次筛选，不代表正式生产时间，也不触发计划量或账本扣减。</p>
+     * 经过换模配额、停机、维修、清洗、禁换模和首检资源校验后的准备可用时间。
+     * <p>新增候选与正式生产使用同一完整时间轴；该字段不触发计划量或账本扣减。</p>
      */
     private final Date preparationAvailableTime;
 
@@ -119,6 +119,9 @@ public class NewSpecMachineAvailabilityPlan {
      * <p>该标识只表示首检和正式生产起点后移，已合法分配的换模开始、完成时间保持不变。</p>
      */
     private final boolean firstInspectionDeferredByClassTotalLimit;
+
+    /** 不含胎胚等待的首检开始时间，仅供当前机台选SKU，不参与实际落班。 */
+    private final Date skuSelectionStartTime;
 
     public NewSpecMachineAvailabilityPlan(
             MachineScheduleDTO machine,
@@ -349,7 +352,7 @@ public class NewSpecMachineAvailabilityPlan {
                 preparationTargetShift, preparationAvailable, formalAvailableProductionTime,
                 formalTargetShift, historicalResidualCapacityInfo,
                 firstInspectionDeferredByClassTotalLimit, sourceDayResourceShift,
-                sourceDayCrossDayPreparation, null, null);
+                sourceDayCrossDayPreparation, null, null, null);
     }
 
     /**
@@ -379,6 +382,7 @@ public class NewSpecMachineAvailabilityPlan {
      * @param sourceDayCrossDayPreparation 是否跨日准备
      * @param firstInspectionTimelinePlan 冻结首检时间轴
      * @param currentDayResourceShift 回看历史首检时的当前日资源班次
+     * @param skuSelectionStartTime 不含胎胚等待的选料首检起点，仅作准入判断
      */
     private NewSpecMachineAvailabilityPlan(
             MachineScheduleDTO machine,
@@ -404,7 +408,8 @@ public class NewSpecMachineAvailabilityPlan {
             LhShiftConfigVO sourceDayResourceShift,
             boolean sourceDayCrossDayPreparation,
             FirstInspectionTimelinePlan firstInspectionTimelinePlan,
-            LhShiftConfigVO currentDayResourceShift) {
+            LhShiftConfigVO currentDayResourceShift,
+            Date skuSelectionStartTime) {
         this.machine = machine;
         this.available = available;
         this.unavailableReason = unavailableReason;
@@ -429,6 +434,7 @@ public class NewSpecMachineAvailabilityPlan {
         this.sourceDayResourceShift = sourceDayResourceShift;
         this.sourceDayCrossDayPreparation = sourceDayCrossDayPreparation;
         this.currentDayResourceShift = currentDayResourceShift;
+        this.skuSelectionStartTime = skuSelectionStartTime;
     }
 
     /**
@@ -449,7 +455,7 @@ public class NewSpecMachineAvailabilityPlan {
                 formalTargetShift, residualCapacityInfo,
                 firstInspectionDeferredByClassTotalLimit,
                 sourceDayResourceShift, sourceDayCrossDayPreparation, firstInspectionTimelinePlan,
-                currentDayResourceShift);
+                currentDayResourceShift, skuSelectionStartTime);
     }
 
     /**
@@ -473,7 +479,8 @@ public class NewSpecMachineAvailabilityPlan {
                 reuseStartTime, reuseShift, null, null,
                 reuseStartTime, reuseShift,
                 Objects.nonNull(reuseStartTime) && Objects.nonNull(reuseShift),
-                reuseStartTime, reuseShift, historicalResidualCapacityInfo, false);
+                reuseStartTime, reuseShift, historicalResidualCapacityInfo, false)
+                .withSkuSelectionStartTime(skuSelectionStartTime);
     }
 
     /**
@@ -493,7 +500,7 @@ public class NewSpecMachineAvailabilityPlan {
                 formalTargetShift, historicalResidualCapacityInfo,
                 firstInspectionDeferredByClassTotalLimit,
                 sourceDayResourceShift, sourceDayCrossDayPreparation, timelinePlan,
-                currentDayResourceShift);
+                currentDayResourceShift, skuSelectionStartTime);
     }
 
     /**
@@ -520,6 +527,12 @@ public class NewSpecMachineAvailabilityPlan {
                 && Objects.nonNull(committedChangeoverEndTime)
                 && Objects.nonNull(committedProductionStartTime)
                 && Objects.nonNull(committedProductionShift);
+        // 同一首检计划必须保留真实占用班次；否则跨班首段0条会再次退化为首个正量班次。
+        FirstInspectionTimelinePlan committedTimeline = Objects.nonNull(firstInspectionTimelinePlan)
+                && committedInspectionPlan == firstInspectionPlan
+                && firstInspectionTimelinePlan.matches(committedChangeoverStartTime,
+                committedChangeoverEndTime, firstInspectionTimelinePlan.getTimingMode())
+                ? firstInspectionTimelinePlan : null;
         return new NewSpecMachineAvailabilityPlan(
                 machine, committedAvailable, committedAvailable ? null : unavailableReason,
                 occupationEndTime, machineReadyTime,
@@ -531,7 +544,8 @@ public class NewSpecMachineAvailabilityPlan {
                 committedAvailable, committedProductionStartTime,
                 committedProductionShift, historicalResidualCapacityInfo,
                 firstInspectionDeferredByClassTotalLimit,
-                sourceDayResourceShift, sourceDayCrossDayPreparation, null, currentDayResourceShift);
+                sourceDayResourceShift, sourceDayCrossDayPreparation, committedTimeline,
+                currentDayResourceShift, skuSelectionStartTime);
     }
 
     /**
@@ -550,7 +564,7 @@ public class NewSpecMachineAvailabilityPlan {
                 preparationTargetShift, preparationAvailable, formalAvailableProductionTime,
                 formalTargetShift, historicalResidualCapacityInfo, true,
                 sourceDayResourceShift, sourceDayCrossDayPreparation, firstInspectionTimelinePlan,
-                currentDayResourceShift);
+                currentDayResourceShift, skuSelectionStartTime);
     }
 
     /**
@@ -572,7 +586,8 @@ public class NewSpecMachineAvailabilityPlan {
                 traceChangeoverEndTime, preparationAvailableTime, preparationTargetShift,
                 preparationAvailable, formalAvailableProductionTime, formalTargetShift,
                 historicalResidualCapacityInfo, firstInspectionDeferredByClassTotalLimit,
-                resourceShift, crossDayAvailable, firstInspectionTimelinePlan, currentDayResourceShift);
+                resourceShift, crossDayAvailable, firstInspectionTimelinePlan,
+                currentDayResourceShift, skuSelectionStartTime);
     }
 
     /**
@@ -603,7 +618,30 @@ public class NewSpecMachineAvailabilityPlan {
                 preparationTargetShift, preparationAvailable, formalAvailableProductionTime,
                 formalTargetShift, historicalResidualCapacityInfo,
                 firstInspectionDeferredByClassTotalLimit, sourceDayResourceShift,
-                sourceDayCrossDayPreparation, firstInspectionTimelinePlan, formalTargetShift);
+                sourceDayCrossDayPreparation, firstInspectionTimelinePlan, formalTargetShift, skuSelectionStartTime);
+    }
+
+    /**
+     * 附加选料首检起点，所有真实换模、首检和正式生产字段保持原值。
+     *
+     * @param selectionStartTime 不叠加胎胚等待的首检开始时间
+     * @return 携带选料基准的新计划
+     */
+    public NewSpecMachineAvailabilityPlan withSkuSelectionStartTime(Date selectionStartTime) {
+        return new NewSpecMachineAvailabilityPlan(
+                machine, available, unavailableReason, occupationEndTime, machineReadyTime,
+                changeoverStartTime, changeoverEndTime, productionNotBeforeTime,
+                candidateProductionNotBeforeTime, candidateAvailableProductionTime, targetShift,
+                firstInspectionPlan, traceChangeoverEndTime, preparationAvailableTime,
+                preparationTargetShift, preparationAvailable, formalAvailableProductionTime,
+                formalTargetShift, historicalResidualCapacityInfo, firstInspectionDeferredByClassTotalLimit,
+                sourceDayResourceShift, sourceDayCrossDayPreparation, firstInspectionTimelinePlan,
+                currentDayResourceShift, selectionStartTime);
+    }
+
+    /** @return 不含胎胚等待的首检开始时间；未配置胎胚时间或无合法预演起点时为空 */
+    public Date getSkuSelectionStartTime() {
+        return skuSelectionStartTime;
     }
 
     public MachineScheduleDTO getMachine() {

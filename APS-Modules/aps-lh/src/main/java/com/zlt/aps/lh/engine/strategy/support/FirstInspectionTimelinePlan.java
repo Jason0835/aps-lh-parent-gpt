@@ -43,6 +43,9 @@ public final class FirstInspectionTimelinePlan {
     /** 正式生产所属班次。 */
     private final LhShiftConfigVO formalProductionShift;
 
+    /** 首检真实开始所在班次，不能被取整后首个正量班次替代。 */
+    private final LhShiftConfigVO productionOccupationShift;
+
     /** 稳定时间轴指纹。 */
     private final String timelineFingerprint;
 
@@ -53,7 +56,8 @@ public final class FirstInspectionTimelinePlan {
                                         Date changeoverEndTime,
                                         Date productionReadyTime,
                                         Date formalProductionStartTime,
-                                        LhShiftConfigVO formalProductionShift) {
+                                        LhShiftConfigVO formalProductionShift,
+                                        LhShiftConfigVO productionOccupationShift) {
         this.allocationPlan = allocationPlan;
         this.timingMode = Objects.requireNonNull(timingMode, "timingMode不能为空");
         this.modeReason = StringUtils.defaultString(modeReason);
@@ -62,6 +66,7 @@ public final class FirstInspectionTimelinePlan {
         this.productionReadyTime = productionReadyTime;
         this.formalProductionStartTime = formalProductionStartTime;
         this.formalProductionShift = formalProductionShift;
+        this.productionOccupationShift = productionOccupationShift;
         this.timelineFingerprint = buildFingerprint();
     }
 
@@ -88,7 +93,29 @@ public final class FirstInspectionTimelinePlan {
                                                  LhShiftConfigVO formalProductionShift) {
         return new FirstInspectionTimelinePlan(
                 allocationPlan, timingMode, modeReason, changeoverStartTime, changeoverEndTime,
-                productionReadyTime, formalProductionStartTime, formalProductionShift);
+                productionReadyTime, formalProductionStartTime, formalProductionShift, null);
+    }
+
+    /**
+     * 使用完整窗口确定的真实占用班次创建时间轴，避免额外复制与重复计算指纹。
+     * @param allocationPlan 已校验首检分摊
+     * @param timingMode 首检模式
+     * @param modeReason 模式依据
+     * @param changeoverStartTime 切换开始
+     * @param changeoverEndTime 切换结束
+     * @param productionReadyTime 生产就绪下限
+     * @param formalProductionStartTime 正式生产开始
+     * @param formalProductionShift 正式生产班次
+     * @param occupationShift 首检真实开始班次
+     * @return 完整不可变时间轴
+     */
+    public static FirstInspectionTimelinePlan of(FirstInspectionAllocationPlan allocationPlan,
+            FirstInspectionTimingMode timingMode, String modeReason, Date changeoverStartTime,
+            Date changeoverEndTime, Date productionReadyTime, Date formalProductionStartTime,
+            LhShiftConfigVO formalProductionShift, LhShiftConfigVO occupationShift) {
+        return new FirstInspectionTimelinePlan(allocationPlan, timingMode, modeReason,
+                changeoverStartTime, changeoverEndTime, productionReadyTime,
+                formalProductionStartTime, formalProductionShift, occupationShift);
     }
 
     public FirstInspectionAllocationPlan getAllocationPlan() {
@@ -131,6 +158,9 @@ public final class FirstInspectionTimelinePlan {
     }
 
     public LhShiftConfigVO getProductionOccupationShift() {
+        if (Objects.nonNull(productionOccupationShift)) {
+            return productionOccupationShift;
+        }
         if (hasInspection()) {
             List<FirstInspectionShiftAllocation> allocations = allocationPlan.getShiftAllocations();
             if (!allocations.isEmpty() && Objects.nonNull(allocations.get(0))) {
@@ -193,6 +223,7 @@ public final class FirstInspectionTimelinePlan {
         appendValue(source, productionReadyTime);
         appendValue(source, formalProductionStartTime);
         appendValue(source, formalProductionShift);
+        appendValue(source, productionOccupationShift);
         if (hasInspection()) {
             appendValue(source, allocationPlan.getInspectionQty());
             appendValue(source, allocationPlan.getHourlyOutput());

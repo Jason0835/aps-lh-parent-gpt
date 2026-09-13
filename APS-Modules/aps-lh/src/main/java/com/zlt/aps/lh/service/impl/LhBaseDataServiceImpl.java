@@ -2477,7 +2477,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 if (mouldDelivery.getMaterialCode() != null && materialCodeSet.contains(mouldDelivery.getMaterialCode()) &&
                         !mouldCodeSet.contains(mouldDelivery.getMouldCode())) {
                     skuMouldRel1 = new MdmSkuMouldRel();
-                    skuMouldRel1.setFactoryCode(mouldDelivery.getMouldCode());
+                    skuMouldRel1.setFactoryCode(mouldDelivery.getFactoryCode());
                     skuMouldRel1.setMouldCode(mouldDelivery.getMouldCode());
                     skuMouldRel1.setMaterialCode(mouldDelivery.getMaterialCode());
                     skuMouldRel1.setMaterialDesc(mouldDelivery.getMaterialDesc());

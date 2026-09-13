@@ -264,6 +264,12 @@ public class NewSpecMachineSkuCompetitionService {
                 }
                 NewSpecMachineAvailabilityPlan availabilityPlan = availabilityResolver.resolve(
                         context, dayContext, candidate, matchResult.getMachine());
+                // 只淘汰当前机台的当前SKU，不改候选池、匹配排序或提交失败缓存。
+                if (!this.canMachineSelectSkuByEmbryoAvailableTime(
+                        context, dayContext, shift, machineResource, poolDate,
+                        candidate, availabilityPlan, roundCache)) {
+                    continue;
+                }
                 if (this.hasRejectedStructureOccupation(
                         availabilityPlan, matchResult, candidate, normalizedFailureSet)) {
                     this.traceMachineSkuDecision(
@@ -453,6 +459,12 @@ public class NewSpecMachineSkuCompetitionService {
                 }
                 NewSpecMachineAvailabilityPlan availabilityPlan = availabilityResolver.resolve(
                         context, dayContext, candidate, matchResult.getMachine());
+                // 只淘汰当前机台的当前SKU，不改候选池、匹配排序或提交失败缓存。
+                if (!this.canMachineSelectSkuByEmbryoAvailableTime(
+                        context, dayContext, shift, machineResource, poolDate,
+                        candidate, availabilityPlan, roundCache)) {
+                    continue;
+                }
                 if (this.hasRejectedStructureOccupation(
                         availabilityPlan, matchResult, candidate, normalizedFailureSet)) {
                     this.traceMachineSkuDecision(
@@ -1089,6 +1101,50 @@ public class NewSpecMachineSkuCompetitionService {
     }
 
     /**
+     * 独立执行机台选SKU胎胚时间门禁，并沿用既有轨迹和未排原因收集。
+     *
+     * @param context 排程上下文
+     * @param dayContext 当前业务日
+     * @param shift 当前竞争班次
+     * @param machineResource 当前机台资源
+     * @param poolDate 原候选日期池
+     * @param candidate 当前SKU候选
+     * @param availabilityPlan 原实际时间轴及独立选料首检起点
+     * @param roundCache 当轮统计
+     * @return true继续原流程；false仅跳过当前SKU
+     */
+    private boolean canMachineSelectSkuByEmbryoAvailableTime(
+            LhScheduleContext context, DayScheduleContext dayContext, LhShiftConfigVO shift,
+            MachineResource machineResource, LocalDate poolDate, DailyNewSpecCandidate candidate,
+            NewSpecMachineAvailabilityPlan availabilityPlan, NewSpecProposalRoundCache roundCache) {
+        // 无合法实际时间轴的候选保留原失败原因，不用新规则覆盖原约束。
+        if (Objects.isNull(availabilityPlan) || !availabilityPlan.isAvailable()) {
+            return true;
+        }
+        String failureReason = NewSpecEmbryoAvailableTimeResolver.resolveMachineSelectionTimeFailure(
+                context, candidate.getSku(), availabilityPlan.getSkuSelectionStartTime());
+        if (StringUtils.isEmpty(failureReason)) {
+            return true;
+        }
+        roundCache.recordEligibilityRejected();
+        this.recordCandidateBusinessGateFailure(
+                candidate, failureReason, READ_ONLY_ELIGIBILITY_FAILURE_PRIORITY);
+        Date earliestTime = NewSpecEmbryoAvailableTimeResolver.resolveEarliestAvailableTime(
+                context, candidate.getSku());
+        String detail = new StringBuilder(256).append(failureReason)
+                .append(", factoryCode=").append(context.getFactoryCode())
+                .append(", structureName=").append(candidate.getSku().getStructureName())
+                .append(", selectionInspectionStart=").append(availabilityPlan.getSkuSelectionStartTime())
+                .append(", embryoAvailableTime=").append(earliestTime)
+                .append(", gapMillis=").append(
+                        earliestTime.getTime() - availabilityPlan.getSkuSelectionStartTime().getTime())
+                .toString();
+        this.traceMachineSkuDecision(context, dayContext, shift, machineResource, poolDate, candidate,
+                NewSpecEmbryoAvailableTimeResolver.MACHINE_SELECTION_TIME_GAP_STAGE, detail);
+        return false;
+    }
+
+    /**
      * 登记已通过机台硬匹配后的业务门禁失败原因。
      *
      * <p>寸口、模套等硬匹配失败只代表单台机台不可用；候选已经在其他机台进入结构、模具等
@@ -1199,6 +1255,10 @@ public class NewSpecMachineSkuCompetitionService {
     private UnscheduledReasonEnum resolveAttemptReasonCode(
             String decisionStage,
             String reason) {
+        if (StringUtils.equals(NewSpecEmbryoAvailableTimeResolver.MACHINE_SELECTION_TIME_GAP_STAGE,
+                decisionStage)) {
+            return UnscheduledReasonEnum.EMBRYO_AVAILABLE_TIME_GAP;
+        }
         if (StringUtils.equals("HARD_MATCH", decisionStage)) {
             return UnscheduledReasonEnum.NO_HARD_MATCH_MACHINE;
         }

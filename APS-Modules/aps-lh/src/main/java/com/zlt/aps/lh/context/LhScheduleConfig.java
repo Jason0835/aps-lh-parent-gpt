@@ -753,6 +753,27 @@ public class LhScheduleConfig {
     }
 
     /**
+     * 获取续作月计划降模停产保机的胎胚可供硫化时长豁免阈值。
+     *
+     * @return 阈值（小时）；小于0表示不启用豁免
+     */
+    public BigDecimal getContinuousStopHoldEmbryoAvailableHoursThreshold() {
+        return getParamBigDecimalValue(
+                LhScheduleParamConstant.CONTINUOUS_STOP_HOLD_EMBRYO_AVAILABLE_HOURS_THRESHOLD,
+                LhScheduleConstant.CONTINUOUS_STOP_HOLD_EMBRYO_AVAILABLE_HOURS_THRESHOLD);
+    }
+
+    /**
+     * 获取机台选SKU时从首检开始到胎胚可供时间的最大允许差值。
+     *
+     * @return 非负小时阈值，默认4小时
+     */
+    public BigDecimal getMachineSkuEmbryoMaxWaitHours() {
+        return this.getParamBigDecimalValue(LhScheduleParamConstant.MACHINE_SKU_EMBRYO_MAX_WAIT_HOURS,
+                LhScheduleConstant.MACHINE_SKU_EMBRYO_MAX_WAIT_HOURS);
+    }
+
+    /**
      * 获取奇数班产计划量加一班别配置。
      * <p>空值表示不启用；合法性由产能计算入口按 1/2/3 判断，非法值保持原班产口径。</p>
      *

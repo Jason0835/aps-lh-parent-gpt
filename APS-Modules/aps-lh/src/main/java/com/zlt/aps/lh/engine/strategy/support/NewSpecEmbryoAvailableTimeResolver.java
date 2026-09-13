@@ -1,5 +1,8 @@
 package com.zlt.aps.lh.engine.strategy.support;
 
+import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
+import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.SkuDailyPlanQuotaDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
@@ -11,12 +14,15 @@ import com.zlt.aps.lh.util.ShiftFieldUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
+import java.math.BigDecimal;
+import java.text.MessageFormat;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 新增规格生产时间下限解析器。
@@ -45,6 +51,12 @@ public final class NewSpecEmbryoAvailableTimeResolver {
     /** 结果行换活字块标识：1-换活字块，0-普通续作或新增 */
     private static final String TYPE_BLOCK_RESULT_YES = "1";
 
+    /** 选料时间差拒绝阶段，供机台决策轨迹和未排诊断使用。 */
+    public static final String MACHINE_SELECTION_TIME_GAP_STAGE = "EMBRYO_SELECTION_TIME_GAP";
+
+    /** 每小时毫秒数，只做精确差值比较，不截断整小时。 */
+    private static final BigDecimal MILLIS_PER_HOUR = BigDecimalUtils.valueOf(TimeUnit.HOURS.toMillis(1));
+
     private NewSpecEmbryoAvailableTimeResolver() {
     }
 
@@ -68,6 +80,53 @@ public final class NewSpecEmbryoAvailableTimeResolver {
             return null;
         }
         return earliestTimeMap.get(sku.getStructureName());
+    }
+
+    /**
+     * 从无胎胚等待的预演计划读取首检起点；计时首检也必须使用开始时间。
+     *
+     * @param selectionPlan 未叠加胎胚等待的只读计划
+     * @return 首检开始时间；既有免首检接管使用原生产起点，无合法起点时为空
+     */
+    public static Date resolveSelectionInspectionStartTime(NewSpecMachineAvailabilityPlan selectionPlan) {
+        if (Objects.isNull(selectionPlan)) {
+            return null;
+        }
+        FirstInspectionAllocationPlan inspectionPlan = selectionPlan.getFirstInspectionPlan();
+        if (Objects.nonNull(inspectionPlan) && inspectionPlan.isValid()) {
+            return inspectionPlan.getInspectionStartTime();
+        }
+        return selectionPlan.getProductionOccupationStartTime();
+    }
+
+    /**
+     * 判断当前机台是否可按胎胚时间选择SKU，返回明确拒绝原因。
+     *
+     * <p>仅比较不含胎胚等待的首检开始时间；没有结构配置时不增加限制。
+     * 原时间轴未能形成合法起点时交由原准入处理，不凭空构造机台就绪时间。
+     * 本方法不修改候选归属、绑定、失败缓存、资源或数量账本。</p>
+     *
+     * @param context 排程上下文及本批参数
+     * @param sku 原候选SKU
+     * @param selectionStartTime 不含胎胚等待的首检开始时间
+     * @return 超过阈值时返回原因，其余返回null并继续原流程
+     */
+    public static String resolveMachineSelectionTimeFailure(
+            LhScheduleContext context, SkuScheduleDTO sku, Date selectionStartTime) {
+        Date earliestTime = resolveEarliestAvailableTime(context, sku);
+        if (Objects.isNull(earliestTime) || Objects.isNull(selectionStartTime)) {
+            return null;
+        }
+        BigDecimal maxWaitHours = Objects.nonNull(context.getScheduleConfig())
+                ? context.getScheduleConfig().getMachineSkuEmbryoMaxWaitHours()
+                : LhScheduleConstant.MACHINE_SKU_EMBRYO_MAX_WAIT_HOURS;
+        BigDecimal gapMillis = BigDecimalUtils.valueOf(earliestTime.getTime())
+                .subtract(BigDecimalUtils.valueOf(selectionStartTime.getTime()));
+        if (gapMillis.compareTo(maxWaitHours.multiply(MILLIS_PER_HOUR)) <= 0) {
+            return null;
+        }
+        return MessageFormat.format(I18nUtil.getMessage("ui.lh.machineSku.embryoTimeGapExceeded"),
+                maxWaitHours.stripTrailingZeros().toPlainString());
     }
 
     /**
@@ -159,8 +218,12 @@ public final class NewSpecEmbryoAvailableTimeResolver {
                                                       List<LhShiftConfigVO> shifts) {
         Date skuProductionGateTime = resolveSkuProductionGateTime(context, sku, shifts);
         Date earliestEmbryoAvailableTime = resolveEffectiveEarliestAvailableTime(context, sku);
-        return resolveActualProductionStartTime(
+        Date existingProductionNotBeforeTime = resolveActualProductionStartTime(
                 skuProductionGateTime, earliestEmbryoAvailableTime);
+        return resolveActualProductionStartTime(
+                existingProductionNotBeforeTime,
+                Objects.isNull(context) ? null
+                        : context.resolveOnlySandBlastRequeueNotBeforeTime(sku));
     }
 
     /**

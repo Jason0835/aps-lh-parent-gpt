@@ -10,6 +10,7 @@ import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuDailyPlanQuotaDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
+import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
@@ -371,7 +372,10 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
             String onlineMaterialCode = StringUtils.trim(onlineInfo.getMaterialCode());
             String onlineKey = MonthPlanDateResolver.buildMaterialStatusKey(
                     onlineMaterialCode, normalizeOnlineProductStatus(onlineInfo.getProductStatus()));
-            if (StringUtils.equals(skuKey, onlineKey)) {
+            // 前日T+1后物料命中的在机关系不享受续作专用目标量保留，其他机台仍可继续匹配。
+            if (StringUtils.equals(skuKey, onlineKey)
+                    && !this.excludePreviousT1AlternateContinuation(
+                    context, entry.getKey(), materialCode)) {
                 return true;
             }
         }
@@ -2578,6 +2582,11 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                     context, onlineInfo.getMaterialCode(), onlineProductStatus)) {
                 return false;
             }
+            // 跨状态补位仍属于续作，不得重新接回已命中的机台与后物料关系。
+            if (this.excludePreviousT1AlternateContinuation(
+                    context, entry.getKey(), targetSku.getMaterialCode())) {
+                return false;
+            }
         }
         return true;
     }
@@ -3043,6 +3052,10 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         if (StringUtils.isEmpty(machineCode) || StringUtils.isEmpty(normalizedMaterialCode)) {
             return;
         }
+        // 在消费原始SKU或复制续作模板前排除交替承接关系，保留需求供正常新增分类处理。
+        if (this.excludePreviousT1AlternateContinuation(context, machineCode, normalizedMaterialCode)) {
+            return;
+        }
         // 同一机台已被分配时，不得再次降级匹配其他状态SKU。
         for (SkuScheduleDTO continuousSku : continuousSkuList) {
             if (Objects.nonNull(continuousSku)
@@ -3084,6 +3097,64 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         String matchedSkuKey = MonthPlanDateResolver.buildMaterialStatusKey(
                 matchedSku.getMaterialCode(), matchedSku.getProductStatus());
         continuousTemplateMap.putIfAbsent(matchedSkuKey, matchedSku);
+    }
+
+    /**
+     * 按前日T+1交替计划的机台与后物料排除本次续作关系，并登记正常排产可接管的机台。
+     * <p>历史数据沿用业务目标日前一日的加载结果，先锁定最近有效批次，再按既有承接口径
+     * 取PLAN_DATE为本次窗口首日的01/02计划。不得将前日全部交替计划或报表日期映射混入。
+     * 保留MES物料、模具和需求账本；时间释放由分类末尾统一重置，实际切换仍走原排产规则。</p>
+     *
+     * @param context 本次排程上下文
+     * @param machineCode 精确运行态机台编码，不合并左右侧
+     * @param materialCode 当前续作物料编码
+     * @return true-命中交替后物料，禁止创建该续作关系；false-继续原续作匹配
+     */
+    private boolean excludePreviousT1AlternateContinuation(
+            LhScheduleContext context, String machineCode, String materialCode) {
+        if (Objects.isNull(context) || Objects.isNull(context.getScheduleDate())
+                || StringUtils.isEmpty(machineCode) || StringUtils.isEmpty(materialCode)
+                || CollectionUtils.isEmpty(context.getHistoricalReverseMouldChangePlanList())) {
+            return false;
+        }
+        List<LhMouldChangePlan> source = context.getHistoricalReverseMouldChangePlanList();
+        // 与独立历史复用阶段保持相同批次选择顺序，禁止先按物料或T+1过滤后回捞旧批次。
+        LhMouldChangePlan latest = source.stream().filter(Objects::nonNull)
+                .filter(plan -> StringUtils.isNotEmpty(plan.getLhResultBatchNo()))
+                .max(Comparator.comparing(LhMouldChangePlan::getCreateTime,
+                                Comparator.nullsFirst(Date::compareTo))
+                        .thenComparing(LhMouldChangePlan::getId,
+                                Comparator.nullsFirst(Long::compareTo))).orElse(null);
+        if (Objects.isNull(latest)) {
+            return false;
+        }
+        LocalDate previousT1Date = this.toLocalDate(context.getScheduleDate());
+        LhMouldChangePlan matchedPlan = source.stream().filter(Objects::nonNull)
+                .filter(plan -> StringUtils.equals(latest.getLhResultBatchNo(), plan.getLhResultBatchNo()))
+                .filter(plan -> MouldChangeTypeEnum.containsAnyCode(plan.getChangeMouldType(),
+                        MouldChangeTypeEnum.REGULAR.getCode(), MouldChangeTypeEnum.TYPE_BLOCK.getCode()))
+                .filter(plan -> Objects.nonNull(plan.getPlanDate())
+                        && previousT1Date.equals(this.toLocalDate(plan.getPlanDate())))
+                .filter(plan -> StringUtils.equals(machineCode, plan.getLhMachineCode())
+                        && StringUtils.equals(StringUtils.trim(materialCode),
+                        StringUtils.trim(plan.getAfterMaterialCode())))
+                .findFirst().orElse(null);
+        if (Objects.isNull(matchedPlan)) {
+            return false;
+        }
+        // 只登记精确命中的运行态机台；未命中的另一侧、同物料其他机台继续保留原续作规则。
+        if (context.getReleasedContinuousMachineCodeSet().add(machineCode)) {
+            String detail = String.format("工厂: %s, 批次: %s, 目标日: %s, 窗口首日: %s, 机台: %s, "
+                            + "续作物料: %s, 前日批次: %s, 交替计划ID: %s, 交替日期: %s, 后物料: %s, "
+                            + "原因: 命中前日T+1交替后物料，排除本次续作关系，转正常换活字块或换模竞争",
+                    context.getFactoryCode(), context.getBatchNo(),
+                    LhScheduleTimeUtil.formatDate(context.getScheduleTargetDate()), previousT1Date,
+                    machineCode, materialCode, matchedPlan.getLhResultBatchNo(), matchedPlan.getId(),
+                    LhScheduleTimeUtil.formatDateTime(matchedPlan.getPlanDate()), matchedPlan.getAfterMaterialCode());
+            log.info("前日T+1交替后物料排除续作, {}", detail);
+            PriorityTraceLogHelper.appendProcessLog(context, "前日T+1交替后物料排除续作", detail);
+        }
+        return true;
     }
 
     /**

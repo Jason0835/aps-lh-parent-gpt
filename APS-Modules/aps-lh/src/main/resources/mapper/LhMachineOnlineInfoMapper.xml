@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.lh.mapper.LhMachineOnlineInfoMapper">
+
+    <!-- 按唯一键（工厂+机台+日期）批量查询已存在数据（包含已逻辑删除的行，用于UPSERT时回填ID并复活） -->
+    <!-- 维度键说明：硫化一台机一行，LR_MOLDS/IN_MACHINE_MOULD_CODE均为行内字段，故键不含物料维度，MES换规格时同键直接覆盖更新 -->
+    <select id="selectByUniqueKeyList" resultType="com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo">
+        SELECT
+            ID,
+            FACTORY_CODE,
+            ONLINE_DATE,
+            LH_CODE,
+            IS_DELETE
+        FROM T_LH_MACHINE_ONLINE_INFO
+        WHERE (FACTORY_CODE, DATE(ONLINE_DATE), LH_CODE) IN
+        <foreach collection="list" item="item" open="(" separator="," close=")">
+            (#{item.factoryCode}, DATE(#{item.onlineDate}), #{item.lhCode})
+        </foreach>
+    </select>
+
+</mapper>

@@ -259,4 +259,8 @@ public final class LhScheduleParamConstant {
     public static final String SMALL_ENDING_SURPLUS_KEEP_RATIO_PERCENT = "SYS0304033";
     /** 优先续作硫化机台前缀，多个前缀使用英文逗号分隔 */
     public static final String PRIORITY_CONTINUATION_MACHINE_PREFIXES = "SYS0304034";
+    /** 续作月计划降模停产保机的胎胚可供硫化时长豁免阈值（小时），小于0表示不启用 */
+    public static final String CONTINUOUS_STOP_HOLD_EMBRYO_AVAILABLE_HOURS_THRESHOLD = "SYS0304035";
+    /** 胎胚最早可供时间距机台首检开始时间的最大允许差值（小时） */
+    public static final String MACHINE_SKU_EMBRYO_MAX_WAIT_HOURS = "SYS0304036";
 }

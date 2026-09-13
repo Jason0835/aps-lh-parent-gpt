@@ -36,10 +36,29 @@ public class ActiveMachineBinding {
      * 作为过程控制状态，避免窗口级最终收尾标记与当前日增量收口语义互相污染。</p>
      */
     private final boolean endingTarget;
+    /** 前置成功绑定承接的需求起始业务日；只用于防止重复新开机台，不改变生产班次。 */
+    private LocalDate machineDemandStartDate;
+
     /** 当前日收口后机台预计结束时间 */
     private Date estimatedEndTime;
     /** 已由前置执行完成的最后业务日；后续编排不得再次消费这些日期的产能和需求。 */
     private LocalDate preparedThroughDate;
+
+    /**
+     * 读取前置绑定已承接需求的起始业务日。
+     * @return 需求生效日；普通新增绑定为空
+     */
+    public LocalDate getMachineDemandStartDate() {
+        return machineDemandStartDate;
+    }
+
+    /**
+     * 冻结本次成功提交承接的需求日期，后续跨日续排不重新推算。
+     * @param machineDemandStartDate 需求生效日
+     */
+    public void setMachineDemandStartDate(LocalDate machineDemandStartDate) {
+        this.machineDemandStartDate = machineDemandStartDate;
+    }
 
     /**
      * 读取前置执行已处理的业务日上界。

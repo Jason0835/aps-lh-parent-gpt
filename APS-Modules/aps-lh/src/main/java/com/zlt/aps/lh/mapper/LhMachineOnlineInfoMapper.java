@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Update;
 
 import java.util.Date;
+import java.util.List;
 
 /**
  * 硫化在机信息Mapper
@@ -48,4 +49,13 @@ public interface LhMachineOnlineInfoMapper extends CommBaseMapper<LhMachineOnlin
      */
     @Update("UPDATE T_LH_MACHINE_ONLINE_INFO SET IS_DELETE = 1, UPDATE_BY = 'CLEAN_TASK', UPDATE_TIME = NOW() WHERE DATE(ONLINE_DATE) <= CURDATE() AND IS_DELETE = 0")
     int logicDeleteAllBeforeToday();
+
+    /**
+     * 按唯一键（工厂+机台+日期）批量查询已存在数据（包含已逻辑删除的行）
+     * 用于MES同步UPSERT时回填ID并复活历史已删行，避免插入产生重复键
+     *
+     * @param list 待查询的数据列表（携带维度键字段）
+     * @return 已存在的数据列表（含ID与IS_DELETE状态）
+     */
+    List<LhMachineOnlineInfo> selectByUniqueKeyList(@Param("list") List<LhMachineOnlineInfo> list);
 }

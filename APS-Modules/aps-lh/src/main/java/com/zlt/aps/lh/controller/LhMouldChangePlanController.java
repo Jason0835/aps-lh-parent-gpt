@@ -516,19 +516,39 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
      * @return 默认排序比较器
      */
     private Comparator<LhMouldChangePlanVo> buildDefaultExportComparator() {
-        return Comparator.comparingInt((LhMouldChangePlanVo item) -> {
-                    if (YesOrNoEnum.YES.getCode().equals(item.getIsDryIceClean())
-                            || YesOrNoEnum.YES.getCode().equals(item.getIsSandblastingClean())) {
-                        return 0;
-                    }
-                    return 2;
-                })
-                .thenComparingLong(item -> item.getPlanDate() == null
+        return Comparator.comparingLong((LhMouldChangePlanVo item) -> item.getPlanDate() == null
                         ? Long.MAX_VALUE : DateUtil.beginOfDay(item.getPlanDate()).getTime())
-                .thenComparing(item -> StringUtils.defaultIfBlank(item.getClassIndex(), ""))
-                .thenComparing(item -> StringUtils.defaultIfBlank(item.getLhMachineCode(), ""))
-                .thenComparing(LhMouldChangePlanVo::getPlanOrder, Comparator.nullsLast(Integer::compareTo))
-                .thenComparing(LhMouldChangePlanVo::getId, Comparator.nullsLast(Long::compareTo));
+                .thenComparingInt(this::resolveMouldChangeTypeSortOrder)
+                .thenComparing((LhMouldChangePlanVo item) -> StringUtils.defaultIfBlank(item.getClassIndex(), ""))
+                .thenComparing((LhMouldChangePlanVo item) -> item.getChangeTime(),
+                        Comparator.nullsLast(Date::compareTo))
+                .thenComparing((LhMouldChangePlanVo item) -> StringUtils.defaultIfBlank(item.getLhMachineCode(), ""))
+                .thenComparing((LhMouldChangePlanVo item) -> item.getPlanOrder(),
+                        Comparator.nullsLast(Integer::compareTo))
+                .thenComparing((LhMouldChangePlanVo item) -> item.getId(),
+                        Comparator.nullsLast(Long::compareTo));
+    }
+
+    /**
+     * 解析模具交替计划默认排序中的类型优先级。
+     *
+     * @param item 模具交替计划导出视图
+     * @return 清洗计划返回0，交替计划返回1，其他计划返回2
+     */
+    private int resolveMouldChangeTypeSortOrder(LhMouldChangePlanVo item) {
+        if (item == null) {
+            return 2;
+        }
+        String changeMouldType = item.getChangeMouldType();
+        boolean cleaningPlan = MouldChangeTypeEnum.containsAnyCode(changeMouldType,
+                MouldChangeTypeEnum.SAND_BLAST.getCode(), MouldChangeTypeEnum.DRY_ICE.getCode());
+        if (cleaningPlan) {
+            return 0;
+        }
+
+        boolean alternatePlan = MouldChangeTypeEnum.containsAnyCode(changeMouldType,
+                MouldChangeTypeEnum.REGULAR.getCode(), MouldChangeTypeEnum.TYPE_BLOCK.getCode());
+        return alternatePlan ? 1 : 2;
     }
 
     /**
@@ -910,11 +930,15 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
 
     @Override
     protected String getOrderBy() {
-        return " CASE WHEN FIND_IN_SET('" + MouldChangeTypeEnum.SAND_BLAST.getCode()
+        return " CASE WHEN PLAN_DATE IS NULL THEN 1 ELSE 0 END, DATE(PLAN_DATE)"
+                + ", CASE WHEN FIND_IN_SET('" + MouldChangeTypeEnum.SAND_BLAST.getCode()
                 + "', CHANGE_MOULD_TYPE) > 0 OR FIND_IN_SET('" + MouldChangeTypeEnum.DRY_ICE.getCode()
-                + "', CHANGE_MOULD_TYPE) > 0 THEN 0 ELSE 2 END"
-                + ", CASE WHEN PLAN_DATE IS NULL THEN 1 ELSE 0 END, DATE(PLAN_DATE)"
+                + "', CHANGE_MOULD_TYPE) > 0 THEN 0"
+                + " WHEN FIND_IN_SET('" + MouldChangeTypeEnum.REGULAR.getCode()
+                + "', CHANGE_MOULD_TYPE) > 0 OR FIND_IN_SET('" + MouldChangeTypeEnum.TYPE_BLOCK.getCode()
+                + "', CHANGE_MOULD_TYPE) > 0 THEN 1 ELSE 2 END"
                 + ", COALESCE(NULLIF(TRIM(CLASS_INDEX), ''), '')"
+                + ", CASE WHEN CHANGE_TIME IS NULL THEN 1 ELSE 0 END, CHANGE_TIME"
                 + ", COALESCE(NULLIF(TRIM(LH_MACHINE_CODE), ''), '')"
                 + ", CASE WHEN PLAN_ORDER IS NULL THEN 1 ELSE 0 END, PLAN_ORDER, ID";
     }

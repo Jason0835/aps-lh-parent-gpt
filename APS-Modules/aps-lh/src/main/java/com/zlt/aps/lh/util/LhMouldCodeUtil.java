@@ -8,6 +8,7 @@ import org.springframework.util.CollectionUtils;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -183,6 +184,26 @@ public final class LhMouldCodeUtil {
             sortedMouldCodeSet.addAll(splitMouldCodeSetText(mouldCodeText));
         }
         return new ArrayList<String>(sortedMouldCodeSet);
+    }
+
+    /**
+     * 判断两组模具号是否完全一致。
+     *
+     * <p>比较前统一按现有口径拆分英文逗号和斜杠、去除首尾空格、去重并排序；任一来源
+     * 未提供有效模具号时均视为不一致，避免空值被误判为同一组模具。</p>
+     *
+     * @param actualMouldCode 实际在机模具号
+     * @param plannedMouldCode 计划维护的模具号
+     * @return true-两组有效模具号完全一致；false-不一致或任一方缺失
+     */
+    public static boolean isSameMouldCodeSet(String actualMouldCode, String plannedMouldCode) {
+        List<String> actualMouldCodeList = normalizeAndSortMouldCodes(
+                Collections.singletonList(actualMouldCode));
+        List<String> plannedMouldCodeList = normalizeAndSortMouldCodes(
+                Collections.singletonList(plannedMouldCode));
+        return !CollectionUtils.isEmpty(actualMouldCodeList)
+                && !CollectionUtils.isEmpty(plannedMouldCodeList)
+                && actualMouldCodeList.equals(plannedMouldCodeList);
     }
 
     /**

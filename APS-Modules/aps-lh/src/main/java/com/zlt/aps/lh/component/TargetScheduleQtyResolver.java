@@ -913,13 +913,16 @@ public class TargetScheduleQtyResolver {
     }
 
     /**
-     * 解析SKU级胎胚库存额度上限。
+     * 解析SKU级胎胚库存分摊额度。
+     * <p>仅当该 SKU 命中胎胚库存收尾硬控（{@code embryoStockHardTargetMaterialSet}）时返回额度，
+     * 否则返回 -1 表示该 SKU 不受胎胚库存额度约束。额度读取与写入口径（{@code buildSkuKey}）
+     * 完全一致，供排产硬控与保存前下机方式（END_TYPE）判定共同复用，保证"额度是否排满"的口径唯一。</p>
      *
      * @param context 排程上下文
      * @param sku SKU
-     * @return SKU额度上限；-1表示无限制
+     * @return SKU额度上限；-1表示当前SKU未命中胎胚库存收尾
      */
-    private int resolveEmbryoStockSkuQuotaLimit(LhScheduleContext context, SkuScheduleDTO sku) {
+    public int resolveEmbryoStockSkuQuotaLimit(LhScheduleContext context, SkuScheduleDTO sku) {
         if (Objects.isNull(context) || Objects.isNull(sku) || StringUtils.isEmpty(sku.getMaterialCode())
                 || !context.getEmbryoStockHardTargetMaterialSet().contains(buildSkuKey(sku))) {
             return NO_EMBRYO_STOCK_LEDGER_LIMIT;
@@ -1468,6 +1471,36 @@ public class TargetScheduleQtyResolver {
      */
     public int resolveFinalEndingTargetQtyByStaticRelation(LhScheduleContext context, SkuScheduleDTO sku) {
         return resolveFinalEndingTargetQty(context, sku, true);
+    }
+
+    /**
+     * 解析结果行 isEnd 最终判定使用的余量收尾比较目标量。
+     * <p>{@code isEnd} 只标识硫化余量是否排完，不标识胎胚库存是否清空。因此本方法
+     * 固定返回硫化余量，不再读取胎胚库存、不按模台数归整，与排产控量使用的
+     * {@link #resolveFinalEndingTargetQty(LhScheduleContext, SkuScheduleDTO)} 完全分离，
+     * 避免“胎胚库存排完但余量仍有剩余”被误标为收尾。</p>
+     * <p>典型场景：硫化余量 100、胎胚库存 30 且命中胎胚收尾时，胎胚库存排完只代表
+     * 本批胎胚用尽，余量仍需下批胎胚继续排，此时结果行不得标识收尾。</p>
+     *
+     * @param context 排程上下文
+     * @param sku SKU排程DTO
+     * @return 余量收尾比较目标量；返回 0 表示无硫化余量（已排完）
+     */
+    public int resolveSurplusEndingTargetQty(LhScheduleContext context, SkuScheduleDTO sku) {
+        if (Objects.isNull(sku)) {
+            return 0;
+        }
+        /*
+         * 提前生产 SKU 当月 TOTAL_QTY 为 0、硫化余量同样为 0，
+         * 其收尾需求由中心运行视图建立的唯一总目标承载，必须先读取该目标，
+         * 否则 isEnd 会恒定落入“无余量”分支而误判为已收尾。
+         */
+        Integer earlyProductionTargetQty =
+                EarlyProductionQuantityCalculator.resolveActiveFutureOnlyEndingTargetQty(context, sku);
+        if (Objects.nonNull(earlyProductionTargetQty)) {
+            return Math.max(0, earlyProductionTargetQty);
+        }
+        return Math.max(0, sku.getSurplusQty());
     }
 
     private int resolveFinalEndingTargetQty(LhScheduleContext context, SkuScheduleDTO sku,

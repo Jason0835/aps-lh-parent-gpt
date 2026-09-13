@@ -50,6 +50,15 @@ public class LhMouldChangePlanVo extends BaseEntity implements Serializable {
     @TableField(value = "CLASS_INDEX")
     private String classIndex;
 
+    /**
+     * 更换时间，仅用于列表和导出默认排序，不作为导出列展示。
+     */
+    @ApiModelProperty(value = "更换时间")
+    @TableField(value = "CHANGE_TIME")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    @DateTimeFormat(pattern = "yyyy-MM-dd")
+    private Date changeTime;
+
     @ApiModelProperty(value = "硫化机台编号")
     @Excel(name = "ui.data.column.lhMouldChangePlan.lhMachineCode")
     @TableField(value = "LH_MACHINE_CODE")

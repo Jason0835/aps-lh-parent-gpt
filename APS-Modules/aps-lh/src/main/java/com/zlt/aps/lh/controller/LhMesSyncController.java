@@ -114,6 +114,14 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
     }
 
     @Override
+    @ApiOperation("按维度键UPSERT批量保存硫化在机信息（键存在更新/不存在插入）")
+    @PostMapping("/upsertMachineOnlineInfoBatch")
+    public AjaxResult upsertMachineOnlineInfoBatch(@RequestBody List<LhMachineOnlineInfo> list) {
+        int count = lhMachineOnlineInfoService.upsertBatch(list);
+        return AjaxResult.success("硫化在机UPSERT完成，处理数量：" + count);
+    }
+
+    @Override
     @ApiOperation("批量删除胶囊已使用次数")
     @PostMapping("/deleteRepairCapsule")
     public AjaxResult deleteRepairCapsule(@RequestParam("factoryCode") String factoryCode) {

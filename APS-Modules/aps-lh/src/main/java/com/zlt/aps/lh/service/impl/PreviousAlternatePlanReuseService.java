@@ -228,8 +228,19 @@ public class PreviousAlternatePlanReuseService {
                 context, sku, candidate.getEarlyProductionPreview(), day.getScheduleDate());
         candidate.setTargetMachineCount(lhDailyMouldCalcService.getRequiredMachineCount(
                 context, sku.getMaterialCode(), sku.getProductStatus(), requiredDate));
-        candidate.setScheduledMachineCount(DailyMachineExpansionPlanner.countScheduledPhysicalMachines(
-                context, sku, day.getScheduleDate()));
+        int scheduledMachineCount = DailyMachineExpansionPlanner.countCommittedMachineDemand(
+                context, sku, day.getScheduleDate());
+        Set<String> onlySandBlastReleasedMachineCodeSet =
+                context.resolveOnlySandBlastReleasedPhysicalMachineCodes(sku);
+        if (!CollectionUtils.isEmpty(onlySandBlastReleasedMachineCodeSet)) {
+            int activeMachineCount = context.getSkuScheduledMachineCountExcluding(
+                    day.getScheduleDate(), sku.getMaterialCode(), sku.getProductStatus(),
+                    onlySandBlastReleasedMachineCodeSet);
+            candidate.setTargetMachineCount(Math.max(candidate.getTargetMachineCount(),
+                    activeMachineCount + Math.max(1, sku.getContinuationShortageMachineCount())));
+            // 目标沿用仅喷砂补偿规则，已落实份数仍包含有效前置绑定，不能重新覆盖为当天生产数。
+        }
+        candidate.setScheduledMachineCount(scheduledMachineCount);
     }
 
     /**

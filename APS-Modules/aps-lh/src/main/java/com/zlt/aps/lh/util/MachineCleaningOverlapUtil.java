@@ -1,10 +1,16 @@
 package com.zlt.aps.lh.util;
 
 import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
+import com.zlt.aps.lh.api.domain.dto.MachineMaintenanceWindowDTO;
+import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.CleaningTypeEnum;
+import com.zlt.aps.lh.api.enums.MachineStopTypeEnum;
+import com.zlt.aps.lh.context.LhScheduleContext;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Objects;
@@ -296,6 +302,167 @@ public final class MachineCleaningOverlapUtil {
     public static boolean isSandBlastCleaning(MachineCleaningWindowDTO cleaningWindow) {
         return Objects.nonNull(cleaningWindow)
                 && CleaningTypeEnum.SAND_BLAST.getCode().equals(cleaningWindow.getCleanType());
+    }
+
+    /**
+     * 判断喷砂实际占用区间内是否存在需要组合处理的其他停机窗口。
+     * <p>判断范围按物理机台统一覆盖普通设备停机、独立故障、精度/维保及其他清洗窗口；
+     * 同一来源喷砂事件派生的单控L/R窗口视为同一次事件，不构成“其他停机”。区间采用
+     * {@code [start,end)} 严格相交口径，仅端点相接不算重叠。</p>
+     *
+     * @param context 排程上下文
+     * @param machineCode 当前续作机台编码
+     * @param sandBlastWindow 待判断的喷砂窗口
+     * @return true-存在其他重叠停机；false-该时间段仅命中本次喷砂
+     */
+    public static boolean hasOtherDowntimeOverlap(LhScheduleContext context,
+                                                   String machineCode,
+                                                   MachineCleaningWindowDTO sandBlastWindow) {
+        if (Objects.isNull(context) || StringUtils.isEmpty(machineCode)
+                || !isSandBlastCleaning(sandBlastWindow)
+                || Objects.isNull(sandBlastWindow.getCleanStartTime())) {
+            return false;
+        }
+        Date sandBlastEndTime = resolveEffectiveCleanEndTime(sandBlastWindow);
+        if (Objects.isNull(sandBlastEndTime)
+                || !sandBlastWindow.getCleanStartTime().before(sandBlastEndTime)) {
+            return false;
+        }
+        Date sandBlastStartTime = sandBlastWindow.getCleanStartTime();
+        String physicalMachineCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode);
+        if (hasDeviceStopOverlap(context, physicalMachineCode, sandBlastStartTime, sandBlastEndTime)
+                || hasFaultOverlap(context, physicalMachineCode, sandBlastStartTime, sandBlastEndTime)) {
+            return true;
+        }
+        return hasMachineWindowOverlap(context, physicalMachineCode, sandBlastWindow,
+                sandBlastStartTime, sandBlastEndTime);
+    }
+
+    /**
+     * 判断非清洗设备停机是否与喷砂区间重叠。
+     *
+     * @param context 排程上下文
+     * @param physicalMachineCode 物理机台编码
+     * @param startTime 喷砂开始时间
+     * @param endTime 喷砂占用结束时间
+     * @return true-存在重叠；false-不存在重叠
+     */
+    private static boolean hasDeviceStopOverlap(LhScheduleContext context,
+                                                String physicalMachineCode,
+                                                Date startTime,
+                                                Date endTime) {
+        if (CollectionUtils.isEmpty(context.getDevicePlanShutList())) {
+            return false;
+        }
+        return context.getDevicePlanShutList().stream()
+                .filter(Objects::nonNull)
+                .filter(plan -> !StringUtils.equals(
+                        MachineStopTypeEnum.DRY_ICE_CLEANING.getCode(), plan.getMachineStopType()))
+                .filter(plan -> !StringUtils.equals(
+                        MachineStopTypeEnum.SANDBLASTING_CLEANING.getCode(), plan.getMachineStopType()))
+                .filter(plan -> StringUtils.equals(physicalMachineCode,
+                        LhSingleControlMachineUtil.resolvePhysicalMachineCode(plan.getMachineCode())))
+                .anyMatch(plan -> isWindowOverlap(
+                        plan.getBeginDate(), plan.getEndDate(), startTime, endTime));
+    }
+
+    /**
+     * 判断独立临时故障是否与喷砂区间重叠。
+     *
+     * @param context 排程上下文
+     * @param physicalMachineCode 物理机台编码
+     * @param startTime 喷砂开始时间
+     * @param endTime 喷砂占用结束时间
+     * @return true-存在重叠；false-不存在重叠
+     */
+    private static boolean hasFaultOverlap(LhScheduleContext context,
+                                           String physicalMachineCode,
+                                           Date startTime,
+                                           Date endTime) {
+        if (CollectionUtils.isEmpty(context.getTemporaryFaultWindowMap())) {
+            return false;
+        }
+        return context.getTemporaryFaultWindowMap().values().stream()
+                .filter(Objects::nonNull)
+                .filter(fault -> StringUtils.equals(physicalMachineCode,
+                        LhSingleControlMachineUtil.resolvePhysicalMachineCode(fault.getMachineCode())))
+                .anyMatch(fault -> isWindowOverlap(
+                        fault.getStartTime(), fault.getEndTime(), startTime, endTime));
+    }
+
+    /**
+     * 判断精度/维保或其他清洗窗口是否与喷砂区间重叠。
+     *
+     * @param context 排程上下文
+     * @param physicalMachineCode 物理机台编码
+     * @param sandBlastWindow 当前喷砂事件
+     * @param startTime 喷砂开始时间
+     * @param endTime 喷砂占用结束时间
+     * @return true-存在重叠；false-不存在重叠
+     */
+    private static boolean hasMachineWindowOverlap(LhScheduleContext context,
+                                                   String physicalMachineCode,
+                                                   MachineCleaningWindowDTO sandBlastWindow,
+                                                   Date startTime,
+                                                   Date endTime) {
+        if (CollectionUtils.isEmpty(context.getMachineScheduleMap())) {
+            return false;
+        }
+        for (MachineScheduleDTO machine : context.getMachineScheduleMap().values()) {
+            if (Objects.isNull(machine) || !StringUtils.equals(physicalMachineCode,
+                    LhSingleControlMachineUtil.resolvePhysicalMachineCode(machine.getMachineCode()))) {
+                continue;
+            }
+            List<MachineMaintenanceWindowDTO> maintenanceWindowList =
+                    CollectionUtils.isEmpty(machine.getMaintenanceWindowList())
+                            ? Collections.<MachineMaintenanceWindowDTO>emptyList()
+                            : machine.getMaintenanceWindowList();
+            boolean maintenanceOverlap = maintenanceWindowList.stream()
+                    .filter(Objects::nonNull)
+                    .anyMatch(window -> isWindowOverlap(window.getMaintenanceStartTime(),
+                            Objects.nonNull(window.getProductionResumeTime())
+                                    ? window.getProductionResumeTime() : window.getMaintenanceEndTime(),
+                            startTime, endTime));
+            if (maintenanceOverlap) {
+                return true;
+            }
+            List<MachineCleaningWindowDTO> cleaningWindowList =
+                    CollectionUtils.isEmpty(machine.getCleaningWindowList())
+                            ? Collections.<MachineCleaningWindowDTO>emptyList()
+                            : machine.getCleaningWindowList();
+            boolean otherCleaningOverlap = cleaningWindowList.stream()
+                    .filter(Objects::nonNull)
+                    .filter(window -> !isSameCleaningEvent(window, sandBlastWindow))
+                    .anyMatch(window -> isWindowOverlap(window.getCleanStartTime(),
+                            resolveEffectiveCleanEndTime(window), startTime, endTime));
+            if (otherCleaningOverlap) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 判断两个运行侧窗口是否属于同一物理清洗事件。
+     *
+     * @param left 左侧窗口
+     * @param right 右侧窗口
+     * @return true-同一清洗事件；false-不同事件
+     */
+    private static boolean isSameCleaningEvent(MachineCleaningWindowDTO left,
+                                               MachineCleaningWindowDTO right) {
+        if (left == right) {
+            return true;
+        }
+        if (Objects.isNull(left) || Objects.isNull(right)) {
+            return false;
+        }
+        if (Objects.nonNull(left.getSourcePlanId()) || Objects.nonNull(right.getSourcePlanId())) {
+            return Objects.equals(left.getSourcePlanId(), right.getSourcePlanId());
+        }
+        return Objects.equals(left.getCleanType(), right.getCleanType())
+                && Objects.equals(left.getCleanStartTime(), right.getCleanStartTime())
+                && Objects.equals(resolveEffectiveCleanEndTime(left), resolveEffectiveCleanEndTime(right));
     }
 
     /**

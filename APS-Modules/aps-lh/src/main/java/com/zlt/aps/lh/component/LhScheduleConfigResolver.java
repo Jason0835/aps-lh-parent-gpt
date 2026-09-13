@@ -245,6 +245,12 @@ public class LhScheduleConfigResolver {
         putEndingAutoFillEnabled(resolvedParamMap, lhParamsMap);
         // 续作停产保机前后观察天数只允许1～3，非法配置统一回退默认值2。
         putContinuousMouldOfflineCheckDays(resolvedParamMap, lhParamsMap);
+        // 胎胚可供硫化时长阈值仅接受非负小数；异常值关闭豁免，保持原停产保机流程。
+        this.putNonNegativeBigDecimalOrDisabled(resolvedParamMap, lhParamsMap,
+                LhScheduleParamConstant.CONTINUOUS_STOP_HOLD_EMBRYO_AVAILABLE_HOURS_THRESHOLD,
+                LhScheduleConstant.CONTINUOUS_STOP_HOLD_EMBRYO_AVAILABLE_HOURS_THRESHOLD);
+        // 选料等待阈值按非负小数小时进入批次快照，不复用停产保机的负数关闭语义。
+        this.putMachineSkuEmbryoMaxWaitHours(resolvedParamMap, lhParamsMap);
         putStringValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.ODD_SHIFT_CAPACITY_PLUS_SHIFT_TYPE,
                 LhScheduleConstant.ODD_SHIFT_CAPACITY_PLUS_SHIFT_TYPE);
         putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.DAILY_STANDARD_CAPACITY_REMAIN_SHIFT_TYPE,
@@ -611,6 +617,66 @@ public class LhScheduleConfigResolver {
                     paramCode, value, defaultValue);
         }
         resolvedParamMap.put(paramCode, String.valueOf(defaultValue));
+    }
+
+    /**
+     * 解析非负高精度阈值；未配置、非数字或负数均关闭对应功能。
+     *
+     * @param resolvedParamMap 解析后的参数快照
+     * @param lhParamsMap 原始硫化参数
+     * @param paramCode 参数编码
+     * @param disabledValue 关闭功能的默认值
+     */
+    private void putNonNegativeBigDecimalOrDisabled(Map<String, String> resolvedParamMap,
+                                                     Map<String, String> lhParamsMap,
+                                                     String paramCode,
+                                                     BigDecimal disabledValue) {
+        String value = lhParamsMap.get(paramCode);
+        if (StringUtils.isEmpty(value)) {
+            resolvedParamMap.put(paramCode, disabledValue.toPlainString());
+            return;
+        }
+        try {
+            BigDecimal parsedValue = new BigDecimal(value.trim());
+            if (parsedValue.signum() >= 0) {
+                resolvedParamMap.put(paramCode, parsedValue.stripTrailingZeros().toPlainString());
+                return;
+            }
+        } catch (NumberFormatException exception) {
+            log.warn("硫化参数解析失败，关闭胎胚可供硫化时长豁免, paramCode={}, value={}", paramCode, value);
+            resolvedParamMap.put(paramCode, disabledValue.toPlainString());
+            return;
+        }
+        log.warn("硫化参数必须为非负数，关闭胎胚可供硫化时长豁免, paramCode={}, value={}", paramCode, value);
+        resolvedParamMap.put(paramCode, disabledValue.toPlainString());
+    }
+
+    /**
+     * 解析机台选SKU胎胚等待阈值，缺省或非法配置沿用业务默认4小时。
+     *
+     * @param resolvedParamMap 已解析参数快照
+     * @param lhParamsMap 工厂原始参数
+     */
+    private void putMachineSkuEmbryoMaxWaitHours(Map<String, String> resolvedParamMap,
+                                               Map<String, String> lhParamsMap) {
+        String paramCode = LhScheduleParamConstant.MACHINE_SKU_EMBRYO_MAX_WAIT_HOURS;
+        String value = lhParamsMap.get(paramCode);
+        BigDecimal hours = LhScheduleConstant.MACHINE_SKU_EMBRYO_MAX_WAIT_HOURS;
+        if (StringUtils.isNotEmpty(value)) {
+            try {
+                BigDecimal configuredHours = new BigDecimal(value.trim());
+                if (configuredHours.signum() >= 0) {
+                    hours = configuredHours;
+                } else {
+                    log.warn("机台选SKU胎胚等待阈值不能为负数，使用默认值, paramCode={}, value={}, defaultHours={}",
+                            paramCode, value, hours);
+                }
+            } catch (NumberFormatException exception) {
+                log.warn("机台选SKU胎胚等待阈值解析失败，使用默认值, paramCode={}, value={}, defaultHours={}",
+                        paramCode, value, hours);
+            }
+        }
+        resolvedParamMap.put(paramCode, hours.stripTrailingZeros().toPlainString());
     }
 
     /**

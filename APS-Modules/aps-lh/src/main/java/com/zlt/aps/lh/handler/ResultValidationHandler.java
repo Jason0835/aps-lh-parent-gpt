@@ -116,6 +116,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     private static final String END_TYPE_BY_REMAINING_QTY = "0";
     /** 按时间下机：前物料余量未排完、机台按固定时间下机时的下机方式，与交替类型无关。 */
     private static final String END_TYPE_BY_TIME = "1";
+    /** 未命中胎胚库存收尾硬控或额度缺失时的胎胚库存SKU额度标记。 */
+    private static final int NO_EMBRYO_STOCK_SKU_QUOTA = -1;
     /** 干冰清洗因三天内收尾跳过时的固定原因 */
     private static final String DRY_ICE_ENDING_ANALYSIS = "干冰清洗+收尾";
     /** 喷砂清洗因三天内收尾跳过时的固定原因 */
@@ -184,7 +186,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
 
             /*
              * 全部排产阶段及历史班次保护已经结束，此处按“物料+产品状态”汇总最终实际量，
-             * 统一刷新同组所有有效结果的isEnd，并执行保存前数量上限强校验。
+             * 统一刷新同组所有有效结果的isEnd（硫化余量排完 或 胎胚收尾且胎胚库存额度排完），
+             * 并执行保存前数量上限强校验。
              */
             refreshFinalEndingFlagByMaterialStatus(context);
 //            validateProductionQuantityPolicy(context);
@@ -1691,6 +1694,13 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     /**
      * 按物料和产品状态汇总最终实际排产量，并统一刷新同组所有结果的收尾标识。
      * <p>续作、换活字块和新增属于同一SKU在不同阶段的产能来源，最终落库不得再按阶段局部量判断。</p>
+     * <p>isEnd 在以下两种口径任一命中时标识为收尾：</p>
+     * <ol>
+     *     <li>硫化余量收尾：本 SKU 的硫化余量已全部排完；</li>
+     *     <li>胎胚收尾：命中胎胚库存收尾且胎胚库存额度已排完。胎胚收尾的排产目标量就是胎胚库存
+     *     内部额度（精确硬目标、不按模台数归整、不受硫化余量约束），排满该额度即代表本批胎胚用尽，
+     *     此时即使硫化余量仍有剩余也必须标识收尾。</li>
+     * </ol>
      *
      * @param context 排程上下文
      */
@@ -1720,20 +1730,41 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                         context.getBatchNo(), entry.getKey(), entry.getValue());
                 continue;
             }
-            boolean finalTailFlag = endingJudgmentStrategy.isFinalEnding(
-                    context, sourceSku, entry.getValue());
+            TargetScheduleQtyResolver targetScheduleQtyResolver = this.getTargetScheduleQtyResolver();
+            int actualScheduledQty = Math.max(0, entry.getValue());
+            // 口径一：硫化余量已全部排完即标识收尾。
+            boolean surplusTailFlag = endingJudgmentStrategy.isFinalEnding(
+                    context, sourceSku, actualScheduledQty);
+            /*
+             * 口径二：胎胚收尾且胎胚库存额度已排完，同样标识收尾。
+             * 胎胚收尾的目标量即胎胚库存内部额度（精确硬目标），排满额度代表本批胎胚用尽，
+             * 因此不再要求硫化余量同时排完；未命中胎胚收尾的 SKU 该分支恒为 false，不影响原余量口径。
+             * 仅在口径一未命中时解析，避免对已判定收尾的 SKU 产生多余目标量解析与日志开销。
+             */
+            int embryoStockTargetQty = 0;
+            boolean embryoStockTailFlag = false;
+            if (!surplusTailFlag) {
+                embryoStockTargetQty = targetScheduleQtyResolver
+                        .resolveFinalEndingTargetQtyByStaticRelation(context, sourceSku);
+                embryoStockTailFlag = embryoStockTargetQty > 0
+                        && targetScheduleQtyResolver.isEmbryoStockEnding(context, sourceSku)
+                        && actualScheduledQty >= embryoStockTargetQty;
+            }
+            boolean finalTailFlag = surplusTailFlag || embryoStockTailFlag;
             context.getScheduleResultList().stream()
                     .filter(Objects::nonNull)
                     .filter(result -> StringUtils.equals(entry.getKey(),
                             MonthPlanDateResolver.buildMaterialStatusKey(
                                     result.getMaterialCode(), result.getProductStatus())))
                     .forEach(result -> result.setIsEnd(finalTailFlag ? "1" : "0"));
-            int finalTargetQty = getTargetScheduleQtyResolver()
-                    .resolveFinalEndingTargetQtyByStaticRelation(context, sourceSku);
+            int finalTargetQty = targetScheduleQtyResolver
+                    .resolveSurplusEndingTargetQty(context, sourceSku);
             log.info("SKU排后最终收尾统一刷新完成, batchNo: {}, materialCode: {}, productStatus: {}, "
-                            + "actualScheduledQty: {}, finalTargetQty: {}, finalTailFlag: {}",
+                            + "actualScheduledQty: {}, finalTargetQty: {}, surplusTailFlag: {}, "
+                            + "embryoStockTargetQty: {}, embryoStockTailFlag: {}, finalTailFlag: {}",
                     context.getBatchNo(), sourceSku.getMaterialCode(), sourceSku.getProductStatus(),
-                    entry.getValue(), finalTargetQty, finalTailFlag);
+                    actualScheduledQty, finalTargetQty, surplusTailFlag,
+                    embryoStockTargetQty, embryoStockTailFlag, finalTailFlag);
         }
     }
 
@@ -2946,6 +2977,10 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
      * 本批全部结果量：真实剩余量大于0时，无论换模落在哪个班次，都属于余量未排完后的按时间下机（1）。
      * 只有真实剩余量已经归零，才继续比较换模班次与前物料跨机台最后正量班次：换模更早为按时间下机（1），
      * 换模处于收尾班次或之后为按余量收尾下机（0）。</p>
+     * <p>胎胚收尾口径：前物料胎胚收尾（embryoEndingFlagMap 中该胎胚标识为1）且本次排程已把胎胚库存
+     * 分摊额度排满时，前物料已无料可产，视同余量收尾完成，直接判定为按余量收尾下机（0），
+     * 不再比较换模班次先后。该口径在真实剩余量判断之前短路，避免胎胚库存额度远小于硫化余量时
+     * 剩余量恒大于0而被误判为按时间下机。</p>
      * <p>边界口径：前物料硫化余量小于等于0时按余量下机；余量大于0但本次窗口完全没有排产量时
      * 按时间下机；无法解析换模班次时回退到“硫化余量-本次排产量”的真实剩余量口径，
      * 不读取运行期共享的 SKU 实际消费账本，避免账本被上游规则改写后误判。
@@ -2965,6 +3000,13 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                                                  Date changeTime) {
         SkuScheduleDTO beforeSku = resolveBeforeSkuForEndType(
                 context, machineCode, beforeMaterialCode, beforeProductStatus);
+        if (this.isOnlySandBlastTimeDown(
+                context, machineCode, beforeMaterialCode, changeTime)) {
+            log.info("模具交替计划END_TYPE判断, machineCode: {}, beforeMaterialCode: {}, "
+                            + "beforeProductStatus: {}, endType: 1, reason: 仅喷砂下机时仍有真实余量",
+                    machineCode, beforeMaterialCode, beforeProductStatus);
+            return END_TYPE_BY_TIME;
+        }
         Integer beforeSurplusQty = Objects.isNull(beforeSku) ? null : beforeSku.getSurplusQty();
         int beforeMaterialSurplusQty = Objects.isNull(beforeSurplusQty)
                 ? 0 : Math.max(0, beforeSurplusQty);
@@ -2977,6 +3019,17 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                             + "beforeMaterialSurplusQty: {}, lastPositiveShiftPosition: {}, changeShiftPosition: {}, "
                             + "beforeMaterialCannotFinish: false, endType: 0, reason: 前物料无硫化余量",
                     machineCode, beforeMaterialCode, beforeProductStatus, beforeMaterialSurplusQty, 0, 0);
+            return END_TYPE_BY_REMAINING_QTY;
+        }
+        // 胎胚收尾且胎胚库存额度已排满时前物料已无料可产，视同余量收尾完成，必须直接短路为按余量下机；
+        // 不能并入下方“真实剩余量大于0”条件后继续比较班次，否则换模早于最后正量班次时会被改判回按时间下机。
+        if (this.isBeforeMaterialEmbryoStockExhausted(
+                context, beforeSku, beforeMaterialCode, beforeProductStatus)) {
+            log.info("模具交替计划END_TYPE判断, machineCode: {}, beforeMaterialCode: {}, beforeProductStatus: {}, "
+                            + "beforeMaterialSurplusQty: {}, beforeMaterialRemainingQty: {}, "
+                            + "endType: 0, reason: 前物料胎胚收尾且胎胚库存额度已排满",
+                    machineCode, beforeMaterialCode, beforeProductStatus, beforeMaterialSurplusQty,
+                    beforeMaterialRemainingQty);
             return END_TYPE_BY_REMAINING_QTY;
         }
         if (Objects.nonNull(beforeMaterialRemainingQty) && beforeMaterialRemainingQty > 0) {
@@ -3039,6 +3092,36 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                 beforeMaterialRemainingQty, lastPositiveShiftPosition, changeShiftPosition,
                 beforeMaterialCannotFinish, endType);
         return endType;
+    }
+
+    /**
+     * 判断当前清洗交替是否为仅喷砂触发且下机时仍有真实余量的按时间下机事件。
+     *
+     * @param context 排程上下文
+     * @param machineCode 机台编码
+     * @param beforeMaterialCode 清洗时点前物料
+     * @param changeTime 清洗实际开始时间
+     * @return true-仅喷砂按时间下机；false-沿用原END_TYPE判断
+     */
+    private boolean isOnlySandBlastTimeDown(LhScheduleContext context,
+                                            String machineCode,
+                                            String beforeMaterialCode,
+                                            Date changeTime) {
+        if (Objects.isNull(context) || StringUtils.isEmpty(machineCode)
+                || StringUtils.isEmpty(beforeMaterialCode) || Objects.isNull(changeTime)
+                || CollectionUtils.isEmpty(context.getOnlySandBlastContinuationReleaseWindowMap())) {
+            return false;
+        }
+        MachineCleaningWindowDTO releaseWindow = context
+                .getOnlySandBlastContinuationReleaseWindowMap().get(machineCode);
+        MachineScheduleDTO initialMachine = context.getInitialMachineScheduleMap().get(machineCode);
+        int remainingQty = context.getOnlySandBlastContinuationRemainingQtyMap()
+                .getOrDefault(machineCode, 0);
+        return remainingQty > 0
+                && Objects.nonNull(releaseWindow)
+                && Objects.equals(changeTime, releaseWindow.getCleanStartTime())
+                && Objects.nonNull(initialMachine)
+                && StringUtils.equals(beforeMaterialCode, initialMachine.getCurrentMaterialCode());
     }
 
     /**
@@ -3231,6 +3314,120 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                             ? ShiftFieldUtil.resolveScheduledQty(result) : planQty);
                 })
                 .sum();
+    }
+
+    /**
+     * 判断前物料是否胎胚收尾且本次排程已把胎胚库存分摊额度排满。
+     * <p>胎胚收尾标识来自 {@code embryoEndingFlagMap}；胎胚库存分摊额度由 {@link TargetScheduleQtyResolver}
+     * 在保存前排产时写入，这里按同一口径读取。排量按“物料+产品状态”汇总全部结果，与硫化余量口径
+     * 共用同一个汇总方法，不读取运行期消费账本，避免账本被上游规则改写后误判。</p>
+     * <p>额度缺失、额度小于等于0（共用胎胚库存为0）或排量小于额度时均不视为已排满，
+     * 保证只在前物料确实“已无料可产”时才改写下机方式；前物料来源 SKU 缺失或胎胚编码为空时，
+     * 回退到结果行和额度表按“物料+产品状态”取值。</p>
+     *
+     * @param context 排程上下文
+     * @param beforeSku 交替计划前物料来源 SKU，可为空
+     * @param beforeMaterialCode 交替计划前物料编码
+     * @param beforeProductStatus 交替计划前物料产品状态
+     * @return true-胎胚收尾且胎胚库存额度已排满；false-未命中、额度缺失或未排满
+     */
+    private boolean isBeforeMaterialEmbryoStockExhausted(LhScheduleContext context,
+                                                         SkuScheduleDTO beforeSku,
+                                                         String beforeMaterialCode,
+                                                         String beforeProductStatus) {
+        if (Objects.isNull(context) || StringUtils.isEmpty(beforeMaterialCode)) {
+            return false;
+        }
+        String embryoCode = Objects.isNull(beforeSku) ? null : beforeSku.getEmbryoCode();
+        int quotaQty = NO_EMBRYO_STOCK_SKU_QUOTA;
+        if (Objects.nonNull(beforeSku) && StringUtils.isNotEmpty(embryoCode)) {
+            quotaQty = this.getTargetScheduleQtyResolver()
+                    .resolveEmbryoStockSkuQuotaLimit(context, beforeSku);
+        }
+        // 额度与排量口径必须与前物料来源 SKU 保持一致：入口传入的产品状态由机台在线信息归一化得到，
+        // 机台在线信息缺失时为空，故优先取 SKU 自身产品状态，避免“物料+产品状态”匹配落空。
+        String skuProductStatus = Objects.nonNull(beforeSku)
+                ? beforeSku.getProductStatus() : this.normalizeProductStatus(beforeProductStatus);
+        if (StringUtils.isEmpty(embryoCode)) {
+            // 无续作降模快照的机台缺少前物料来源 SKU，按“物料+产品状态”回退取胎胚编码与额度。
+            embryoCode = this.resolveBeforeMaterialEmbryoCode(
+                    context, beforeMaterialCode, skuProductStatus);
+            quotaQty = this.resolveEmbryoStockSkuQuotaByMaterialStatus(
+                    context, beforeMaterialCode, skuProductStatus);
+        }
+        if (StringUtils.isEmpty(embryoCode) || quotaQty <= 0) {
+            return false;
+        }
+        if (!this.getTargetScheduleQtyResolver()
+                .isEmbryoStockEndingFlagYes(context, embryoCode)) {
+            return false;
+        }
+        int scheduledQty = this.resolveScheduledQtyByMaterialStatus(
+                context, beforeMaterialCode, skuProductStatus);
+        log.info("模具交替计划END_TYPE胎胚库存排满判定, materialCode: {}, embryoCode: {}, "
+                        + "胎胚库存额度: {}, 本次排量: {}",
+                beforeMaterialCode, embryoCode, quotaQty, scheduledQty);
+        return scheduledQty >= quotaQty;
+    }
+
+    /**
+     * 按“物料+产品状态”从结果行解析前物料胎胚编码。
+     * <p>供缺少前物料来源 SKU 的机台判定胎胚收尾时使用，匹配口径与最后正量班次解析保持一致；
+     * 结果行胎胚编码为空或本次窗口无该物料结果时返回 null。</p>
+     *
+     * @param context 排程上下文
+     * @param materialCode 前物料编码
+     * @param productStatus 前物料产品状态
+     * @return 前物料胎胚编码；无法解析时返回 null
+     */
+    private String resolveBeforeMaterialEmbryoCode(LhScheduleContext context,
+                                                   String materialCode,
+                                                   String productStatus) {
+        if (Objects.isNull(context) || StringUtils.isEmpty(materialCode)
+                || CollectionUtils.isEmpty(context.getScheduleResultList())) {
+            return null;
+        }
+        String targetSkuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                materialCode, this.normalizeProductStatus(productStatus));
+        for (LhScheduleResult result : context.getScheduleResultList()) {
+            if (Objects.isNull(result) || StringUtils.isEmpty(result.getEmbryoCode())) {
+                continue;
+            }
+            if (!StringUtils.equals(materialCode, result.getMaterialCode())) {
+                continue;
+            }
+            if (StringUtils.equals(targetSkuKey, MonthPlanDateResolver.buildMaterialStatusKey(
+                    result.getMaterialCode(), result.getProductStatus()))) {
+                return result.getEmbryoCode();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 按“物料+产品状态”解析前物料的胎胚库存分摊额度。
+     * <p>额度表 key 与 {@link TargetScheduleQtyResolver} 写入口径一致；仍需命中胎胚库存硬控集合，
+     * 避免使用已清理的残留额度。未命中或额度缺失时返回 {@link #NO_EMBRYO_STOCK_SKU_QUOTA}。</p>
+     *
+     * @param context 排程上下文
+     * @param materialCode 前物料编码
+     * @param productStatus 前物料产品状态
+     * @return 胎胚库存分摊额度；未命中时返回 -1
+     */
+    private int resolveEmbryoStockSkuQuotaByMaterialStatus(LhScheduleContext context,
+                                                           String materialCode,
+                                                           String productStatus) {
+        if (Objects.isNull(context) || StringUtils.isEmpty(materialCode)
+                || CollectionUtils.isEmpty(context.getEmbryoStockSkuQuotaMap())) {
+            return NO_EMBRYO_STOCK_SKU_QUOTA;
+        }
+        String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                materialCode, this.normalizeProductStatus(productStatus));
+        if (!context.getEmbryoStockHardTargetMaterialSet().contains(skuKey)) {
+            return NO_EMBRYO_STOCK_SKU_QUOTA;
+        }
+        Integer quotaQty = context.getEmbryoStockSkuQuotaMap().get(skuKey);
+        return Objects.isNull(quotaQty) ? NO_EMBRYO_STOCK_SKU_QUOTA : Math.max(0, quotaQty);
     }
 
     /**

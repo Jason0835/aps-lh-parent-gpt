@@ -470,6 +470,11 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                 if (lockedMaterialKeySet.contains(materialStatusKey)) {
                     continue;
                 }
+                // 按天反选与普通新增共用已落实需求，前置复用成功后不再为同一需求反选第三台。
+                if (DailyMachineExpansionPlanner.isPreScheduledMachineDemandSatisfied(
+                        this.lhDailyMouldCalcService, context, sku, scheduleDate)) {
+                    continue;
+                }
                 // 完全复用现有换活字块候选判断：同胎胚同模具 + 机台硬性准入 + 当前物料不相同。
                 if (!isTypeBlockCandidate(context, machine, sku, false)) {
                     continue;
@@ -1452,8 +1457,16 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         if (machine == null || estimatedEndTime == null) {
             return null;
         }
+        Date effectiveEstimatedEndTime = estimatedEndTime;
+        Date onlySandBlastRequeueTime = Objects.isNull(context)
+                ? null : context.resolveOnlySandBlastRequeueNotBeforeTime(sku);
+        if (Objects.nonNull(onlySandBlastRequeueTime)
+                && onlySandBlastRequeueTime.after(effectiveEstimatedEndTime)) {
+            // 仅喷砂剩余需求从旧SKU实际下机时刻才重新入池，换活字块准备不得提前占用其他机台。
+            effectiveEstimatedEndTime = onlySandBlastRequeueTime;
+        }
         Date rawSwitchStartTime = resolveAllowedSwitchStartTime(
-                context, machine.getMachineCode(), estimatedEndTime);
+                context, machine.getMachineCode(), effectiveEstimatedEndTime);
         if (rawSwitchStartTime == null) {
             return null;
         }
@@ -1825,6 +1838,12 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                         failureReason, "胎胚时间约束后的换活字块开产业务日无法解析");
                 return false;
             }
+            // 在激活提前生产账本前检查已经落实的需求，拒绝新开机台时不产生额外数量副作用。
+            if (DailyMachineExpansionPlanner.isPreScheduledMachineDemandSatisfied(
+                    this.lhDailyMouldCalcService, context, sku, actualProductionWorkDate)) {
+                this.recordTypeBlockAppendFailure(failureReason, "前置复用已落实目标机台需求，停止新开机台");
+                return false;
+            }
             int actualDayPlanQty = this.resolveTypeBlockOriginalDayPlanQty(
                     context, sku, actualProductionWorkDate);
             if (actualDayPlanQty <= 0) {
@@ -1841,6 +1860,13 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     return false;
                 }
             }
+        }
+        // 使用最终开产业务日复核，覆盖普通换活字块、定点直选及配对侧等待后的实际日期。
+        if (DailyMachineExpansionPlanner.isPreScheduledMachineDemandSatisfied(
+                this.lhDailyMouldCalcService, context, sku,
+                this.resolveTypeBlockProductionWorkDate(shifts, startTime))) {
+            this.recordTypeBlockAppendFailure(failureReason, "前置复用已落实目标机台需求，停止新开机台");
+            return false;
         }
         // 成型胎胚库存收尾优先按胎胚库存严格控量，避免被零目标或共用胎胚零余量规则提前拦截。
         boolean embryoStockEndingTargetApplied = getTargetScheduleQtyResolver()
@@ -2203,6 +2229,22 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             sku.setRemainingScheduleQty(remainingQty);
             sku.setStrictTargetQty(originalStrictTargetQty);
         }
+        Date onlySandBlastRequeueTime = context.resolveOnlySandBlastRequeueNotBeforeTime(sku);
+        if (remainingQty > 0 && Objects.nonNull(onlySandBlastRequeueTime)) {
+            LocalDate requeueDate = onlySandBlastRequeueTime.toInstant()
+                    .atZone(ZoneId.systemDefault()).toLocalDate();
+            sku.setFirstAddMachineProductionDate(requeueDate);
+            this.appendTypeBlockPartialResidualProcessLog(
+                    context, machine, sku, adoptedTargetQty, scheduledQty, remainingQty,
+                    TYPE_BLOCK_PARTIAL_NEXT_ACTION_S4_5, requeueDate,
+                    sku.getContinuationRequiredMachineCount(),
+                    DailyMachineExpansionPlanner.countCommittedMachineDemand(
+                            context, sku, requeueDate));
+            log.info("仅喷砂续作SKU换活字块部分成功，保留剩余量进入S4.5, machineCode: {}, "
+                            + "materialCode: {}, scheduledQty: {}, remainingQty: {}, requeueDate: {}",
+                    machine.getMachineCode(), sku.getMaterialCode(), scheduledQty, remainingQty, requeueDate);
+            return;
+        }
         // 成功结果已登记到逐日机台索引；补机只读取剩余账本，不重新初始化需求。
         LocalDate firstAddMachineDate = remainingQty > 0
                 ? DailyMachineExpansionPlanner.resolveTypeBlockAddMachineDate(
@@ -2214,7 +2256,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                             context, sku, null, firstAddMachineDate) : firstAddMachineDate;
             int targetMachineCount = this.lhDailyMouldCalcService.getRequiredMachineCount(
                     context, sku.getMaterialCode(), sku.getProductStatus(), requiredDate);
-            int currentMachineCount = DailyMachineExpansionPlanner.countScheduledPhysicalMachines(
+            int currentMachineCount = DailyMachineExpansionPlanner.countCommittedMachineDemand(
                     context, sku, firstAddMachineDate);
             this.appendTypeBlockPartialResidualProcessLog(
                     context, machine, sku, adoptedTargetQty, scheduledQty, remainingQty,
@@ -3124,11 +3166,10 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         pairResult.setMachineOrder(pairMachine.getMachineOrder());
         pairResult.setMouldCode(resolveTypeBlockActualMouldCode(context, pairMachine, sku));
         // 主侧已代表物理整机执行一次换胶囊，配对侧结果不得复制出第二条换胶囊备注。
+        // 首检是 L/R 两侧模具各自的物理动作，班次原因分析中的“首检”备注必须双侧同时保留，不再从配对侧移除。
         for (int shiftIndex = 1; shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
             ShiftFieldUtil.removeShiftAnalysis(
                     pairResult, shiftIndex, CapsuleReplacementRuleService.CAPSULE_REPLACEMENT_ANALYSIS);
-            ShiftFieldUtil.removeShiftAnalysis(
-                    pairResult, shiftIndex, FirstInspectionQtyUtil.FIRST_INSPECTION_ANALYSIS);
         }
         refreshResultSummary(context, pairResult, shifts);
         return pairResult;
