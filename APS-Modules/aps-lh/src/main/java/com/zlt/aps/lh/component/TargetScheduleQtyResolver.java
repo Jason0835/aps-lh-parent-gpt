@@ -22,6 +22,7 @@ import com.zlt.aps.lh.engine.strategy.IMachineMatchStrategy;
 import com.zlt.aps.lh.engine.strategy.IMouldChangeBalanceStrategy;
 import com.zlt.aps.lh.engine.strategy.support.NewSpecEmbryoAvailableTimeResolver;
 import com.zlt.aps.lh.engine.strategy.support.FirstInspectionAllocationPlan;
+import com.zlt.aps.lh.engine.strategy.support.StructureSwitchSchedulingPolicy;
 import com.zlt.aps.lh.util.CleaningScheduleRuleUtil;
 import com.zlt.aps.lh.util.FirstInspectionAllocationUtil;
 import com.zlt.aps.lh.util.FirstInspectionQtyUtil;
@@ -1135,7 +1136,10 @@ public class TargetScheduleQtyResolver {
         int remainingQty = resolveEffectiveProductionRemainingQty(context, sku);
         int allowedOverQty = resolveEndingAllowedOverQty(context, result);
         int retainedLimitQty = remainingQty + allowedOverQty;
-        if (resultQty <= retainedLimitQty) {
+        boolean hasSwitchPlan = !CollectionUtils.isEmpty(shifts) && shifts.stream().anyMatch(shift ->
+                StructureSwitchSchedulingPolicy.isFirstBatch(context, context.getStructureSwitchResultPlanMap().get(result), shift)
+                        && StructureSwitchSchedulingPolicy.quantity(result, shift.getShiftIndex()) > 0);
+        if (resultQty <= retainedLimitQty && !hasSwitchPlan) {
             return resultQty;
         }
         if (CollectionUtils.isEmpty(shifts)) {
@@ -1158,6 +1162,8 @@ public class TargetScheduleQtyResolver {
             }
             int currentShiftQty = resolveRetainedShiftQty(
                     context, sku, Math.min(planQty, remainingRetainQty), mouldQty, result, shift);
+            currentShiftQty = StructureSwitchSchedulingPolicy.capRetainedQuantity(context, result, shift,
+                    currentShiftQty, remainingQty - actualRetainedQty);
             Date shiftStartTime = ShiftFieldUtil.getShiftStartTime(result, shift.getShiftIndex());
             Date originalShiftEndTime = ShiftFieldUtil.getShiftEndTime(result, shift.getShiftIndex());
             if (currentShiftQty <= 0) {

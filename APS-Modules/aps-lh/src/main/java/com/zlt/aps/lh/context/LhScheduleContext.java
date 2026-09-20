@@ -13,6 +13,7 @@ import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.StructureEarlyProductionAdmission;
 import com.zlt.aps.lh.component.StructureShiftInMachineIndex;
 import com.zlt.aps.lh.engine.strategy.support.*;
+import com.zlt.aps.cx.entity.config.CxEmbryoLhTime;
 import com.zlt.aps.lh.handler.SkuMonthPlanCalculator;
 import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationEndingAllocationSnapshot;
@@ -31,6 +32,7 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 硫化排程上下文。
@@ -247,6 +249,12 @@ public class LhScheduleContext {
     /** 06 独立故障窗口，按来源计划主键去重；不进入普通设备停机业务列表。 */
     private Map<Long, MachineFaultWindowDTO> temporaryFaultWindowMap = new LinkedHashMap<>(16);
     /**
+     * 达到连续两班禁产阈值的续作临时故障迁移事件，key=运行态续作机台编码。
+     * <p>该事件贯穿续作解绑、历史机台优先、正常候选回流和最终交替计划生成。</p>
+     */
+    private Map<String, ContinuationTemporaryFaultTransferEvent> continuationTemporaryFaultTransferEventMap =
+            new LinkedHashMap<String, ContinuationTemporaryFaultTransferEvent>(4);
+    /**
      * 本次排程已加载的清洗类设备停机候选列表。
      * <p>仅保存计划开始时间不早于排程日期 T 日、尚未实际完成且未删除的干冰/喷砂清洗候选。
      * 清洗候选转换为运行态清洗窗口后会从 {@link #devicePlanShutList} 剥离，但该只读快照仍供续作降模
@@ -274,6 +282,16 @@ public class LhScheduleContext {
      */
     private Map<String, LhMachineInfo> machineInfoMap = new LinkedHashMap<>();
     /**
+     * 产品结构对应的成型机索引，key=固定结构1，value=去重后的成型机编码集合。
+     * <p>只有集合大小为1的结构才继续检查专供硫化机；零台或多台成型机均保持原选SKU逻辑。</p>
+     */
+    private Map<String, Set<String>> structureFormingMachineMap = new LinkedHashMap<>(16);
+    /**
+     * 成型机对应的专供硫化机索引，key=成型机编码，value=去除L/R后的物理硫化机编码集合。
+     * <p>该索引只用于结构唯一绑定成型机时的机台选SKU硬约束，不参与候选排序。</p>
+     */
+    private Map<String, Set<String>> formingMachineSupplyLhMachineMap = new LinkedHashMap<>(16);
+    /**
      * 新增排产机台资源作用域。
      * <p>空集合表示沿用原主流程全部机台；班次9独立上下文写入班次8真实释放机台编码，
      * 只限制机台驱动竞争入口，不删除其它机台，确保模具占用等全局硬约束仍可读取完整状态。</p>
@@ -296,6 +314,31 @@ public class LhScheduleContext {
      * 结构胎胚最早可供硫化时间Map, key=structureName
      */
     private Map<String, Date> structureEarliestLhTimeMap = new HashMap<>();
+
+    /** 后结构对应的有效供胚来源记录；时间与两个标识必须来自同一行。 */
+    private Map<String, CxEmbryoLhTime> structureSwitchSourceMap =
+            new LinkedHashMap<>(16);
+
+    /** 同一次结构切换的已提交首班状态，键为后结构，生命周期限定本次配置快照。 */
+    private Map<String, StructureSwitchRuntimeState> structureSwitchRuntimeMap = new LinkedHashMap<>(16);
+
+    /** 逐班审计标量快照，不参与业务回滚；原窗口保存前汇总，班次9副本禁止写入。 */
+    private Map<String, StructureSwitchShiftAuditEntry> structureSwitchShiftAuditMap = new LinkedHashMap<>(32);
+
+    /** 独立窗口复制的已提交首班基线，原窗口为空；不得因副本清空结果而重置S0。 */
+    private Map<String, StructureSwitchRuntimeState> structureSwitchBaselineRuntimeMap = Collections.emptyMap();
+
+
+    /** 已落地结果对应的冻结切换计划；单控两侧可引用同一计划。 */
+    private Map<LhScheduleResult, StructureSwitchPlan> structureSwitchResultPlanMap = new IdentityHashMap<>(16);
+
+    /** 正式提交作用域内的冻结计划，仅供分量调用，退出提交作用域即恢复。 */
+    private Map<String, StructureSwitchPlan> structureSwitchAttemptPlanMap = new LinkedHashMap<>(4);
+
+    /** 仅在无供胚等待的选料基准预演中置位，不参与业务资源或首班状态。 */
+    private boolean structureSwitchSelectionProbe;
+
+
 
     /**
      * 胎胚收尾标识Map, key=embryoCode, value=1-收尾/0-非收尾；以胎胚维度合并硫化余量后按主销参与情况判定
@@ -675,10 +718,13 @@ public class LhScheduleContext {
     private Set<String> releasedContinuousMachineCodeSet = new LinkedHashSet<>();
     /**
      * 续作阶段因“仅喷砂清洗”主动下机的实际清洗窗口，key=运行态机台编码。
-     * <p>该快照同时承载三项运行态事实：旧SKU及模具从cleanStartTime释放、喷砂机台到readyTime后
-     * 才能重新参与排产、剩余需求必须转入后续换活字块/新增排产。喷砂与其他停机重叠时禁止写入。</p>
+     * <p>该快照同时承载三项运行态事实：旧SKU及机台从cleanStartTime释放、原模具到cleanEndTime后
+     * 才能重新参与资源匹配、剩余需求必须转入后续换活字块/新增排产。喷砂与其他停机重叠时禁止写入。</p>
      */
     private Map<String, MachineCleaningWindowDTO> onlySandBlastContinuationReleaseWindowMap =
+            new LinkedHashMap<String, MachineCleaningWindowDTO>(4);
+    /** 续作仅喷砂统一处置事件，保留从机台有效停机窗口移出的清洗事实。 */
+    private Map<String, MachineCleaningWindowDTO> continuationSandBlastWindowMap =
             new LinkedHashMap<String, MachineCleaningWindowDTO>(4);
     /** 仅喷砂实际下机时仍需转入后续排产的真实余量，key=运行态机台编码。 */
     private Map<String, Integer> onlySandBlastContinuationRemainingQtyMap =
@@ -716,11 +762,18 @@ public class LhScheduleContext {
      */
     private Set<String> firstDayNoPlanReleasedContinuousMachineCodeSet = new LinkedHashSet<>();
     /**
-     * 续作停产保机日期，key=机台编码，value=该机台计划量必须为0但仍保持原SKU和模具占用的业务日集合。
+     * 续作停产保机日期，key=机台编码，value=该机台存在停产保机班次且仍保持原SKU和模具占用的业务日集合。
      * <p>该状态只属于本次排程运行态，不代表机台释放，也不参与续作降模END_TYPE判断。</p>
      */
     private Map<String, Set<LocalDate>> continuousStopHoldDateMap =
             new LinkedHashMap<String, Set<LocalDate>>(8);
+    /**
+     * 续作停产保机实际班次，key=机台编码，value=本次窗口内必须置零的班次序号集合。
+     * <p>首个保机业务日只登记早班、中班；连续保机后续日登记夜班、早班、中班，
+     * 使排量、后处理和结构在机统计共享同一份精确班次边界。</p>
+     */
+    private Map<String, Set<Integer>> continuousStopHoldShiftIndexMap =
+            new LinkedHashMap<String, Set<Integer>>(8);
     /**
      * 当前仍处于停产保机占用的机台集合。
      * <p>历史保机日期保留在continuousStopHoldDateMap；计划恢复生产或后续真正降模后会从本集合移除，
@@ -1298,6 +1351,7 @@ public class LhScheduleContext {
      * @return 实际登记的“结果业务日”数量
      */
     public int rebuildScheduledMachineCountMaps(List<LhShiftConfigVO> shifts) {
+        StructureSwitchSchedulingPolicy.rebuildCommittedState(this);
         this.clearScheduledMachineCountMaps();
         if (CollectionUtils.isEmpty(scheduleResultList) || CollectionUtils.isEmpty(shifts)) {
             return 0;
@@ -1777,7 +1831,7 @@ public class LhScheduleContext {
     /**
      * 解析当前SKU因仅喷砂主动下机而释放的物理机台。
      *
-     * @param sku 当前续作来源或共享同一日计划账本的补偿SKU
+     * @param sku 当前续作来源或同物料、同产品状态的补偿SKU
      * @return 已释放物理机台编码集合
      */
     public Set<String> resolveOnlySandBlastReleasedPhysicalMachineCodes(SkuScheduleDTO sku) {
@@ -1788,7 +1842,6 @@ public class LhScheduleContext {
         }
         for (SkuScheduleDTO continuousSku : continuousSkuList) {
             if (Objects.isNull(continuousSku)
-                    || continuousSku.getDailyPlanQuotaMap() != sku.getDailyPlanQuotaMap()
                     || !StringUtils.equals(continuousSku.getMaterialCode(), sku.getMaterialCode())
                     || !StringUtils.equals(StringUtils.trimToEmpty(continuousSku.getProductStatus()),
                     StringUtils.trimToEmpty(sku.getProductStatus()))
@@ -1797,6 +1850,7 @@ public class LhScheduleContext {
                     continuousSku.getContinuousMachineCode())) {
                 continue;
             }
+            // 释放是同物料、同状态的机台事实，不依赖候选复制或回滚后的账本对象身份。
             physicalMachineCodeSet.add(LhSingleControlMachineUtil.resolvePhysicalMachineCode(
                     continuousSku.getContinuousMachineCode()));
         }
@@ -1804,33 +1858,156 @@ public class LhScheduleContext {
     }
 
     /**
+     * 解析续作因强制业务事件释放的物理机台。
+     *
+     * @param sku 当前续作来源或补偿SKU
+     * @return 仅喷砂及两班临时故障已经释放的物理机台
+     */
+    public Set<String> resolveForcedReleasedPhysicalMachineCodes(SkuScheduleDTO sku) {
+        Set<String> physicalMachineCodeSet = this.resolveOnlySandBlastReleasedPhysicalMachineCodes(sku);
+        if (Objects.isNull(sku) || CollectionUtils.isEmpty(continuationTemporaryFaultTransferEventMap)) {
+            return physicalMachineCodeSet;
+        }
+        continuationTemporaryFaultTransferEventMap.values().stream()
+                .filter(Objects::nonNull)
+                .filter(event -> StringUtils.equals(event.getMaterialCode(), sku.getMaterialCode()))
+                .filter(event -> StringUtils.equals(StringUtils.trimToEmpty(event.getProductStatus()),
+                        StringUtils.trimToEmpty(sku.getProductStatus())))
+                .map(ContinuationTemporaryFaultTransferEvent::getOriginalPhysicalMachineCode)
+                .filter(StringUtils::isNotEmpty)
+                .forEach(physicalMachineCodeSet::add);
+        return physicalMachineCodeSet;
+    }
+
+    /**
+     * 判断候选机台是否为当前仅喷砂释放 SKU 已退出的原物理机台。
+     *
+     * @param sku 仅喷砂回流候选
+     * @param machineCode 候选运行态机台
+     * @return true-本次重新排产禁止选回的原喷砂物理机台
+     */
+    public boolean isOnlySandBlastOriginalMachine(SkuScheduleDTO sku, String machineCode) {
+        if (Objects.isNull(sku) || StringUtils.isEmpty(machineCode)) {
+            return false;
+        }
+        return this.resolveOnlySandBlastReleasedPhysicalMachineCodes(sku).contains(
+                LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode));
+    }
+
+    /**
+     * 解析当前仅喷砂回流 SKU 必须携带的离机清洗事件。
+     *
+     * <p>无替换模具时，原 SKU 必须等待原模具清洗完成并携带该套模具转到其他机台。
+     * 这里按清洗结束时间和来源机台稳定排序，供新增链路执行精确模具分配。</p>
+     *
+     * @param sku 仅喷砂回流候选
+     * @return 同物料、同产品状态的离机喷砂事件
+     */
+    public List<MachineCleaningWindowDTO> resolveOnlySandBlastRequeueEvents(SkuScheduleDTO sku) {
+        if (Objects.isNull(sku)
+                || CollectionUtils.isEmpty(onlySandBlastContinuationReleaseWindowMap)) {
+            return Collections.emptyList();
+        }
+        return onlySandBlastContinuationReleaseWindowMap.values().stream()
+                .filter(Objects::nonNull)
+                .filter(MachineCleaningWindowDTO::isOffMachineCleaning)
+                .filter(event -> StringUtils.isEmpty(event.getReplacementMouldCode()))
+                .filter(event -> StringUtils.equals(
+                        event.getContinuationMaterialCode(), sku.getMaterialCode()))
+                .filter(event -> StringUtils.equals(
+                        StringUtils.trimToEmpty(event.getContinuationProductStatus()),
+                        StringUtils.trimToEmpty(sku.getProductStatus())))
+                .sorted(Comparator
+                        .comparing(MachineCleaningWindowDTO::getCleanEndTime,
+                                Comparator.nullsLast(Date::compareTo))
+                        .thenComparing(event -> StringUtils.defaultString(event.getLhCode())))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 判断候选是否来源于达到两班阈值的临时故障续作迁移。
+     *
+     * @param sku 待排候选
+     * @return true-故障释放SKU；false-普通候选
+     */
+    public boolean isTemporaryFaultTransferSku(SkuScheduleDTO sku) {
+        if (Objects.isNull(sku) || CollectionUtils.isEmpty(continuationTemporaryFaultTransferEventMap)) {
+            return false;
+        }
+        return continuationTemporaryFaultTransferEventMap.values().stream()
+                .filter(Objects::nonNull)
+                .anyMatch(event -> StringUtils.equals(event.getMaterialCode(), sku.getMaterialCode())
+                        && StringUtils.equals(StringUtils.trimToEmpty(event.getProductStatus()),
+                        StringUtils.trimToEmpty(sku.getProductStatus())));
+    }
+
+    /**
+     * 判断候选机台是否为当前故障SKU已经退出的原物理机台。
+     *
+     * @param sku 故障回流候选
+     * @param machineCode 候选运行态机台
+     * @return true-本次迁移禁止选回的原故障物理机台
+     */
+    public boolean isTemporaryFaultOriginalMachine(SkuScheduleDTO sku, String machineCode) {
+        if (Objects.isNull(sku) || StringUtils.isEmpty(machineCode)
+                || CollectionUtils.isEmpty(continuationTemporaryFaultTransferEventMap)) {
+            return false;
+        }
+        String physicalMachineCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode);
+        return continuationTemporaryFaultTransferEventMap.values().stream()
+                .filter(Objects::nonNull)
+                .anyMatch(event -> StringUtils.equals(event.getMaterialCode(), sku.getMaterialCode())
+                        && StringUtils.equals(StringUtils.trimToEmpty(event.getProductStatus()),
+                        StringUtils.trimToEmpty(sku.getProductStatus()))
+                        && StringUtils.equals(event.getOriginalPhysicalMachineCode(), physicalMachineCode));
+    }
+
+    /**
      * 解析仅喷砂剩余需求重新进入后续排产的最早时刻。
      *
      * @param sku 当前续作来源或共享同一日计划账本的补偿SKU
-     * @return 所有关联释放机台中最晚的喷砂实际开始时间；非本场景返回null
+     * @return 所有关联释放机台中最晚的喷砂清洗结束时间；非本场景返回null
      */
     public Date resolveOnlySandBlastRequeueNotBeforeTime(SkuScheduleDTO sku) {
         Date requeueNotBeforeTime = null;
-        Set<String> releasedPhysicalMachineCodeSet =
-                this.resolveOnlySandBlastReleasedPhysicalMachineCodes(sku);
-        if (CollectionUtils.isEmpty(releasedPhysicalMachineCodeSet)) {
-            return null;
-        }
-        for (Map.Entry<String, MachineCleaningWindowDTO> entry
-                : onlySandBlastContinuationReleaseWindowMap.entrySet()) {
-            MachineCleaningWindowDTO releaseWindow = entry.getValue();
-            if (!releasedPhysicalMachineCodeSet.contains(
-                    LhSingleControlMachineUtil.resolvePhysicalMachineCode(entry.getKey()))
-                    || Objects.isNull(releaseWindow)
-                    || Objects.isNull(releaseWindow.getCleanStartTime())) {
+        for (MachineCleaningWindowDTO releaseWindow
+                : this.resolveOnlySandBlastRequeueEvents(sku)) {
+            if (Objects.isNull(releaseWindow.getCleanEndTime())) {
                 continue;
             }
             if (Objects.isNull(requeueNotBeforeTime)
-                    || releaseWindow.getCleanStartTime().after(requeueNotBeforeTime)) {
-                requeueNotBeforeTime = releaseWindow.getCleanStartTime();
+                    || releaseWindow.getCleanEndTime().after(requeueNotBeforeTime)) {
+                // 原 SKU 携带离机喷砂模具重新排产，必须等待模具清洗完成；原机台仍从清洗开始时释放。
+                requeueNotBeforeTime = releaseWindow.getCleanEndTime();
             }
         }
         return requeueNotBeforeTime;
+    }
+
+    /**
+     * 解析续作被强制释放后重新参与资源竞争的最早时刻。
+     *
+     * @param sku 当前续作来源或补偿SKU
+     * @return 仅喷砂清洗完成或临时故障释放时刻中的最晚值；非释放场景返回null
+     */
+    public Date resolveForcedRequeueNotBeforeTime(SkuScheduleDTO sku) {
+        Date notBeforeTime = this.resolveOnlySandBlastRequeueNotBeforeTime(sku);
+        if (Objects.isNull(sku) || CollectionUtils.isEmpty(continuationTemporaryFaultTransferEventMap)) {
+            return notBeforeTime;
+        }
+        for (ContinuationTemporaryFaultTransferEvent event
+                : continuationTemporaryFaultTransferEventMap.values()) {
+            if (Objects.isNull(event) || Objects.isNull(event.getFaultStartTime())
+                    || !StringUtils.equals(event.getMaterialCode(), sku.getMaterialCode())
+                    || !StringUtils.equals(StringUtils.trimToEmpty(event.getProductStatus()),
+                    StringUtils.trimToEmpty(sku.getProductStatus()))) {
+                continue;
+            }
+            if (Objects.isNull(notBeforeTime) || event.getFaultStartTime().after(notBeforeTime)) {
+                notBeforeTime = event.getFaultStartTime();
+            }
+        }
+        return notBeforeTime;
     }
 
     /**
@@ -2163,6 +2340,26 @@ public class LhScheduleContext {
     }
 
     /**
+     * 登记续作停产保机实际班次。
+     *
+     * @param machineCode    机台编码
+     * @param productionDate 业务日期
+     * @param shiftIndexes   实际停产保机班次序号
+     */
+    public void registerContinuousStopHoldShifts(String machineCode,
+                                                  LocalDate productionDate,
+                                                  Collection<Integer> shiftIndexes) {
+        if (StringUtils.isEmpty(machineCode) || Objects.isNull(productionDate)
+                || CollectionUtils.isEmpty(shiftIndexes)) {
+            return;
+        }
+        this.registerContinuousStopHoldDate(machineCode, productionDate);
+        continuousStopHoldShiftIndexMap
+                .computeIfAbsent(machineCode, key -> new LinkedHashSet<Integer>(8))
+                .addAll(shiftIndexes);
+    }
+
+    /**
      * 判断机台在指定业务日是否处于停产保机状态。
      *
      * @param machineCode    机台编码
@@ -2176,6 +2373,25 @@ public class LhScheduleContext {
         }
         Set<LocalDate> holdDateSet = continuousStopHoldDateMap.get(machineCode);
         return !CollectionUtils.isEmpty(holdDateSet) && holdDateSet.contains(productionDate);
+    }
+
+    /**
+     * 判断机台在指定班次是否处于停产保机状态。
+     * <p>历史调用只登记业务日时继续按整日保机处理；新主链登记实际班次后严格按班次判断。</p>
+     *
+     * @param machineCode    机台编码
+     * @param productionDate 业务日期
+     * @param shiftIndex     班次序号
+     * @return true-该班次停产保机；false-该班次允许按原规则生产
+     */
+    public boolean isContinuousStopHoldShift(String machineCode,
+                                             LocalDate productionDate,
+                                             Integer shiftIndex) {
+        if (!this.isContinuousStopHoldDate(machineCode, productionDate) || Objects.isNull(shiftIndex)) {
+            return false;
+        }
+        Set<Integer> holdShiftIndexSet = continuousStopHoldShiftIndexMap.get(machineCode);
+        return CollectionUtils.isEmpty(holdShiftIndexSet) || holdShiftIndexSet.contains(shiftIndex);
     }
 
     /**

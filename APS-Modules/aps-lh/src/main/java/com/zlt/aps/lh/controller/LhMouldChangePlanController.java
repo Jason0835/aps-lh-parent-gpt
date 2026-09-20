@@ -12,13 +12,16 @@ import com.ruoyi.api.gateway.system.service.IExportLogService;
 import com.ruoyi.api.gateway.system.service.IImportErrorLogService;
 import com.ruoyi.api.gateway.system.service.IImportLogService;
 import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
+import com.ruoyi.common.constant.HttpStatus;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.ServletUtils;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.core.web.page.PageDomain;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.core.web.page.TableSupport;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
@@ -137,7 +140,37 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody LhMouldChangePlan queryVO) {
-        TableDataInfo tableDataInfo = super.list(queryVO);
+        TableDataInfo tableDataInfo;
+        if (this.hasExplicitSort(queryVO)) {
+            tableDataInfo = super.list(queryVO);
+        } else {
+            QueryWrapper<LhMouldChangePlan> queryWrapper = new QueryWrapper<>();
+            this.builderCondition(queryWrapper, queryVO);
+            // 复用基类的数据权限条件，保证全量排序前的候选集合与原分页查询一致。
+            this.buildDataAuthSQL(queryWrapper);
+            List<LhMouldChangePlan> allRows = lhMouldChangePlanMapper.selectList(queryWrapper);
+            List<LhMouldChangePlan> sortedRows = lhMouldChangePlanService == null
+                    ? allRows : lhMouldChangePlanService.sortByDefaultOrder(allRows);
+            if (sortedRows == null) {
+                sortedRows = allRows == null ? Collections.emptyList() : allRows;
+            }
+            PageDomain pageDomain = this.resolvePageDomain();
+            if (pageDomain == null) {
+                pageDomain = new PageDomain();
+            }
+            int pageNum = pageDomain.getPageNum() == null || pageDomain.getPageNum() < 1
+                    ? 1 : pageDomain.getPageNum();
+            int pageSize = pageDomain.getPageSize() == null || pageDomain.getPageSize() < 1
+                    ? 20 : pageDomain.getPageSize();
+            int fromIndex = Math.min((pageNum - 1) * pageSize, sortedRows.size());
+            int toIndex = Math.min(fromIndex + pageSize, sortedRows.size());
+            tableDataInfo = new TableDataInfo();
+            tableDataInfo.setCode(HttpStatus.SUCCESS);
+            tableDataInfo.setRows(new ArrayList<>(sortedRows.subList(fromIndex, toIndex)));
+            tableDataInfo.setTotal(sortedRows.size());
+            tableDataInfo.setMsg(I18nUtil.getMessage("common.msg.base.query.success"));
+            AppUtils.formatData(tableDataInfo.getRows(), getQueryFormulas());
+        }
         this.fillDisplayMouldCode(tableDataInfo);
         return tableDataInfo;
     }
@@ -356,11 +389,19 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         }
         QueryWrapper<LhMouldChangePlan> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
-        String orderBy = this.getOrderBy(obj);
-        if (StringUtils.isNotBlank(orderBy)) {
-            wrapper.last("ORDER BY " + orderBy);
+        List<LhMouldChangePlan> list;
+        if (this.hasExplicitSort(obj)) {
+            String orderBy = this.getOrderBy(obj);
+            if (StringUtils.isNotBlank(orderBy)) {
+                wrapper.last("ORDER BY " + orderBy);
+            }
+            list = lhMouldChangePlanMapper.selectList(wrapper);
+        } else {
+            list = lhMouldChangePlanMapper.selectList(wrapper);
+            List<LhMouldChangePlan> sortedList = lhMouldChangePlanService == null
+                    ? list : lhMouldChangePlanService.sortByDefaultOrder(list);
+            list = sortedList == null ? list : sortedList;
         }
-        List<LhMouldChangePlan> list = lhMouldChangePlanMapper.selectList(wrapper);
         AppUtils.formatData(list, getQueryFormulas());
         return list;
     }
@@ -398,7 +439,8 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         setExportTitleFieldName(tableMap);
         if (CollectionUtils.isNotEmpty(list)) {
             List<LhMouldChangePlanVo> exportList = this.buildLhMouldChangePlanVoList(list, queryVO);
-            excelDataList.add(buildExportDataList(exportList, queryVO, previousDayPlanKeySet));
+            // listExportData 已完成默认全量排序，模板组装阶段直接复用该顺序，避免重复查询计划量。
+            excelDataList.add(buildExportDataList(exportList, queryVO, previousDayPlanKeySet, true));
         }
         tableMap = buildExportTableMap(queryVO.getScheduleDate());
         // 赋值表头字段名称
@@ -511,44 +553,41 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
     }
 
     /**
-     * 构建列表和导出共用的默认排序比较器。
+     * 构建服务未注入时的导出排序比较器，兼容独立导出组装测试调用。
      *
-     * @return 默认排序比较器
+     * @return 默认导出排序比较器
      */
-    private Comparator<LhMouldChangePlanVo> buildDefaultExportComparator() {
+    private Comparator<LhMouldChangePlanVo> buildLegacyExportComparator() {
         return Comparator.comparingLong((LhMouldChangePlanVo item) -> item.getPlanDate() == null
                         ? Long.MAX_VALUE : DateUtil.beginOfDay(item.getPlanDate()).getTime())
-                .thenComparingInt(this::resolveMouldChangeTypeSortOrder)
+                .thenComparingInt(this::resolveLegacyMouldChangeTypeSortOrder)
                 .thenComparing((LhMouldChangePlanVo item) -> StringUtils.defaultIfBlank(item.getClassIndex(), ""))
-                .thenComparing((LhMouldChangePlanVo item) -> item.getChangeTime(),
+                .thenComparing(LhMouldChangePlanVo::getChangeTime,
                         Comparator.nullsLast(Date::compareTo))
                 .thenComparing((LhMouldChangePlanVo item) -> StringUtils.defaultIfBlank(item.getLhMachineCode(), ""))
-                .thenComparing((LhMouldChangePlanVo item) -> item.getPlanOrder(),
+                .thenComparing(LhMouldChangePlanVo::getPlanOrder,
                         Comparator.nullsLast(Integer::compareTo))
-                .thenComparing((LhMouldChangePlanVo item) -> item.getId(),
+                .thenComparing(LhMouldChangePlanVo::getId,
                         Comparator.nullsLast(Long::compareTo));
     }
 
     /**
-     * 解析模具交替计划默认排序中的类型优先级。
+     * 解析兼容导出排序中的模具交替类型优先级。
      *
      * @param item 模具交替计划导出视图
      * @return 清洗计划返回0，交替计划返回1，其他计划返回2
      */
-    private int resolveMouldChangeTypeSortOrder(LhMouldChangePlanVo item) {
+    private int resolveLegacyMouldChangeTypeSortOrder(LhMouldChangePlanVo item) {
         if (item == null) {
             return 2;
         }
         String changeMouldType = item.getChangeMouldType();
-        boolean cleaningPlan = MouldChangeTypeEnum.containsAnyCode(changeMouldType,
-                MouldChangeTypeEnum.SAND_BLAST.getCode(), MouldChangeTypeEnum.DRY_ICE.getCode());
-        if (cleaningPlan) {
+        if (MouldChangeTypeEnum.containsAnyCode(changeMouldType,
+                MouldChangeTypeEnum.SAND_BLAST.getCode(), MouldChangeTypeEnum.DRY_ICE.getCode())) {
             return 0;
         }
-
-        boolean alternatePlan = MouldChangeTypeEnum.containsAnyCode(changeMouldType,
-                MouldChangeTypeEnum.REGULAR.getCode(), MouldChangeTypeEnum.TYPE_BLOCK.getCode());
-        return alternatePlan ? 1 : 2;
+        return MouldChangeTypeEnum.containsAnyCode(changeMouldType,
+                MouldChangeTypeEnum.REGULAR.getCode(), MouldChangeTypeEnum.TYPE_BLOCK.getCode()) ? 1 : 2;
     }
 
     /**
@@ -559,10 +598,41 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
      */
     private boolean hasExplicitSort(LhMouldChangePlan queryVO) {
         if (queryVO == null || queryVO.getParams() == null) {
-            return false;
+            PageDomain pageDomain = this.resolvePageDomain();
+            return pageDomain != null && this.isEffectiveSortValue(pageDomain.getOrderByColumn());
         }
         Object orderBy = queryVO.getParams().get("orderBy");
-        return orderBy != null && StringUtils.isNotBlank(String.valueOf(orderBy));
+        Object orderByColumn = queryVO.getParams().get("orderByColumn");
+        PageDomain pageDomain = this.resolvePageDomain();
+        return this.isEffectiveSortValue(orderBy)
+                || this.isEffectiveSortValue(orderByColumn)
+                || (pageDomain != null && this.isEffectiveSortValue(pageDomain.getOrderByColumn()));
+    }
+
+    /**
+     * 在存在HTTP请求时读取分页和排序参数；独立服务调用没有请求上下文时返回null。
+     *
+     * @return 当前请求的分页参数，无请求上下文时返回null
+     */
+    private PageDomain resolvePageDomain() {
+        if (ServletUtils.getRequest() == null) {
+            return null;
+        }
+        return TableSupport.getPageDomain();
+    }
+
+    /**
+     * 判断排序值是否为前端实际传入的字段，过滤框架无参数时产生的字符串 null。
+     *
+     * @param sortValue 待判断的排序值
+     * @return 有效排序字段返回true
+     */
+    private boolean isEffectiveSortValue(Object sortValue) {
+        if (sortValue == null) {
+            return false;
+        }
+        String value = String.valueOf(sortValue).trim();
+        return StringUtils.isNotBlank(value) && !"null".equalsIgnoreCase(value);
     }
 
     /**
@@ -587,9 +657,33 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
     public List<Map<String, Object>> buildExportDataList(List<LhMouldChangePlanVo> list,
                                                          LhMouldChangePlan queryVO,
                                                          Set<String> previousDayPlanKeySet) {
-        // 未传显式排序时按列表和导出共用的默认顺序排序，计划日期仅按年月日比较，避免时分秒影响导出顺序。
-        if (!this.hasExplicitSort(queryVO)) {
-            list = list.stream().sorted(this.buildDefaultExportComparator()).collect(Collectors.toList());
+        return this.buildExportDataList(list, queryVO, previousDayPlanKeySet, false);
+    }
+
+    /**
+     * 构建导出数据，并允许调用方声明列表已经完成统一默认排序。
+     *
+     * @param list                  模具交替计划导出视图列表
+     * @param queryVO               查询条件
+     * @param previousDayPlanKeySet 前日交替计划唯一标识集合
+     * @param alreadySorted         列表是否已由统一排序服务完成排序
+     * @return 导出行数据
+     */
+    private List<Map<String, Object>> buildExportDataList(List<LhMouldChangePlanVo> list,
+                                                          LhMouldChangePlan queryVO,
+                                                          Set<String> previousDayPlanKeySet,
+                                                          boolean alreadySorted) {
+        if (!alreadySorted && !this.hasExplicitSort(queryVO)) {
+            if (lhMouldChangePlanService != null) {
+                List<LhMouldChangePlanVo> sortedList = lhMouldChangePlanService.sortVoByDefaultOrder(list);
+                // 单元测试或独立组装场景可能仅提供服务桩，返回空值时沿用本地兼容排序。
+                list = sortedList == null
+                        ? list.stream().sorted(this.buildLegacyExportComparator()).collect(Collectors.toList())
+                        : sortedList;
+            } else {
+                // 独立组装调用没有Spring服务时，保留原有日期、类型和稳定字段排序。
+                list = list.stream().sorted(this.buildLegacyExportComparator()).collect(Collectors.toList());
+            }
         }
         // 查询字典用于转义
         List<SysDictData> classNumDictList = iSysDictDataCacheService.getType("class_num_two_mm");

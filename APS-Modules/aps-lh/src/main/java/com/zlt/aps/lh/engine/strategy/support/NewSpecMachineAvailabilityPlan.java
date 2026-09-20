@@ -644,6 +644,11 @@ public class NewSpecMachineAvailabilityPlan {
         return skuSelectionStartTime;
     }
 
+    /** @return 冻结的结构切换决策；非结构切换为空 */
+    public StructureSwitchPlan getStructureSwitchPlan() {
+        return Objects.isNull(firstInspectionTimelinePlan) ? null : firstInspectionTimelinePlan.getStructureSwitchPlan();
+    }
+
     public MachineScheduleDTO getMachine() {
         return machine;
     }

@@ -88,6 +88,13 @@ public class LhScheduleConfigResolver {
         putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.NO_MOULD_CHANGE_END_HOUR,
                 LhScheduleConstant.NO_MOULD_CHANGE_END_HOUR);
 
+        // 本批次只读同一开关快照，独立下一班窗口也继承该值。
+        this.putStructureSwitchSchedulingEnabled(resolvedParamMap, lhParamsMap);
+        // 大换英寸延迟只作用于该次切换的首个批量生产班。
+        this.putNonNegativeIntValue(resolvedParamMap, lhParamsMap,
+                LhScheduleParamConstant.LARGE_INCH_FIRST_BATCH_DELAY_HOURS,
+                LhScheduleConstant.LARGE_INCH_FIRST_BATCH_DELAY_HOURS);
+
         // 换模与首检参数
         putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.DAILY_MOULD_CHANGE_LIMIT,
                 LhScheduleConstant.DEFAULT_DAILY_MOULD_CHANGE_LIMIT);
@@ -298,6 +305,24 @@ public class LhScheduleConfigResolver {
         putTrialMassTrialSchedulingEnabled(resolvedParamMap, lhParamsMap);
 
         return new LhScheduleConfig(resolvedParamMap);
+    }
+
+    /**
+     * 按现有0/1开关口径解析结构切换总开关；缺省及非法值使用已明确的默认1。
+     * @param resolvedParamMap 已解析快照
+     * @param lhParamsMap 工厂参数
+     */
+    private void putStructureSwitchSchedulingEnabled(Map<String, String> resolvedParamMap,
+            Map<String, String> lhParamsMap) {
+        String paramCode = LhScheduleParamConstant.STRUCTURE_SWITCH_SCHEDULING_ENABLED;
+        String value = StringUtils.trim(lhParamsMap.get(paramCode));
+        if (!StringUtils.equals("0", value) && !StringUtils.equals("1", value)) {
+            log.warn("结构切换特殊排程开关未配置或非法，使用默认值, paramCode={}, value={}, defaultValue={}",
+                    paramCode, value, LhScheduleConstant.STRUCTURE_SWITCH_SCHEDULING_ENABLED);
+            value = String.valueOf(LhScheduleConstant.STRUCTURE_SWITCH_SCHEDULING_ENABLED);
+        }
+        resolvedParamMap.put(paramCode, value);
+        log.info("结构切换特殊排程开关快照, paramCode={}, enabled={}", paramCode, value);
     }
 
     /**

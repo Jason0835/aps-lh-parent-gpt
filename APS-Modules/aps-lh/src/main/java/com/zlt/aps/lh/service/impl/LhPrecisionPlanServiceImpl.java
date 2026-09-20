@@ -1935,7 +1935,8 @@ public class LhPrecisionPlanServiceImpl extends AbstractDocService<LhPrecisionPl
      * 按设备保养计划(MES同步数据)分发写入硫化精度计划表
      * 现逻辑：MES全权决定计划时间(OPER_TIME)和实际完成时间(FIRST_WASH_TIME)，
      * APS侧不再回填实际日期、不再生成下一次精度计划。
-     * 本方法根据MES字段值直接计算派生字段并upsert到T_LH_PRECISION_PLAN。
+     * 本方法按分厂"物理清空MES镜像行+整批重插"的全量重建语义写入T_LH_PRECISION_PLAN，
+     * 源数据先按业务键防御性去重。
      *
      * 派生字段计算规则：
      * - PLAN_DATE = MES.OPER_TIME
@@ -1947,7 +1948,7 @@ public class LhPrecisionPlanServiceImpl extends AbstractDocService<LhPrecisionPl
      * - DAYS_TO_DUE = today - PLAN_DATE（≥0）
      * - WARNING_STATUS/IS_WARNING_SENT = '0'（由独立checkWarning任务扫描更新）
      * - DATA_SOURCE = '0'(MES同步)
-     * - MES_SOURCE_ID = MES.id（upsert匹配键）
+     * - MES_SOURCE_ID = MES镜像表主键ID（数据溯源用）
      *
      * @param maintenancePlanIds 设备保养计划ID列表（仅处理PRECISION_TYPE='硫化精度'的数据）
      * @return 分发写入的记录数
@@ -1971,14 +1972,30 @@ public class LhPrecisionPlanServiceImpl extends AbstractDocService<LhPrecisionPl
             log.info("未查询到精度类型为'硫化精度'的设备保养计划数据，跳过分发");
             return 0;
         }
+
+        // 防御性按业务键（分厂|机台|精度类型|计划时间）去重，每键保留首条：
+        // 镜像表已有唯一索引uk_mdm_dev_plan_key兜底，此处防止历史脏数据或异常入参导致计划表写入重复行
+        int beforeDedupSize = mesPlans.size();
+        mesPlans = new ArrayList<>(mesPlans.stream()
+                .collect(Collectors.toMap(
+                        mesPlan -> mesPlan.getFactoryCode() + "|" + mesPlan.getDevCode() + "|"
+                                + mesPlan.getPrecisionType() + "|" + mesPlan.getOperTime(),
+                        Function.identity(),
+                        (first, second) -> first,
+                        LinkedHashMap::new
+                ))
+                .values());
+        if (beforeDedupSize != mesPlans.size()) {
+            log.warn("分发硫化精度计划源数据存在重复业务键，去重前{}条，去重后{}条", beforeDedupSize, mesPlans.size());
+        }
         log.info("查询到硫化精度设备保养计划数据{}条", mesPlans.size());
 
-        // 步骤1：按分厂逻辑删除APS本地表所有MES同步来源的旧硫化精度计划（先删后插模式）
+        // 步骤1：按分厂物理删除APS本地表所有MES同步来源的旧硫化精度计划（含历史软删死行，先删后插全量重建）
         // 仅清理DATA_SOURCE='0'的MES同步数据，保留系统自动生成的数据
         // 取第一条的factoryCode（MES同步时已按factoryCode过滤，所有记录factoryCode一致）
         String factoryCode = mesPlans.get(0).getFactoryCode();
-        int deletedCount = lhPrecisionPlanMapper.logicDeleteMesSyncByFactoryCode(factoryCode);
-        log.info("逻辑删除APS本地表旧MES同步硫化精度计划完成，分厂={}，删除{}条", factoryCode, deletedCount);
+        int deletedCount = lhPrecisionPlanMapper.physicalDeleteMesSyncByFactoryCode(factoryCode);
+        log.info("物理删除APS本地表旧MES同步硫化精度计划完成，分厂={}，删除{}条", factoryCode, deletedCount);
 
         // 步骤2：将MES新版本数据全量插入
         int intervalYears = getIntervalYears();

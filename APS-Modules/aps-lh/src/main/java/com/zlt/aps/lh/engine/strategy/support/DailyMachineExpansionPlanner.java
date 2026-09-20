@@ -93,7 +93,7 @@ public final class DailyMachineExpansionPlanner {
 
     /**
      * 计算新开机台判断使用的已落实需求份数，不改写逐日生产机台索引。
-     * <p>当日已排机台与同一需求的有效前置绑定取物理机台并集；仅喷砂已释放机台仍予排除。</p>
+     * <p>当日已排机台与同一需求的有效前置绑定取物理机台并集；强制释放机台仍予排除。</p>
      * @param context 排程上下文
      * @param sku 物料及产品状态
      * @param productionDate 当前竞争业务日
@@ -104,7 +104,7 @@ public final class DailyMachineExpansionPlanner {
                                                   LocalDate productionDate) {
         Set<String> committedMachines = resolvePreScheduledDemandMachines(context, sku, productionDate);
         Set<String> excludedMachines = new LinkedHashSet<String>(committedMachines);
-        excludedMachines.addAll(context.resolveOnlySandBlastReleasedPhysicalMachineCodes(sku));
+        excludedMachines.addAll(context.resolveForcedReleasedPhysicalMachineCodes(sku));
         // 已排集合排除绑定后再相加，避免同一天或左右侧已登记时重复占用需求。
         return committedMachines.size() + context.getSkuScheduledMachineCountExcluding(
                 productionDate, sku.getMaterialCode(), sku.getProductStatus(), excludedMachines);
@@ -180,7 +180,7 @@ public final class DailyMachineExpansionPlanner {
         if (Objects.isNull(productionDate)) {
             return machines;
         }
-        Set<String> releasedMachines = context.resolveOnlySandBlastReleasedPhysicalMachineCodes(sku);
+        Set<String> releasedMachines = context.resolveForcedReleasedPhysicalMachineCodes(sku);
         for (ActiveMachineBinding binding : context.getPreScheduledMachineBindingList()) {
             if (Objects.isNull(binding) || Objects.isNull(binding.getMachineDemandStartDate())
                     || productionDate.isBefore(binding.getMachineDemandStartDate())

@@ -3,6 +3,7 @@ package com.zlt.aps.lh.api.domain.vo;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.common.annotation.ImportExcelValidated;
@@ -31,6 +32,22 @@ import java.util.Date;
 public class LhMouldChangePlanVo extends BaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
+
+    /**
+     * 分厂编号，仅用于导出排序匹配硫化排程结果，不作为导出列展示。
+     */
+    @ApiModelProperty(value = "分厂编号")
+    @JsonIgnore
+    @TableField(exist = false)
+    private String factoryCode;
+
+    /**
+     * 关联硫化结果批次号，仅用于导出排序匹配硫化排程结果，不作为导出列展示。
+     */
+    @ApiModelProperty(value = "硫化结果批次号")
+    @JsonIgnore
+    @TableField(exist = false)
+    private String lhResultBatchNo;
 
     @ApiModelProperty(value = "序号")
     @Excel(name = "ui.data.column.facMonthPlanProdResult.planSeq", cellType = Excel.ColumnType.NUMERIC)

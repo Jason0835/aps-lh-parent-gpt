@@ -726,14 +726,26 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     }
 
     /**
-     * 批量计划更新。
+     * 计划更新。
      *
      * @param scheduleResultList 硫化排程结果列表
      * @return 处理结果
      */
     @PostMapping("/increaseMouldStartPlan")
+    @ApiOperation("计划更新")
+    public AjaxResult increaseMouldStartPlan(@RequestBody LhScheduleResult scheduleResultList) {
+        return lhScheduleService.increaseMouldStartPlan(scheduleResultList);
+    }
+
+    /**
+     * 批量计划更新。
+     *
+     * @param scheduleResultList 硫化排程结果列表
+     * @return 处理结果
+     */
+    @PostMapping("/batchIncreaseMouldStartPlan")
     @ApiOperation("批量计划更新")
-    public AjaxResult increaseMouldStartPlan(@RequestBody List<LhScheduleResult> scheduleResultList) {
+    public AjaxResult batchIncreaseMouldStartPlan(@RequestBody List<LhScheduleResult> scheduleResultList) {
         return lhScheduleService.batchIncreaseMouldStartPlan(scheduleResultList);
     }
 

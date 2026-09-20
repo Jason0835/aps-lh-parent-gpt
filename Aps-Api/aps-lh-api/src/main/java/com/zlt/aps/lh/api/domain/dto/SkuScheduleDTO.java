@@ -6,7 +6,9 @@ import lombok.EqualsAndHashCode;
 import java.time.LocalDate;
 import java.util.Date;
 import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * SKU排程数据传输对象。
@@ -146,6 +148,9 @@ public class SkuScheduleDTO {
     /** 续作释放后转新增补偿时保留的原续作优先机台，仅供 S4.5 轮到该 SKU 选机时优先锁回 */
     @EqualsAndHashCode.Exclude
     private String preferredContinuousMachineCode;
+    /** 临时故障迁移来源机台集合，仅用于关联故障释放需求与最终新机台结果，不落库。 */
+    @EqualsAndHashCode.Exclude
+    private Set<String> temporaryFaultSourceMachineCodeSet = new LinkedHashSet<String>(2);
     /** 续作增机台补偿SKU首次允许新增机台生效的业务日期 */
     private LocalDate firstAddMachineProductionDate;
     /** 续作增机台补偿SKU生成时已有的续作机台数 */

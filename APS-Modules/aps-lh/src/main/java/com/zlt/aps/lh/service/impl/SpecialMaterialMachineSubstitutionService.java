@@ -109,7 +109,7 @@ public class SpecialMaterialMachineSubstitutionService {
     @Resource
     private ILhDailyMouldCalcService lhDailyMouldCalcService;
 
-    /** 换活字块指定机台入口，置换时复用现有同胎胚、同模具判断和切换主链 */
+    /** 换活字块指定机台入口，置换时复用现有同模具判断和切换主链 */
     @Resource
     private ITypeBlockProductionStrategy typeBlockProductionStrategy;
 
@@ -881,7 +881,7 @@ public class SpecialMaterialMachineSubstitutionService {
     /**
      * 按现有换活字块关系选择候选预演时长。
      *
-     * <p>同胎胚、同模具等条件满足时使用换活字块时长，否则使用正规换模时长。
+     * <p>同模具等条件满足时使用换活字块时长，否则使用正规换模时长。
      * 判断入口只读取运行态，不登记换模次数，也不写入排程结果。</p>
      *
      * @param context 排程上下文
@@ -1486,7 +1486,7 @@ public class SpecialMaterialMachineSubstitutionService {
         try {
             MachineScheduleDTO machine = context.getMachineScheduleMap().get(machineCode);
             /*
-             * 置换后的实际交替类型必须先走现有换活字块判断。同胎胚、同模具等条件满足时，
+             * 置换后的实际交替类型必须先走现有换活字块判断。同模具等条件满足时，
              * 由换活字块主链完成切换、首检、产能和账本更新；明确不适用时才进入正规换模主链。
              */
             SpecifiedMachineScheduleResult typeBlockResult =

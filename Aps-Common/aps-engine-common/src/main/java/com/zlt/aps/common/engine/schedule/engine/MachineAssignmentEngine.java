@@ -241,6 +241,10 @@ public final class MachineAssignmentEngine<C extends MachineAssignmentContext<T>
     }
 
     public void clearDuplicateProductShiftPlan(T task, BigDecimal openingStock) {
+        // 同班重复任务不重新计算覆盖规则，清除旧判定避免后续解释沿用过期状态。
+        task.setStockCoverageStockGapQty(null);
+        task.setStockCoverageCovered(null);
+        task.setTwoShiftStockCovered(null);
         task.setPreLossPlanQty(BigDecimal.ZERO);
         task.setLossAddQty(BigDecimal.ZERO);
         task.setPlanQtyBeforeToolLimit(BigDecimal.ZERO);

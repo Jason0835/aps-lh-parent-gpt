@@ -1,5 +1,6 @@
 package com.zlt.aps.common.engine.schedule.engine;
 
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.engine.quantity.PlanQuantityAllocationItem;
 import com.zlt.aps.common.engine.quantity.PlanQuantityAllocationUtils;
 
@@ -135,6 +136,10 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
                 }
                 // 同一产品同班只计算首个非预置任务，保留原有计划组去重语义，避免局部库存被重复扣减。
                 if (!this.isPresetPlanTask(task) && !recalculatedProductCodeSet.add(productCode)) {
+                    task.setStockCoverageStockGapQty(null);
+                    task.setStockCoverageCovered(null);
+                    // 同班重复任务不参与二次库存判断，清除历史兼容标记避免日志误判为覆盖。
+                    task.setTwoShiftStockCovered(null);
                     task.setPreLossPlanQty(BigDecimal.ZERO);
                     task.setLossAddQty(BigDecimal.ZERO);
                     task.setPlanQtyBeforeToolLimit(BigDecimal.ZERO);
@@ -193,6 +198,7 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
             return;
         }
         List<T> originalTaskList = new ArrayList<>(context.getTaskDraftList());
+        SchedulePlanTailCalculator.prepareTailMetadata(originalTaskList);
         Map<String, List<T>> groupedTaskMap = originalTaskList.stream()
                 .filter(Objects::nonNull)
                 .collect(Collectors.groupingBy(task -> this.buildPlanGroupKey(context, task),
@@ -213,7 +219,7 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
             List<T> groupSourceList = entry.getValue();
             T aggregateTask = groupSourceList.size() == 1
                     ? groupSourceList.get(0) : policy.copyDerivedTask(groupSourceList.get(0));
-            policy.applyTailDecision(aggregateTask, groupSourceList);
+            SchedulePlanTailCalculator.mergeRuntimeMetadata(aggregateTask, groupSourceList);
             boolean formingShutdownCloseOut = groupSourceList.stream()
                     .allMatch(task -> Boolean.TRUE.equals(task.getFormingShutdownCloseOutFlag()));
             aggregateTask.setFormingShutdownCloseOutFlag(formingShutdownCloseOut);
@@ -235,6 +241,11 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
                     .map(this::resolveOriginalCurrentShiftDemandQty).reduce(BigDecimal.ZERO, BigDecimal::add);
             BigDecimal nextShiftDemandQty = this.sum(groupSourceList,
                     ScheduleTaskDraftModel::getNextShiftDemandQty);
+            boolean coverageWindowAvailable = groupSourceList.stream()
+                    .allMatch(sourceTask -> sourceTask.getStockCoverageDemandQty() != null);
+            BigDecimal stockCoverageDemandQty = coverageWindowAvailable
+                    ? this.sum(groupSourceList, ScheduleTaskDraftModel::getStockCoverageDemandQty) : null;
+            ScheduleStockCoverageWindowModel stockCoverageWindow = this.mergeStockCoverageWindow(groupSourceList);
             BigDecimal guardDemandQty = this.resolveGroupGuardDemandQty(groupSourceList,
                     rawCurrentShiftDemandQty, guardWindowQtyMap);
             Integer formingLogicalShiftOrder = this.resolveGroupCurrentLogicalShiftOrder(groupSourceList,
@@ -260,6 +271,8 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
             aggregateTask.setCurrentShiftDemandQty(currentShiftDemandQty);
             aggregateTask.setOriginalCurrentShiftDemandQty(originalCurrentShiftDemandQty);
             aggregateTask.setNextShiftDemandQty(nextShiftDemandQty);
+            aggregateTask.setStockCoverageDemandQty(stockCoverageDemandQty);
+            aggregateTask.setStockCoverageWindow(stockCoverageWindow);
             aggregateTask.setGuardDemandQty(guardDemandQty);
             aggregateTask.setFormingGuardWindowQtyMap(guardWindowQtyMap);
             if (formingLogicalShiftOrder != null) {
@@ -267,6 +280,7 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
             }
             aggregateTask.setFormingGuardWindowHoursMap(
                     this.resolveGroupGuardWindowHoursMap(context, guardWindowQtyMap, 6));
+            policy.applyTailDecision(aggregateTask, groupSourceList);
             aggregateTask.setDemandQty(null);
             if (groupSourceList.size() > 1) {
                 aggregateTask.setPlanQty(null);
@@ -278,6 +292,7 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
             taskGroup.setSourceTaskList(sourceSnapshotList);
             taskGroup.setGroupCurrentShiftDemandQty(currentShiftDemandQty);
             taskGroup.setGroupNextShiftDemandQty(nextShiftDemandQty);
+            taskGroup.setGroupStockCoverageDemandQty(stockCoverageDemandQty);
             taskGroup.setGroupGuardDemandQty(guardDemandQty);
             planTaskGroupMap.put(planGroupKey, taskGroup);
             aggregateTaskList.add(aggregateTask);
@@ -324,15 +339,19 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
      * @param calculationScale 分摊精度
      * @param formulaDesc      领域公式说明
      * @param tracePort        领域轨迹端口
+     * @param policy           领域计划量策略，用于清理覆盖命中的专有调整量
      */
     public void applyPlanGroupResult(C context, T aggregateTask, int calculationScale,
-                                     String formulaDesc, PlanGroupResultTracePort<C, T, G> tracePort) {
+                                     String formulaDesc, PlanGroupResultTracePort<C, T, G> tracePort,
+                                     PlanCalculationPolicy<C, T, F, G, P, D> policy) {
         G taskGroup = context.getPlanTaskGroupMap().get(aggregateTask.getPlanGroupKey());
         if (taskGroup == null || taskGroup.getSourceTaskList() == null
                 || taskGroup.getSourceTaskList().isEmpty()) {
             return;
         }
-        boolean twoShiftStockCovered = Boolean.TRUE.equals(aggregateTask.getTwoShiftStockCovered());
+        boolean twoShiftStockCovered = aggregateTask.getStockCoverageCovered() == null
+                ? Boolean.TRUE.equals(aggregateTask.getTwoShiftStockCovered())
+                : Boolean.TRUE.equals(aggregateTask.getStockCoverageCovered());
         Map<String, BigDecimal> sourceWeightMap = this.resolveSourceWeightMap(taskGroup.getSourceTaskList(),
                 aggregateTask, twoShiftStockCovered);
         taskGroup.setSourceWeightMap(sourceWeightMap);
@@ -366,13 +385,18 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
             sourceTask.setTwoShiftDemandQty(aggregateTask.getTwoShiftDemandQty());
             sourceTask.setTwoShiftStockGapQty(aggregateTask.getTwoShiftStockGapQty());
             sourceTask.setTwoShiftStockCovered(aggregateTask.getTwoShiftStockCovered());
+            sourceTask.setStockCoverageStockGapQty(aggregateTask.getStockCoverageStockGapQty());
+            sourceTask.setStockCoverageCovered(aggregateTask.getStockCoverageCovered());
             if (twoShiftStockCovered) {
                 sourceTask.setLossAddQty(BigDecimal.ZERO);
                 sourceTask.setToolLimitAdjustQty(BigDecimal.ZERO);
                 sourceTask.setToolOverflowQty(BigDecimal.ZERO);
+                sourceTask.setMinStartAdjustQty(BigDecimal.ZERO);
+                sourceTask.setTailRoundAdjustQty(BigDecimal.ZERO);
                 sourceTask.setCapacityAdjustQty(BigDecimal.ZERO);
                 sourceTask.setPreLossPlanQty(BigDecimal.ZERO);
                 sourceTask.setPlanQtyBeforeToolLimit(BigDecimal.ZERO);
+                policy.clearAdditionalPlanAdjustments(sourceTask);
             }
             sourceTask.setCalcFormulaDesc(formulaDesc);
             this.fillGroupFields(sourceTask, taskGroup);
@@ -389,11 +413,14 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
     private void fillGroupFields(T task, G taskGroup) {
         task.setPlanGroupKey(taskGroup.getPlanGroupKey());
         task.setGroupSourceCount(taskGroup.getSourceTaskList().size());
+        boolean stockCoverageCovered = task.getStockCoverageCovered() == null
+                ? Boolean.TRUE.equals(task.getTwoShiftStockCovered())
+                : Boolean.TRUE.equals(task.getStockCoverageCovered());
         BigDecimal groupRequiredQty = Boolean.TRUE.equals(task.getFormingShutdownCloseOutFlag())
                 ? this.nvl(task.getFormingShutdownCloseOutDemandQty())
-                : Boolean.TRUE.equals(task.getTwoShiftStockCovered())
-                ? this.nvl(taskGroup.getGroupCurrentShiftDemandQty())
-                .add(this.nvl(taskGroup.getGroupNextShiftDemandQty()))
+                : stockCoverageCovered
+                ? this.nvl(taskGroup.getGroupStockCoverageDemandQty() == null
+                ? task.getStockCoverageDemandQty() : taskGroup.getGroupStockCoverageDemandQty())
                 : this.nvl(taskGroup.getGroupCurrentShiftDemandQty())
                 .add(this.nvl(taskGroup.getGroupGuardDemandQty()));
         task.setGroupRequiredQty(groupRequiredQty);
@@ -409,6 +436,7 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
         evidence.put("sourceCount", taskGroup.getSourceTaskList().size());
         evidence.put("groupCurrentShiftDemandQty", taskGroup.getGroupCurrentShiftDemandQty());
         evidence.put("groupNextShiftDemandQty", taskGroup.getGroupNextShiftDemandQty());
+        evidence.put("groupStockCoverageDemandQty", taskGroup.getGroupStockCoverageDemandQty());
         evidence.put("groupGuardDemandQty", taskGroup.getGroupGuardDemandQty());
         evidence.put("groupBaseDemandQty", taskGroup.getGroupBaseDemandQty());
         evidence.put("groupMinStartAdjustQty", taskGroup.getGroupMinStartAdjustQty());
@@ -602,7 +630,7 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
      *
      * @param sourceTaskList 来源任务
      * @param aggregateTask 汇总任务
-     * @param twoShiftStockCovered 是否命中两班库存覆盖
+     * @param twoShiftStockCovered 是否命中库存覆盖；变量名保留历史兼容语义
      * @return 来源业务键到需求权重的映射
      */
     private Map<String, BigDecimal> resolveSourceWeightMap(List<T> sourceTaskList, T aggregateTask,
@@ -614,9 +642,13 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
             return sourceTaskList.stream().collect(Collectors.toMap(ScheduleTaskDraftModel::getBusinessKey,
                     sourceTask -> Boolean.TRUE.equals(aggregateTask.getFormingShutdownCloseOutFlag())
                             ? this.nvl(sourceTask.getFormingShutdownCloseOutDemandQty())
+                            : twoShiftStockCovered
+                            ? this.nvl(sourceTask.getStockCoverageDemandQty() == null
+                            ? this.nvl(sourceTask.getCurrentShiftDemandQty()).add(
+                            this.nvl(sourceTask.getNextShiftDemandQty()))
+                            : sourceTask.getStockCoverageDemandQty())
                             : this.nvl(sourceTask.getCurrentShiftDemandQty()).add(this.nvl(
-                            twoShiftStockCovered ? sourceTask.getNextShiftDemandQty()
-                                    : sourceTask.getGuardDemandQty())),
+                            sourceTask.getGuardDemandQty())),
                     BigDecimal::add, LinkedHashMap::new));
         }
         Map<String, BigDecimal> sourceWeightMap = sourceTaskList.stream()
@@ -639,6 +671,40 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
             });
         });
         return sourceWeightMap;
+    }
+
+    /**
+     * 合并计划组来源任务的库存覆盖窗口。
+     *
+     * @param sourceTaskList 来源任务快照
+     * @return 合并后的库存覆盖窗口；来源缺少窗口时返回 null
+     */
+    private ScheduleStockCoverageWindowModel mergeStockCoverageWindow(List<T> sourceTaskList) {
+        if (sourceTaskList == null || sourceTaskList.isEmpty()
+                || sourceTaskList.stream().anyMatch(task -> task.getStockCoverageWindow() == null)) {
+            return null;
+        }
+        ScheduleStockCoverageWindowModel first = sourceTaskList.get(0).getStockCoverageWindow();
+        ScheduleStockCoverageWindowModel target = first.copy();
+        Map<Integer, BigDecimal> demandMap = new LinkedHashMap<>();
+        sourceTaskList.forEach(sourceTask -> sourceTask.getStockCoverageWindow().getDemandQtyByOffset()
+                .forEach((offset, quantity) -> demandMap.merge(offset, this.nvl(quantity), BigDecimal::add)));
+        target.setDemandQtyByOffset(demandMap);
+        BigDecimal totalDemandQty = demandMap.values().stream().map(this::nvl)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        Integer extrapolatedShiftCount = first.getExtrapolatedShiftCount();
+        if (extrapolatedShiftCount != null && extrapolatedShiftCount > 0) {
+            BigDecimal extrapolatedDemandQty = sourceTaskList.stream()
+                    .map(task -> task.getStockCoverageWindow().getExtrapolatedDemandQtyPerShift())
+                    .map(this::nvl).reduce(BigDecimal.ZERO, BigDecimal::add);
+            target.setExtrapolatedStartOffset(first.getExtrapolatedStartOffset());
+            target.setExtrapolatedShiftCount(extrapolatedShiftCount);
+            target.setExtrapolatedDemandQtyPerShift(extrapolatedDemandQty);
+            totalDemandQty = totalDemandQty.add(extrapolatedDemandQty.multiply(
+                    BigDecimalUtils.valueOf(extrapolatedShiftCount)));
+        }
+        target.setTotalDemandQty(totalDemandQty);
+        return target;
     }
 
     public Map<Integer, BigDecimal> resolveGroupGuardWindowHoursMap(
@@ -709,15 +775,27 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
         boolean newSpecBypass = task.getCommonNewSpecInfo() != null && task.getCommonNewSpecInfo().isNewSpecHit();
         boolean experimentBypass = task.getCommonExperimentSpecInfo() != null
                 && task.getCommonExperimentSpecInfo().isExperimentSpecHit();
-        evidence.put("applicable", !newSpecBypass && !experimentBypass && task.getPlanQty() != null);
+        boolean formingShutdownCloseOut = Boolean.TRUE.equals(task.getFormingShutdownCloseOutFlag());
+        evidence.put("applicable", !newSpecBypass && !experimentBypass && !formingShutdownCloseOut
+                && task.getPlanQty() != null);
         evidence.put("bypassReason", newSpecBypass ? "NEW_SPEC_ADVANCE"
-                : experimentBypass ? "EXPERIMENT_SPEC_ADVANCE_WINDOW" : null);
+                : experimentBypass ? "EXPERIMENT_SPEC_ADVANCE_WINDOW"
+                : formingShutdownCloseOut ? "FORMING_SHUTDOWN_CLOSE_OUT" : null);
         evidence.put("currentShiftDemandQty", task.getCurrentShiftDemandQty());
         evidence.put("nextShiftDemandQty", task.getNextShiftDemandQty());
         evidence.put("rollingStockQty", task.getRollingStockQty());
         evidence.put("twoShiftDemandQty", task.getTwoShiftDemandQty());
         evidence.put("twoShiftStockGapQty", task.getTwoShiftStockGapQty());
         evidence.put("stockCovered", task.getTwoShiftStockCovered());
+        evidence.put("stockCoverageWindow", task.getStockCoverageWindow());
+        evidence.put("stockCoverageDemandQty", task.getStockCoverageDemandQty());
+        evidence.put("stockCoverageStockGapQty", task.getStockCoverageStockGapQty());
+        evidence.put("stockCoverageCovered", task.getStockCoverageCovered());
+        ScheduleStockCoverageWindowModel coverageWindow = task.getStockCoverageWindow();
+        evidence.put("stockCoverageParamCode", coverageWindow == null ? null : coverageWindow.getParamCode());
+        evidence.put("stockCoverageShiftCount", coverageWindow == null ? null : coverageWindow.getShiftCount());
+        evidence.put("stockCoverageParamSource", coverageWindow == null ? null : coverageWindow.getParamSource());
+        evidence.put("stockCoverageFallbackReason", coverageWindow == null ? null : coverageWindow.getFallbackReason());
         evidence.put("twoShiftLeadTask", task.getTwoShiftLeadTask());
         evidence.put("finalPlanQty", task.getPlanQty());
         return evidence;

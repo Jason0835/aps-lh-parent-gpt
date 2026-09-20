@@ -46,6 +46,9 @@ public final class FirstInspectionTimelinePlan {
     /** 首检真实开始所在班次，不能被取整后首个正量班次替代。 */
     private final LhShiftConfigVO productionOccupationShift;
 
+    /** 同一次结构切换的冻结决策；普通非切换时间轴为空。 */
+    private final StructureSwitchPlan structureSwitchPlan;
+
     /** 稳定时间轴指纹。 */
     private final String timelineFingerprint;
 
@@ -58,6 +61,19 @@ public final class FirstInspectionTimelinePlan {
                                         Date formalProductionStartTime,
                                         LhShiftConfigVO formalProductionShift,
                                         LhShiftConfigVO productionOccupationShift) {
+        this(allocationPlan, timingMode, modeReason, changeoverStartTime, changeoverEndTime,
+                productionReadyTime, formalProductionStartTime, formalProductionShift, productionOccupationShift, null);
+    }
+
+    private FirstInspectionTimelinePlan(FirstInspectionAllocationPlan allocationPlan,
+                                        FirstInspectionTimingMode timingMode,
+                                        String modeReason,
+                                        Date changeoverStartTime,
+                                        Date changeoverEndTime,
+                                        Date productionReadyTime,
+                                        Date formalProductionStartTime,
+                                        LhShiftConfigVO formalProductionShift,
+                                        LhShiftConfigVO productionOccupationShift, StructureSwitchPlan structureSwitchPlan) {
         this.allocationPlan = allocationPlan;
         this.timingMode = Objects.requireNonNull(timingMode, "timingMode不能为空");
         this.modeReason = StringUtils.defaultString(modeReason);
@@ -67,6 +83,7 @@ public final class FirstInspectionTimelinePlan {
         this.formalProductionStartTime = formalProductionStartTime;
         this.formalProductionShift = formalProductionShift;
         this.productionOccupationShift = productionOccupationShift;
+        this.structureSwitchPlan = structureSwitchPlan;
         this.timelineFingerprint = buildFingerprint();
     }
 
@@ -116,6 +133,22 @@ public final class FirstInspectionTimelinePlan {
         return new FirstInspectionTimelinePlan(allocationPlan, timingMode, modeReason,
                 changeoverStartTime, changeoverEndTime, productionReadyTime,
                 formalProductionStartTime, formalProductionShift, occupationShift);
+    }
+
+    /**
+     * 在新时间轴副本中附加切换决策，原预演对象保持不变。
+     * @param switchPlan 同一次切换的冻结决策
+     * @return 时间轴副本
+     */
+    public FirstInspectionTimelinePlan withStructureSwitchPlan(StructureSwitchPlan switchPlan) {
+        return new FirstInspectionTimelinePlan(allocationPlan, timingMode,
+                modeReason, changeoverStartTime, changeoverEndTime, productionReadyTime,
+                formalProductionStartTime, formalProductionShift, productionOccupationShift, switchPlan);
+    }
+
+    /** @return 本候选结构切换冻结计划；非切换为空 */
+    public StructureSwitchPlan getStructureSwitchPlan() {
+        return structureSwitchPlan;
     }
 
     public FirstInspectionAllocationPlan getAllocationPlan() {
@@ -224,6 +257,16 @@ public final class FirstInspectionTimelinePlan {
         appendValue(source, formalProductionStartTime);
         appendValue(source, formalProductionShift);
         appendValue(source, productionOccupationShift);
+        if (Objects.nonNull(structureSwitchPlan)) {
+            appendValue(source, structureSwitchPlan.getSource().getId());
+            appendValue(source, structureSwitchPlan.getSource().getEarliestLhTime());
+            appendValue(source, structureSwitchPlan.getSource().getIsWaitNotify());
+            appendValue(source, structureSwitchPlan.getSource().getIsBigInchChange());
+            appendValue(source, structureSwitchPlan.getFirstQuantityShift());
+            appendValue(source, structureSwitchPlan.getFirstBatchShift());
+            appendValue(source, structureSwitchPlan.getBaseStart());
+            appendValue(source, structureSwitchPlan.getProductionStart());
+        }
         if (hasInspection()) {
             appendValue(source, allocationPlan.getInspectionQty());
             appendValue(source, allocationPlan.getHourlyOutput());

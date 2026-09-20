@@ -5,6 +5,8 @@ import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.component.EarlyProductionRuntimePlanService;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.DailySchedulePhase;
+import com.zlt.aps.lh.engine.strategy.support.StructureSwitchPlan;
+import com.zlt.aps.lh.engine.strategy.support.StructureSwitchSchedulingPolicy;
 import com.zlt.aps.lh.engine.strategy.support.DayScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionRuntimePlan;
 import com.zlt.aps.lh.engine.strategy.support.MachineSkuMatchResult;
@@ -15,6 +17,8 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
+import java.util.Map;
+import java.util.LinkedHashMap;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -87,7 +91,27 @@ public class SpecifiedMachineProductionService {
                     return 0;
                 }
             }
-            return executeAction.getAsInt();
+            // 关闭总开关时直接执行原提交动作，不创建切换计划绑定作用域。
+            if (!StructureSwitchSchedulingPolicy.isEnabled(context)) {
+                return executeAction.getAsInt();
+            }
+            StructureSwitchPlan switchPlan = assignmentPlan.getAvailabilityPlan().getStructureSwitchPlan();
+            Map<String, StructureSwitchPlan> previousPlans = new LinkedHashMap<>(context.getStructureSwitchAttemptPlanMap());
+            try {
+                // 仅进入实际提交后提供分量策略，不更新S0或结构计数。
+                if (Objects.nonNull(switchPlan)) {
+                    assignmentPlan.getMatchResult().getDeclaredMachineCodes().forEach(machineCode ->
+                            context.getStructureSwitchAttemptPlanMap().put(machineCode, switchPlan));
+                }
+                int beforeCount = context.getScheduleResultList().size();
+                int scheduledCount = executeAction.getAsInt();
+                for (int index = beforeCount; index < context.getScheduleResultList().size(); index++) {
+                    StructureSwitchSchedulingPolicy.bindResult(context, context.getScheduleResultList().get(index));
+                }
+                return scheduledCount;
+            } finally {
+                context.setStructureSwitchAttemptPlanMap(previousPlans);
+            }
         };
         if (assignmentPlan.isFixedMachineExecution()) {
             return newSpecScheduleCommitService.commitResultOnly(context, activatedAction);

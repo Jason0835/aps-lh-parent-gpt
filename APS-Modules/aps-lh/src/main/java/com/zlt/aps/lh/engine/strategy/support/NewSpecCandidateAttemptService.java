@@ -232,6 +232,13 @@ public class NewSpecCandidateAttemptService {
                 || Objects.isNull(productionOccupationShift.getShiftIndex())) {
             return null;
         }
+        // 新增分班限制叠加原准入，实际顺延后以冻结时间轴重新校验。
+        StructureMachineLimitDecision switchDecision = StructureSwitchSchedulingPolicy.evaluate(context,
+                availabilityPlan.getStructureSwitchPlan(), candidate.getSku(),
+                matchResult.getMachine().getMachineCode(), null);
+        if (Objects.nonNull(switchDecision)) {
+            return switchDecision;
+        }
         EarlyProductionRuntimePlan earlyProductionPlan =
                 candidate.getEarlyProductionPreview();
         EarlyProductionDecision earlyProductionDecision =

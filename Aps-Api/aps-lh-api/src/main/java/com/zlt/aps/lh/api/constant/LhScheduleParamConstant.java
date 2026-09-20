@@ -58,6 +58,10 @@ public final class LhScheduleParamConstant {
     public static final String TYPE_BLOCK_CHANGE_TOTAL_HOURS = "SYS0302010";
     /** 首检时间（小时） */
     public static final String FIRST_INSPECTION_HOURS = "SYS0303001";
+    /** 大换英寸首个批量生产班延迟小时数。 */
+    public static final String LARGE_INCH_FIRST_BATCH_DELAY_HOURS = "SYS0303005";
+    /** 结构切换特殊排程规则总开关：1开启，0沿用改造前逻辑。 */
+    public static final String STRUCTURE_SWITCH_SCHEDULING_ENABLED = "SYS0303006";
     /** 同班次前2台首检计划量 */
     public static final String FIRST_TWO_FIRST_INSPECTION_QTY = "SYS0303002";
     /** 每班最大首检次数 */

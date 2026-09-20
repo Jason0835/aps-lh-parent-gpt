@@ -774,6 +774,25 @@ public class LhScheduleConfig {
     }
 
     /**
+     * 获取本批次结构切换特殊排程总开关；只有合法0关闭，缺省按1开启。
+     * @return 是否执行分班上机、扩机优先级及大换英寸P0规则
+     */
+    public boolean isStructureSwitchSchedulingEnabled() {
+        String value = this.getParamValue(LhScheduleParamConstant.STRUCTURE_SWITCH_SCHEDULING_ENABLED,
+                String.valueOf(LhScheduleConstant.STRUCTURE_SWITCH_SCHEDULING_ENABLED));
+        return !StringUtils.equals("0", StringUtils.trim(value));
+    }
+
+    /**
+     * 获取大换英寸首个批量生产班的延迟小时数。
+     * @return 非负小时数，默认1小时
+     */
+    public int getLargeInchFirstBatchDelayHours() {
+        return this.getParamIntValue(LhScheduleParamConstant.LARGE_INCH_FIRST_BATCH_DELAY_HOURS,
+                LhScheduleConstant.LARGE_INCH_FIRST_BATCH_DELAY_HOURS);
+    }
+
+    /**
      * 获取奇数班产计划量加一班别配置。
      * <p>空值表示不启用；合法性由产能计算入口按 1/2/3 判断，非法值保持原班产口径。</p>
      *

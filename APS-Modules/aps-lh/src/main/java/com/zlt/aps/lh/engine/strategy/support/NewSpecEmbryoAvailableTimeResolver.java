@@ -223,7 +223,27 @@ public final class NewSpecEmbryoAvailableTimeResolver {
         return resolveActualProductionStartTime(
                 existingProductionNotBeforeTime,
                 Objects.isNull(context) ? null
-                        : context.resolveOnlySandBlastRequeueNotBeforeTime(sku));
+                        : context.resolveForcedRequeueNotBeforeTime(sku));
+    }
+
+    /**
+     * 解析候选准备动作不得早于的生产时间下限。
+     *
+     * <p>普通新增仍只使用 SKU 类型门禁，允许在胎胚到位前完成准备；仅喷砂回流 SKU
+     * 必须携带原模具转机，因此换模或换活字块准备也不得早于原模具清洗结束时间。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 待排 SKU
+     * @param shifts 完整排程窗口班次
+     * @return 候选准备时间下限；未配置时返回 null
+     */
+    public static Date resolveCandidateProductionNotBeforeTime(
+            LhScheduleContext context, SkuScheduleDTO sku, List<LhShiftConfigVO> shifts) {
+        Date skuProductionGateTime = resolveSkuProductionGateTime(context, sku, shifts);
+        Date onlySandBlastRequeueTime = Objects.isNull(context)
+                ? null : context.resolveOnlySandBlastRequeueNotBeforeTime(sku);
+        return resolveActualProductionStartTime(
+                skuProductionGateTime, onlySandBlastRequeueTime);
     }
 
     /**

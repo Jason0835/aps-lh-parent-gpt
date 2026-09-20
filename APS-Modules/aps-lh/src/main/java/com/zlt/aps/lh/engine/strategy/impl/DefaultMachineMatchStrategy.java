@@ -17,6 +17,7 @@ import com.zlt.aps.lh.api.enums.LhSpecialMaterialCategoryEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.api.enums.SkuTagEnum;
 import com.zlt.aps.lh.api.enums.TrialStatusEnum;
+import com.zlt.aps.lh.component.LhMachineSupplyStructureRule;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
@@ -95,6 +96,11 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     @Resource
     private LhMaintenanceScheduleService maintenanceScheduleService =
             new LhMaintenanceScheduleService();
+
+    /** 硫化机专供结构硬约束，统一限制所有机台视角选SKU入口。 */
+    @Resource
+    private LhMachineSupplyStructureRule machineSupplyStructureRule =
+            new LhMachineSupplyStructureRule();
 
     /** 每小时毫秒数 */
     private static final long MILLIS_PER_HOUR = 60L * 60L * 1000L;
@@ -228,6 +234,17 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                 trace.recordFilteredMachine(machine, "定点机台不可作业");
                 continue;
             }
+            if (Objects.nonNull(machine)
+                    && context.isTemporaryFaultOriginalMachine(sku, machine.getMachineCode())) {
+                trace.temporaryFaultOriginalMachineFilteredCount++;
+                trace.recordFilteredMachine(machine, "临时故障SKU禁止选回原机台");
+                continue;
+            }
+            if (Objects.nonNull(machine)
+                    && context.isOnlySandBlastOriginalMachine(sku, machine.getMachineCode())) {
+                trace.recordFilteredMachine(machine, "仅喷砂释放SKU禁止选回原机台");
+                continue;
+            }
             MachineAvailabilityReason availabilityReason = resolveMachineAvailabilityReason(
                     context, sku, mouldResourceContext, skuInch,
                     specialMaterialMatchResult, machine);
@@ -300,6 +317,12 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                 || StringUtils.isEmpty(machine.getMachineCode())) {
             return MachineSkuMatchResult.failed(machine, sku, "排程上下文、机台或SKU为空");
         }
+        // 先按SKU结构判断是否唯一绑定成型机，命中专供硫化机配置时提前过滤当前Machine-SKU组合。
+        MachineSkuMatchResult supplyStructureMatch = this.matchSupplyStructureConstraint(
+                context, machine, sku);
+        if (!supplyStructureMatch.isMatched()) {
+            return supplyStructureMatch;
+        }
         Set<String> notAllowedMachineCodes = LhSpecifyMachineUtil.resolveNotAllowedMachineCodes(
                 context, sku.getMaterialCode());
         MachineSkuMatchResult primaryMatch = this.matchSingleMachineHardConstraints(
@@ -360,6 +383,40 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     }
 
     /**
+     * 校验SKU结构唯一成型机对应的专供硫化机硬约束。
+     *
+     * @param context 排程上下文
+     * @param machine 当前候选硫化机
+     * @param sku 当前候选SKU
+     * @return 匹配结果；未命中专供限制时返回通过，仅不合格Machine-SKU组合返回失败
+     */
+    private MachineSkuMatchResult matchSupplyStructureConstraint(
+            LhScheduleContext context, MachineScheduleDTO machine, SkuScheduleDTO sku) {
+        if (machineSupplyStructureRule.canMachineSelectStructure(
+                context, machine.getMachineCode(), sku.getStructureName())) {
+            return MachineSkuMatchResult.matched(
+                    machine, sku, Collections.emptyList(), null, null);
+        }
+        Set<String> formingMachines = machineSupplyStructureRule.getFormingMachines(
+                context, sku.getStructureName());
+        Set<String> allowedLhMachines = machineSupplyStructureRule.getAllowedLhMachines(
+                context, sku.getStructureName());
+        String failureReason = new StringBuilder(192)
+                .append("SKU结构唯一绑定成型机且当前硫化机不在专供范围，结构=")
+                .append(sku.getStructureName())
+                .append("，成型机=").append(formingMachines)
+                .append("，允许硫化机=").append(allowedLhMachines)
+                .toString();
+        if (!context.isPriorityTraceMuted()) {
+            log.info("[专供结构约束] 过滤SKU, machineCode: {}, materialCode: {}, "
+                            + "skuStructure: {}, formingMachines: {}, allowedLhMachines: {}, reason: {}",
+                    machine.getMachineCode(), sku.getMaterialCode(), sku.getStructureName(),
+                    formingMachines, allowedLhMachines, failureReason);
+        }
+        return MachineSkuMatchResult.failed(machine, sku, failureReason);
+    }
+
+    /**
      * 校验一台运行态机台的公共硬约束。
      *
      * @param context 排程上下文
@@ -378,6 +435,12 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         }
         if (isNotAllowedMachine(notAllowedMachineCodes, machine)) {
             return MachineSkuMatchResult.failed(machine, sku, "指定机台命中SKU定点不可作业限制");
+        }
+        if (context.isTemporaryFaultOriginalMachine(sku, machine.getMachineCode())) {
+            return MachineSkuMatchResult.failed(machine, sku, "临时故障SKU禁止选回原故障机台");
+        }
+        if (context.isOnlySandBlastOriginalMachine(sku, machine.getMachineCode())) {
+            return MachineSkuMatchResult.failed(machine, sku, "仅喷砂释放SKU禁止选回原机台");
         }
         MouldResourceContext mouldResourceContext = resolveMouldResourceContext(context);
         BigDecimal skuInch = parseInch(sku.getProSize());
@@ -4617,7 +4680,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     /**
      * 解析候选机台本次准备动作的实际标准耗时。
      *
-     * <p>同胎胚同模具使用换活字块总时长，其余候选使用换模总时长。该口径与新增正式
+     * <p>同模具使用换活字块总时长，其余候选使用换模总时长。该口径与新增正式
      * 排产主链保持一致，避免候选画像一律按8小时估算而把可提前完成的换活字块机台分错组。</p>
      *
      * @param context 排程上下文
@@ -4628,7 +4691,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     private int resolveCandidateSwitchDurationHours(LhScheduleContext context,
                                                     SkuScheduleDTO sku,
                                                     MachineScheduleDTO machine) {
-        return TypeBlockRelationUtil.isSameEmbryoAndSameMould(context, machine, sku)
+        return TypeBlockRelationUtil.canChangeTypeBlock(context, machine, sku)
                 ? LhScheduleTimeUtil.getTypeBlockChangeTotalHours(context)
                 : LhScheduleTimeUtil.getMouldChangeTotalHours(context);
     }
@@ -6428,6 +6491,8 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         private final int totalMachineCount;
         /** 不可作业过滤数 */
         private int notAllowedMachineFilteredCount;
+        /** 临时故障SKU原机台过滤数 */
+        private int temporaryFaultOriginalMachineFilteredCount;
         /** 禁用过滤数 */
         private int disabledCount;
         /** 超时停机过滤数 */

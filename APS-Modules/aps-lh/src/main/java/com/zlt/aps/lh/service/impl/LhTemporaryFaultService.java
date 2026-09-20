@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * 临时故障窗口服务。仅登记原始禁产时间并适配公共产能算法，不调用其他业务调度。
+ * 临时故障窗口服务。登记原始禁产时间并适配公共产能算法；续作两班故障迁移由独立服务消费窗口。
  */
 @Slf4j
 @Service

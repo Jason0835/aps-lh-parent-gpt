@@ -239,8 +239,7 @@ public final class FirstInspectionAllocationUtil {
          * 禁止先把小时产量截断为整数，否则班产14条/8小时会从1.75条/小时被降为1条/小时，
          * 将本应落在后续班次的首检区间错误拉长到前一班次。
          */
-        long durationSeconds = ceilDivide(
-                (long) inspectionQty * effectiveSeconds, shiftCapacity);
+        long durationSeconds = resolveInspectionDurationSeconds(inspectionQty, effectiveSeconds, shiftCapacity);
         long durationMillis = durationSeconds * MILLIS_PER_SECOND;
         Date inspectionStartTime = forwardInspection
                 ? inspectionReferenceTime
@@ -497,6 +496,20 @@ public final class FirstInspectionAllocationUtil {
             shiftQtyMap.put(allocation.getShift().getShiftIndex(), allocation.getQuantity());
         }
         return shiftQtyMap;
+    }
+
+    /**
+     * 统一计件首检时长，供首检分摊和结构切换倒推使用，避免跨班两次计算采用不同精度。
+     * @param inspectionQty 本次配置及剩余需求约束后的首检量
+     * @param effectiveSeconds 实际计数班次的完整时长
+     * @param shiftCapacity 当前运行态班产
+     * @return 按秒向上取整的时长；无有效数量或容量时返回0，调用方拒绝时间轴
+     */
+    public static long resolveInspectionDurationSeconds(int inspectionQty, long effectiveSeconds, int shiftCapacity) {
+        if (inspectionQty <= 0 || effectiveSeconds <= 0L || shiftCapacity <= 0) {
+            return 0L;
+        }
+        return ceilDivide((long) inspectionQty * effectiveSeconds, shiftCapacity);
     }
 
     private static long ceilDivide(long dividend, long divisor) {

@@ -5,6 +5,7 @@ import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.util.LhMouldCodeUtil;
 import com.zlt.aps.lh.util.MouldStatusUtil;
 import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
@@ -674,6 +675,11 @@ public class MouldResourceContext {
                     || StringUtils.isEmpty(machine.getMachineCode())) {
                 continue;
             }
+            MachineCleaningWindowDTO replacement = context.getContinuationSandBlastWindowMap().get(machine.getMachineCode());
+            if (Objects.nonNull(replacement) && StringUtils.isNotEmpty(replacement.getReplacementMouldCode())) {
+                resultMap.put(machine.getMachineCode(), LhMouldCodeUtil.splitMouldCode(replacement.getReplacementMouldCode()));
+                continue;
+            }
             if (context.getOnlySandBlastContinuationReleaseWindowMap()
                     .containsKey(machine.getMachineCode())) {
                 // MES在机信息是排程前快照；仅喷砂已经在本批明确下机时，禁止继续据此占用旧模具。
@@ -714,6 +720,17 @@ public class MouldResourceContext {
                 continue;
             }
             LinkedHashSet<String> mouldCodeSet = LhMouldCodeUtil.splitMouldCode(result.getMouldCode());
+            MachineCleaningWindowDTO replacement = context.getContinuationSandBlastWindowMap()
+                    .get(result.getLhMachineCode());
+            if (Objects.nonNull(replacement) && StringUtils.isNotEmpty(replacement.getReplacementMouldCode())
+                    && StringUtils.equals(replacement.getContinuationMaterialCode(), result.getMaterialCode())
+                    && StringUtils.equals(replacement.getContinuationProductStatus(), result.getProductStatus())
+                    && StringUtils.equals(ScheduleTypeEnum.CONTINUOUS.getCode(), result.getScheduleType())
+                    && Objects.nonNull(resolveResultProductionEndTime(result))
+                    && resolveResultProductionEndTime(result).after(replacement.getCleanStartTime())) {
+                // 续作结果保留原模具生产事实，当前资源绑定必须使用交接后的替换模具。
+                mouldCodeSet = LhMouldCodeUtil.splitMouldCode(replacement.getReplacementMouldCode());
+            }
             if (!CollectionUtils.isEmpty(mouldCodeSet)) {
                 resultMap.put(result.getLhMachineCode(), mouldCodeSet);
             }

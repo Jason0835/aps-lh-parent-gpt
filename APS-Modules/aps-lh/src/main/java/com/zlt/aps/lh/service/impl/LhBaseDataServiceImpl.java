@@ -12,6 +12,7 @@ import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.lh.api.enums.*;
+import com.zlt.aps.lh.component.LhMachineSupplyStructureRule;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.SkuDecrementChecker;
 import com.zlt.aps.lh.context.LhScheduleContext;
@@ -206,6 +207,10 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
 
     @Resource
     private ILhMonthStartService lhMonthStartService;
+
+    /** 硫化机专供结构基础数据加载及索引规则。 */
+    @Resource
+    private LhMachineSupplyStructureRule machineSupplyStructureRule;
 
     @Resource(name = "lhDataInitExecutor")
     private Executor lhDataInitExecutor;
@@ -412,6 +417,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 skuMouldRelFuture,
                 modelInfoFuture,
                 machineInfoFuture,
+                runAfterDataInitTask(machineInfoFuture, "硫化机专供结构",
+                        () -> machineSupplyStructureRule.loadAndAttach(context, factoryCode),
+                        () -> sizeOf(context.getStructureFormingMachineMap())),
                 runDataInitTaskAsync("前日物料日完成量",
                         () -> loadDayFinishQty(context, factoryCode, previousDataDate),
                         () -> sizeOf(context.getMaterialDayFinishedQtyMap())),
@@ -2036,8 +2044,8 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     /**
      * 独立加载排程窗口内按结构配置的胎胚最早可供硫化时间。
      *
-     * <p>查询范围严格使用排程窗口左闭右开区间，结构名称保持大小写敏感的精确键；
-     * 同一结构存在多条配置时取最早时间，保证数据库返回顺序不会影响排程结果。</p>
+     * <p>按工厂和排程起始日期读取同一配置快照，后结构名称保持大小写敏感的精确键；
+     * 同结构取最早时间，同时刻按主键稳定选择来源，时间和标识不得跨记录拼接。</p>
      *
      * @param context         排程上下文
      * @param factoryCode     分厂编号
@@ -2050,13 +2058,15 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                                              Date windowEndTime) {
         Map<String, Date> earliestTimeMap = new HashMap<String, Date>(16);
         context.setStructureEarliestLhTimeMap(earliestTimeMap);
-        // 查询范围固定从排程窗口前一天开始抓取，避免遗漏前一日已配置的胎胚可供硫化时间
+        Map<String, CxEmbryoLhTime> sourceMap = new LinkedHashMap<>(16);
+        context.setStructureSwitchSourceMap(sourceMap);
+        // 沿用排程起始日期对应的成型配置快照，不扩展查询到其它日期。
         List<CxEmbryoLhTime> configuredTimeList = cxEmbryoLhTimeMapper.selectList(
                 new LambdaQueryWrapper<CxEmbryoLhTime>()
                         .eq(CxEmbryoLhTime::getFactoryCode, factoryCode)
                         .eq(CxEmbryoLhTime::getScheduleDate, windowStartTime)
-                        // 已逻辑删除的成型配置不再代表有效胎胚供料承诺，禁止作为生产时间下限。
-                        .eq(CxEmbryoLhTime::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
+                        // 同时刻按主键稳定选择来源；逻辑删除由框架过滤。
+                        .orderByAsc(CxEmbryoLhTime::getId));
         int ignoredCount = 0;
         int duplicateCount = 0;
         if (!CollectionUtils.isEmpty(configuredTimeList)) {
@@ -2077,6 +2087,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 if (Objects.isNull(currentEarliestTime)
                         || configuredTime.getEarliestLhTime().before(currentEarliestTime)) {
                     earliestTimeMap.put(structureName, configuredTime.getEarliestLhTime());
+                    sourceMap.put(structureName, configuredTime);
                 }
             }
         }

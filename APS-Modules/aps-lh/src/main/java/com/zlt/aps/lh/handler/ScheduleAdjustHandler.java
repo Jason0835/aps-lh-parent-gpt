@@ -151,6 +151,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     private StructureMinMachineRetentionService structureMinMachineRetentionService;
     @Resource
     private ILhDailyMouldCalcService lhDailyMouldCalcService;
+    @Resource
+    private DayPlanAdjustRequireAssembler dayPlanAdjustRequireAssembler;
 
     @Override
     protected void doHandle(LhScheduleContext context) {
@@ -300,6 +302,19 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                                 + "materialCode: {}, productStatus: {}, reason: {}",
                         context.getFactoryCode(), context.getBatchNo(), dto.getMaterialCode(),
                         dto.getProductStatus(), PendingSkuUnscheduledRule.LEGACY_ONLY_EXCLUSION_REASON);
+                continue;
+            }
+            /*
+             * 原始月计划 TOTAL_QTY 为0但存在正向日计划调整量时，不生成普通月计划零目标未排，
+             * 也不进入新增/提前生产主链。该独立需求统一交给 S4.5.2 按调整余量严格排产，
+             * 避免原始 TOTAL_QTY 门禁与日计划调整入口相互覆盖。
+             */
+            if (!exactOnlineContinuation
+                    && dayPlanAdjustRequireAssembler.isDayPlanAdjustOnlyDemand(context, plan)) {
+                log.info("纯日计划调整需求延后至S4.5.2处理, factoryCode: {}, batchNo: {}, "
+                                + "materialCode: {}, productStatus: {}, originalTotalQty: {}, surplusQty: {}",
+                        context.getFactoryCode(), context.getBatchNo(), dto.getMaterialCode(),
+                        dto.getProductStatus(), safeInt(plan.getTotalQty()), Math.max(0, dto.getSurplusQty()));
                 continue;
             }
             if (!exactOnlineContinuation && EarlyProductionQuantityCalculator.applyCurrentMonthTotalRoute(

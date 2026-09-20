@@ -25,6 +25,8 @@ import com.zlt.aps.lh.engine.strategy.support.DayTypeBlockReverseSelectionDirect
 import com.zlt.aps.lh.engine.strategy.support.SharedMouldSubstitutionRecord;
 import com.zlt.aps.lh.engine.strategy.support.SpecialMaterialSubstitutionRecord;
 import com.zlt.aps.lh.engine.strategy.support.UnscheduledResultRuntime;
+import com.zlt.aps.lh.engine.strategy.support.StructureSwitchPlan;
+import com.zlt.aps.lh.engine.strategy.support.StructureSwitchRuntimeState;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -50,6 +52,11 @@ import java.util.Set;
  * @author APS
  */
 final class ScheduleSubstitutionAttemptSnapshot {
+
+    /** 结构切换首班随候选整体回滚。 */
+    private Map<String, StructureSwitchRuntimeState> structureSwitchRuntimeMap;
+    /** 置换前结果与冻结切换计划的关联。 */
+    private Map<LhScheduleResult, StructureSwitchPlan> structureSwitchResultPlanMap;
 
     /** 置换前排程结果对象顺序 */
     private List<LhScheduleResult> scheduleResultList;
@@ -155,6 +162,8 @@ final class ScheduleSubstitutionAttemptSnapshot {
     private Map<String, Date> preScheduledMouldReleaseTimeMap;
     /** 置换前仅喷砂续作下机窗口，失败回滚后仍需保持旧SKU及模具释放事实。 */
     private Map<String, MachineCleaningWindowDTO> onlySandBlastContinuationReleaseWindowMap;
+    /** 置换前续作喷砂统一处置事件。 */
+    private Map<String, MachineCleaningWindowDTO> continuationSandBlastWindowMap;
     /** 置换前仅喷砂下机真实余量。 */
     private Map<String, Integer> onlySandBlastContinuationRemainingQtyMap;
     /** 置换前持久化过程日志；预演日志必须随快照回滚。 */
@@ -189,6 +198,8 @@ final class ScheduleSubstitutionAttemptSnapshot {
     private Map<SkuScheduleDTO, SkuScheduleDTO> skuStateMap;
     /** 置换前所有联动 SKU 日计划账本深拷贝。 */
     private Map<SkuScheduleDTO, Map<LocalDate, SkuDailyPlanQuotaDTO>> skuDailyQuotaMap;
+    /** 原始账本引用，用于恢复续作与补偿SKU的共享关系。 */
+    private Map<SkuScheduleDTO, Map<LocalDate, SkuDailyPlanQuotaDTO>> skuDailyQuotaReferenceMap;
 
     private ScheduleSubstitutionAttemptSnapshot() {
     }
@@ -224,6 +235,8 @@ final class ScheduleSubstitutionAttemptSnapshot {
                 new ScheduleSubstitutionAttemptSnapshot();
         snapshot.nextShiftNewPlanCandidateList = new ArrayList<>(context.getNextShiftNewPlanCandidateList());
         snapshot.nextShiftNewPlanPoolDateMap = new LinkedHashMap<>(context.getNextShiftNewPlanPoolDateMap());
+        snapshot.structureSwitchRuntimeMap = new LinkedHashMap<>(context.getStructureSwitchRuntimeMap());
+        snapshot.structureSwitchResultPlanMap = new IdentityHashMap<>(context.getStructureSwitchResultPlanMap());
         snapshot.scheduleResultList = new ArrayList<LhScheduleResult>(context.getScheduleResultList());
         snapshot.scheduleResultStateMap = new IdentityHashMap<LhScheduleResult, LhScheduleResult>(
                 Math.max(16, context.getScheduleResultList().size() * 2));
@@ -395,6 +408,8 @@ final class ScheduleSubstitutionAttemptSnapshot {
         snapshot.skuStateMap = new IdentityHashMap<SkuScheduleDTO, SkuScheduleDTO>(4);
         snapshot.skuDailyQuotaMap =
                 new IdentityHashMap<SkuScheduleDTO, Map<LocalDate, SkuDailyPlanQuotaDTO>>(4);
+        snapshot.skuDailyQuotaReferenceMap =
+                new IdentityHashMap<SkuScheduleDTO, Map<LocalDate, SkuDailyPlanQuotaDTO>>(4);
         if (skuCollection != null) {
             for (SkuScheduleDTO sku : skuCollection) {
                 if (sku == null || snapshot.skuStateMap.containsKey(sku)) {
@@ -402,10 +417,12 @@ final class ScheduleSubstitutionAttemptSnapshot {
                 }
                 snapshot.skuStateMap.put(sku, copyBean(sku, SkuScheduleDTO.class));
                 snapshot.skuDailyQuotaMap.put(sku, copyDailyQuotaMap(sku.getDailyPlanQuotaMap()));
+                snapshot.skuDailyQuotaReferenceMap.put(sku, sku.getDailyPlanQuotaMap());
             }
         }
         snapshot.preScheduledMachineBindingList = new ArrayList<>(context.getPreScheduledMachineBindingList());
         snapshot.preScheduledMouldReleaseTimeMap = new LinkedHashMap<>(context.getPreScheduledMouldReleaseTimeMap());
+        snapshot.continuationSandBlastWindowMap = new LinkedHashMap<>(context.getContinuationSandBlastWindowMap());
         snapshot.onlySandBlastContinuationReleaseWindowMap = new LinkedHashMap<>(
                 context.getOnlySandBlastContinuationReleaseWindowMap());
         snapshot.onlySandBlastContinuationRemainingQtyMap = new LinkedHashMap<>(
@@ -439,8 +456,12 @@ final class ScheduleSubstitutionAttemptSnapshot {
      * @param restoreSourceObjects 是否恢复原结果和SKU对象
      */
     private void restore(LhScheduleContext context, boolean restoreSourceObjects) {
+        context.setStructureSwitchRuntimeMap(new LinkedHashMap<>(structureSwitchRuntimeMap));
+        context.setStructureSwitchResultPlanMap(new IdentityHashMap<>(structureSwitchResultPlanMap));
+
         context.setPreScheduledMachineBindingList(new ArrayList<>(preScheduledMachineBindingList));
         context.setPreScheduledMouldReleaseTimeMap(new LinkedHashMap<>(preScheduledMouldReleaseTimeMap));
+        context.setContinuationSandBlastWindowMap(new LinkedHashMap<>(continuationSandBlastWindowMap));
         context.setOnlySandBlastContinuationReleaseWindowMap(new LinkedHashMap<>(
                 onlySandBlastContinuationReleaseWindowMap));
         context.setOnlySandBlastContinuationRemainingQtyMap(new LinkedHashMap<>(
@@ -597,8 +618,14 @@ final class ScheduleSubstitutionAttemptSnapshot {
         if (restoreSourceObjects) {
             for (Map.Entry<SkuScheduleDTO, SkuScheduleDTO> entry : skuStateMap.entrySet()) {
                 BeanUtil.copyProperties(entry.getValue(), entry.getKey());
-                entry.getKey().setDailyPlanQuotaMap(
-                        copyDailyQuotaMap(skuDailyQuotaMap.get(entry.getKey())));
+                // 原位恢复账本，快照外仍引用该账本的续作SKU也能看到回滚后的消费值。
+                Map<LocalDate, SkuDailyPlanQuotaDTO> originalQuotaMap =
+                        skuDailyQuotaReferenceMap.get(entry.getKey());
+                if (Objects.nonNull(originalQuotaMap)) {
+                    originalQuotaMap.clear();
+                    originalQuotaMap.putAll(copyDailyQuotaMap(skuDailyQuotaMap.get(entry.getKey())));
+                }
+                entry.getKey().setDailyPlanQuotaMap(originalQuotaMap);
             }
         }
 

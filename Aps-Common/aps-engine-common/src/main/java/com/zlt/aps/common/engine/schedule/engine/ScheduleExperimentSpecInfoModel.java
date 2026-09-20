@@ -10,9 +10,19 @@ import java.util.List;
 public class ScheduleExperimentSpecInfoModel {
     /** 是否命中实验规格。 */
     protected Boolean experimentSpec;
-    /** 月计划回看天数。 */
+    /**
+     * 成型计划施工阶段。
+     */
+    protected String constructionStage;
+    /**
+     * 成型计划产品状态。
+     */
+    protected String productStatus;
+    /**
+     * 兼容旧解释字段；当前实验规格判断不读取月计划回看天数。
+     */
     protected Integer lookbackDays;
-    /** 月计划回看天数来源。 */
+    /** 兼容旧解释字段来源；当前实验规格判断不读取月计划回看天数。 */
     protected String lookbackDaysSource;
     /** 实验规格提前生产班数。 */
     protected Integer advanceShiftCount;
@@ -30,15 +40,15 @@ public class ScheduleExperimentSpecInfoModel {
     protected Integer formingWindowEstimatedShiftCount;
     /** 排程日期。 */
     protected LocalDate scheduleDate;
-    /** 实验月计划日期。 */
+    /** 兼容旧解释字段；当前实验规格判断不读取实验月计划日期。 */
     protected LocalDate experimentPlanDate;
-    /** 月计划对应日期的定稿数量。 */
+    /** 兼容旧解释字段；当前实验规格判断不读取月计划数量。 */
     protected BigDecimal monthPlanDayQty;
-    /** 命中的月计划主键。 */
+    /** 兼容旧解释字段；当前实验规格判断不读取月计划主键。 */
     protected List<Long> monthPlanIds;
-    /** 命中的月计划工单号。 */
+    /** 兼容旧解释字段；当前实验规格判断不读取月计划工单号。 */
     protected List<String> productionNos;
-    /** 命中的胎胚号。 */
+    /** 兼容旧解释字段；当前实验规格判断不读取月计划胎胚号。 */
     protected List<String> embryoCodes;
     /** 命中原因说明。 */
     protected String reason;

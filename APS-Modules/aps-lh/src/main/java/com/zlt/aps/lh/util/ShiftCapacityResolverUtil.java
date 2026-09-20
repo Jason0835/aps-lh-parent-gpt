@@ -880,6 +880,24 @@ public final class ShiftCapacityResolverUtil {
                                            int mouldQty,
                                            long shiftDurationSeconds,
                                            long availableSeconds) {
+        return resolveShiftCapacity(shiftCapacity, lhTimeSeconds, mouldQty, shiftDurationSeconds, availableSeconds, false);
+    }
+
+    /**
+     * 共享产能折算，P0可选择保留未经模数向上补齐的数量。
+     * @param shiftCapacity 班产
+     * @param lhTimeSeconds 硫化周期
+     * @param mouldQty 实际模数
+     * @param shiftDurationSeconds 完整班长
+     * @param availableSeconds 有效时长
+     * @param retainRawQuantity 是否保留未经向上补模的数量
+     * @return 有效时间可覆盖的数量
+     */
+    public static int resolveShiftCapacity(int shiftCapacity,
+                                           int lhTimeSeconds,
+                                           int mouldQty,
+                                           long shiftDurationSeconds,
+                                           long availableSeconds, boolean retainRawQuantity) {
         if (availableSeconds <= 0) {
             return 0;
         }
@@ -899,7 +917,8 @@ public final class ShiftCapacityResolverUtil {
                     .multiply(BigDecimal.valueOf(effectiveAvailableSeconds))
                     .divide(BigDecimal.valueOf(shiftDurationSeconds), 0, RoundingMode.DOWN)
                     .intValue();
-            return normalizeQtyToMouldMultiple(resolvedQty, mouldQty, effectiveAvailableSeconds < shiftDurationSeconds);
+            return retainRawQuantity ? resolvedQty
+                    : normalizeQtyToMouldMultiple(resolvedQty, mouldQty, effectiveAvailableSeconds < shiftDurationSeconds);
         }
 
         // 无班产主数据时，按完整硫化周期数回退计算，仍然只统计可完整完成的周期。
@@ -1263,6 +1282,42 @@ public final class ShiftCapacityResolverUtil {
                                                        int dryIceLossQty,
                                                        int dryIceDurationHours,
                                                        int plannedRepairFixedQty) {
+        return resolveShiftCapacityWithDowntime(devicePlanShutList, cleaningWindowList, maintenanceWindowList,
+                machineCode, windowStartTime, windowEndTime, shiftCapacity, lhTimeSeconds, mouldQty,
+                shiftDurationSeconds, dryIceLossQty, dryIceDurationHours, plannedRepairFixedQty, false);
+    }
+
+    /**
+     * 复用设备、保养、清洗扣减，P0仅关闭中间模数向上补量，最终取偶交给结构切换策略。
+     * @param devicePlanShutList 设备停机
+     * @param cleaningWindowList 清洗窗口
+     * @param maintenanceWindowList 保养窗口
+     * @param machineCode 机台
+     * @param windowStartTime 起点
+     * @param windowEndTime 终点
+     * @param shiftCapacity 班产
+     * @param lhTimeSeconds 周期
+     * @param mouldQty 模数
+     * @param shiftDurationSeconds 完整班长
+     * @param dryIceLossQty 干冰损失量
+     * @param dryIceDurationHours 干冰时长
+     * @param plannedRepairFixedQty 维修固定量
+     * @param retainRawQuantity 是否关闭向上补模
+     * @return 扣减后的可排量
+     */
+    public static int resolveShiftCapacityWithDowntime(List<MdmDevicePlanShut> devicePlanShutList,
+                                                       List<MachineCleaningWindowDTO> cleaningWindowList,
+                                                       List<MachineMaintenanceWindowDTO> maintenanceWindowList,
+                                                       String machineCode,
+                                                       Date windowStartTime,
+                                                       Date windowEndTime,
+                                                       int shiftCapacity,
+                                                       int lhTimeSeconds,
+                                                       int mouldQty,
+                                                       long shiftDurationSeconds,
+                                                       int dryIceLossQty,
+                                                       int dryIceDurationHours,
+                                                       int plannedRepairFixedQty, boolean retainRawQuantity) {
         if (Objects.isNull(windowStartTime) || Objects.isNull(windowEndTime) || !windowStartTime.before(windowEndTime)) {
             return 0;
         }
@@ -1274,7 +1329,7 @@ public final class ShiftCapacityResolverUtil {
             long productiveSeconds = resolveNetProductiveSeconds(devicePlanShutList, cleaningWindowList,
                     maintenanceWindowList, machineCode, windowStartTime, fixedQtyEnd);
             int availableQty = resolveShiftCapacity(shiftCapacity, lhTimeSeconds, mouldQty,
-                    shiftDurationSeconds, productiveSeconds);
+                    shiftDurationSeconds, productiveSeconds, retainRawQuantity);
             return Math.min(Math.max(0, plannedRepairFixedQty), availableQty);
         }
         // 喷砂首检是独立产出，正常生产仍按净可生产时长和原有模数规则折算。
@@ -1284,11 +1339,11 @@ public final class ShiftCapacityResolverUtil {
             long productiveSeconds = resolveNetProductiveSeconds(devicePlanShutList, cleaningWindowList,
                     maintenanceWindowList, machineCode, windowStartTime, windowEndTime);
             int normalQty = resolveShiftCapacity(shiftCapacity, lhTimeSeconds, mouldQty,
-                    shiftDurationSeconds, productiveSeconds);
+                    shiftDurationSeconds, productiveSeconds, retainRawQuantity);
             int inspectionQty = inspectionWindows.stream()
                     .mapToInt(window -> resolveSandBlastInspectionQty(maintenanceWindowList, window)).sum();
             int fullShiftCapacity = resolveShiftCapacity(shiftCapacity, lhTimeSeconds, mouldQty,
-                    shiftDurationSeconds, shiftDurationSeconds);
+                    shiftDurationSeconds, shiftDurationSeconds, retainRawQuantity);
             return Math.min(fullShiftCapacity, normalQty + inspectionQty);
         }
         long availableSeconds = Math.max(0L, (windowEndTime.getTime() - windowStartTime.getTime()) / 1000L);
@@ -1304,7 +1359,7 @@ public final class ShiftCapacityResolverUtil {
         long dryIceAdjustedSeconds = resolveDryIceAdjustedAvailableSeconds(
                 cleaningWindowList, baseDowntimeIntervals, windowStartTime, windowEndTime, baseAdjustedSeconds);
         int stopAdjustedQty = resolveShiftCapacity(
-                shiftCapacity, lhTimeSeconds, mouldQty, shiftDurationSeconds, dryIceAdjustedSeconds);
+                shiftCapacity, lhTimeSeconds, mouldQty, shiftDurationSeconds, dryIceAdjustedSeconds, retainRawQuantity);
         if (stopAdjustedQty <= 0) {
             return 0;
         }
@@ -1319,7 +1374,7 @@ public final class ShiftCapacityResolverUtil {
         int finalQty = Math.max(stopAdjustedQty - cleaningLossQty, 0);
         boolean shouldNormalizeResidual = (shiftDurationSeconds > 0 && dryIceAdjustedSeconds < shiftDurationSeconds)
                 || cleaningLossQty > 0;
-        return normalizeQtyToMouldMultiple(finalQty, mouldQty, shouldNormalizeResidual);
+        return retainRawQuantity ? finalQty : normalizeQtyToMouldMultiple(finalQty, mouldQty, shouldNormalizeResidual);
     }
 
     /**

@@ -16,6 +16,15 @@ import java.util.Map;
 public interface PlanCalculationPolicy<C, T extends ScheduleTaskDraftModel,
         F extends ScheduleInventoryForecast, G extends SchedulePlanTaskGroup<T>, P, D> {
 
+    /**
+     * 清理领域专有的计划量调整分量。
+     *
+     * @param task 已命中库存覆盖的来源任务
+     */
+    default void clearAdditionalPlanAdjustments(T task) {
+        // 默认无领域专有调整分量。
+    }
+
     void validateContext(C context);
 
     T copyDerivedTask(T sourceTask);

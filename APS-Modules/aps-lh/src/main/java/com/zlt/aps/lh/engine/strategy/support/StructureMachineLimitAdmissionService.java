@@ -24,9 +24,9 @@ import java.util.Set;
  * 新增结构物理机台上限统一准入计算器。
  *
  * <p>普通新增、续作加机台和普通结构提前生产统一按生产占用班次所属业务日读取结构机台上限，
- * 并复用结构收尾服务的班次边界判断计算有效在机数。结构切换、结构收尾提前生产已经由
- * 提前生产中心按未来计划日完成结构规则判断，不重复套用普通结构班次门禁。计算过程只读，
- * 不修改结构索引、排程结果、候选运行态或资源账本。</p>
+ * 并复用结构收尾服务的班次边界判断计算有效在机数。结构切换在提前生产和后续正常资源
+ * 竞争阶段统一使用S0/S1专用逐班名额；结构收尾提前生产沿用专用准入，两者都不重复套用
+ * 普通结构班次门禁。计算过程只读，不修改结构索引、排程结果、候选运行态或资源账本。</p>
  *
  * <p>预演阶段仅按“结构+正式目标班次”缓存统计快照，禁止缓存Machine×SKU时间计划；
  * 正式提交使用无缓存复核，兼顾候选扫描性能和提交时点业务正确性。</p>
@@ -98,12 +98,12 @@ public class StructureMachineLimitAdmissionService {
                     false, true, phase, null, formalTargetShift, machineCode,
                     sku, originalPoolDate, null, 0, "SKU无结构信息，不执行结构机台上限约束");
         }
-        if (this.shouldSkipNormalStructureShiftLimit(
-                phase, earlyProductionDecision)) {
+        if (StructureSwitchSchedulingPolicy.shouldSkipNormalStructureShiftLimit(
+                context, sku, phase, earlyProductionDecision)) {
             return this.buildDecision(
                     false, true, phase, null, formalTargetShift, machineCode,
                     sku, originalPoolDate, null, 0,
-                    "结构切换或结构收尾提前生产不执行普通结构班次机台数门禁");
+                    "结构切换专用逐班名额或结构收尾提前生产不执行普通结构班次机台数门禁");
         }
         if (Objects.isNull(context) || Objects.isNull(formalTargetShift)
                 || Objects.isNull(formalTargetShift.getShiftIndex())
@@ -203,16 +203,23 @@ public class StructureMachineLimitAdmissionService {
                 || CollectionUtils.isEmpty(scheduleShifts)) {
             return null;
         }
-        if (this.shouldSkipNormalStructureShiftLimit(
-                phase, earlyProductionDecision)) {
-            return requestedStartTime;
+        if (StructureSwitchSchedulingPolicy.shouldSkipNormalStructureShiftLimit(
+                context, sku, phase, earlyProductionDecision)) {
+            // 结构切换跳过普通日机台数门禁，但仍须按S0/S1名额顺延实际首检和生产。
+            return StructureSwitchSchedulingPolicy.resolveEarliestOccupationTime(
+                    context, sku, machineCode, requestedStartTime);
         }
         for (LhShiftConfigVO shift : scheduleShifts) {
             Date allowedTime = this.resolveAllowedTimeWithinShift(
                     context, phase, sku, earlyProductionDecision,
                     machineCode, requestedStartTime, shift, roundCache);
             if (Objects.nonNull(allowedTime)) {
-                return allowedTime;
+                // 同时满足普通结构上限和结构切换分班上限，不能在两个门禁之间来回丢失限制。
+                Date switchAllowedTime = StructureSwitchSchedulingPolicy.resolveEarliestOccupationTime(
+                        context, sku, machineCode, allowedTime);
+                if (Objects.nonNull(switchAllowedTime) && switchAllowedTime.before(shift.getShiftEndDateTime())) {
+                    return switchAllowedTime;
+                }
             }
         }
         return null;
@@ -332,30 +339,4 @@ public class StructureMachineLimitAdmissionService {
                 .toString();
     }
 
-    /**
-     * 判断当前提前生产场景是否应跳过普通结构班次机台数门禁。
-     *
-     * <p>结构切换和结构收尾已在提前生产中心按未来计划日执行专属规则；这里只排除
-     * 这两个明确场景，普通提前生产和续作增机提前生产继续执行现有实时班次硬控。</p>
-     *
-     * @param phase 当前排程阶段
-     * @param decision 当前提前生产准入结论
-     * @return true-跳过普通结构班次门禁；false-继续执行现有门禁
-     */
-    private boolean shouldSkipNormalStructureShiftLimit(
-            DailySchedulePhase phase,
-            EarlyProductionDecision decision) {
-        if (phase != DailySchedulePhase.EARLY_PRODUCTION
-                || Objects.isNull(decision)
-                || !decision.isEarlyProduction()
-                || !decision.isAllowed()) {
-            return false;
-        }
-        return StringUtils.equals(
-                EarlyProductionDecision.SCENE_STRUCTURE_SWITCH,
-                decision.getSceneType())
-                || StringUtils.equals(
-                EarlyProductionDecision.SCENE_STRUCTURE_ENDING,
-                decision.getSceneType());
-    }
 }

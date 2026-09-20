@@ -341,6 +341,55 @@ public final class ScheduleProcessLogFormatter {
         return quantity == null ? "未计算" : quantity.stripTrailingZeros().toPlainString();
     }
 
+    /**
+     * 解析库存覆盖摘要日志中的需求字段名称。
+     *
+     * <p>班数为2时保留历史“当班需求+下班需求”文案；其他班数只调整需求字段名称，
+     * 其余日志结构由 TM/TC 模板继续沿用原格式。</p>
+     *
+     * @param shiftCount 库存覆盖起排班数
+     * @return 摘要日志需求字段名称
+     */
+    public String resolveStockCoverageProcessDemandLabel(Integer shiftCount) {
+        int effectiveShiftCount = this.resolveStockCoverageShiftCount(shiftCount);
+        if (effectiveShiftCount == 1) {
+            return "当班需求";
+        }
+        if (effectiveShiftCount == 2) {
+            return "当班需求+下班需求";
+        }
+        return "当班起连续" + effectiveShiftCount + "班需求";
+    }
+
+    /**
+     * 解析库存覆盖 FULL 公式中的需求字段名称。
+     *
+     * <p>班数为2时保留历史“当班及下一班需求”文案，避免改变已有 FULL 过程日志格式。</p>
+     *
+     * @param shiftCount 库存覆盖起排班数
+     * @return FULL 公式需求字段名称
+     */
+    public String resolveStockCoverageFormulaDemandLabel(Integer shiftCount) {
+        int effectiveShiftCount = this.resolveStockCoverageShiftCount(shiftCount);
+        if (effectiveShiftCount == 1) {
+            return "当班需求";
+        }
+        if (effectiveShiftCount == 2) {
+            return "当班及下一班需求";
+        }
+        return "当班起连续" + effectiveShiftCount + "班需求";
+    }
+
+    /**
+     * 规范化库存覆盖班数，缺失或非正数沿用历史两班默认口径。
+     *
+     * @param shiftCount 原始库存覆盖班数
+     * @return 有效库存覆盖班数
+     */
+    private int resolveStockCoverageShiftCount(Integer shiftCount) {
+        return shiftCount == null || shiftCount <= 0 ? 2 : shiftCount;
+    }
+
     private BigDecimal nvl(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
     }

@@ -37,7 +37,7 @@ public class DayTypeBlockReverseSelectionDirective implements Serializable {
     /** 反选命中物料在当天 S4.5 排序中的全局名次，用于稳定排序与日志对账 */
     private Integer skuSortRank;
 
-    /** 换活字块匹配层级说明，当前统一为“同胎胚+同模具” */
+    /** 换活字块匹配层级说明，当前统一为“同模具” */
     private String matchedLayer;
 
     /** 是否已在当天正常资源竞争阶段尝试 */

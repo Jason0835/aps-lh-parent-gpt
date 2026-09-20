@@ -418,6 +418,12 @@ public final class LhScheduleConstant {
     /** 续作月计划降模停产保机胎胚可供硫化时长豁免阈值默认值，小于0表示不启用 */
     public static final BigDecimal CONTINUOUS_STOP_HOLD_EMBRYO_AVAILABLE_HOURS_THRESHOLD = BigDecimal.valueOf(-1);
 
+    /** 大换英寸首个批量生产班默认延迟1小时。 */
+    public static final int LARGE_INCH_FIRST_BATCH_DELAY_HOURS = 1;
+
+    /** 结构切换特殊排程规则默认开启。 */
+    public static final int STRUCTURE_SWITCH_SCHEDULING_ENABLED = 1;
+
     /** 机台选SKU允许等待胎胚的最大小时数；首检开始即开产，默认4小时 */
     public static final BigDecimal MACHINE_SKU_EMBRYO_MAX_WAIT_HOURS = BigDecimalUtils.valueOf(4);
 

@@ -3,6 +3,8 @@
  */
 package com.zlt.aps.lh.engine.strategy.impl;
 
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
+
 import cn.hutool.core.bean.BeanUtil;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
@@ -53,6 +55,12 @@ import com.zlt.aps.lh.engine.strategy.support.PendingSkuUnscheduledRule;
 import com.zlt.aps.lh.engine.strategy.support.SpecifiedMachineScheduleResult;
 import com.zlt.aps.lh.engine.strategy.support.StructureMachineLimitAdmissionService;
 import com.zlt.aps.lh.engine.strategy.support.StructureMachineLimitDecision;
+import com.zlt.aps.lh.engine.strategy.support.StructureSwitchSchedulingPolicy;
+import com.zlt.aps.lh.engine.strategy.support.StructureSwitchPlan;
+import com.zlt.aps.lh.engine.strategy.support.FirstInspectionTimelinePlan;
+import com.zlt.aps.cx.entity.config.CxEmbryoLhTime;
+import com.zlt.aps.lh.service.impl.NewSpecScheduleCommitService;
+import com.zlt.aps.lh.service.impl.NewSpecScheduleCommitResult;
 import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
 import com.zlt.aps.lh.service.impl.LhMaintenanceScheduleService;
 import com.zlt.aps.lh.util.CleaningScheduleRuleUtil;
@@ -108,7 +116,7 @@ import java.util.stream.Collectors;
  * <ul>
  *   <li>在 S4.4 续作收尾后，根据机台收尾时间寻找可以更换活字块衔接的新增 SKU；</li>
  *   <li>优先使用收尾机台，必要时使用在机前规格兜底机台；</li>
- *   <li>候选 SKU 需要满足同胎胚、同模具、可更换活字块、机台硬性准入等条件；</li>
+ *   <li>候选 SKU 需要满足同模具、可更换活字块、机台硬性准入等条件；</li>
  *   <li>结果落地后仍作为排程结果进入统一日计划账本、胎胚库存和后置校验链路。</li>
  * </ul>
  *
@@ -175,6 +183,11 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
     /** 换活字块提前生产与普通新增共用的结构机台上限准入入口。 */
     @Resource
     private StructureMachineLimitAdmissionService structureMachineLimitAdmissionService;
+
+    /** 结构切换分支复用新增提交的完整快照恢复能力。 */
+    @Resource
+    private NewSpecScheduleCommitService structureSwitchCommitService;
+
     /** 物料+产品状态+自然日目标总机台数唯一查询入口。 */
     @Resource
     private ILhDailyMouldCalcService lhDailyMouldCalcService;
@@ -296,7 +309,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     break;
                 }
 
-                // 基于同胎胚、同模具、同主花纹等条件筛选可换活字块候选。
+                // 基于同模具、同主花纹等条件筛选可换活字块候选。
                 // 该阶段只允许不更换整套模具的轻量衔接，完整换模能力评估必须留给 S4.5 新增主链。
                 List<SkuScheduleDTO> typeBlockCandidates = filterTypeBlockCandidates(
                         context, machine);
@@ -305,7 +318,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     log.info("释放机台换活字块候选SKU列表, machineCode: {}, currentMaterialCode: {}, candidates: {}",
                             machineCode, machine.getCurrentMaterialCode(), buildSkuCodeSummary(typeBlockCandidates));
                 }
-                String matchedLayer = !CollectionUtils.isEmpty(typeBlockCandidates) ? "同胎胚+同模具" : "未命中";
+                String matchedLayer = !CollectionUtils.isEmpty(typeBlockCandidates) ? "同模具" : "未命中";
                 if (CollectionUtils.isEmpty(typeBlockCandidates)) {
                     log.debug("换活字块未匹配到SKU, 机台: {}, 触发来源: {}, 候选数: {}",
                             machineCode, machineTriggerSourceMap.get(machineCode),
@@ -325,14 +338,17 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                         break;
                     }
                     // 普通换活字块保持历史行为只尝试排序第一名；精度前窗口才按同一既有顺序遍历全部候选。
-                    if (!precisionPreInsertSearch && Objects.nonNull(typeBlockSku)) {
+                    if (!precisionPreInsertSearch && Objects.nonNull(typeBlockSku)
+                            && !context.isTemporaryFaultTransferSku(typeBlockSku)) {
                         break;
                     }
                     typeBlockSku = candidateSku;
                     if (shouldReserveMachineForNewSpecPath(context, machine, typeBlockSku, shifts)) {
                         log.info("候选SKU需走新增换模主链，当前阶段不执行换活字块, machineCode: {}, materialCode: {}",
                                 machineCode, typeBlockSku.getMaterialCode());
-                        if (precisionPreInsertSearch) {
+                        if (precisionPreInsertSearch
+                                || context.isTemporaryFaultTransferSku(typeBlockSku)) {
+                            // 故障回流SKU不能阻塞当前机台继续匹配其他普通候选。
                             continue;
                         }
                         break;
@@ -475,7 +491,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                         this.lhDailyMouldCalcService, context, sku, scheduleDate)) {
                     continue;
                 }
-                // 完全复用现有换活字块候选判断：同胎胚同模具 + 机台硬性准入 + 当前物料不相同。
+                // 完全复用现有换活字块候选判断：同模具 + 机台硬性准入 + 当前物料不相同。
                 if (!isTypeBlockCandidate(context, machine, sku, false)) {
                     continue;
                 }
@@ -487,7 +503,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                 directive.setMaterialCode(sku.getMaterialCode());
                 directive.setProductStatus(sku.getProductStatus());
                 directive.setSkuSortRank(sku.getSortRank());
-                directive.setMatchedLayer("同胎胚+同模具");
+                directive.setMatchedLayer("同模具");
                 result.add(directive);
                 lockedMaterialKeySet.add(MonthPlanDateResolver.buildMaterialStatusKey(
                         directive.getMaterialCode(), directive.getProductStatus()));
@@ -508,7 +524,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
      * @param machine 特殊材料准备接管的续作机台
      * @param sku 特殊材料 SKU
      * @param earliestSwitchTime 置换预演得出的最早允许切换时间
-     * @return 换活字块执行结果；不满足同胎胚、同模具等关系时返回不适用
+     * @return 换活字块执行结果；不满足同模具等关系时返回不适用
      */
     /**
      * 无副作用判断特殊材料置换是否适用换活字块时长。
@@ -751,7 +767,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
      * 判断机台是否允许进入换活字块衔接候选。
      *
      * <p>机台当前规格本次排程窗口内运行结束即允许衔接下一规格，不要求前物料在
-     * SKU 级收尾（结果行 IS_END=1）。避免同胎胚同模具切换因前物料月计划未收尾
+     * SKU 级收尾（结果行 IS_END=1）。避免同模具切换因前物料月计划未收尾
      * 被挡在 S4.4 之外，最终由 S4.5 按正规换模（01）误落库。</p>
      *
      * @param context 排程上下文
@@ -1134,7 +1150,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
 
     /**
      * 判断SKU是否满足换活字块条件。
-     * <p>条件：同胎胚且同模具，则允许换活字块。</p>
+     * <p>条件：只要同模具，则允许换活字块，不再要求同胎胚。</p>
      *
      * @param context 排程上下文
      * @param machine 机台
@@ -1249,7 +1265,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
 
     /**
      * 判断当前在机SKU与候选SKU是否允许换活字块。
-     * <p>条件：同胎胚且同模具，则允许换活字块。</p>
+     * <p>条件：只要同模具，则允许换活字块，不再要求同胎胚。</p>
      *
      * @param context 排程上下文
      * @param machine 机台
@@ -1261,18 +1277,10 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                                          MachineScheduleDTO machine,
                                          SkuScheduleDTO sku,
                                          boolean writeDecisionLog) {
-        String machineEmbryoCode = normalizeCompareToken(resolveMachineEmbryoCode(context, machine));
-        String skuEmbryoCode = normalizeCompareToken(sku == null ? null : sku.getEmbryoCode());
-        String machineEmbryoDesc = normalizeCompareToken(resolveMachineEmbryoDesc(context, machine));
-        String skuEmbryoDesc = normalizeCompareToken(resolveSkuEmbryoDesc(context, sku));
         Set<String> machineMouldCodeSet = machine == null
                 ? new LinkedHashSet<>(0) : resolveMouldCodeSet(context, machine.getCurrentMaterialCode());
         Set<String> skuMouldCodeSet = sku == null
                 ? new LinkedHashSet<>(0) : resolveMouldCodeSet(context, sku.getMaterialCode());
-        boolean sameCarcass = (StringUtils.isNotEmpty(machineEmbryoCode)
-                && StringUtils.equals(machineEmbryoCode, skuEmbryoCode))
-                || (StringUtils.isNotEmpty(machineEmbryoDesc)
-                && StringUtils.equals(machineEmbryoDesc, skuEmbryoDesc));
         boolean sameMold = false;
         if (!CollectionUtils.isEmpty(machineMouldCodeSet) && !CollectionUtils.isEmpty(skuMouldCodeSet)) {
             for (String mouldCode : machineMouldCodeSet) {
@@ -1282,18 +1290,22 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                 }
             }
         }
-        // 换活字块关系判定统一走共享工具，保证 S4.4 与 S4.5 使用同一口径。
-        boolean matched = TypeBlockRelationUtil.isSameEmbryoAndSameMould(context, machine, sku);
+        // 换活字块关系判定统一走共享工具，保证 S4.4 与 S4.5 使用同一口径：只要同模具即可。
+        boolean matched = TypeBlockRelationUtil.canChangeTypeBlock(context, machine, sku);
         if (writeDecisionLog) {
-            log.info("[换活字块匹配判断] 机台编码: {}, 在机SKU: {}, 候选SKU: {}, 在机胎胚代码: {}, 候选胎胚代码: {}, "
-                            + "在机胎胚描述: {}, 候选胎胚描述: {}, 同胎胚: {}, 在机模具号集合: {}, 候选模具号集合: {}, "
-                            + "同模具: {}, 是否可换活字块: {}",
+            // 胎胚信息仅作诊断参考，不再参与换活字块准入判定。
+            String machineEmbryoCode = normalizeCompareToken(resolveMachineEmbryoCode(context, machine));
+            String skuEmbryoCode = normalizeCompareToken(sku == null ? null : sku.getEmbryoCode());
+            String machineEmbryoDesc = normalizeCompareToken(resolveMachineEmbryoDesc(context, machine));
+            String skuEmbryoDesc = normalizeCompareToken(resolveSkuEmbryoDesc(context, sku));
+            log.info("[换活字块匹配判断] 判定口径: 只要同模具。机台编码: {}, 在机SKU: {}, 候选SKU: {}, "
+                            + "在机模具号集合: {}, 候选模具号集合: {}, 同模具: {}, 是否可换活字块: {}, "
+                            + "参考胎胚信息-在机胎胚代码: {}, 候选胎胚代码: {}, 在机胎胚描述: {}, 候选胎胚描述: {}",
                     machine == null ? null : machine.getMachineCode(),
                     machine == null ? null : machine.getCurrentMaterialCode(),
                     sku == null ? null : sku.getMaterialCode(),
-                    machineEmbryoCode, skuEmbryoCode, machineEmbryoDesc, skuEmbryoDesc,
-                    sameCarcass, machineMouldCodeSet, skuMouldCodeSet, sameMold,
-                    matched);
+                    machineMouldCodeSet, skuMouldCodeSet, sameMold, matched,
+                    machineEmbryoCode, skuEmbryoCode, machineEmbryoDesc, skuEmbryoDesc);
         }
         return matched;
     }
@@ -1458,12 +1470,12 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             return null;
         }
         Date effectiveEstimatedEndTime = estimatedEndTime;
-        Date onlySandBlastRequeueTime = Objects.isNull(context)
-                ? null : context.resolveOnlySandBlastRequeueNotBeforeTime(sku);
-        if (Objects.nonNull(onlySandBlastRequeueTime)
-                && onlySandBlastRequeueTime.after(effectiveEstimatedEndTime)) {
-            // 仅喷砂剩余需求从旧SKU实际下机时刻才重新入池，换活字块准备不得提前占用其他机台。
-            effectiveEstimatedEndTime = onlySandBlastRequeueTime;
+        Date forcedRequeueTime = Objects.isNull(context)
+                ? null : context.resolveForcedRequeueNotBeforeTime(sku);
+        if (Objects.nonNull(forcedRequeueTime)
+                && forcedRequeueTime.after(effectiveEstimatedEndTime)) {
+            // 强制释放的剩余需求到达业务允许回流时刻后才重新入池，换活字块准备不得提前占用其他机台。
+            effectiveEstimatedEndTime = forcedRequeueTime;
         }
         Date rawSwitchStartTime = resolveAllowedSwitchStartTime(
                 context, machine.getMachineCode(), effectiveEstimatedEndTime);
@@ -1480,6 +1492,10 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         // 试制SKU换活字块需在早班完成，不受开产模式限制；非试制SKU仍受开产模式约束
         switchReadyTime = ShiftProductionControlUtil.resolveEarliestSwitchStartTime(
                 context, switchReadyTime, sku);
+        // 与新增共用含首检时间轴：准备仍按合法设备窗口执行，结构分班名额只后移首检和生产。
+        if (Objects.isNull(switchReadyTime)) {
+            return null;
+        }
         return getMaintenanceScheduleService().delaySwitchStartByMaintenance(
                 machine, switchReadyTime, LhScheduleTimeUtil.getTypeBlockChangeTotalHours(context));
     }
@@ -1973,6 +1989,10 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                 ? buildWholeSingleControlTypeBlockPairResult(
                 context, result, pairMachine, sku, machineMouldQty, shifts)
                 : null;
+        if (StructureSwitchSchedulingPolicy.isEnabled(context) && Objects.nonNull(pairResult)
+                && context.getStructureSwitchResultPlanMap().containsKey(result)) {
+            context.getStructureSwitchResultPlanMap().put(pairResult, context.getStructureSwitchResultPlanMap().get(result));
+        }
         int precisionPlannedQty = wholeSingleControlUnit
                 ? ShiftFieldUtil.resolveScheduledQty(result) + ShiftFieldUtil.resolveScheduledQty(pairResult)
                 : ShiftFieldUtil.resolveScheduledQty(result);
@@ -2229,9 +2249,9 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             sku.setRemainingScheduleQty(remainingQty);
             sku.setStrictTargetQty(originalStrictTargetQty);
         }
-        Date onlySandBlastRequeueTime = context.resolveOnlySandBlastRequeueNotBeforeTime(sku);
-        if (remainingQty > 0 && Objects.nonNull(onlySandBlastRequeueTime)) {
-            LocalDate requeueDate = onlySandBlastRequeueTime.toInstant()
+        Date forcedRequeueTime = context.resolveForcedRequeueNotBeforeTime(sku);
+        if (remainingQty > 0 && Objects.nonNull(forcedRequeueTime)) {
+            LocalDate requeueDate = forcedRequeueTime.toInstant()
                     .atZone(ZoneId.systemDefault()).toLocalDate();
             sku.setFirstAddMachineProductionDate(requeueDate);
             this.appendTypeBlockPartialResidualProcessLog(
@@ -2240,7 +2260,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     sku.getContinuationRequiredMachineCount(),
                     DailyMachineExpansionPlanner.countCommittedMachineDemand(
                             context, sku, requeueDate));
-            log.info("仅喷砂续作SKU换活字块部分成功，保留剩余量进入S4.5, machineCode: {}, "
+            log.info("强制释放续作SKU换活字块部分成功，保留剩余量进入S4.5, machineCode: {}, "
                             + "materialCode: {}, scheduledQty: {}, remainingQty: {}, requeueDate: {}",
                     machine.getMachineCode(), sku.getMaterialCode(), scheduledQty, remainingQty, requeueDate);
             return;
@@ -2587,6 +2607,28 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
      * @return true-成功
      */
     private boolean appendTypeBlockResultWithRollback(LhScheduleContext context,
+                                                      MachineScheduleDTO machine,
+                                                      SkuScheduleDTO sku,
+                                                      Date startTime,
+                                                      Date switchStartTime,
+                                                      List<LhShiftConfigVO> shifts,
+                                                      boolean isSingleMachine,
+                                                      StringBuilder failureReason) {
+        if (Objects.isNull(StructureSwitchSchedulingPolicy.resolveSource(context, sku))) {
+            return this.appendTypeBlockResultInternal(context, machine, sku, startTime, switchStartTime,
+                    shifts, isSingleMachine, failureReason);
+        }
+        NewSpecScheduleCommitResult committed = structureSwitchCommitService.commitResultOnly(context,
+                () -> this.appendTypeBlockResultInternal(context, machine, sku, startTime, switchStartTime,
+                        shifts, isSingleMachine, failureReason) ? 1 : 0);
+        if (committed.getScheduledCount() <= 0 && Objects.nonNull(switchStartTime)) {
+            getMouldChangeBalanceStrategy().rollbackMouldChange(context, switchStartTime);
+        }
+        return committed.getScheduledCount() > 0;
+    }
+
+    /** 原换活字块提交内核；适用结构切换由外层整体恢复资源与账本。 */
+    private boolean appendTypeBlockResultInternal(LhScheduleContext context,
                                                       MachineScheduleDTO machine,
                                                       SkuScheduleDTO sku,
                                                       Date startTime,
@@ -3799,12 +3841,12 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                         + ", " + PriorityTraceLogHelper.kv("过滤SKU数", filteredCount)
                         + ", 过滤原因统计: 未满足换活字块准入条件=" + Math.max(0, filteredCount));
 
-        // 输出候选 TOP5（同胎胚+同模具）
+        // 输出候选 TOP5（同模具）
         int topN = LhScheduleConstant.TYPE_BLOCK_SKU_CANDIDATE_TOP_N;
         if (!CollectionUtils.isEmpty(candidates)) {
             int outputCount = Math.min(topN, totalCandidates);
             PriorityTraceLogHelper.appendLine(detailBuilder,
-                    "候选(同胎胚+同模具) TOP" + outputCount + ":");
+                    "候选(同模具) TOP" + outputCount + ":");
             appendSkuCandidateLines(detailBuilder, context, machine, candidates, outputCount);
         }
 
@@ -3861,9 +3903,9 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             }
 
             String sortKey = PriorityTraceLogHelper.formatSortKey(Arrays.asList(
-                    "L1_同胎胚同模具=" + (sameCarcass && sameMold ? 1 : 0),
+                    "L1_同模具=" + (sameMold ? 1 : 0),
                     "L2_物料编码兜底=" + PriorityTraceLogHelper.safeText(sku.getMaterialCode())));
-            String hitLevel = sameCarcass && sameMold ? "命中L1同胎胚+同模具" : "-";
+            String hitLevel = sameMold ? "命中L1同模具" : "-";
 
             PriorityTraceLogHelper.appendLine(builder,
                     (i + 1)
@@ -3878,7 +3920,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                             + ", " + PriorityTraceLogHelper.kv("规格", sku.getSpecCode())
                             + ", " + PriorityTraceLogHelper.kv("SKU模具号", skuMouldCodes)
                             + ", " + PriorityTraceLogHelper.kv("交集模具号", intersectMouldCodes)
-                            + ", " + PriorityTraceLogHelper.kv("同胎胚", PriorityTraceLogHelper.oneZero(sameCarcass))
+                            + ", " + PriorityTraceLogHelper.kv("同胎胚(仅参考)", PriorityTraceLogHelper.oneZero(sameCarcass))
                             + ", " + PriorityTraceLogHelper.kv("同模具", PriorityTraceLogHelper.oneZero(sameMold))
                             + ", " + PriorityTraceLogHelper.kv("满足换活字块", PriorityTraceLogHelper.oneZero(canChange))
                             + ", " + PriorityTraceLogHelper.kv("SortKey", sortKey)
@@ -3903,7 +3945,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         }
         List<String> reasons = new ArrayList<>(4);
         if (!CollectionUtils.isEmpty(candidates) && candidates.contains(selectedSku)) {
-            reasons.add("同胎胚+同模具");
+            reasons.add("同模具");
         }
         if (isSameCarcass(context, machine, selectedSku)) {
             reasons.add("胎胚一致");
@@ -4318,16 +4360,17 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         List<MachineMaintenanceWindowDTO> maintenanceWindowList = resolveMachineMaintenanceWindowList(
                 context, machine.getMachineCode());
         /*
-         * 首检属于换活字块准备阶段，结束时刻固定等于真实换活字块完成时刻；胎胚最早
-         * 可供时间只约束正式生产，不得把已经完成的首检一起推迟到正式生产班次。
+         * 普通换活字块保留包含首检的既有准备口径；大换英寸由共享策略重新冻结实际
+         * 首检与普通生产区间，不能先用旧首检区间的容量失败阻断后续合法时间轴。
          */
+        boolean largeTimelineRequired = StructureSwitchSchedulingPolicy.requiresLargeTimeline(context, sku, startTime);
         FirstInspectionAllocationPlan firstInspectionAllocationPlan =
                 FirstInspectionAllocationUtil.buildPlan(
                         context, sku, shifts, switchCompleteTime, startTime,
                         runtimeShiftCapacity, refinedTargetQty,
                         ScheduleTypeEnum.TYPE_BLOCK.getCode(),
                         machine.getMachineCode(), null);
-        if (firstInspectionAllocationPlan.isValid()
+        if (!largeTimelineRequired && firstInspectionAllocationPlan.isValid()
                 && firstInspectionAllocationPlan.getInspectionQty() > 0) {
             Map<Integer, Integer> firstInspectionCapacityMap =
                     this.calculateTypeBlockFirstInspectionAvailableCapacityMap(
@@ -4340,13 +4383,40 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     ScheduleTypeEnum.TYPE_BLOCK.getCode(),
                     machine.getMachineCode(), firstInspectionCapacityMap);
         }
-        if (!firstInspectionAllocationPlan.isValid()) {
+        if (!largeTimelineRequired && !firstInspectionAllocationPlan.isValid()) {
             log.info("换活字块首检时间分摊失败，取消当前结果, batchNo: {}, materialCode: {}, "
                             + "machineCode: {}, switchCompleteTime: {}, reason: {}",
                     context.getBatchNo(), sku.getMaterialCode(), machine.getMachineCode(),
                     LhScheduleTimeUtil.formatDateTime(switchCompleteTime),
                     firstInspectionAllocationPlan.getInvalidReason());
             return null;
+        }
+        CxEmbryoLhTime switchSource = StructureSwitchSchedulingPolicy.resolveSource(context, sku);
+        StructureSwitchPlan switchPlan = null;
+        if (largeTimelineRequired) {
+            FirstInspectionTimelinePlan timeline = StructureSwitchSchedulingPolicy.buildLargeTimeline(context, sku,
+                    machine.getMachineCode(), startTime, switchStartTime, switchCompleteTime, runtimeShiftCapacity,
+                    refinedTargetQty, ScheduleTypeEnum.TYPE_BLOCK.getCode(),
+                    inspection -> this.calculateTypeBlockFirstInspectionAvailableCapacityMap(context, result, sku,
+                            inspection, runtimeShiftCapacity, mouldQty, cleaningWindowList, maintenanceWindowList));
+            if (Objects.isNull(timeline)) {
+                return null;
+            }
+            firstInspectionAllocationPlan = timeline.getAllocationPlan();
+            startTime = timeline.getFormalProductionStartTime();
+            switchPlan = timeline.getStructureSwitchPlan();
+        } else if (Objects.nonNull(switchSource)) {
+            switchPlan = StructureSwitchSchedulingPolicy.createPlan(context, switchSource, firstInspectionAllocationPlan,
+                    NewSpecEmbryoAvailableTimeResolver.resolveProductionShift(shifts, startTime), startTime, startTime);
+        }
+        if (Objects.nonNull(switchPlan)) {
+            String switchFailure = StructureSwitchSchedulingPolicy.validate(context, switchPlan, machine.getMachineCode(), null);
+            if (StringUtils.isNotEmpty(switchFailure)) {
+                log.info("换活字块结构切换预检拒绝, sku={}, machine={}, reason={}",
+                        sku.getMaterialCode(), machine.getMachineCode(), switchFailure);
+                return null;
+            }
+            context.getStructureSwitchResultPlanMap().put(result, switchPlan);
         }
         LhShiftConfigVO firstInspectionAttributionShift =
                 firstInspectionAllocationPlan.getCountingShift();
@@ -4521,7 +4591,9 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                         0, "班次管控不可排");
                 continue;
             }
-            Date effectiveStart = control.getEffectiveStartTime();
+            StructureSwitchPlan switchPlan = context.getStructureSwitchResultPlanMap().get(result);
+            Date effectiveStart = StructureSwitchSchedulingPolicy.effectiveStart(context,
+                    switchPlan, shift, control.getEffectiveStartTime());
             Date effectiveEnd = control.getEffectiveEndTime();
             int actualShiftPlanQty = ShiftCapacityResolverUtil.resolveActualShiftPlanQty(
                     shiftCapacity, shift, configPlusShiftType, ScheduleTypeEnum.TYPE_BLOCK.getCode());
@@ -4557,6 +4629,9 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     ScheduleTypeEnum.TYPE_BLOCK.getCode(),
                     plannedRepairFixedQty);
             shiftMaxQty = ShiftProductionControlUtil.deductCapacityByControl(control, shiftMaxQty, mouldQty);
+            shiftMaxQty = StructureSwitchSchedulingPolicy.capCapacity(context, switchPlan, shift, control,
+                    result.getLhMachineCode(), shiftCapacity, lhTimeSeconds, mouldQty, cleaningWindowList,
+                    maintenanceWindowList, shiftMaxQty, ScheduleTypeEnum.TYPE_BLOCK.getCode());
             int physicalShiftMaxQty = shiftMaxQty;
             shiftMaxQty = dailyStandardShiftCapacityMap.getOrDefault(shift.getShiftIndex(), shiftMaxQty);
             int capacityAfterSwitch;
@@ -4601,9 +4676,13 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             int shiftQty = getTargetScheduleQtyResolver().resolveAllocatedShiftQty(
                     context, result, Math.min(remaining, shiftMaxQty), shiftMaxQty, mouldQty,
                     cleaningWindowList, effectiveStart, effectiveEnd);
+            shiftQty = StructureSwitchSchedulingPolicy.capQuantity(context, sku, result, shift,
+                    shiftQty, physicalShiftMaxQty, remaining);
             // 目标量、首检和物理产能全部收口后，再按本班实际候选量执行一次换胶囊扣减。
             shiftQty = capsuleReplacementRuleService.resolveActualPlanQty(
                     context, result, shift, shiftQty, shiftMaxQty, effectiveStart, "换活字块排产");
+            shiftQty = StructureSwitchSchedulingPolicy.capQuantity(context, sku, result, shift,
+                    shiftQty, physicalShiftMaxQty, remaining);
             // 未满产换胶囊可能刚登记时间窗口，后续班次必须立即读取最新窗口重新计算产能。
             maintenanceWindowList = resolveMachineMaintenanceWindowList(context, result.getLhMachineCode());
             if (shiftQty <= 0) {
@@ -5692,6 +5771,12 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     this.resolveEffectiveCleaningWindowList(context, result,
                             ShiftFieldUtil.getShiftStartTime(result, shift.getShiftIndex())),
                     ShiftFieldUtil.getShiftStartTime(result, shift.getShiftIndex()), shift.getShiftEndDateTime());
+            boolean switchFirstBatch = StructureSwitchSchedulingPolicy.isFirstBatch(context,
+                    context.getStructureSwitchResultPlanMap().get(result), shift);
+            if (switchFirstBatch) {
+                normalizedPlanQty = StructureSwitchSchedulingPolicy.capRetainedQuantity(
+                        context, result, shift, planQty, allowedPlanQty);
+            }
             // 按历史欠产、当日计划、受限追补窗口消费同一SKU的日计划账本
             int consumed = normalizedPlanQty > 0
                     ? SkuDailyPlanQuotaUtil.consumeRollingQuota(
@@ -5702,7 +5787,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                 boolean endingResult = YES_FLAG.equals(result.getIsEnd());
                 // 收尾结果必须严格截断，不再记录满班补齐超排；
                 // 试制等严格目标量场景仍需回裁，但保留超排账本用于追踪被截掉的补满量。
-                if (endingResult || shouldApplyStrictTypeBlockQuotaLimit(sku, endingResult)) {
+                if (endingResult || shouldApplyStrictTypeBlockQuotaLimit(sku, endingResult) || switchFirstBatch) {
                     /*
                      * 收尾/严格目标只能回裁首检之后的正式生产量。换活字块阶段
                      * 已经发生的首检必须保留，且回裁到仅余首检时恢复真实首检区间。
@@ -5775,6 +5860,10 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
          * 整机合计结果的班次量是单侧的2倍，因此日计划回裁也必须按2倍
          * 保护首检；回写后每侧恢复为原分摊量，不会重复计入SKU目标。
          */
+        StructureSwitchPlan groupSwitchPlan = context.getStructureSwitchResultPlanMap().get(primaryResult);
+        if (StructureSwitchSchedulingPolicy.isEnabled(context) && Objects.nonNull(groupSwitchPlan)) {
+            context.getStructureSwitchResultPlanMap().put(groupResult, groupSwitchPlan);
+        }
         int actualQty = this.applyTypeBlockToDailyQuota(
                 context, sku, groupResult, shifts,
                 firstInspectionAllocationPlan, 2);

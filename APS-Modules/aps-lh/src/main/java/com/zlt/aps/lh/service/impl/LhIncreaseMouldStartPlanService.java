@@ -20,6 +20,7 @@ import com.zlt.aps.lh.mapper.LhMoldAlterPlanFinishMapper;
 import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
 import com.zlt.aps.lh.mapper.LhParamsMapper;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
+import com.zlt.aps.lh.util.FirstInspectionQtyUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
@@ -230,6 +231,18 @@ public class LhIncreaseMouldStartPlanService {
         Date productionStartTime = new Date(middleShiftStartTime.getTime() + mouldChangeSeconds * 1000L);
         // 中班计划量只看“换模完成后到中班结束前”还能完整覆盖多少模次。
         int middleShiftPlanQty = calculateMiddleShiftPlanQty(productionStartTime, middleShiftEndTime, scheduleResult.getLhTime());
+
+        // 中班的硫化示方类型和硫化示方号
+        if (Objects.nonNull(constructionRef)) {
+            ShiftFieldUtil.setShiftCureFormula(scheduleResult, MIDDLE_SHIFT_INDEX,
+                    constructionRef.getLhNo(),
+                    constructionRef.getLhType());
+        }
+        // 换模时间内需要加 首检条数
+        BigDecimal firstInspectionQty = getLhParamsByCode(scheduleResult.getFactoryCode(), LhScheduleParamConstant.FIRST_INSPECTION_QTY);
+        middleShiftPlanQty = middleShiftPlanQty + firstInspectionQty.intValue();
+        ShiftFieldUtil.setShiftAnalysis(scheduleResult, MIDDLE_SHIFT_INDEX, FirstInspectionQtyUtil.FIRST_INSPECTION_ANALYSIS);
+
         ShiftFieldUtil.setShiftPlanQty(scheduleResult, MIDDLE_SHIFT_INDEX, middleShiftPlanQty,
                 ShiftFieldUtil.getShiftStartTime(scheduleResult, MIDDLE_SHIFT_INDEX),
                 ShiftFieldUtil.getShiftEndTime(scheduleResult, MIDDLE_SHIFT_INDEX));
@@ -332,29 +345,40 @@ public class LhIncreaseMouldStartPlanService {
     }
 
     /**
-     * 读取换模总耗时参数。
+     * 读取硫化参数。
      *
      * @param factoryCode 分厂编码
-     * @return 换模总耗时（小时）
+     * @param paramCode   参数编码
+     * @return 参数值
      */
-    private BigDecimal getMouldChangeTotalHours(String factoryCode) {
+    private BigDecimal getLhParamsByCode(String factoryCode, String paramCode) {
         LhParams params = lhParamsMapper.selectOne(new LambdaQueryWrapper<LhParams>()
                 .eq(LhParams::getFactoryCode, factoryCode)
-                .eq(LhParams::getParamCode, LhScheduleParamConstant.MOULD_CHANGE_TOTAL_HOURS)
+                .eq(LhParams::getParamCode, paramCode)
                 .eq(LhParams::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
                 .last("LIMIT 1"));
         if (Objects.isNull(params) || StringUtils.isBlank(params.getParamValue())) {
             throw new IllegalStateException(String.format(
                     I18nUtil.getMessage("ui.data.alert.lhScheduleResult.increaseMouldStartPlan.paramMissing"),
-                    LhScheduleParamConstant.MOULD_CHANGE_TOTAL_HOURS));
+                    paramCode));
         }
         try {
             return new BigDecimal(params.getParamValue().trim());
         } catch (NumberFormatException ex) {
             throw new IllegalStateException(String.format(
                     I18nUtil.getMessage("ui.data.alert.lhScheduleResult.increaseMouldStartPlan.paramInvalid"),
-                    LhScheduleParamConstant.MOULD_CHANGE_TOTAL_HOURS, params.getParamValue()), ex);
+                    paramCode, params.getParamValue()), ex);
         }
+    }
+
+    /**
+     * 读取换模总耗时参数。
+     *
+     * @param factoryCode 分厂编码
+     * @return 换模总耗时（小时）
+     */
+    private BigDecimal getMouldChangeTotalHours(String factoryCode) {
+        return getLhParamsByCode(factoryCode, LhScheduleParamConstant.MOULD_CHANGE_TOTAL_HOURS);
     }
 
     /**

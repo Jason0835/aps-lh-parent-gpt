@@ -567,9 +567,18 @@ public class EngineConstants {
     /** SYS1101033：胎圈新规格保底备库班数（新规格/试制规格主动备库时的保底班数，与备库配置班数取最大），默认2班 */
     public static String TQ_NEW_SPEC_BACKUP_SHIFT_COUNT = "SYS1101033";
 
-    /** SYS1101034：胎圈备库二次触发阈值（S5.8滚动重估时班初库存低于 阈值×班N需求 触发二次备库），默认0.7 */
-    public static String TQ_BACKUP_TRIGGER_THRESHOLD_CLASS = "SYS1101034";
+    // SYS1101034（胎圈备库二次触发阈值，原默认0.7）已废弃：胎圈按业务口径严格供需（阈值固定1.0，
+    // 班初库存+本班已排 < 下班成型消耗即触发二次备库），0.7缓冲仅钢丝圈 SYS1601006 使用。逻辑见 TqSecondaryBackupHandler
 
     /** SYS1101035：胎圈收尾判定容差（月计划剩余量与6班成型毛需求比较的容差，差值≤容差时仍判定为收尾；收尾规格6班合计与月剩余差额≤容差时补排到月剩余），默认100 */
     public static String TQ_CLOSE_OUT_TOLERANCE = "SYS1101035";
+
+    /** SYS1101036：胎圈规格级班产上限口径模式（1=参数口径：统一取SYS1101029；2=速度口径：MES机台×规格生产速度优先，未命中回退SYS1101029），默认1 */
+    public static String TQ_SPEC_CLASS_LIMIT_MODE = "SYS1101036";
+
+    /** 规格级班产上限口径模式：参数口径（统一取SYS1101029班产阈值） */
+    public static final int SPEC_CLASS_LIMIT_MODE_PARAM = 1;
+
+    /** 规格级班产上限口径模式：速度口径（MES机台×规格生产速度优先，未命中回退SYS1101029） */
+    public static final int SPEC_CLASS_LIMIT_MODE_SPEED = 2;
 }

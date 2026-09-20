@@ -3,8 +3,8 @@ package com.zlt.aps.lh.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.zlt.aps.lh.api.domain.entity.LhPrecisionPlan;
 import com.zlt.aps.lh.api.domain.vo.LhPrecisionPlanVo;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
 
@@ -88,15 +88,17 @@ public interface LhPrecisionPlanMapper extends BaseMapper<LhPrecisionPlan> {
     List<LhPrecisionPlan> selectByMesSourceIdBatch(@Param("mesSourceIds") List<Long> mesSourceIds);
 
     /**
-     * 逻辑删除指定分厂所有MES同步来源的硫化精度计划数据
-     * 用于分发同步前清理旧数据（仅清理DATA_SOURCE='0'的MES同步数据，保留系统自动生成的数据）
+     * 物理删除指定分厂所有MES同步来源的硫化精度计划数据（含历史软删死行）
+     * 分发为"按分厂全量重建"语义：每次分发先物理清空MES镜像行再整批重插，
+     * 物理删除可避免软删行无限堆积（旧逻辑每天残留一批死行），
+     * 仅清理DATA_SOURCE='0'的MES同步数据，保留系统自动生成(DATA_SOURCE='1')的数据。
      * WHERE必须包含FACTORY_CODE业务主键，否则会被BlockAttackInnerInterceptor拦截
      *
      * @param factoryCode 分厂编号
      * @return 受影响行数
      */
-    @Update("UPDATE T_LH_PRECISION_PLAN SET IS_DELETE = 1, UPDATE_BY = 'MES', UPDATE_TIME = NOW() WHERE FACTORY_CODE = #{factoryCode} AND PRECISION_TYPE = '硫化精度' AND DATA_SOURCE = '0' AND IS_DELETE = 0")
-    int logicDeleteMesSyncByFactoryCode(@Param("factoryCode") String factoryCode);
+    @Delete("DELETE FROM T_LH_PRECISION_PLAN WHERE FACTORY_CODE = #{factoryCode} AND PRECISION_TYPE = '硫化精度' AND DATA_SOURCE = '0'")
+    int physicalDeleteMesSyncByFactoryCode(@Param("factoryCode") String factoryCode);
 
     /**
      * 根据机台编码列表和年份批量查询计划

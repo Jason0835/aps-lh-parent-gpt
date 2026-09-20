@@ -2,6 +2,7 @@ package com.zlt.aps.lh.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
+import com.zlt.aps.lh.api.domain.vo.LhMouldChangePlanVo;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.Date;
@@ -35,6 +36,22 @@ public interface ILhMouldChangePlanService extends IDocService<LhMouldChangePlan
      * @param lhResultBatchNo 硫化结果批次号
      */
     void refreshMouldCode(String factoryCode, Date scheduleDate, String lhResultBatchNo);
+
+    /**
+     * 按默认业务规则排序模具交替计划，并按关联硫化排程结果补充班次计划量比较值。
+     *
+     * @param planList 待排序的模具交替计划列表
+     * @return 排序后的模具交替计划列表；入参为空时返回空列表
+     */
+    List<LhMouldChangePlan> sortByDefaultOrder(List<LhMouldChangePlan> planList);
+
+    /**
+     * 按默认业务规则排序模具交替计划导出视图。
+     *
+     * @param planList 待排序的导出视图列表
+     * @return 排序后的导出视图列表
+     */
+    List<LhMouldChangePlanVo> sortVoByDefaultOrder(List<LhMouldChangePlanVo> planList);
 
     /**
      * 排程发布

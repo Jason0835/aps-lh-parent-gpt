@@ -3,9 +3,8 @@ package com.zlt.aps.common.engine.schedule.engine;
 import lombok.Data;
 
 import java.math.BigDecimal;
-import java.util.Date;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.time.LocalDate;
+import java.util.*;
 
 /**
  * TM/TC 自动排程任务草稿公共非持久化模型。
@@ -23,6 +22,10 @@ public class ScheduleTaskDraftModel implements ScheduleSortableTask, ScheduleQua
     protected String sourceOrderNos;
     /** 成型来源唯一键；同一成型结果行生成的多个班次任务共用该键，仅用于运行态聚合。 */
     protected String formingSourceKey;
+    /**
+     * 来源成型计划所属排程日期，未来停产来源不得被替换成当前排程日期。
+     */
+    protected LocalDate formingSourceScheduleDate;
     /** 成型物料编号 */
     protected String materialCode;
     /** 成型物料描述 */
@@ -61,8 +64,30 @@ public class ScheduleTaskDraftModel implements ScheduleSortableTask, ScheduleQua
     protected BigDecimal twoShiftDemandQty;
     /** 两班需求扣减班初滚动库存后的缺口，单位米 */
     protected BigDecimal twoShiftStockGapQty;
-    /** 滚动库存是否已覆盖当班与下一排程班需求 */
+    /**
+     * 历史两班控制标记；普通任务同步本次库存覆盖结论，停产收尾保留原有语义。
+     */
     protected Boolean twoShiftStockCovered;
+    /**
+     * 剩余库存起排班数需求窗口，仅用于库存覆盖判定。
+     */
+    protected ScheduleStockCoverageWindowModel stockCoverageWindow;
+    /**
+     * 剩余库存起排班数覆盖窗口累计需求，单位米。
+     */
+    protected BigDecimal stockCoverageDemandQty;
+    /**
+     * 覆盖窗口累计需求扣除班初滚动库存后的差额，单位米。
+     */
+    protected BigDecimal stockCoverageStockGapQty;
+    /**
+     * 是否命中剩余库存起排班数覆盖规则。
+     */
+    protected Boolean stockCoverageCovered;
+    /**
+     * 来源成型行 CLASS1~CLASS8 对应的物料编码，用于覆盖窗口逐班隔离 RECIPE 物料切换。
+     */
+    protected Map<Integer, String> formingClassProductCodeMap = new LinkedHashMap<>();
     /** 保证范围内成型产品需求量，单位米 */
     protected BigDecimal guardDemandQty;
     /** 库存供应时长窗口的逐班成型需求，首项为当班对应的成型需求，后续为备库保证窗口。 */
@@ -73,6 +98,15 @@ public class ScheduleTaskDraftModel implements ScheduleSortableTask, ScheduleQua
     protected Map<Integer, BigDecimal> formingClassQtyMap = new LinkedHashMap<>();
     /** 来源成型行 CLASS1~CLASS8 对应的产品换算长度，单位米，仅用于重建保证窗口。 */
     protected Map<Integer, BigDecimal> formingClassLengthMap = new LinkedHashMap<>();
+
+    /**
+     * 设置库存覆盖窗口并复制对象，避免派生任务与来源任务共享可变窗口。
+     *
+     * @param stockCoverageWindow 库存覆盖窗口
+     */
+    public void setStockCoverageWindow(ScheduleStockCoverageWindowModel stockCoverageWindow) {
+        this.stockCoverageWindow = stockCoverageWindow == null ? null : stockCoverageWindow.copy();
+    }
     /** 来源行硫化余量封顶条数，空值表示不封顶。 */
     protected BigDecimal formingGuardFormingQtyLimit;
     /** 当前班开始滚动库存，单位米 */
@@ -101,8 +135,56 @@ public class ScheduleTaskDraftModel implements ScheduleSortableTask, ScheduleQua
     protected String tailFlag;
     /** 收尾成型余量，单位条 */
     protected BigDecimal tailBalanceQty;
+    /**
+     * 来源成型计划的原始收尾余量，保留 CX_REMAIN_QTY 为空的语义，仅用于来源收尾班次判定。
+     */
+    protected BigDecimal formingTailRemainQty;
+    /**
+     * 来源成型计划按原始 CLASS1~CLASS8 累计确定的收尾班次。
+     */
+    protected Integer formingTailShiftOrder;
+    /**
+     * 同产品代码所有成型来源中最晚的收尾班次。
+     */
+    protected Integer productTailShiftOrder;
+    /**
+     * 同产品代码所有有效成型来源是否均已确定收尾班次。
+     */
+    protected Boolean productTailDecisionAvailable;
     /** 成型需求对应的原始逻辑班次，取值1到8 */
     protected Integer formingLogicalShiftOrder;
+    /**
+     * 当前任务实际对应的成型需求班次，按来源日期映射为实际生产日期和班次。
+     */
+    protected ScheduleFormingShiftKey formingDemandShiftKey;
+    /**
+     * 当前需求算法实际覆盖的成型班次集合，不包含后续保证窗口。
+     */
+    protected List<ScheduleFormingShiftKey> formingDemandShiftKeyList = new ArrayList<>();
+    /**
+     * 当前任务目标生产班次对应的实际生产日期和班次。
+     */
+    protected ScheduleFormingShiftKey targetProductionShiftKey;
+    /**
+     * 成型来源收尾计算快照，独立于任务合并结果保存。
+     */
+    protected List<ScheduleFormingTailSourceModel> formingTailSourceList = new ArrayList<>();
+    /**
+     * 未来停产需求前移分配明细。
+     */
+    protected List<ScheduleFutureDemandAllocationModel> futureDemandAllocationList = new ArrayList<>();
+    /**
+     * 当前任务实际覆盖的成型班次集合，专供普通收尾判定使用。
+     */
+    protected Set<ScheduleFormingShiftKey> formingCoverageShiftKeySet = new LinkedHashSet<>();
+    /**
+     * 产品级最终收尾判定结果。
+     */
+    protected ScheduleProductTailDecisionModel productTailDecision;
+    /**
+     * 是否为未来停产需求补充任务，避免把复制的数量窗口当成普通收尾覆盖窗口。
+     */
+    protected Boolean futureShutdownSupplementTask;
     /** 是否命中成型连续停产自动收尾 */
     protected Boolean formingShutdownCloseOutFlag;
     /** 成型连续停产收尾需求量，单位米；按最后开放成型班原始需求计算 */
@@ -247,6 +329,57 @@ public class ScheduleTaskDraftModel implements ScheduleSortableTask, ScheduleQua
     public void setFormingClassLengthMap(Map<Integer, BigDecimal> formingClassLengthMap) {
         this.formingClassLengthMap = formingClassLengthMap == null
                 ? new LinkedHashMap<>() : new LinkedHashMap<>(formingClassLengthMap);
+    }
+
+    /**
+     * 设置来源成型班次物料编码快照并复制容器。
+     *
+     * @param formingClassProductCodeMap CLASS1~CLASS8 物料编码
+     */
+    public void setFormingClassProductCodeMap(Map<Integer, String> formingClassProductCodeMap) {
+        this.formingClassProductCodeMap = formingClassProductCodeMap == null
+                ? new LinkedHashMap<>() : new LinkedHashMap<>(formingClassProductCodeMap);
+    }
+
+    /**
+     * 设置成型来源收尾快照并复制容器。
+     *
+     * @param formingTailSourceList 来源收尾快照
+     */
+    public void setFormingTailSourceList(List<ScheduleFormingTailSourceModel> formingTailSourceList) {
+        this.formingTailSourceList = formingTailSourceList == null
+                ? new ArrayList<>() : new ArrayList<>(formingTailSourceList);
+    }
+
+    /**
+     * 设置未来停产前移分配明细并复制容器。
+     *
+     * @param futureDemandAllocationList 前移分配明细
+     */
+    public void setFutureDemandAllocationList(
+            List<ScheduleFutureDemandAllocationModel> futureDemandAllocationList) {
+        this.futureDemandAllocationList = futureDemandAllocationList == null
+                ? new ArrayList<>() : new ArrayList<>(futureDemandAllocationList);
+    }
+
+    /**
+     * 设置当前需求覆盖的成型班次并复制容器。
+     *
+     * @param formingDemandShiftKeyList 当前需求覆盖班次
+     */
+    public void setFormingDemandShiftKeyList(List<ScheduleFormingShiftKey> formingDemandShiftKeyList) {
+        this.formingDemandShiftKeyList = formingDemandShiftKeyList == null
+                ? new ArrayList<>() : new ArrayList<>(formingDemandShiftKeyList);
+    }
+
+    /**
+     * 设置实际覆盖成型班次并复制容器。
+     *
+     * @param formingCoverageShiftKeySet 覆盖班次集合
+     */
+    public void setFormingCoverageShiftKeySet(Set<ScheduleFormingShiftKey> formingCoverageShiftKeySet) {
+        this.formingCoverageShiftKeySet = formingCoverageShiftKeySet == null
+                ? new LinkedHashSet<>() : new LinkedHashSet<>(formingCoverageShiftKeySet);
     }
 
     /**

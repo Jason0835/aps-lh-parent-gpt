@@ -6,8 +6,8 @@ import java.io.Serializable;
 import java.util.Date;
 
 /**
- * 临时故障原始禁产窗口，仅供时间产能计算及设备计划日期回填。
- * 不参与维修、清洗、精度、换模或换活字块的业务调度。
+ * 临时故障原始禁产窗口，供时间产能计算、设备计划日期回填及续作两班故障迁移判断。
+ * 不参与维修、清洗或精度业务；达到迁移阈值后的换模/换活字块仍由现有排产主链执行。
  */
 @Data
 public class MachineFaultWindowDTO implements Serializable {

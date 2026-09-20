@@ -199,6 +199,7 @@ public class NewSpecMachineSkuCompetitionService {
                 ? candidate -> true : candidateScope;
         Set<String> normalizedFailureSet = Objects.isNull(failedAssignmentKeySet)
                 ? Collections.<String>emptySet() : failedAssignmentKeySet;
+        Map<String, NewSpecScheduleProposal> switchExpansionProposals = new LinkedHashMap<>(4);
         NewSpecScheduleProposal bestOrdinaryProposal = null;
         NewSpecScheduleProposal bestCrossDayProposal = null;
         for (LocalDate poolDate : orderedPoolDates) {
@@ -264,6 +265,9 @@ public class NewSpecMachineSkuCompetitionService {
                 }
                 NewSpecMachineAvailabilityPlan availabilityPlan = availabilityResolver.resolve(
                         context, dayContext, candidate, matchResult.getMachine());
+                // 仅复制正式解析结果，不能用无供胚等待探针重新计算审计时间轴。
+                StructureSwitchShiftAudit.recordPlan(context, dayContext, shift, candidate,
+                        machineResource.getMachine().getMachineCode(), availabilityPlan);
                 // 只淘汰当前机台的当前SKU，不改候选池、匹配排序或提交失败缓存。
                 if (!this.canMachineSelectSkuByEmbryoAvailableTime(
                         context, dayContext, shift, machineResource, poolDate,
@@ -317,6 +321,10 @@ public class NewSpecMachineSkuCompetitionService {
                 this.traceMachineSkuDecision(
                         context, dayContext, shift, machineResource,
                         poolDate, candidate, "PROPOSAL_GENERATED", "已形成完整可执行提案");
+                if (this.collectSwitchExpansionProposal(context, proposal, switchExpansionProposals,
+                        standardDynamicCompetition)) {
+                    continue;
+                }
                 boolean crossDayPreparation = Objects.nonNull(proposal.getAvailabilityPlan())
                         && proposal.getAvailabilityPlan().isSourceDayCrossDayPreparation();
                 if (crossDayPreparation) {
@@ -342,12 +350,56 @@ public class NewSpecMachineSkuCompetitionService {
                     && Objects.nonNull(crossDayProposalOfDate)) {
                 bestCrossDayProposal = crossDayProposalOfDate;
             }
-            if (Objects.nonNull(bestOrdinaryProposal)
+            if (switchExpansionProposals.isEmpty()
+                    && (!StructureSwitchSchedulingPolicy.isEnabled(context) || context.getStructureSwitchRuntimeMap().isEmpty())
+                    && Objects.nonNull(bestOrdinaryProposal)
                     && Objects.nonNull(bestCrossDayProposal)) {
                 break;
             }
         }
+        // 组内先选同SKU/同胎胚，组间继续使用原日期池和适配顺序。
+        for (NewSpecScheduleProposal proposal : switchExpansionProposals.values()) {
+            if (proposal.getAvailabilityPlan().isSourceDayCrossDayPreparation()) {
+                if (this.isPreferredWithinOriginalPool(context, proposal, bestCrossDayProposal, standardDynamicCompetition)) {
+                    bestCrossDayProposal = proposal;
+                }
+            } else if (this.isPreferredWithinOriginalPool(context, proposal, bestOrdinaryProposal, standardDynamicCompetition)) {
+                bestOrdinaryProposal = proposal;
+            }
+        }
         return NewSpecMachineProposalBuckets.of(bestOrdinaryProposal, bestCrossDayProposal);
+    }
+
+    /**
+     * 切换组选择完毕后按原日期池及同层级规则并回原提案桶。
+     * @param context 排程上下文
+     * @param candidate 当前切换组提案
+     * @param previous 原桶最佳提案
+     * @param standardDynamicCompetition 原排序模式
+     * @return 当前提案是否更优
+     */
+    private boolean isPreferredWithinOriginalPool(LhScheduleContext context, NewSpecScheduleProposal candidate,
+            NewSpecScheduleProposal previous, boolean standardDynamicCompetition) {
+        if (Objects.isNull(previous)) {
+            return true;
+        }
+        int poolComparison = candidate.getPoolDate().compareTo(previous.getPoolDate());
+        return poolComparison < 0 || (poolComparison == 0
+                && this.compareCandidateProposal(context, candidate, previous, standardDynamicCompetition) < 0);
+    }
+
+    /**
+     * 在已通过硬约束的同次切换S1提案内选择优先SKU，其他提案仍走原流程。
+     * @param context 排程上下文
+     * @param proposal 合格提案
+     * @param proposals 本机当前轮次的切换分组
+     * @param standardDynamicCompetition 原排序模式
+     * @return 是否由切换组接管
+     */
+    private boolean collectSwitchExpansionProposal(LhScheduleContext context, NewSpecScheduleProposal proposal,
+            Map<String, NewSpecScheduleProposal> proposals, boolean standardDynamicCompetition) {
+        return StructureSwitchSchedulingPolicy.collectExpansionProposal(context, proposal, proposals,
+                (left, right) -> this.compareCandidateProposal(context, left, right, standardDynamicCompetition));
     }
 
     /**
@@ -403,6 +455,7 @@ public class NewSpecMachineSkuCompetitionService {
                 continue;
             }
             NewSpecScheduleProposal bestProposal = null;
+            Map<String, NewSpecScheduleProposal> expansionProposals = new LinkedHashMap<>(4);
             for (DailyNewSpecCandidate candidate : poolCandidates) {
                 if (!effectiveScope.test(candidate)) {
                     continue;
@@ -459,6 +512,9 @@ public class NewSpecMachineSkuCompetitionService {
                 }
                 NewSpecMachineAvailabilityPlan availabilityPlan = availabilityResolver.resolve(
                         context, dayContext, candidate, matchResult.getMachine());
+                // 兼容原机台顺序入口，复用相同审计口径和已完成的时间轴。
+                StructureSwitchShiftAudit.recordPlan(context, dayContext, shift, candidate,
+                        machineResource.getMachine().getMachineCode(), availabilityPlan);
                 // 只淘汰当前机台的当前SKU，不改候选池、匹配排序或提交失败缓存。
                 if (!this.canMachineSelectSkuByEmbryoAvailableTime(
                         context, dayContext, shift, machineResource, poolDate,
@@ -512,6 +568,9 @@ public class NewSpecMachineSkuCompetitionService {
                 this.traceMachineSkuDecision(
                         context, dayContext, shift, machineResource,
                         poolDate, candidate, "PROPOSAL_GENERATED", "已形成完整可执行提案");
+                if (this.collectSwitchExpansionProposal(context, proposal, expansionProposals, standardDynamicCompetition)) {
+                    continue;
+                }
                 if (Objects.isNull(bestProposal)
                         || this.compareCandidateProposal(
                         context, proposal, bestProposal, standardDynamicCompetition) < 0) {
@@ -521,6 +580,12 @@ public class NewSpecMachineSkuCompetitionService {
                         == proposal.getMatchResult().getMatchLevel()
                         && !standardDynamicCompetition) {
                     return proposal;
+                }
+            }
+            for (NewSpecScheduleProposal proposal : expansionProposals.values()) {
+                if (Objects.isNull(bestProposal)
+                        || this.compareCandidateProposal(context, proposal, bestProposal, standardDynamicCompetition) < 0) {
+                    bestProposal = proposal;
                 }
             }
             if (Objects.nonNull(bestProposal)) {
@@ -570,7 +635,8 @@ public class NewSpecMachineSkuCompetitionService {
         }
         List<NewSpecScheduleProposal> resourceProposalList =
                 this.retainBestProposalPerMachineResource(
-                        context, machineBestProposalList, standardDynamicCompetition);
+                        context, StructureSwitchSchedulingPolicy.retainExpansionPriority(context, machineBestProposalList),
+                        standardDynamicCompetition);
         if (Objects.nonNull(roundCache)) {
             roundCache.recordRetainedBestProposalCount(resourceProposalList.size());
         }
@@ -1184,6 +1250,9 @@ public class NewSpecMachineSkuCompetitionService {
             return;
         }
         MachineScheduleDTO machine = machineResource.getMachine();
+        // 审计记录独立于应用日志去重和DEBUG开关，保留每个组合最近一次真实决策。
+        StructureSwitchShiftAudit.recordDecision(context, dayContext, shift, candidate,
+                machine.getMachineCode(), decisionStage, reason);
         String traceKey = new StringBuilder(128)
                 .append(machine.getMachineCode()).append('|')
                 .append(Objects.isNull(dayContext) ? null : dayContext.getCurrentPhase()).append('|')

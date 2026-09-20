@@ -88,6 +88,33 @@ public class ScheduleConstraintCalculator {
     }
 
     /**
+     * 将资源限制后的非收尾正计划量向上补齐为整卷。
+     *
+     * <p>计划量在资源限制前已经完成常规卷数取整。工装余额或机台剩余产能再次截断后，
+     * 需要恢复为完整卷生产量；资源可用量为零、收尾任务、卷曲长度无效以及未发生截断时
+     * 保留限制结果。调用方必须以本方法返回的实际生产量扣减剩余需求和资源余额。</p>
+     *
+     * @param requestedPlanQty 资源限制前请求量
+     * @param limitedPlanQty   资源限制得到的原始承接量
+     * @param curlRollLength   有效卷曲长度
+     * @param tailTask         是否为收尾任务
+     * @return 实际承接量；满足补整卷条件时按有效卷曲长度向上取整
+     */
+    public BigDecimal roundUpLimitedPlanQty(BigDecimal requestedPlanQty, BigDecimal limitedPlanQty,
+                                            BigDecimal curlRollLength, boolean tailTask) {
+        BigDecimal normalizedRequestedPlanQty = this.nonNegative(requestedPlanQty);
+        BigDecimal normalizedLimitedPlanQty = this.nonNegative(limitedPlanQty);
+        BigDecimal normalizedCurlRollLength = this.nonNegative(curlRollLength);
+        if (tailTask || normalizedLimitedPlanQty.compareTo(BigDecimal.ZERO) <= 0
+                || normalizedLimitedPlanQty.compareTo(normalizedRequestedPlanQty) >= 0
+                || normalizedCurlRollLength.compareTo(BigDecimal.ZERO) <= 0) {
+            return normalizedLimitedPlanQty;
+        }
+        return normalizedLimitedPlanQty.divide(normalizedCurlRollLength, 0, RoundingMode.CEILING)
+                .multiply(normalizedCurlRollLength);
+    }
+
+    /**
      * 计算两个相邻任务之间的切换产能。
      *
      * @param previousTask 前置任务；班次没有有效前置时可为空

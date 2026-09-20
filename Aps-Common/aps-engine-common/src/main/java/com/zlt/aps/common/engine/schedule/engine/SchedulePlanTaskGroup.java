@@ -35,6 +35,11 @@ public class SchedulePlanTaskGroup<T extends ScheduleTaskDraftModel>
     /** 汇总下一排程班需求量 */
     protected BigDecimal groupNextShiftDemandQty;
 
+    /**
+     * 汇总剩余库存起排班数窗口需求量
+     */
+    protected BigDecimal groupStockCoverageDemandQty;
+
     /** 汇总保证范围需求量 */
     protected BigDecimal groupGuardDemandQty;
 
@@ -50,4 +55,3 @@ public class SchedulePlanTaskGroup<T extends ScheduleTaskDraftModel>
     /** 汇总最终计划量 */
     protected BigDecimal groupFinalPlanQty;
 }
-

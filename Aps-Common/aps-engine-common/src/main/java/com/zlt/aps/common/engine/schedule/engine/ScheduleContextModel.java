@@ -67,7 +67,9 @@ public abstract class ScheduleContextModel<T extends ScheduleTaskDraftModel,
     protected List<M> machineCandidateList = new ArrayList<>();
     protected Set<String> configuredMouthPlateCodeSet = new HashSet<>();
     protected Set<String> configuredGlueCodeSet = new HashSet<>();
-    /** 数据加载阶段按产品编码形成的实验规格月计划映射。 */
+    /**
+     * 兼容旧流程的实验规格映射；当前 TM/TC 任务按成型计划来源行字段直接判断。
+     */
     protected Map<String, ScheduleExperimentSpecInfoModel> experimentSpecInfoMap = new LinkedHashMap<>();
     protected BigDecimal initialAvailableToolQty;
     protected BigDecimal currentAvailableToolQty;

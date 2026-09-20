@@ -4,6 +4,8 @@ import lombok.Data;
 
 import java.io.Serializable;
 import java.util.Date;
+import java.util.Map;
+import java.util.LinkedHashMap;
 
 /**
  * 机台清洗时间窗口。
@@ -44,6 +46,19 @@ public class MachineCleaningWindowDTO implements Serializable {
     private Date sourcePlanEndTime;
     /** 数据来源 */
     private String dataSource;
+    /** 仅喷砂处置时的续作物料，离机后仍用于交替计划追溯。 */
+    private String continuationMaterialCode;
+    /** 仅喷砂处置时的物料名称。 */
+    private String continuationMaterialDesc;
+    /** 仅喷砂处置时的产品状态。 */
+    private String continuationProductStatus;
+    /** 同 SKU 置换后接替生产的精确模具号；为空表示没有可用替换模具。 */
+    private String replacementMouldCode;
+    /** 预占前的原模具可用边界，续作提前结束取消置换时精确恢复。 */
+    private Map<String, Date> mouldReleaseTimeBeforeReplacement = new LinkedHashMap<>(4);
+    /** 已确认模具离机清洗，不再占用原机台或承接原机台喷砂首检。 */
+    private boolean offMachineCleaning;
+
     /** 清洗备注 */
     private String remark;
 }

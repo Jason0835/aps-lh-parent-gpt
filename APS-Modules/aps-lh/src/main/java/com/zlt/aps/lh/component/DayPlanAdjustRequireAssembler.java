@@ -26,19 +26,17 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
  * 硫化日计划调整需求组装器。
  *
- * <p>职责独立于新增排产主循环：只从 {@code context.allLhDayPlanAdjustList} 加载本月月计划中
- * 不存在的物料，按“物料编码 + 产品状态”分组汇总调整量，并复用现有硫化余量口径判断是否进入
+ * <p>职责独立于新增排产主循环：从 {@code context.allLhDayPlanAdjustList} 加载本月没有正向原始
+ * 月计划量的物料，按“物料编码 + 产品状态”分组汇总调整量，并复用现有硫化余量口径判断是否进入
  * 硫化日计划调整待排清单。该组件不写入排程结果、不选机、不扣减任何运行态账本。</p>
  *
  * @author APS
@@ -56,7 +54,7 @@ public class DayPlanAdjustRequireAssembler {
     private UnscheduledResultCollector unscheduledResultCollector;
 
     /**
-     * 加载并汇总月计划不存在的日计划调整待排物料。
+     * 加载并汇总没有正向原始月计划量的日计划调整待排物料。
      *
      * <p>汇总口径：同一“物料编码 + 产品状态”的多条调整记录按调整量求和。只有同时满足
      * “汇总调整量 &gt; 0”和“复用现有口径计算出的硫化余量 &gt; 0”才进入待排清单。</p>
@@ -69,7 +67,6 @@ public class DayPlanAdjustRequireAssembler {
             return Collections.emptyList();
         }
 
-        Set<String> monthPlanMaterialStatusKeySet = this.buildMonthPlanMaterialStatusKeySet(context);
         Map<String, LhDayPlanAdjustVo> aggregatedAdjustMap = this.aggregateByMaterialStatus(context);
         if (CollectionUtils.isEmpty(aggregatedAdjustMap)) {
             return Collections.emptyList();
@@ -82,9 +79,12 @@ public class DayPlanAdjustRequireAssembler {
             if (StringUtils.isEmpty(adjustVo.getMaterialCode())) {
                 continue;
             }
-            String materialStatusKey = MonthPlanDateResolver.buildMaterialStatusKey(
-                    adjustVo.getMaterialCode(), adjustVo.getProductStatus());
-            if (monthPlanMaterialStatusKeySet.contains(materialStatusKey)) {
+            // 正向月计划继续走 S4.3/S4.5 普通主链；月计划缺失或原始总量为0时统一由本入口承接调整量。
+            if (this.hasPositiveMonthPlan(context, adjustVo)) {
+                continue;
+            }
+            // 月计划零量但已按MES在机续作保留的SKU继续由S4.4消费同一余量，禁止在S4.5.2重复建单。
+            if (this.isHandledByMonthlyRoute(context, adjustVo)) {
                 continue;
             }
 
@@ -121,25 +121,107 @@ public class DayPlanAdjustRequireAssembler {
     }
 
     /**
-     * 构建当前已加载月计划的“物料编码 + 产品状态”集合。
+     * 判断当前月计划记录是否属于应交给 S4.5.2 的纯日计划调整需求。
      *
      * @param context 排程上下文
-     * @return 已存在月计划的物料复合键集合
+     * @param plan    当前月计划记录
+     * @return true-原始月计划量不大于0且调整汇总量大于0；false-继续使用原排产路由
      */
-    private Set<String> buildMonthPlanMaterialStatusKeySet(LhScheduleContext context) {
-        List<FactoryMonthPlanProductionFinalResult> loadedPlanList = context.getLoadedMonthPlanList();
-        if (CollectionUtils.isEmpty(loadedPlanList)) {
-            return new HashSet<>(0);
+    public boolean isDayPlanAdjustOnlyDemand(LhScheduleContext context,
+                                             FactoryMonthPlanProductionFinalResult plan) {
+        if (Objects.isNull(context) || Objects.isNull(plan)
+                || StringUtils.isEmpty(plan.getMaterialCode())
+                || this.safePlanQty(plan) > 0) {
+            return false;
         }
-        Set<String> keySet = new HashSet<>(loadedPlanList.size() * 2);
-        for (FactoryMonthPlanProductionFinalResult plan : loadedPlanList) {
-            if (Objects.isNull(plan) || StringUtils.isEmpty(plan.getMaterialCode())) {
-                continue;
-            }
-            keySet.add(MonthPlanDateResolver.buildMaterialStatusKey(
-                    plan.getMaterialCode(), plan.getProductStatus()));
+        LhDayPlanAdjustVo planIdentity = new LhDayPlanAdjustVo();
+        planIdentity.setYear(plan.getYear());
+        planIdentity.setMonth(plan.getMonth());
+        planIdentity.setMaterialCode(plan.getMaterialCode());
+        planIdentity.setProductStatus(plan.getProductStatus());
+        return !this.hasPositiveMonthPlan(context, planIdentity)
+                && this.resolveAdjustTotalQty(context, planIdentity) > 0;
+    }
+
+    /**
+     * 判断同年月、同物料和产品状态是否存在正向原始月计划量。
+     *
+     * @param context  排程上下文
+     * @param adjustVo 日计划调整记录
+     * @return true-存在正向原始月计划量；false-月计划缺失或原始总量不大于0
+     */
+    private boolean hasPositiveMonthPlan(LhScheduleContext context, LhDayPlanAdjustVo adjustVo) {
+        if (Objects.isNull(context) || Objects.isNull(adjustVo)
+                || CollectionUtils.isEmpty(context.getLoadedMonthPlanList())) {
+            return false;
         }
-        return keySet;
+        String materialStatusKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                adjustVo.getMaterialCode(), adjustVo.getProductStatus());
+        return context.getLoadedMonthPlanList().stream()
+                .filter(Objects::nonNull)
+                .filter(plan -> Objects.equals(adjustVo.getYear(), plan.getYear()))
+                .filter(plan -> Objects.equals(adjustVo.getMonth(), plan.getMonth()))
+                .filter(plan -> Objects.equals(materialStatusKey,
+                        MonthPlanDateResolver.buildMaterialStatusKey(
+                                plan.getMaterialCode(), plan.getProductStatus())))
+                .anyMatch(plan -> this.safePlanQty(plan) > 0);
+    }
+
+    /**
+     * 判断日计划调整量是否已经由月计划续作路由承接。
+     *
+     * @param context  排程上下文
+     * @param adjustVo 日计划调整记录
+     * @return true-已进入续作排产；false-需要由S4.5.2独立承接
+     */
+    private boolean isHandledByMonthlyRoute(LhScheduleContext context, LhDayPlanAdjustVo adjustVo) {
+        if (Objects.isNull(context) || Objects.isNull(adjustVo)
+                || CollectionUtils.isEmpty(context.getContinuousSkuList())) {
+            return false;
+        }
+        String materialStatusKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                adjustVo.getMaterialCode(), adjustVo.getProductStatus());
+        return context.getContinuousSkuList().stream()
+                .filter(Objects::nonNull)
+                .anyMatch(sku -> Objects.equals(materialStatusKey,
+                        MonthPlanDateResolver.buildMaterialStatusKey(
+                                sku.getMaterialCode(), sku.getProductStatus())));
+    }
+
+    /**
+     * 汇总同年月、同物料和产品状态的日计划调整量。
+     *
+     * @param context  排程上下文
+     * @param adjustVo 用于匹配的调整记录身份
+     * @return 调整量汇总，可正可负
+     */
+    private int resolveAdjustTotalQty(LhScheduleContext context, LhDayPlanAdjustVo adjustVo) {
+        if (Objects.isNull(context) || Objects.isNull(adjustVo)
+                || CollectionUtils.isEmpty(context.getAllLhDayPlanAdjustList())) {
+            return 0;
+        }
+        String materialStatusKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                adjustVo.getMaterialCode(), adjustVo.getProductStatus());
+        return context.getAllLhDayPlanAdjustList().stream()
+                .filter(Objects::nonNull)
+                .filter(item -> Objects.equals(adjustVo.getYear(), item.getYear()))
+                .filter(item -> Objects.equals(adjustVo.getMonth(), item.getMonth()))
+                .filter(item -> Objects.equals(materialStatusKey,
+                        MonthPlanDateResolver.buildMaterialStatusKey(
+                                item.getMaterialCode(), item.getProductStatus())))
+                .mapToInt(LhDayPlanAdjustVo::getPlanQtyValue)
+                .sum();
+    }
+
+    /**
+     * 获取非负原始月计划量。
+     *
+     * @param plan 月计划记录
+     * @return 非负原始月计划量
+     */
+    private int safePlanQty(FactoryMonthPlanProductionFinalResult plan) {
+        return Objects.isNull(plan) || Objects.isNull(plan.getTotalQty())
+                ? 0 : Math.max(0, plan.getTotalQty());
     }
 
     /**
@@ -198,8 +280,8 @@ public class DayPlanAdjustRequireAssembler {
     /**
      * 复用现有硫化余量口径计算日计划调整物料的有效余量。
      *
-     * <p>无月计划物料的月计划基础量为 0，故把汇总调整量作为本月有效计划量传入共享计算器，
-     * 余量 = 汇总调整量 - 已完成量 + 有效超欠产(0)。</p>
+     * <p>没有正向原始月计划量的物料以 0 作为月计划基础量，故把汇总调整量作为本月有效计划量
+     * 传入共享计算器，余量 = 汇总调整量 - 已完成量 + 有效超欠产(0)。</p>
      *
      * @param context        排程上下文
      * @param materialCode   物料编码

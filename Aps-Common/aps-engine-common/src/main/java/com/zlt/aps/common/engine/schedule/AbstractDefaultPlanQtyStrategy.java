@@ -1,19 +1,21 @@
 package com.zlt.aps.common.engine.schedule;
 
+import com.zlt.aps.common.engine.schedule.engine.ScheduleTaskDraftModel;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
 /**
  * 公共默认计划量算法模板。
  *
- * <p>模板统一处理两班库存覆盖、基础需求扣库存、收尾限制、最小起排、卷数取整、
+ * <p>模板统一处理库存覆盖、基础需求扣库存、收尾限制、最小起排、卷数取整、
  * 交接库存和结果分量。TM/TC 通过字段及结果适配钩子提供领域对象，不在子类复制主流程。</p>
  *
  * @param <C> 排程上下文类型
  * @param <T> 待排任务类型
  * @param <R> 计划量结果类型
  */
-public abstract class AbstractDefaultPlanQtyStrategy<C, T, R> {
+public abstract class AbstractDefaultPlanQtyStrategy<C, T extends ScheduleTaskDraftModel, R> {
 
     /**
      * 执行公共默认计划量计算。
@@ -37,13 +39,25 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T, R> {
         BigDecimal twoShiftStockGap = twoShiftDemand.subtract(stock);
         this.setTwoShiftDemandQty(task, twoShiftDemand);
         this.setTwoShiftStockGapQty(task, twoShiftStockGap);
-        if (this.isTwoShiftStockCoverageApplicable(task)
-                && twoShiftStockGap.compareTo(BigDecimal.ZERO) <= 0) {
-            this.setTwoShiftStockCovered(task, Boolean.TRUE);
-            return this.buildTwoShiftCoveredResult(task, currentDemand, twoShiftDemand, stock);
-        }
-        if (this.isTwoShiftStockCoverageApplicable(task)) {
+        boolean stockCoverageApplicable = this.isTwoShiftStockCoverageApplicable(task);
+        if (stockCoverageApplicable) {
+            BigDecimal coverageDemand = task.getStockCoverageDemandQty() == null
+                    ? twoShiftDemand : this.nvl(task.getStockCoverageDemandQty());
+            task.setStockCoverageDemandQty(coverageDemand);
+            BigDecimal coverageStockGap = coverageDemand.subtract(stock);
+            task.setStockCoverageStockGapQty(coverageStockGap);
+            if (coverageStockGap.compareTo(BigDecimal.ZERO) <= 0) {
+                task.setStockCoverageCovered(Boolean.TRUE);
+                this.setTwoShiftStockCovered(task, Boolean.TRUE);
+                return this.buildStockCoverageCoveredResult(task, currentDemand, coverageDemand, stock);
+            }
+            task.setStockCoverageCovered(Boolean.FALSE);
             this.setTwoShiftStockCovered(task, Boolean.FALSE);
+        } else {
+            task.setStockCoverageDemandQty(null);
+            task.setStockCoverageCovered(null);
+            task.setStockCoverageStockGapQty(null);
+            this.setTwoShiftStockCovered(task, null);
         }
 
         BigDecimal grossDemand = currentDemand.add(guardDemand);
@@ -143,10 +157,10 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T, R> {
     protected abstract boolean isFormingShutdownCloseOut(T task);
 
     /**
-     * 判断是否应用两班库存覆盖门槛。
+     * 判断是否应用库存覆盖门槛。
      *
      * @param task 待排任务
-     * @return 是否应用两班库存覆盖
+     * @return 是否应用库存覆盖
      */
     protected abstract boolean isTwoShiftStockCoverageApplicable(T task);
 
@@ -200,23 +214,23 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T, R> {
     protected abstract BigDecimal getDefaultCurlRollLength(T task);
 
     /**
-     * 写入两班需求合计。
+     * 写入历史两班需求合计。
      *
      * @param task 任务
-     * @param value 两班需求合计
+     * @param value 历史两班需求合计
      */
     protected abstract void setTwoShiftDemandQty(T task, BigDecimal value);
 
     /**
-     * 写入两班库存缺口。
+     * 写入历史两班库存缺口。
      *
      * @param task 任务
-     * @param value 两班库存缺口
+     * @param value 历史两班库存缺口
      */
     protected abstract void setTwoShiftStockGapQty(T task, BigDecimal value);
 
     /**
-     * 写入两班库存覆盖标识。
+     * 写入历史两班库存覆盖标识。
      *
      * @param task 任务
      * @param value 是否覆盖
@@ -343,6 +357,8 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T, R> {
      * @return 停产收尾计划量结果
      */
     private R calculateFormingShutdownCloseOut(T task, BigDecimal stock) {
+        task.setStockCoverageCovered(null);
+        task.setStockCoverageStockGapQty(null);
         BigDecimal closeOutDemandQty = this.nvl(this.getFormingShutdownCloseOutDemandQty(task));
         BigDecimal stockDeductQty = stock.min(closeOutDemandQty);
         BigDecimal basePlanQty = closeOutDemandQty.subtract(stock).max(BigDecimal.ZERO);
@@ -386,19 +402,29 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T, R> {
     }
 
     /**
-     * 构建两班库存已覆盖的零计划结果。
+     * 构建库存覆盖已命中的零计划结果。
      *
      * @param task            任务
      * @param currentDemand  当班需求量
-     * @param twoShiftDemand 两班需求合计
+     * @param coverageDemand 覆盖窗口需求合计
      * @param stock           班初滚动库存
      * @return 零计划结果
      */
-    private R buildTwoShiftCoveredResult(T task, BigDecimal currentDemand,
-                                         BigDecimal twoShiftDemand, BigDecimal stock) {
+    private R buildStockCoverageCoveredResult(T task, BigDecimal currentDemand,
+                                              BigDecimal coverageDemand, BigDecimal stock) {
         BigDecimal zero = BigDecimal.ZERO;
-        this.setStockDeductQty(task, stock.min(twoShiftDemand));
+        this.setStockDeductQty(task, stock.min(coverageDemand));
         this.setPlanStockQty(task, stock.subtract(currentDemand).max(zero));
+        task.setLossAddQty(zero);
+        task.setToolLimitAdjustQty(zero);
+        task.setToolOverflowQty(zero);
+        task.setMinStartAdjustQty(zero);
+        task.setTailRoundAdjustQty(zero);
+        task.setCapacityAdjustQty(zero);
+        task.setBaseDemandQty(zero);
+        task.setPreLossPlanQty(zero);
+        task.setPlanQtyBeforeToolLimit(zero);
+        this.clearAdditionalAdjustments(task);
         this.setPlanQty(task, zero);
 
         R result = this.newResult();
@@ -407,7 +433,12 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T, R> {
         this.setResultPreLossPlanQty(result, zero);
         this.setResultPlanQtyBeforeToolLimit(result, zero);
         this.setResultFinalPlanQty(result, zero);
-        this.setResultCalcFormulaDesc(result, "两班需求已由班初滚动库存覆盖，当班无需排产");
+        Integer coverageShiftCount = task.getStockCoverageWindow() == null
+                ? null : task.getStockCoverageWindow().getShiftCount();
+        String coverageDescription = coverageShiftCount == null
+                ? "库存覆盖需求已由班初滚动库存覆盖，当班无需排产"
+                : coverageShiftCount + "班需求已由班初滚动库存覆盖，当班无需排产";
+        this.setResultCalcFormulaDesc(result, coverageDescription);
         return result;
     }
 
@@ -423,6 +454,17 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T, R> {
         this.setResultToolLimitAdjustQty(result, BigDecimal.ZERO);
         this.setResultToolOverflowQty(result, BigDecimal.ZERO);
         this.setResultCapacityAdjustQty(result, BigDecimal.ZERO);
+    }
+
+    /**
+     * 清理领域策略扩展的计划量调整分量。
+     *
+     * <p>公共模型只包含 TM/TC 共用字段；领域策略可覆盖此方法清理本模块专有调整量。</p>
+     *
+     * @param task 已命中库存覆盖的任务
+     */
+    protected void clearAdditionalAdjustments(T task) {
+        // 默认无额外调整分量。
     }
 
     /**

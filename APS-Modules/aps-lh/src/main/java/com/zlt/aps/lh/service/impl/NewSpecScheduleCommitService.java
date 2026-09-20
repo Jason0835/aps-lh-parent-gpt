@@ -5,6 +5,8 @@ import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import cn.hutool.core.bean.BeanUtil;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.component.StructureEndingAlignmentService;
+import com.zlt.aps.lh.engine.strategy.support.StructureSwitchSchedulingPolicy;
+import org.apache.commons.lang3.StringUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -55,6 +57,13 @@ public class NewSpecScheduleCommitService {
                 context, selectedSku);
         try {
             int scheduledCount = commitAction.getAsInt();
+            String switchFailure = StructureSwitchSchedulingPolicy.validateCommittedResults(context, beforeResultCount);
+            if (StringUtils.isNotEmpty(switchFailure)) {
+                snapshot.restore(context);
+                this.rebuildStructureInMachineIndex(context);
+                log.info("结构切换实际提交校验失败，完整回滚, batchNo={}, reason={}", context.getBatchNo(), switchFailure);
+                return NewSpecScheduleCommitResult.rolledBack();
+            }
             boolean terminalStateCommitted = context.getScheduleResultList().size() > beforeResultCount
                     || context.getUnscheduledResultList().size() > beforeUnscheduledCount
                     || (selectedSkuPendingBefore && !this.containsByIdentity(context, selectedSku));
@@ -89,6 +98,7 @@ public class NewSpecScheduleCommitService {
      * @return 有效结果提交数或完整回滚；异常恢复后继续传播
      */
     public NewSpecScheduleCommitResult commitResultOnly(LhScheduleContext context, IntSupplier attemptAction) {
+        int beforeResultCount = context.getScheduleResultList().size();
         // 前置阶段持有机台对象引用，失败恢复时同步原对象，避免下一组合使用试排后的状态。
         Map<String, MachineScheduleDTO> originalMachines =
                 new LinkedHashMap<String, MachineScheduleDTO>(context.getMachineScheduleMap());
@@ -97,7 +107,11 @@ public class NewSpecScheduleCommitService {
         boolean success = false;
         try {
             int scheduledCount = attemptAction.getAsInt();
-            success = scheduledCount > 0;
+            String switchFailure = StructureSwitchSchedulingPolicy.validateCommittedResults(context, beforeResultCount);
+            success = scheduledCount > 0 && StringUtils.isEmpty(switchFailure);
+            if (StringUtils.isNotEmpty(switchFailure)) {
+                log.info("结构切换指定组合提交拒绝, batchNo={}, reason={}", context.getBatchNo(), switchFailure);
+            }
             return success ? NewSpecScheduleCommitResult.resultCommitted(scheduledCount)
                     : NewSpecScheduleCommitResult.rolledBack();
         } finally {

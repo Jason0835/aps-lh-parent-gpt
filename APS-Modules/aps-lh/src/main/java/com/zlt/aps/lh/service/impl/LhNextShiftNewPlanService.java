@@ -1,5 +1,8 @@
 package com.zlt.aps.lh.service.impl;
 
+import com.zlt.aps.lh.engine.strategy.support.StructureSwitchRuntimeState;
+import com.zlt.aps.lh.engine.strategy.support.StructureSwitchSchedulingPolicy;
+
 import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
@@ -287,6 +290,16 @@ public class LhNextShiftNewPlanService {
         isolatedContext.setWindowEndDate(businessTargetShift.getWorkDate());
         isolatedContext.setCurrentScheduleDate(
                 Date.from(targetBusinessDate.atStartOfDay(ZoneId.systemDefault()).toInstant()));
+        // 独立班次仅复制已提交首班，不让空结果列表重新初始化同一次结构切换。
+        Map<String, StructureSwitchRuntimeState> switchBaseline = new LinkedHashMap<>(16);
+        if (StructureSwitchSchedulingPolicy.isEnabled(sourceContext)) {
+            sourceContext.getStructureSwitchRuntimeMap().forEach((structure, state) -> switchBaseline.put(structure,
+                    StructureSwitchSchedulingPolicy.withAdjacentShift(state, sourceEndingShift, businessTargetShift)));
+        }
+        isolatedContext.setStructureSwitchBaselineRuntimeMap(Collections.unmodifiableMap(switchBaseline));
+        isolatedContext.setStructureSwitchRuntimeMap(new LinkedHashMap<>(switchBaseline));
+        isolatedContext.setStructureSwitchResultPlanMap(new IdentityHashMap<>());
+        isolatedContext.setStructureSwitchAttemptPlanMap(new LinkedHashMap<>(4));
         isolatedContext.setScheduleResultList(new ArrayList<LhScheduleResult>());
         isolatedContext.setScheduleResultSourceSkuMap(
                 new IdentityHashMap<LhScheduleResult, SkuScheduleDTO>());

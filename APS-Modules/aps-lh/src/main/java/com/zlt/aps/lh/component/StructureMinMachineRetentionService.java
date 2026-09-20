@@ -651,7 +651,7 @@ public class StructureMinMachineRetentionService {
         }
         LocalDate productionDate = businessDate.toInstant()
                 .atZone(ZoneId.systemDefault()).toLocalDate();
-        if (!context.isContinuousStopHoldDate(machineCode, productionDate)) {
+        if (!context.isContinuousStopHoldShift(machineCode, productionDate, shift.getShiftIndex())) {
             return false;
         }
         return context.getScheduleResultList().stream()
