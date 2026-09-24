@@ -35,6 +35,8 @@ import com.zlt.aps.lh.engine.observer.ScheduleEvent;
 import com.zlt.aps.lh.engine.observer.ScheduleEventPublisher;
 import com.zlt.aps.lh.engine.strategy.IEndingJudgmentStrategy;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceContext;
+import com.zlt.aps.lh.engine.strategy.support.PreviousAlternatePlanReleaseEvent;
+import com.zlt.aps.lh.engine.strategy.support.OffMachineDecision;
 import com.zlt.aps.lh.engine.strategy.support.ProductionQuantityPolicy;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationEndingHandoffAudit;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationTemporaryFaultTransferEvent;
@@ -212,6 +214,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
 //            validateProductionQuantityPolicy(context);
             // 正式后料、首检及最终裁量均已完成，只读比较续作预测与实际衔接，禁止为维持预测改后料。
             ContinuationEndingHandoffAudit.audit(context);
+            // 独立时间下机边界必须经得住所有后置数量归整及后料提交，不能只在S4.4中间态正确。
+            this.validateTimedMachineOffBoundaries(context);
 
             /*
              * 所有会改变最终结果数量的后置处理已经结束。此处只整理未排诊断投影，
@@ -1565,6 +1569,15 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         if (Objects.isNull(result)) {
             return;
         }
+        SkuScheduleDTO sourceSku = context.getScheduleResultSourceSkuMap().get(result);
+        // 严格目标量已经由统一生产账本精确扣减，保存前不得再按模台数向上补齐。
+        if (Objects.nonNull(sourceSku) && sourceSku.isStrictTargetQty()) {
+            log.info("严格目标结果跳过模台数保存前收敛, batchNo: {}, materialCode: {}, "
+                            + "productStatus: {}, machineCode: {}, planQty: {}",
+                    context.getBatchNo(), result.getMaterialCode(), result.getProductStatus(),
+                    result.getLhMachineCode(), ShiftFieldUtil.resolveScheduledQty(result));
+            return;
+        }
         Integer mouldQtyValue = result.getMouldQty();
         int mouldQty = Objects.isNull(mouldQtyValue) ? 0 : mouldQtyValue;
         if (mouldQty <= 1) {
@@ -2241,6 +2254,23 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     }
 
     /**
+     * 区分完整装机的左右模与历史单副换模的动作范围。
+     *
+     * @param context 含正式承接结果关联的排程上下文
+     * @param result 当前换模排产结果
+     * @return 单副换模返回历史L/R，其余沿用结果和机台既有口径
+     */
+    private String resolveMouldChangePlanLeftRightMould(LhScheduleContext context, LhScheduleResult result) {
+        PreviousAlternatePlanReleaseEvent event = context.getPreviousAlternateReleaseEventMap()
+                .get(result.getLhMachineCode());
+        if (Objects.nonNull(event) && event.isSingleMouldReplacement()
+                && context.getPreviousAlternateResultPlanMap().get(result) == event.getPlan()) {
+            return event.getPlan().getLeftRightMould();
+        }
+        return LeftRightMouldUtil.resolveLeftRightMould(result.getLeftRightMould(), result.getLhMachineCode());
+    }
+
+    /**
      * 生成模具交替计划。
      * <p>
      * 收集排程结果中换模的机台，生成对应的模具交替计划记录。<br/>
@@ -2271,7 +2301,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             RollingMachineState state = rollingStateMap.computeIfAbsent(result.getLhMachineCode(),
                     machineCode -> buildInitialState(context, machineCode));
             String changeMouldType = determineChangeMouldType(result);
-            if (shouldSkipSameMaterialMouldChangePlan(state, result)) {
+            if (!context.getPreviousAlternateResultPlanMap().containsKey(result)
+                    && shouldSkipSameMaterialMouldChangePlan(state, result)) {
                 log.info("前后物料编码相同，跳过模具交替计划生成, 工厂: {}, 批次: {}, 机台: {}, 前物料: {}, "
                                 + "后物料: {}, 交替类型: {}, 产品状态: {}",
                         context.getFactoryCode(), context.getBatchNo(), result.getLhMachineCode(),
@@ -2293,13 +2324,15 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             plan.setClassIndex(resolvePlanShiftCode(context, plannedMouldChangeStartTime));
             plan.setLhMachineCode(result.getLhMachineCode());
             plan.setLhMachineName(result.getLhMachineName());
-            plan.setLeftRightMould(LeftRightMouldUtil.resolveLeftRightMould(
-                    result.getLeftRightMould(), result.getLhMachineCode()));
+            // 排产结果描述完整装机产能；单副换模计划的动作范围单独沿用历史L/R。
+            plan.setLeftRightMould(this.resolveMouldChangePlanLeftRightMould(context, result));
             // 前规格取换模前机台当前在产规格，后规格取本次换模上机规格。
             plan.setBeforeMaterialCode(state.getCurrentMaterialCode());
             plan.setBeforeMaterialDesc(state.getCurrentMaterialDesc());
             plan.setAfterMaterialCode(result.getMaterialCode());
             plan.setAfterMaterialDesc(result.getMaterialDesc());
+            // 保存本条计划物料（换模后上机物料）对应的产品状态，与排程结果 PRODUCT_STATUS 同口径。
+            plan.setProductStatus(result.getProductStatus());
             plan.setMouldCode(result.getMouldCode());
             plan.setIsRelease("0");
             plan.setMouldStatus("0");
@@ -2482,6 +2515,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         plan.setBeforeMaterialDesc(event.getMaterialDesc());
         plan.setAfterMaterialCode(event.getMaterialCode());
         plan.setAfterMaterialDesc(event.getMaterialDesc());
+        // 保存下机物料对应的产品状态，取自续作临时故障迁移事件。
+        plan.setProductStatus(event.getProductStatus());
         plan.setChangeMouldType(MouldChangeTypeEnum.REGULAR.getCode());
         plan.setChangeTime(event.getFaultStartTime());
         plan.setMouldCode(event.getOriginalMouldCode());
@@ -2577,6 +2612,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         plan.setBeforeMaterialDesc(state.getCurrentMaterialDesc());
         plan.setAfterMaterialCode(result.getMaterialCode());
         plan.setAfterMaterialDesc(result.getMaterialDesc());
+        // 保存补齐计划物料（新机台上机物料）对应的产品状态，与排程结果 PRODUCT_STATUS 同口径。
+        plan.setProductStatus(result.getProductStatus());
         plan.setMouldCode(result.getMouldCode());
         plan.setIsRelease("0");
         plan.setMouldStatus("0");
@@ -3169,6 +3206,9 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             RollingMachineState cleaningState = resolveCleaningMaterialState(context, changeResults,
                     machineCode, cleaningWindow.getCleanStartTime());
             String changeMouldType = resolveCleaningMouldChangeType(cleaningWindow);
+            // 清洗计划物料对应的产品状态：离机清洗取事件中的续作物料状态，其余取清洗时点机台前物料状态。
+            String planProductStatus = cleaningWindow.isOffMachineCleaning()
+                    ? cleaningWindow.getContinuationProductStatus() : cleaningState.getCurrentProductStatus();
             LhMouldChangePlan plan = new LhMouldChangePlan();
             plan.setFactoryCode(context.getFactoryCode());
             plan.setLhResultBatchNo(context.getBatchNo());
@@ -3209,17 +3249,17 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                 }
             }
             plan.setIsDelete(0);
+            // 保存本条清洗计划物料对应的产品状态。
+            plan.setProductStatus(planProductStatus);
             // 清洗计划同样按清洗发生时点的前物料判断，不能读取排程结束后的机台 ending 状态。
             plan.setEndType(resolveMouldChangePlanEndType(context, machineCode,
-                    plan.getBeforeMaterialCode(), cleaningWindow.isOffMachineCleaning()
-                            ? cleaningWindow.getContinuationProductStatus() : cleaningState.getCurrentProductStatus(),
+                    plan.getBeforeMaterialCode(), planProductStatus,
                     cleaningWindow.getCleanStartTime()));
             plans.add(plan);
             log.info("续作清洗交替计划生成, 机台: {}, 前物料: {}, 后物料: {}, 原模具: {}, 替换模具: {}, 备注: {}, 已生成交替计划: true, 类型: {}, 保存模具: {}",
                     machineCode, plan.getBeforeMaterialCode(), plan.getAfterMaterialCode(), cleaningWindow.getMouldCode(),
                     cleaningWindow.getReplacementMouldCode(), plan.getRemark(), plan.getChangeMouldType(), plan.getMouldCode());
-            planProductStatusMap.put(plan, cleaningWindow.isOffMachineCleaning()
-                    ? cleaningWindow.getContinuationProductStatus() : cleaningState.getCurrentProductStatus());
+            planProductStatusMap.put(plan, planProductStatus);
             if (cleaningWindow.isOffMachineCleaning()) {
                 this.appendOffMachineCleaningProcessLog(context, plan, cleaningWindow);
             }
@@ -4493,6 +4533,49 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     private void requireField(String value, String fieldName, LhScheduleContext context, LhScheduleResult result) {
         if (StringUtils.isBlank(value)) {
             throwValidationFailure(context, result, fieldName + " 缺失");
+        }
+    }
+
+    /**
+     * 保存前只读核对按时间下机前后时间轴，不搬动后料、不重复登记换模次数。
+     * @param context 最终排程上下文
+     */
+    private void validateTimedMachineOffBoundaries(LhScheduleContext context) {
+        for (Map.Entry<LhScheduleResult, OffMachineDecision> entry
+                : context.getTimedMachineOffDecisionMap().entrySet()) {
+            LhScheduleResult original = entry.getKey();
+            Date boundary = entry.getValue().getOccupancyEndTime();
+            if (context.getScheduleResultList().contains(original) && ShiftFieldUtil.resolveScheduledQty(original) > 0) {
+                if (!Objects.equals(boundary, original.getSpecEndTime())
+                        || !Objects.equals(boundary, original.getTdaySpecEndTime())) {
+                    this.throwValidationFailure(context, original, "按时间下机收尾时刻被后置处理覆盖");
+                }
+                for (LhShiftConfigVO shift : context.getScheduleWindowShifts()) {
+                    Integer quantity = ShiftFieldUtil.getShiftPlanQty(original, shift.getShiftIndex());
+                    Date endTime = ShiftFieldUtil.getShiftEndTime(original, shift.getShiftIndex());
+                    if (Objects.nonNull(quantity) && quantity > 0
+                            && (Objects.isNull(endTime) || endTime.after(boundary))) {
+                        this.throwValidationFailure(context, original, "按时间下机后仍存在生产量或有量班次缺少真实结束时间");
+                    }
+                }
+            }
+            String physicalCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(original.getLhMachineCode());
+            for (LhScheduleResult following : context.getScheduleResultList()) {
+                if (context.getTimedMachineOffDecisionMap().containsKey(following)
+                        || !StringUtils.equals(physicalCode,
+                        LhSingleControlMachineUtil.resolvePhysicalMachineCode(following.getLhMachineCode()))) {
+                    continue;
+                }
+                Date changeTime = following.getMouldChangeStartTime();
+                if (Objects.nonNull(changeTime) && changeTime.before(boundary)) {
+                    this.throwValidationFailure(context, following, "后料换模早于按时间下机的物理释放边界");
+                }
+            }
+            PriorityTraceLogHelper.appendProcessLog(context, "按时间下机最终时间核对",
+                    String.format("SKU=%s, 状态=%s, 机台=%s, 下机=%s, 占用截止=%s, 规则=%s, 结论=一致",
+                            original.getMaterialCode(), original.getProductStatus(), original.getLhMachineCode(),
+                            LhScheduleTimeUtil.formatDateTime(entry.getValue().getOffMachineTime()),
+                            LhScheduleTimeUtil.formatDateTime(boundary), entry.getValue().getReason()));
         }
     }
 

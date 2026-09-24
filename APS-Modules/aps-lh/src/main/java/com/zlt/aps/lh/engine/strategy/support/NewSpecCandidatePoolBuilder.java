@@ -84,6 +84,12 @@ public class NewSpecCandidatePoolBuilder {
             // 先完整保留现有日期池语义，再叠加胎胚最早可供业务日下限。
             LocalDate basePoolDate = this.resolvePoolDate(
                     windowStartDate, phase, candidate);
+            // 历史下机候选不能早于实际释放班次归池，精确时刻继续由正式时间轴约束。
+            Date releaseTime = context.getPreviousAlternateCandidateAvailableTimeMap().get(candidate.getSku());
+            LocalDate releasePoolDate = this.resolveEarliestLhPoolDate(context, releaseTime);
+            if (Objects.nonNull(releasePoolDate) && releasePoolDate.isAfter(basePoolDate)) {
+                basePoolDate = releasePoolDate;
+            }
             candidate.setPoolDate(basePoolDate);
             Date earliestLhTime = NewSpecEmbryoAvailableTimeResolver
                     .resolveEffectiveEarliestAvailableTime(context, candidate.getSku());

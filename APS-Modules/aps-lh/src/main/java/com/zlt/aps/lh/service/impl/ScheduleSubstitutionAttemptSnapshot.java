@@ -1,5 +1,6 @@
 package com.zlt.aps.lh.service.impl;
 
+import com.zlt.aps.lh.engine.strategy.support.ContinuationEndingAllocationSnapshot;
 import cn.hutool.core.bean.BeanUtil;
 import com.zlt.aps.lh.api.domain.dto.CapsuleReplacementTimeWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.CleaningScheduleDateFillItem;
@@ -201,6 +202,16 @@ final class ScheduleSubstitutionAttemptSnapshot {
     /** 原始账本引用，用于恢复续作与补偿SKU的共享关系。 */
     private Map<SkuScheduleDTO, Map<LocalDate, SkuDailyPlanQuotaDTO>> skuDailyQuotaReferenceMap;
 
+    /** 历史承载置换新增的退出时刻与物料身份，失败必须同步恢复。 */
+    private Map<String, Date> previousAlternateReleasedMachineTimeMap;
+    private Map<String, String> previousAlternateReleasedSkuKeyMap;
+    private Map<SkuScheduleDTO, Date> previousAlternateCandidateAvailableTimeMap;
+    /** 正式交替结果标记，避免失败结果残留影响同料计划生成。 */
+    private Map<LhScheduleResult, LhMouldChangePlan> previousAlternateResultPlanMap;
+
+    /** 收尾只读快照采用写时复制，置换失败恢复原对象映射。 */
+    private Map<LhScheduleResult, ContinuationEndingAllocationSnapshot> continuationFinishSnapshots;
+
     private ScheduleSubstitutionAttemptSnapshot() {
     }
 
@@ -233,6 +244,11 @@ final class ScheduleSubstitutionAttemptSnapshot {
             Collection<SkuScheduleDTO> skuCollection) {
         ScheduleSubstitutionAttemptSnapshot snapshot =
                 new ScheduleSubstitutionAttemptSnapshot();
+        snapshot.previousAlternateReleasedMachineTimeMap = new LinkedHashMap<>(context.getPreviousAlternateReleasedMachineTimeMap());
+        snapshot.previousAlternateReleasedSkuKeyMap = new LinkedHashMap<>(context.getPreviousAlternateReleasedSkuKeyMap());
+        snapshot.previousAlternateCandidateAvailableTimeMap = new IdentityHashMap<>(context.getPreviousAlternateCandidateAvailableTimeMap());
+        snapshot.previousAlternateResultPlanMap = new IdentityHashMap<>(context.getPreviousAlternateResultPlanMap());
+        snapshot.continuationFinishSnapshots = new IdentityHashMap<>(context.getContinuationSurplusEndingSnapshotMap());
         snapshot.nextShiftNewPlanCandidateList = new ArrayList<>(context.getNextShiftNewPlanCandidateList());
         snapshot.nextShiftNewPlanPoolDateMap = new LinkedHashMap<>(context.getNextShiftNewPlanPoolDateMap());
         snapshot.structureSwitchRuntimeMap = new LinkedHashMap<>(context.getStructureSwitchRuntimeMap());
@@ -633,6 +649,11 @@ final class ScheduleSubstitutionAttemptSnapshot {
          * 模具资源上下文没有暴露可变 Map，恢复排程结果和机台状态后按相同基础数据重新构建，
          * 可确保机台旧模具绑定、特殊材料预占模具和全局占用集合同时回到候选前口径。
          */
+        context.setPreviousAlternateReleasedMachineTimeMap(new LinkedHashMap<>(previousAlternateReleasedMachineTimeMap));
+        context.setPreviousAlternateReleasedSkuKeyMap(new LinkedHashMap<>(previousAlternateReleasedSkuKeyMap));
+        context.setPreviousAlternateCandidateAvailableTimeMap(new IdentityHashMap<>(previousAlternateCandidateAvailableTimeMap));
+        context.setPreviousAlternateResultPlanMap(new IdentityHashMap<>(previousAlternateResultPlanMap));
+        context.setContinuationSurplusEndingSnapshotMap(new IdentityHashMap<>(continuationFinishSnapshots));
         context.setMouldResourceContext(MouldResourceContext.from(context));
     }
 

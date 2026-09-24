@@ -17,7 +17,6 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -67,58 +66,60 @@ public class LhMachineOnlineInfoServiceImpl extends AbstractDocService<LhMachine
     }
 
     /**
-     * 按维度键UPSERT批量保存（MES同步新模式）
-     * 维度键 = 工厂 + 机台 + 日期
-     * 键存在则更新（命中已逻辑删除的行会回填ID并复活），不存在则插入；
-     * 不做对账删除，MES未上报的既有键保持原状
+     * 先删后插批量保存（MES同步模式）
+     * 批内按维度键（工厂+机台+日期）去重（保留最后一条）后，按（工厂+日期）分组逐组：
+     * 先逻辑删除该（工厂+日期）下全部旧数据（实现该日全量对账：MES未上报的机台行会被清理），再插入新数据；
+     * 整个操作处于类级事务内，删除或插入失败整体回滚，不会出现"删了没插"
      *
+     * @param updateBy 更新者（MES同步传MES，清理任务传CLEAN_TASK）
      * @param list 待保存的数据列表
      * @return 实际处理的数据条数
      */
     @Override
-    public int upsertBatch(List<LhMachineOnlineInfo> list) {
+    public int deleteAndSaveBatch(String updateBy, List<LhMachineOnlineInfo> list) {
         if (CollectionUtils.isEmpty(list)) {
             return 0;
         }
-        log.info("硫化在机同步-UPSERT开始：待处理数量={}", list.size());
+        log.info("硫化在机同步-先删后插开始：待处理数量={}", list.size());
 
-        // 同批次内先按维度键去重（保留最后一条），避免重复键引发插入冲突
+        // 同批次内先按维度键去重（保留最后一条），避免同键多行插入产生重复数据
         Map<String, LhMachineOnlineInfo> keyMap = new LinkedHashMap<>();
         for (LhMachineOnlineInfo item : list) {
             keyMap.put(this.buildUniqueKey(item), item);
         }
-        List<LhMachineOnlineInfo> upsertList = new ArrayList<>(keyMap.values());
+        List<LhMachineOnlineInfo> dedupList = new ArrayList<>(keyMap.values());
 
-        // 查询维度键已存在的数据（包含已逻辑删除的行）
-        List<LhMachineOnlineInfo> existsList = lhMachineOnlineInfoMapper.selectByUniqueKeyList(upsertList);
-        Map<String, LhMachineOnlineInfo> existsMap = existsList.stream()
-                .collect(Collectors.toMap(this::buildUniqueKey, Function.identity(), (v1, v2) -> v1));
+        // 按（工厂+日期）分组，组顺序保持插入顺序
+        Map<String, List<LhMachineOnlineInfo>> groupMap = dedupList.stream()
+                .collect(Collectors.groupingBy(this::buildDateGroupKey, LinkedHashMap::new, Collectors.toList()));
 
-        // 命中维度键：回填ID并复活（IS_DELETE置0），saveBatch按ID走更新；未命中：无ID走插入
-        int updateCount = 0;
-        for (LhMachineOnlineInfo item : upsertList) {
-            LhMachineOnlineInfo existsData = existsMap.get(this.buildUniqueKey(item));
-            if (existsData != null) {
-                item.setId(existsData.getId());
-                item.setIsDelete(0);
-                updateCount++;
+        // 逐组先删后插：先逻辑删除该（工厂+日期）下全部旧数据，再分批插入新数据
+        Date now = new Date();
+        int deleteCount = 0;
+        for (Map.Entry<String, List<LhMachineOnlineInfo>> entry : groupMap.entrySet()) {
+            LhMachineOnlineInfo firstItem = entry.getValue().get(0);
+            // 在线日期为空时无法圈定删除范围，跳过删除仅插入
+            if (firstItem.getOnlineDate() != null) {
+                deleteCount += lhMachineOnlineInfoMapper.logicDeleteByFactoryCodeAndOnlineDate(
+                        firstItem.getFactoryCode(), DateUtil.beginOfDay(firstItem.getOnlineDate()), updateBy, now);
+            }
+
+            // 分批插入（1000条/批）
+            List<LhMachineOnlineInfo> groupList = entry.getValue();
+            int batchSize = 1000;
+            for (int i = 0; i < groupList.size(); i += batchSize) {
+                int end = Math.min(i + batchSize, groupList.size());
+                baseDao.insertBatch(groupList.subList(i, end));
             }
         }
 
-        // 分批保存（saveBatch内部按ID有无区分更新/插入）
-        int batchSize = 1000;
-        for (int i = 0; i < upsertList.size(); i += batchSize) {
-            int end = Math.min(i + batchSize, upsertList.size());
-            baseDao.saveBatch(upsertList.subList(i, end));
-        }
-
-        log.info("硫化在机同步-UPSERT完成：总数={}，更新={}，插入={}", upsertList.size(), updateCount, upsertList.size() - updateCount);
-        return upsertList.size();
+        log.info("硫化在机同步-先删后插完成：分组数={}，逻辑删除行数={}，插入数量={}", groupMap.size(), deleteCount, dedupList.size());
+        return dedupList.size();
     }
 
     /**
      * 构建维度键：工厂 + 机台 + 日期（yyyy-MM-dd）
-     * 硫化一台机一行，左右模/在机模号均为行内字段，键不含物料维度，MES换规格时同键直接覆盖更新
+     * 硫化一台机一行，左右模/在机模号均为行内字段，键不含物料维度
      *
      * @param item 在机信息
      * @return 维度键字符串
@@ -126,5 +127,16 @@ public class LhMachineOnlineInfoServiceImpl extends AbstractDocService<LhMachine
     private String buildUniqueKey(LhMachineOnlineInfo item) {
         String onlineDateStr = item.getOnlineDate() == null ? "" : DateUtil.formatDate(item.getOnlineDate());
         return item.getFactoryCode() + "|" + item.getLhCode() + "|" + onlineDateStr;
+    }
+
+    /**
+     * 构建（工厂+日期）分组键：用于先删后插的对账范围圈定
+     *
+     * @param item 在机信息
+     * @return 分组键字符串
+     */
+    private String buildDateGroupKey(LhMachineOnlineInfo item) {
+        String onlineDateStr = item.getOnlineDate() == null ? "" : DateUtil.formatDate(item.getOnlineDate());
+        return item.getFactoryCode() + "|" + onlineDateStr;
     }
 }

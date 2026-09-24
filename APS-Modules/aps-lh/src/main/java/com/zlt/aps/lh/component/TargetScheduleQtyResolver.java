@@ -21,6 +21,7 @@ import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IMachineMatchStrategy;
 import com.zlt.aps.lh.engine.strategy.IMouldChangeBalanceStrategy;
 import com.zlt.aps.lh.engine.strategy.support.NewSpecEmbryoAvailableTimeResolver;
+import com.zlt.aps.lh.engine.strategy.support.PendingSkuUnscheduledRule;
 import com.zlt.aps.lh.engine.strategy.support.FirstInspectionAllocationPlan;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchSchedulingPolicy;
 import com.zlt.aps.lh.util.CleaningScheduleRuleUtil;
@@ -1482,7 +1483,7 @@ public class TargetScheduleQtyResolver {
     /**
      * 解析结果行 isEnd 最终判定使用的余量收尾比较目标量。
      * <p>{@code isEnd} 只标识硫化余量是否排完，不标识胎胚库存是否清空。因此本方法
-     * 固定返回硫化余量，不再读取胎胚库存、不按模台数归整，与排产控量使用的
+     * 使用硫化余量；已明确按奇数加一建立严格总目标时使用该归整目标，不读取胎胚库存，与排产控量使用的
      * {@link #resolveFinalEndingTargetQty(LhScheduleContext, SkuScheduleDTO)} 完全分离，
      * 避免“胎胚库存排完但余量仍有剩余”被误标为收尾。</p>
      * <p>典型场景：硫化余量 100、胎胚库存 30 且命中胎胚收尾时，胎胚库存排完只代表
@@ -1490,7 +1491,7 @@ public class TargetScheduleQtyResolver {
      *
      * @param context 排程上下文
      * @param sku SKU排程DTO
-     * @return 余量收尾比较目标量；返回 0 表示无硫化余量（已排完）
+     * @return 余量收尾比较目标量；已建立的奇数归整目标必须全部完成
      */
     public int resolveSurplusEndingTargetQty(LhScheduleContext context, SkuScheduleDTO sku) {
         if (Objects.isNull(sku)) {
@@ -1506,7 +1507,19 @@ public class TargetScheduleQtyResolver {
         if (Objects.nonNull(earlyProductionTargetQty)) {
             return Math.max(0, earlyProductionTargetQty);
         }
-        return Math.max(0, sku.getSurplusQty());
+        int surplusQty = Math.max(0, sku.getSurplusQty());
+        int roundedQty = ShiftCapacityResolverUtil.roundUpQtyToMouldMultiple(surplusQty, sku.getMouldQty());
+        Integer ledgerTarget = Objects.nonNull(context)
+                ? context.getSkuProductionTargetQtyMap().get(this.buildSkuKey(sku)) : null;
+        // 补偿副本的DTO可能仅承载剩余量，仍按共享账本的唯一总目标判断是否真正排完。
+        boolean roundedTargetEstablished = sku.resolveTargetScheduleQty() == roundedQty
+                || Objects.equals(ledgerTarget, roundedQty);
+        if (sku.isStrictTargetQty() && !sku.isStrictNewSpecShortageOnly()
+                && !PendingSkuUnscheduledRule.isTrialOrMassTrialSku(sku)
+                && !this.isEmbryoStockEnding(context, sku) && roundedTargetEstablished) {
+            return roundedQty;
+        }
+        return surplusQty;
     }
 
     private int resolveFinalEndingTargetQty(LhScheduleContext context, SkuScheduleDTO sku,
@@ -1519,6 +1532,13 @@ public class TargetScheduleQtyResolver {
         if (isEmbryoStockEnding(context, sku)) {
             log.info("最终收尾目标量解析, materialCode: {}, 胎胚编码: {}, 原始目标量: {}, "
                             + "精确硬目标: {}, 模台数: {}, 最终比较目标: {}, rule: 胎胚库存硬目标不做模台数归整",
+                    sku.getMaterialCode(), sku.getEmbryoCode(), originalTargetQty,
+                    originalTargetQty, mouldQty, originalTargetQty);
+            return originalTargetQty;
+        }
+        if (sku.isStrictTargetQty()) {
+            log.info("最终收尾目标量解析, materialCode: {}, 胎胚编码: {}, 原始目标量: {}, "
+                            + "精确硬目标: {}, 模台数: {}, 最终比较目标: {}, rule: 严格目标不做模台数归整",
                     sku.getMaterialCode(), sku.getEmbryoCode(), originalTargetQty,
                     originalTargetQty, mouldQty, originalTargetQty);
             return originalTargetQty;

@@ -34,13 +34,13 @@ public interface ILhMachineOnlineInfoService extends IDocService<LhMachineOnline
     void logicDeleteAndSaveBatch(String factoryCode, Date onlineDate, String updateBy, List<LhMachineOnlineInfo> insertList);
 
     /**
-     * 按维度键UPSERT批量保存（MES同步新模式）
-     * 维度键 = 工厂 + 机台 + 日期
-     * 键存在则更新（命中已逻辑删除的行会回填ID并复活），不存在则插入；
-     * 不做对账删除，MES未上报的既有键保持原状
+     * 先删后插批量保存（MES同步模式）
+     * 批内按维度键（工厂+机台+日期）去重（保留最后一条）后，按（工厂+日期）分组逐组：
+     * 先逻辑删除该（工厂+日期）下全部旧数据（实现该日全量对账，MES未上报的机台行会被清理），再插入新数据
      *
+     * @param updateBy 更新者（MES同步传MES，清理任务传CLEAN_TASK）
      * @param list 待保存的数据列表
      * @return 实际处理的数据条数
      */
-    int upsertBatch(List<LhMachineOnlineInfo> list);
+    int deleteAndSaveBatch(String updateBy, List<LhMachineOnlineInfo> list);
 }

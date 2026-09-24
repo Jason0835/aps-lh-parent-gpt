@@ -10,6 +10,7 @@ import com.zlt.aps.lh.engine.strategy.ISkuPriorityStrategy;
 import com.zlt.aps.lh.engine.strategy.ITypeBlockProductionStrategy;
 import com.zlt.aps.lh.service.impl.LhMaintenanceScheduleService;
 import com.zlt.aps.lh.service.impl.PreviousAlternatePlanReuseService;
+import com.zlt.aps.lh.service.impl.TimedMachineOffShiftService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -44,6 +45,9 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
     /** 续作真实释放时间确定后，先消费可复用交替关系的一份机台需求。 */
     @Resource
     private PreviousAlternatePlanReuseService previousAlternatePlanReuseService;
+    /** 余量收尾之后独立确定按时间下机边界，必须早于正式扣账和后料提交。 */
+    @Resource
+    private TimedMachineOffShiftService timedMachineOffShiftService;
     /** S4.4 续作排产前校验 MES 实际在机模具与续作 SKU 模具关系。 */
     @Resource
     private ContinuationOnlineMouldValidator continuationOnlineMouldValidator;
@@ -56,6 +60,8 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
                 context.getScheduleResultList().size());
         // S4.4正式排产前校验真实在机模具，失败时不进入续作、换活字块及新增排产链路。
         continuationOnlineMouldValidator.validate(context);
+        // 冻结历史交替时刻，续作识别保持原样，排量及所有后置调整共同遵守下机边界。
+        previousAlternatePlanReuseService.prepareReleaseEvents(context);
         ISkuPriorityStrategy priorityStrategy = strategyFactory.getSkuPriorityStrategy();
         /*
          * S4.4排序调用：排序策略从S4.2独立的结构排序日期快照读取最大END_DAY，按结构只计算一次
@@ -89,16 +95,14 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
         log.info("续作胎胚库存调整完成, 排程结果数: {}, 未排产数: {}",
                 context.getScheduleResultList().size(), context.getUnscheduledResultList().size());
 
-        /*
-         * S4.4.4 续作降模和共用胎胚收尾均衡：
-         * 1. 降模及其他续作数量修改先全部稳定；
-         * 2. 在续作日计划账本一次性扣减前，执行共用胎胚多机台均衡。
-         * 两个动作必须在同一续作策略内连续完成，避免先扣账后搬量产生二次账本调整。
-         * 原“结构停产保机”阶段判断已废弃，结构收尾对齐改为S4.5新增选机时实时判断。
-         */
+        // 前置续作降模只冻结余量收尾机台及硬边界，普通非收尾处理保持原有口径。
         strategy.scheduleReduceMould(context);
-        log.info("续作降模及共用胎胚收尾均衡完成, 排程结果数: {}, 未排产数: {}",
-                context.getScheduleResultList().size(), context.getUnscheduledResultList().size());
+        // 历史交替正式排产前计算真实收尾，禁止后料提交后再搬动前料。
+        strategy.calculateContinuationRemainderFinish(context);
+        // 不依赖余量收尾组是否存在，独立处理已选机台的时间下机需求。
+        timedMachineOffShiftService.resolveAndApply(context);
+        // 数量稳定后只消费一次账本，同时发布机台、模具和待排余量。
+        strategy.finalizeContinuousProduction(context);
 
         // 续作最终数量、真实收尾和物理交接时间已经稳定，按精度优先级统一分配每日一台额度。
         maintenanceScheduleService.finalizeMaintenancePlanWindows(context);

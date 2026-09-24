@@ -19,6 +19,8 @@ public class ContinuationEndingAllocationSnapshot implements Serializable {
     private Date productionEndTime;
     /** 单控整机、停产保机及胶囊窗口约束后的物理释放时间。 */
     private Date releaseTime;
+    /** 新节点规则要求的生产收尾截止，允许恰好落在节点。 */
+    private Date finishDeadline;
     /** 组级模拟次数快照下的预测换模时间，null表示当时无合法预测。 */
     private Date predictedChangeTime;
     /** 预测使用的动作类型，后料尚未选定时为通用交替。 */

@@ -111,6 +111,13 @@ public class LhMouldChangePlan extends BaseEntity implements Serializable {
     @TableField(value = "AFTER_MATERIAL_DESC")
     private String afterMaterialDesc;
 
+    /**
+     * 产品状态（本条计划物料对应的产品状态，取值口径与硫化排程结果 PRODUCT_STATUS 一致，字典：lh_trial_status）
+     */
+    @ApiModelProperty(value = "产品状态")
+    @TableField(value = "PRODUCT_STATUS")
+    private String productStatus;
+
     @ApiModelProperty(value = "更换时间")
     @Excel(name = "ui.data.column.lhMouldChangePlan.changeTime", dateFormat = "yyyy-MM-dd")
     @TableField(value = "CHANGE_TIME")

@@ -3241,7 +3241,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     /**
      * 构建前规格参考行。
      * <p>参考行沿用历史收尾记录的规格及状态信息；8个班次的顺序、计划量、实际量，
-     * 以及当前计划相关的汇总量、库存、胶囊次数和产量字段不写入，保持为空。</p>
+     * 以及当前计划相关的汇总量、库存、胶囊次数、产量和备注字段不写入，保持为空。</p>
      *
      * @param beforeMaterialResult 前规格历史排程记录
      * @param cxMachineCodeMap     成型机台映射
@@ -3255,7 +3255,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             Map<String, String> recipeTypeMap,
             Map<String, String> endTypeMap) {
         Map<String, Object> referenceRow = new HashMap<>(96);
-        referenceRow.put("height", this.calculateExportRemarkRowHeight(beforeMaterialResult.getRemark()));
+        referenceRow.put("height", 17F);
         referenceRow.put("lhMachineCode", beforeMaterialResult.getLhMachineCode());
         referenceRow.put("materialCode", beforeMaterialResult.getMaterialCode());
         referenceRow.put("materialDesc", beforeMaterialResult.getMaterialDesc());
@@ -3263,7 +3263,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         referenceRow.put("mainMaterialDesc", beforeMaterialResult.getMainMaterialDesc());
         referenceRow.put("structureName", beforeMaterialResult.getStructureName());
         referenceRow.put("cxMachineCode", cxMachineCodeMap.get(beforeMaterialResult.getId()));
-        referenceRow.put("remark", beforeMaterialResult.getRemark());
+        // 前规格参考行仅用于展示历史物料，不属于当前排程，不继承历史收尾备注。
+        referenceRow.put("remark", "");
         referenceRow.put("mouldSurplusQty", beforeMaterialResult.getMouldSurplusQty());
         referenceRow.put("leftRightMould", beforeMaterialResult.getLeftRightMould());
         referenceRow.put("mouldMethod", beforeMaterialResult.getMouldMethod());

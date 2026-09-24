@@ -101,6 +101,16 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
                                     SkuScheduleDTO sku,
                                     String actionType,
                                     Date businessDayEndTime) {
+        // 未提供生产日边界的旧入口只执行普通早中班配额，不能仅凭动作名称取得豁免。
+        return this.allocateMouldChange(context, machineCode, endingTime, switchDurationHours,
+                sku, actionType, businessDayEndTime, null);
+    }
+
+    /** 按真实准备边界正式分配，参数及返回值含义见策略接口。 */
+    @Override
+    public Date allocateMouldChange(LhScheduleContext context, String machineCode, Date endingTime,
+            int switchDurationHours, SkuScheduleDTO sku, String actionType,
+            Date businessDayEndTime, Date preparationBeforeTime) {
         if (Objects.isNull(context) || Objects.isNull(endingTime)) {
             return null;
         }
@@ -109,7 +119,8 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
         }
         // 所有预演和正式分配只使用同一个只读决策内核；此处是唯一真实次数登记入口。
         Date allocatedTime = this.resolveMouldChangeStart(context, machineCode, endingTime,
-                switchDurationHours, actionType, businessDayEndTime, context.getDailyMouldChangeCountMap());
+                switchDurationHours, actionType, businessDayEndTime, preparationBeforeTime,
+                context.getDailyMouldChangeCountMap());
         this.recordMouldChangeDecision(context, machineCode, endingTime, switchDurationHours,
                 sku, businessDayEndTime, allocatedTime);
         if (Objects.isNull(allocatedTime)) {
@@ -118,7 +129,11 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
                     LhScheduleTimeUtil.formatDateTime(endingTime));
             return null;
         }
-        return this.registerMouldChangeAndLog(context, allocatedTime, sku, actionType,
+        // 日上限或停机避让可能把前日准备推至生产当天，日志也必须记录实际动作身份。
+        String committedActionType = this.isCrossDayPreparationAction(actionType)
+                && !this.isPreparationBeforeBoundary(allocatedTime, preparationBeforeTime)
+                ? ACTION_NEW_SPEC_MOULD_CHANGE : actionType;
+        return this.registerMouldChangeAndLog(context, allocatedTime, sku, committedActionType,
                 this.formatDateKey(allocatedTime));
     }
 
@@ -145,8 +160,18 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
                                    SkuScheduleDTO sku,
                                    String actionType,
                                    Date businessDayEndTime) {
+        return this.previewMouldChange(context, machineCode, endingTime, switchDurationHours,
+                sku, actionType, businessDayEndTime, null);
+    }
+
+    /** 按真实准备边界只读预演，参数及返回值含义见策略接口。 */
+    @Override
+    public Date previewMouldChange(LhScheduleContext context, String machineCode, Date endingTime,
+            int switchDurationHours, SkuScheduleDTO sku, String actionType,
+            Date businessDayEndTime, Date preparationBeforeTime) {
         return Objects.isNull(context) ? null : this.resolveMouldChangeStart(context, machineCode, endingTime,
-                switchDurationHours, actionType, businessDayEndTime, context.getDailyMouldChangeCountMap());
+                switchDurationHours, actionType, businessDayEndTime, preparationBeforeTime,
+                context.getDailyMouldChangeCountMap());
     }
 
     /**
@@ -159,17 +184,26 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
      * @param durationHours 动作耗时
      * @param actionType 动作类型
      * @param dayEnd 当前业务日日终
+     * @param preparationBeforeTime 生产业务日起点；实际准备必须严格早于该时刻
      * @param countMap 当前资源快照（真实或独立模拟次数）
      * @return 最早合法落点；没有落点返回null
      */
     private Date resolveMouldChangeStart(LhScheduleContext context, String machineCode, Date readyTime,
-            int durationHours, String actionType, Date dayEnd, Map<String, int[]> countMap) {
+            int durationHours, String actionType, Date dayEnd, Date preparationBeforeTime, Map<String, int[]> countMap) {
         if (Objects.isNull(context) || Objects.isNull(readyTime) || Objects.isNull(countMap)) {
             return null;
         }
         boolean balanced = this.isChangeoverBalanceEnabled(context);
-        Date cursor = readyTime;
+        // 已提交的时间下机边界统一约束预演和正式入口，不受旧均衡开关或跨日准备例外影响。
+        Date timedBoundary = context.getTimedMachineOffBoundary(machineCode);
+        boolean timedOff = Objects.nonNull(timedBoundary);
+        Date cursor = timedOff && timedBoundary.after(readyTime) ? timedBoundary : readyTime;
+        Date timedWindowEnd = timedOff ? context.getScheduleWindowShifts().stream()
+                .map(shift -> shift.getShiftEndDateTime()).max(Date::compareTo).orElse(null) : null;
         for (int attempt = 0; attempt < MAX_ALLOCATION_ATTEMPTS; attempt++) {
+            if (timedOff && (Objects.isNull(timedWindowEnd) || !cursor.before(timedWindowEnd))) {
+                return null;
+            }
             Date adjusted = this.resolveDowntimeAdjustedStartTime(context, machineCode, cursor, durationHours);
             if (adjusted.after(cursor)) {
                 cursor = adjusted;
@@ -181,14 +215,15 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
             }
             String dateKey = this.formatDateKey(cursor);
             int[] counts = countMap.getOrDefault(dateKey, new int[]{0, 0});
-            if (balanced && this.getTotalUsed(counts) >= this.getDailyLimit(context)) {
+            if ((balanced || timedOff) && this.getTotalUsed(counts) >= this.getDailyLimit(context)) {
                 if (this.isOnOrAfterScheduleTargetDate(context, cursor)) {
                     return null;
                 }
                 cursor = this.getNextCalendarDayMorningStart(context, cursor);
                 continue;
             }
-            if (balanced && this.isCrossDayPreparationAction(actionType)
+            if (balanced && !timedOff && this.isCrossDayPreparationAction(actionType)
+                    && this.isPreparationBeforeBoundary(cursor, preparationBeforeTime)
                     && this.isSwitchCompletionBeforeBusinessDayEnd(cursor, durationHours, dayEnd)) {
                 return cursor;
             }
@@ -196,7 +231,7 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
                 if (counts[IDX_MORNING] < this.getMorningLimit(context)) {
                     return cursor;
                 }
-                if (!balanced) {
+                if (!balanced && !timedOff) {
                     // 关闭态保持原正式行为：早班满后从中班起点继续避让，不附加新日终限制。
                     cursor = LhScheduleTimeUtil.getAfternoonShiftStart(context, cursor);
                     continue;
@@ -210,7 +245,7 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
                     && counts[IDX_AFTERNOON] < this.getAfternoonLimit(context)) {
                 return cursor;
             }
-            if (balanced && this.isOnOrAfterScheduleTargetDate(context, cursor)) {
+            if ((balanced || timedOff) && this.isOnOrAfterScheduleTargetDate(context, cursor)) {
                 return null;
             }
             cursor = this.getNextCalendarDayMorningStart(context, cursor);
@@ -265,6 +300,17 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
     private boolean isCrossDayPreparationAction(String actionType) {
         return StringUtils.equals(
                 ACTION_CROSS_DAY_PREPARATION_MOULD_CHANGE, actionType);
+    }
+
+    /**
+     * 判断实际准备起点是否仍在生产业务日之前，不沿用顺延前的候选身份。
+     * @param startTime 停机和配额避让后的实际开始时间
+     * @param preparationBeforeTime 明确的生产业务日起点
+     * @return 是否可以使用跨日准备班次豁免
+     */
+    private boolean isPreparationBeforeBoundary(Date startTime, Date preparationBeforeTime) {
+        return Objects.nonNull(startTime) && Objects.nonNull(preparationBeforeTime)
+                && startTime.before(preparationBeforeTime);
     }
 
     /**
@@ -456,7 +502,7 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
             Date businessDayEndTime, Map<String, int[]> simulatedCountMap) {
         // 内核不修改Map，失败时不会留下空日期或部分次数；成功才计入组内模拟账本。
         Date time = this.resolveMouldChangeStart(context, machineCode, switchReadyTime,
-                switchDurationHours, actionType, businessDayEndTime, simulatedCountMap);
+                switchDurationHours, actionType, businessDayEndTime, null, simulatedCountMap);
         if (Objects.nonNull(time)) {
             this.registerMouldChangeCount(context, time, simulatedCountMap);
         }

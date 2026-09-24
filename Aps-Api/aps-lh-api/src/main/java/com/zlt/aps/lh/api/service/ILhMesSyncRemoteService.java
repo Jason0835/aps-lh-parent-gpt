@@ -37,15 +37,17 @@ public interface ILhMesSyncRemoteService {
     AjaxResult logicDeleteAndSaveMachineOnlineInfo(@RequestParam("factoryCode") String factoryCode, @RequestParam("onlineDate") String onlineDate, @RequestParam("updateBy") String updateBy, @RequestBody List<LhMachineOnlineInfo> list);
 
     /**
-     * 按维度键UPSERT批量保存硫化在机信息（MES同步新模式）
-     * 维度键 = 工厂 + 机台 + 日期；键存在则更新（含复活已逻辑删除行），不存在则插入
+     * 先删后插批量保存硫化在机信息（MES同步模式，事务性操作）
+     * 批内按维度键（工厂+机台+日期）去重后，按（工厂+日期）分组逐组：先逻辑删除该日全部旧数据，再插入新数据；
+     * 实现该日全量对账，MES未上报的机台行（下线/换规格）会被清理
      *
+     * @param updateBy 更新者（MES同步传MES，清理任务传CLEAN_TASK）
      * @param list 待保存的数据列表
      * @return 结果
      */
-    @ApiOperation("按维度键UPSERT批量保存硫化在机信息（键存在更新/不存在插入）")
-    @PostMapping("/mesSync/upsertMachineOnlineInfoBatch")
-    AjaxResult upsertMachineOnlineInfoBatch(@RequestBody List<LhMachineOnlineInfo> list);
+    @ApiOperation("先删后插批量保存硫化在机信息（按工厂+日期逐组删除后插入，事务性操作）")
+    @PostMapping("/mesSync/deleteAndSaveMachineOnlineInfoBatch")
+    AjaxResult deleteAndSaveMachineOnlineInfoBatch(@RequestParam("updateBy") String updateBy, @RequestBody List<LhMachineOnlineInfo> list);
 
     @ApiOperation("批量删除胶囊已使用次数")
     @PostMapping("/mesSync/deleteRepairCapsule")

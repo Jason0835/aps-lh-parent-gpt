@@ -62,6 +62,20 @@ public interface IProductionStrategy {
     void scheduleReduceMould(LhScheduleContext context);
 
     /**
+     * 为前置阶段已确定的机台计算续作余量收尾，不重新选机。
+     * @param context 排程上下文
+     */
+    default void calculateContinuationRemainderFinish(LhScheduleContext context) {
+    }
+
+    /**
+     * 按最终续作结果统一扣账并发布资源释放状态。
+     * @param context 排程上下文
+     */
+    default void finalizeContinuousProduction(LhScheduleContext context) {
+    }
+
+    /**
      * 新增规格排产(新增策略使用)
      *
      * @param context            排程上下文

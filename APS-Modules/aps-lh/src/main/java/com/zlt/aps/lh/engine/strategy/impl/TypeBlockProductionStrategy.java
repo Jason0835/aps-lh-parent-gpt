@@ -34,6 +34,7 @@ import com.zlt.aps.lh.component.StructureEndingAlignmentService;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.component.UnscheduledResultCollector;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.component.LhMachineSupplyStructureRule;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
 import com.zlt.aps.lh.engine.strategy.IEndingJudgmentStrategy;
 import com.zlt.aps.lh.engine.strategy.IFirstInspectionBalanceStrategy;
@@ -177,6 +178,10 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
     private ICapacityCalculateStrategy capacityCalculateStrategy;
     @Resource
     private IMachineMatchStrategy machineMatchStrategy;
+
+    /** 换活字块同样不得绕过强专供范围硬约束。 */
+    @Resource
+    private LhMachineSupplyStructureRule machineSupplyStructureRule = new LhMachineSupplyStructureRule();
     /** 换活字块与新增排产共用的结构班次在机索引构建及增量更新入口。 */
     @Resource
     private StructureEndingAlignmentService structureEndingAlignmentService;
@@ -337,9 +342,10 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     if (success) {
                         break;
                     }
-                    // 普通换活字块保持历史行为只尝试排序第一名；精度前窗口才按同一既有顺序遍历全部候选。
+                    // 匹配专供候选失败后继续尝试，避免软优先阻断其它候选；其它场景保持既有重试范围。
                     if (!precisionPreInsertSearch && Objects.nonNull(typeBlockSku)
-                            && !context.isTemporaryFaultTransferSku(typeBlockSku)) {
+                            && !context.isTemporaryFaultTransferSku(typeBlockSku)
+                            && !machineSupplyStructureRule.isPreferredMachine(context, machineCode, typeBlockSku)) {
                         break;
                     }
                     typeBlockSku = candidateSku;
@@ -439,8 +445,8 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
      *
      * <p>本方法只做无副作用匹配，不执行时间分配、首检、计数登记或结果写入：</p>
      * <ul>
-     *   <li>机台顺序完全复用现有换活字块排序（同业务日下按切换就绪时间→收尾时间→机台编码）；</li>
-     *   <li>物料按调用方传入的当天 S4.5 优先级顺序取首位，保持候选判断口径与 S4.4 一致；</li>
+     *   <li>机台先按专供优先，层内复用现有换活字块排序（同业务日下按切换就绪时间→收尾时间→机台编码）；</li>
+     *   <li>物料先按匹配专供层级，层内按调用方传入的当天 S4.5 优先级顺序取首位，保持候选判断口径与 S4.4 一致；</li>
      *   <li>每个机台只锁定一个物料，每个物料需求只被一台机台锁定，结果稳定确定；</li>
      *   <li>实际切换时间、首检、班次计划量、机台收尾时间和物料账本仍由 S4.5 新增主链统一计算。</li>
      * </ul>
@@ -466,7 +472,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         List<MachineScheduleDTO> orderedMachines = new ArrayList<MachineScheduleDTO>(dayMachines);
         orderedMachines.sort((leftMachine, rightMachine) -> compareTypeBlockMachine(
                 context, leftMachine, rightMachine, Collections.<String, String>emptyMap()));
-        // 物料顺序由调用方按当天 S4.5 优先级传入，本方法保持该顺序不做二次排序。
+        // 物料由调用方按当天 S4.5 优先级传入，专供层内保持该顺序。
         Set<String> lockedMaterialKeySet = new LinkedHashSet<String>(dayMaterials.size());
         List<DayTypeBlockReverseSelectionDirective> result =
                 new ArrayList<DayTypeBlockReverseSelectionDirective>(
@@ -475,7 +481,11 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             if (Objects.isNull(machine) || StringUtils.isEmpty(machine.getMachineCode())) {
                 continue;
             }
-            for (SkuScheduleDTO sku : dayMaterials) {
+            List<SkuScheduleDTO> orderedMaterials = new ArrayList<>(dayMaterials);
+            // 反选指令必须先匹配自身专供结构，同层仍使用调用方给定顺序。
+            orderedMaterials.sort(Comparator.comparing(sku -> machineSupplyStructureRule
+                    .getMatchPriority(context, machine.getMachineCode(), sku)));
+            for (SkuScheduleDTO sku : orderedMaterials) {
                 if (Objects.isNull(sku) || StringUtils.isEmpty(sku.getMaterialCode())
                         || sku.resolveTargetScheduleQty() <= 0) {
                     continue;
@@ -796,7 +806,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                                         Map<String, String> machineTriggerSourceMap) {
         /*
          * 换活字块首先按机台真实收尾所属业务日竞争：T 日优先于 T+1，T+1 优先于 T+2。
-         * 同一业务日内继续沿用既有触发来源、切换就绪时间和机台顺序，避免改变原日内语义。
+         * 同一业务日先处理专供机，层内沿用既有触发来源、切换就绪时间和机台顺序。
          */
         LocalDate leftEndingBusinessDate =
                 this.resolveTypeBlockEndingBusinessDate(context, leftMachine);
@@ -806,6 +816,13 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                 leftEndingBusinessDate, rightEndingBusinessDate);
         if (endingBusinessDateCompare != 0) {
             return endingBusinessDateCompare;
+        }
+        // 同一业务日专供机优先，其余触发来源和时间排序继续沿用。
+        int supplyCompare = Integer.compare(
+                machineSupplyStructureRule.getMachinePriority(context, leftMachine.getMachineCode()),
+                machineSupplyStructureRule.getMachinePriority(context, rightMachine.getMachineCode()));
+        if (supplyCompare != 0) {
+            return supplyCompare;
         }
         String leftTriggerSource = machineTriggerSourceMap.get(leftMachine.getMachineCode());
         String rightTriggerSource = machineTriggerSourceMap.get(rightMachine.getMachineCode());
@@ -1099,6 +1116,9 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                 candidateList.add(sku);
             }
         }
+        // 稳定排序只增加专供层级，层内保留原月计划SKU顺序。
+        candidateList.sort(Comparator.comparing(sku -> machineSupplyStructureRule
+                .getMatchPriority(context, machine.getMachineCode(), sku)));
         return candidateList;
     }
 
@@ -1163,6 +1183,14 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                                          SkuScheduleDTO sku,
                                          boolean writeDecisionLog) {
         if (sku == null) {
+            return false;
+        }
+        if (Objects.nonNull(machine) && !machineSupplyStructureRule.canMachineSelectStructure(
+                context, machine.getMachineCode(), sku)) {
+            if (writeDecisionLog) {
+                log.info("换活字块专供结构拒绝, batchNo: {}, machineCode: {}, materialCode: {}, structure: {}",
+                        context.getBatchNo(), machine.getMachineCode(), sku.getMaterialCode(), sku.getStructureName());
+            }
             return false;
         }
         // SYS0311004=0时试制、量试不参与新增排产，换活字块作为新增侧入口同样拦截。
@@ -3535,7 +3563,11 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
     private boolean isMachineHardMatched(LhScheduleContext context,
                                          MachineScheduleDTO machine,
                                          SkuScheduleDTO sku) {
-        return LhMachineHardMatchUtil.isMachineHardMatched(context, sku, machine);
+        // 定点、特殊材料置换和普通换活字块共用强专供范围限制，先过滤再分配切换资源。
+        return Objects.nonNull(machine) && Objects.nonNull(sku)
+                && machineSupplyStructureRule.canMachineSelectStructure(
+                context, machine.getMachineCode(), sku)
+                && LhMachineHardMatchUtil.isMachineHardMatched(context, sku, machine);
     }
 
     /**

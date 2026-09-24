@@ -141,6 +141,44 @@ public interface IMouldChangeBalanceStrategy {
     }
 
     /**
+     * 按明确的生产业务日起点分配准备动作；实际起点跨过边界后恢复普通班次配额。
+     * @param context 排程上下文
+     * @param machineCode 机台编码
+     * @param endingTime 机台可交接时间
+     * @param switchDurationHours 切换时长
+     * @param sku 当前物料
+     * @param actionType 切换动作类型
+     * @param businessDayEndTime 允许准备完成的业务日日终
+     * @param preparationBeforeTime 生产业务日起点；仅在该时刻之前开始才属于跨日准备
+     * @return 正式切换开始时间
+     */
+    default Date allocateMouldChange(LhScheduleContext context, String machineCode, Date endingTime,
+            int switchDurationHours, SkuScheduleDTO sku, String actionType,
+            Date businessDayEndTime, Date preparationBeforeTime) {
+        return allocateMouldChange(context, machineCode, endingTime, switchDurationHours,
+                sku, actionType, businessDayEndTime);
+    }
+
+    /**
+     * 使用与正式分配相同的生产业务日边界进行只读预演。
+     * @param context 排程上下文
+     * @param machineCode 机台编码
+     * @param endingTime 机台可交接时间
+     * @param switchDurationHours 切换时长
+     * @param sku 当前物料
+     * @param actionType 切换动作类型
+     * @param businessDayEndTime 允许准备完成的业务日日终
+     * @param preparationBeforeTime 生产业务日起点，空值不提供跨日准备豁免
+     * @return 预演切换开始时间，不占用真实配额
+     */
+    default Date previewMouldChange(LhScheduleContext context, String machineCode, Date endingTime,
+            int switchDurationHours, SkuScheduleDTO sku, String actionType,
+            Date businessDayEndTime, Date preparationBeforeTime) {
+        return previewMouldChange(context, machineCode, endingTime, switchDurationHours,
+                sku, actionType, businessDayEndTime);
+    }
+
+    /**
      * 兼容旧调用方的默认入口。
      *
      * @param context 排程上下文

@@ -127,6 +127,11 @@ public class UnscheduledResultCollector {
         if (Objects.isNull(context) || Objects.isNull(derivedSku)) {
             return;
         }
+        // 后续补偿副本继承历史下机的精确时间，避免复制候选后只剩日期而提前重新上机。
+        java.util.Date previousAlternateAvailableTime = context.getPreviousAlternateCandidateAvailableTimeMap().get(sourceSku);
+        if (Objects.nonNull(previousAlternateAvailableTime)) {
+            context.getPreviousAlternateCandidateAvailableTimeMap().put(derivedSku, previousAlternateAvailableTime);
+        }
         UnscheduledDemandSnapshot sourceSnapshot = this.findSnapshot(context, sourceSku);
         if (Objects.isNull(sourceSnapshot)) {
             return;

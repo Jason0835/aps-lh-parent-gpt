@@ -2,6 +2,7 @@ package com.zlt.aps.lh.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
+import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuDailyPlanQuotaDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
@@ -67,8 +68,49 @@ public class ContinuationCutoverService {
             SkuScheduleDTO sourceSku,
             String physicalMachineCode,
             Date offlineTime) {
-        List<LhScheduleResult> continuationResultList =
-                resolveContinuationResults(context, sourceSku, physicalMachineCode);
+        return this.cutoverResults(context, sourceSku, physicalMachineCode, offlineTime,
+                this.resolveContinuationResults(context, sourceSku, physicalMachineCode), "共用模具置换恢复 B 截断尾量");
+    }
+
+    /**
+     * 历史指定机台等台数置换，读取本次有效续作结果，不借用特殊材料冻结集合。
+     * @param context 排程上下文
+     * @param sourceSku 原承载物料
+     * @param physicalMachineCode 被置换的物理机台
+     * @param offlineTime 原承载退出时间
+     * @return 已恢复到账本的截断量
+     */
+    public ContinuationCutoverResult cutoverCurrentContinuation(LhScheduleContext context,
+            SkuScheduleDTO sourceSku, String physicalMachineCode, Date offlineTime) {
+        List<LhScheduleResult> results = context.getScheduleResultList().stream()
+                .filter(result -> StringUtils.equals(ScheduleTypeEnum.CONTINUOUS.getCode(), result.getScheduleType()))
+                .filter(result -> StringUtils.equals(physicalMachineCode,
+                        LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode())))
+                .filter(result -> StringUtils.equals(sourceSku.getMaterialCode(), result.getMaterialCode())
+                        && StringUtils.equals(sourceSku.getProductStatus(), result.getProductStatus()))
+                .collect(java.util.stream.Collectors.toList());
+        ContinuationCutoverResult cutover = this.cutoverResults(context, sourceSku, physicalMachineCode, offlineTime, results, "历史交替承载置换恢复截断尾量");
+        // 承载退出不表示物料需求收尾；保留实际生产结束与物理下机边界的区别。
+        cutover.getRetainedResultList().forEach(result -> {
+            ShiftFieldUtil.applyLastPlannedShiftEndMark(result, false);
+            result.setIsEnd("0");
+            result.setSpecEndTime(offlineTime);
+        });
+        return cutover;
+    }
+
+    /**
+     * 对指定结果集合复用截断和账本恢复，调用者负责机台和模具退出。
+     * @param context 排程上下文
+     * @param sourceSku 原物料
+     * @param physicalMachineCode 原物理机台
+     * @param offlineTime 截断时刻
+     * @param continuationResultList 同物料状态的结果集合
+     * @param restoreReason 本次恢复账本的业务来源
+     * @return 截断结果
+     */
+    private ContinuationCutoverResult cutoverResults(LhScheduleContext context, SkuScheduleDTO sourceSku,
+            String physicalMachineCode, Date offlineTime, List<LhScheduleResult> continuationResultList, String restoreReason) {
         if (CollectionUtils.isEmpty(continuationResultList)) {
             throw new IllegalStateException("原物理机台不存在可截断的冻结续作结果: " + physicalMachineCode);
         }
@@ -89,7 +131,7 @@ public class ContinuationCutoverService {
             // 调用处明确记录本次联动来源，便于生产余量账本日志按 A/B 置换检索。
             targetScheduleQtyResolver.restoreProductionRemainingQty(
                     context, sourceSku, totalRemovedQty,
-                    "共用模具置换恢复 B 截断尾量", physicalMachineCode);
+                    restoreReason, physicalMachineCode);
             restoreTruncatedDailyQuota(
                     context, sourceSku, cutoverResult.getRemovedQtyByDate());
         }

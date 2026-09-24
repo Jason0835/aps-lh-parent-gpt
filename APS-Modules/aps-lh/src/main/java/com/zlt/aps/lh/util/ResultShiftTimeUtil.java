@@ -6,6 +6,7 @@ import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineMaintenanceWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.ShiftProductionControlDTO;
+import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.component.CapsuleReplacementRuleService;
@@ -66,10 +67,12 @@ public final class ResultShiftTimeUtil {
                     context.getBatchNo(), result.getMaterialCode(), result.getLhMachineCode(), shift.getShiftIndex(), planQty);
             return null;
         }
-        // 一模内的尾数使用同一完成点；完整奇数班产仍保留既有班别修正上限。
+        // 严格余量收尾按精确目标反算时间，其他场景保留既有模台数归整完成点。
         boolean hasSandBlastInspection = !CleaningScheduleRuleUtil.resolveSandBlastInspectionWindows(
                 cleaningWindows, control.getEffectiveStartTime(), control.getEffectiveEndTime()).isEmpty();
-        int timeQty = hasSandBlastInspection ? planQty
+        SkuScheduleDTO sourceSku = context.getScheduleResultSourceSkuMap().get(result);
+        boolean exactStrictTarget = Objects.nonNull(sourceSku) && sourceSku.isStrictTargetQty();
+        int timeQty = hasSandBlastInspection || exactStrictTarget ? planQty
                 : ShiftCapacityResolverUtil.roundUpQtyToMouldMultiple(planQty, mouldQty);
         if (planQty <= capacity) {
             timeQty = Math.min(timeQty, capacity);
@@ -133,6 +136,10 @@ public final class ResultShiftTimeUtil {
                 endTime = shiftEnd;
             }
         }
+        // 时间下机是物理占用边界，末班实际正量结束可能更早，不能据此提前释放。
+        if (context.getTimedMachineOffDecisionMap().containsKey(result)) {
+            endTime = context.getTimedMachineOffDecisionMap().get(result).getOccupancyEndTime();
+        }
         result.setSpecEndTime(endTime);
         result.setTdaySpecEndTime(endTime);
     }
@@ -148,7 +155,8 @@ public final class ResultShiftTimeUtil {
         if (Objects.isNull(machine)) {
             return;
         }
-        Date endTime = result.getSpecEndTime();
+        Date endTime = context.getTimedMachineOffDecisionMap().containsKey(result)
+                ? context.getTimedMachineOffDecisionMap().get(result).getOccupancyEndTime() : result.getSpecEndTime();
         for (LhScheduleResult scheduled : context.getScheduleResultList()) {
             if (StringUtils.equals(result.getLhMachineCode(), scheduled.getLhMachineCode())
                     && Objects.nonNull(scheduled.getSpecEndTime())

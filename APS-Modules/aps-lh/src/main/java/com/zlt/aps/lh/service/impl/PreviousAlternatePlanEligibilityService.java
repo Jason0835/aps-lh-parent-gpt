@@ -9,6 +9,7 @@ import com.zlt.aps.lh.component.EarlyProductionQuantityCalculator;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.DailyMachineExpansionPlanner;
 import com.zlt.aps.lh.engine.strategy.support.DailyNewSpecCandidate;
+import com.zlt.aps.lh.engine.strategy.support.PreviousAlternatePlanReleaseEvent;
 import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import org.apache.commons.lang3.StringUtils;
@@ -162,6 +163,15 @@ public class PreviousAlternatePlanEligibilityService {
                     activeMachineCount + Math.max(1, sku.getContinuationShortageMachineCount())));
         }
         candidate.setScheduledMachineCount(scheduledMachineCount);
+        PreviousAlternatePlanReleaseEvent event = context.getActivePreviousAlternateEvent();
+        if (Objects.nonNull(event) && event.isBeforeMaterialNotScheduled()
+                && context.isPreviousAlternateAction(sku, event.getMachineCode())
+                && StringUtils.equals(event.getMaterialCode(), sku.getMaterialCode())
+                && StringUtils.equals(event.getProductStatus(), sku.getProductStatus())) {
+            // 后料本来就在该机续作，历史动作只重建这台原承载，不因T日dayN为0等待次日增机。
+            // 仅作用于当前指定动作，不修改统一目标Map，也不给普通新增候选增加份数。
+            candidate.setTargetMachineCount(Math.max(candidate.getTargetMachineCount(), scheduledMachineCount + 1));
+        }
     }
 
     /**

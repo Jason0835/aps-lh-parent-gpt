@@ -105,6 +105,7 @@ public final class DailyMachineExpansionPlanner {
         Set<String> committedMachines = resolvePreScheduledDemandMachines(context, sku, productionDate);
         Set<String> excludedMachines = new LinkedHashSet<String>(committedMachines);
         excludedMachines.addAll(context.resolveForcedReleasedPhysicalMachineCodes(sku));
+        excludedMachines.addAll(context.resolvePreviousAlternateReleasedMachines(sku, productionDate));
         // 已排集合排除绑定后再相加，避免同一天或左右侧已登记时重复占用需求。
         return committedMachines.size() + context.getSkuScheduledMachineCountExcluding(
                 productionDate, sku.getMaterialCode(), sku.getProductStatus(), excludedMachines);

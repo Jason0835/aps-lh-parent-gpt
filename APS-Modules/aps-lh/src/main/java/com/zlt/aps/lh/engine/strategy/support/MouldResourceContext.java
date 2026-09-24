@@ -1,5 +1,6 @@
 package com.zlt.aps.lh.engine.strategy.support;
 
+import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
@@ -407,6 +408,31 @@ public class MouldResourceContext {
     private MouldResourceAllocationResult resolveAllocation(String materialCode, String machineCode, Date resourceReferenceTime) {
         Objects.requireNonNull(resourceReferenceTime, "模具分配必须提供明确的资源时刻");
         int requiredMouldQty = resolveRequiredMouldQty(machineCode);
+        PreviousAlternatePlanReleaseEvent event = scheduleContext.getActivePreviousAlternateEvent();
+        if (Objects.nonNull(event) && StringUtils.equals(machineCode, event.getMachineCode())
+                && StringUtils.equals(materialCode, event.getPlan().getAfterMaterialCode())) {
+            List<String> plannedMoulds = scheduleContext.getPreviousAlternatePlannedMouldMap().get(machineCode);
+            if (!CollectionUtils.isEmpty(plannedMoulds)) {
+                return this.resolveExactAllocation(materialCode, machineCode, plannedMoulds, resourceReferenceTime);
+            }
+            if (MouldChangeTypeEnum.TYPE_BLOCK.getCode()
+                    .equals(event.getPlan().getChangeMouldType())) {
+                // 换活字块仍使用原整组模具，但必须通过真实时刻与占用校验。
+                return this.resolveExactAllocation(materialCode, machineCode,
+                        new ArrayList<String>(event.getOriginalMouldCodes()), resourceReferenceTime);
+            }
+            if (StringUtils.equals(event.getMaterialCode(), materialCode)) {
+                // 同料L/R仅替换一副；LR仍执行整组优先级，两者均校验完整装机模具。
+                List<String> alternatives = this.resolveFreeValidMouldCodes(
+                        materialCode, event.getOriginalMouldCodes(), resourceReferenceTime);
+                List<String> selectedMouldCodes = event.isSingleMouldReplacement()
+                        ? this.resolveSingleMouldReplacement(event, alternatives, requiredMouldQty)
+                        : this.resolveSameMaterialAlternateMouldCodes(
+                                materialCode, machineCode, alternatives, event.getOriginalMouldCodes(), requiredMouldQty);
+                return this.resolveExactAllocation(
+                        materialCode, machineCode, selectedMouldCodes, resourceReferenceTime);
+            }
+        }
         List<String> availableMouldCodeList = skuAvailableMouldCodeMap.get(materialCode);
         int availableMouldQty = CollectionUtils.isEmpty(availableMouldCodeList) ? 0 : availableMouldCodeList.size();
         LinkedHashSet<String> releasableMouldCodeSet = machineBoundMouldCodeMap.get(machineCode);
@@ -483,6 +509,78 @@ public class MouldResourceContext {
         } else if (StringUtils.isNotEmpty(allocationResult.getMachineCode())) {
             machineBoundMouldCodeMap.remove(allocationResult.getMachineCode());
         }
+    }
+
+    /**
+     * 组合单副置换后的完整装机模具，替换模具按共用性升序选择。
+     *
+     * @param event 含保留模具的历史事件
+     * @param alternatives 已排除原模具的空闲有效替换模具
+     * @param requiredMouldQty 机台完整装机模数，不能按单副动作降为一模产能
+     * @return 完整装机组合；原模具不完整或无替换资源时返回空，由精确分配拒绝
+     */
+    private List<String> resolveSingleMouldReplacement(PreviousAlternatePlanReleaseEvent event,
+            List<String> alternatives, int requiredMouldQty) {
+        int retainedMouldQty = requiredMouldQty - PreviousAlternatePlanReleaseEvent.SINGLE_REPLACEMENT_MOULD_QTY;
+        if (event.getOriginalMouldCodes().size() != requiredMouldQty
+                || event.getRetainedMouldCodes().size() != retainedMouldQty
+                || CollectionUtils.isEmpty(alternatives)) {
+            return Collections.emptyList();
+        }
+        // 复用中心共用性统计与排序，预演、正式提交和普通资源查询使用同一口径。
+        sortMouldCodesBySharedSkuCount(alternatives, LhMouldCodeUtil.buildMouldSharedSkuCountMap(scheduleContext));
+        List<String> selectedMouldCodes = new ArrayList<String>(requiredMouldQty);
+        selectedMouldCodes.addAll(event.getRetainedMouldCodes());
+        selectedMouldCodes.add(alternatives.get(0));
+        log.info("前日交替同料单副换模, batchNo: {}, planId: {}, machineCode: {}, materialCode: {}, "
+                        + "leftRightMould: {}, offlineTime: {}, originalMoulds: {}, retainedMoulds: {}, selectedMoulds: {}",
+                scheduleContext.getBatchNo(), event.getPlan().getId(), event.getMachineCode(), event.getMaterialCode(),
+                event.getPlan().getLeftRightMould(), event.getOfflineTime(), event.getOriginalMouldCodes(),
+                event.getRetainedMouldCodes(), selectedMouldCodes);
+        return selectedMouldCodes;
+    }
+
+    /**
+     * 解析同料整组01交替的模具组：优先完整非共用替代组，不足时允许完整共用替代组，
+     * 所有替代模具均不足时才保留原整组，禁止新旧混搭。
+     *
+     * @param materialCode 当前续排物料
+     * @param machineCode 强制交替机台
+     * @param alternativeMouldCodes 已排除原模具的空闲有效模具
+     * @param originalMouldCodes 下机前原整组模具
+     * @param requiredMouldQty 机台需要的模具数量
+     * @return 用于精确分配的完整模具组
+     */
+    private List<String> resolveSameMaterialAlternateMouldCodes(
+            String materialCode,
+            String machineCode,
+            List<String> alternativeMouldCodes,
+            Set<String> originalMouldCodes,
+            int requiredMouldQty) {
+        Map<String, Integer> sharedSkuCountMap = LhMouldCodeUtil.buildMouldSharedSkuCountMap(scheduleContext);
+        List<String> nonSharedMouldCodes = alternativeMouldCodes.stream()
+                .filter(mouldCode -> sharedSkuCountMap.getOrDefault(mouldCode, 1) <= 1)
+                .collect(java.util.stream.Collectors.toList());
+        if (nonSharedMouldCodes.size() >= requiredMouldQty) {
+            List<String> selectedMouldCodes = new ArrayList<String>(
+                    nonSharedMouldCodes.subList(0, requiredMouldQty));
+            log.info("前日交替同料换模选择非共用替代模具, materialCode: {}, machineCode: {}, mouldCodes: {}",
+                    materialCode, machineCode, selectedMouldCodes);
+            return selectedMouldCodes;
+        }
+        if (alternativeMouldCodes.size() >= requiredMouldQty) {
+            List<String> selectedMouldCodes = new ArrayList<String>(
+                    alternativeMouldCodes.subList(0, requiredMouldQty));
+            log.info("前日交替同料换模无完整非共用替代组，选择可用共用替代模具, materialCode: {}, "
+                            + "machineCode: {}, mouldCodes: {}",
+                    materialCode, machineCode, selectedMouldCodes);
+            return selectedMouldCodes;
+        }
+        List<String> selectedMouldCodes = new ArrayList<String>(originalMouldCodes);
+        log.info("前日交替同料换模无完整替代组，重新使用原模具, materialCode: {}, machineCode: {}, "
+                        + "mouldCodes: {}",
+                materialCode, machineCode, selectedMouldCodes);
+        return selectedMouldCodes;
     }
 
     private int resolveRequiredMouldQty(String machineCode) {
@@ -675,6 +773,16 @@ public class MouldResourceContext {
                     || StringUtils.isEmpty(machine.getMachineCode())) {
                 continue;
             }
+            if (context.getPreviousAlternateReleasedMachineTimeMap().containsKey(machine.getMachineCode())) {
+                // 原续作已退出，但单副换模保留的一侧不能被其他关联计划借走；正式结果随后覆盖此绑定。
+                PreviousAlternatePlanReleaseEvent event = context.getPreviousAlternateReleaseEventMap()
+                        .get(machine.getMachineCode());
+                if (Objects.nonNull(event) && !CollectionUtils.isEmpty(event.getRetainedMouldCodes())) {
+                    resultMap.put(machine.getMachineCode(), new LinkedHashSet<String>(event.getRetainedMouldCodes()));
+                }
+                // 已下模具释放前仍由模具释放时间门禁阻断，不再据MES占回原整组。
+                continue;
+            }
             MachineCleaningWindowDTO replacement = context.getContinuationSandBlastWindowMap().get(machine.getMachineCode());
             if (Objects.nonNull(replacement) && StringUtils.isNotEmpty(replacement.getReplacementMouldCode())) {
                 resultMap.put(machine.getMachineCode(), LhMouldCodeUtil.splitMouldCode(replacement.getReplacementMouldCode()));
@@ -713,6 +821,12 @@ public class MouldResourceContext {
         }
         for (LhScheduleResult result : resultList) {
             if (Objects.isNull(result) || StringUtils.isEmpty(result.getLhMachineCode())) {
+                continue;
+            }
+            Date alternateRelease = context.getPreviousAlternateReleasedMachineTimeMap().get(result.getLhMachineCode());
+            if (Objects.nonNull(alternateRelease)
+                    && Objects.nonNull(resolveResultProductionEndTime(result))
+                    && !resolveResultProductionEndTime(result).after(alternateRelease)) {
                 continue;
             }
             if (isReleasedByOnlySandBlast(context, result)) {

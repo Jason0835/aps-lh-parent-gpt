@@ -10,6 +10,8 @@ import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
+import com.zlt.aps.lh.util.MachineCleaningOverlapUtil;
+import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -39,7 +41,7 @@ public final class ContinuationEndingMachineProfile {
     private final List<List<MachineMaintenanceWindowDTO>> maintenanceWindows;
     /** 应用已有释放和后续占用上限后的物理机台合计容量。 */
     private final int[] capacities;
-    /** 物理机台残班归整单位。 */
+    /** 残班数量归整单位；普通机台余量收尾为1，与原结果中的实际模具数量独立。 */
     private final int multiple;
     /** 当前物理机台的设备停机，避免候选反复扫描全工厂停机列表。 */
     private final List<MdmDevicePlanShut> deviceStops;
@@ -146,7 +148,7 @@ public final class ContinuationEndingMachineProfile {
     }
 
     /** @param limit 连续数量上限 @return 原时间轴内不超过上限的合法量 */
-    private int floorQuantity(int limit) {
+    public int floorQuantity(int limit) {
         int quantity = 0;
         for (int capacity : capacities) {
             int remaining = limit - quantity;
@@ -156,6 +158,46 @@ public final class ContinuationEndingMachineProfile {
             quantity += capacity;
         }
         return quantity;
+    }
+
+    /**
+     * 反算指定绝对时刻之前的最大合法连续量，沿用既有节拍、停机和单控时间轴。
+     * @param deadline 包含端点的生产截止
+     * @return 不晚于截止的合法累计产量
+     */
+    public int quantityUntil(Date deadline) {
+        int low = 0;
+        int high = (int) Math.min(Integer.MAX_VALUE, java.util.Arrays.stream(capacities).asLongStream().sum());
+        while (low < high) {
+            int middle = low + (int) (((long) high - low + 1) / 2);
+            int quantity = this.floorQuantity(middle);
+            Date completed = quantity > 0 ? this.completionTime(quantity) : null;
+            if (quantity == 0 || (Objects.nonNull(completed) && !completed.after(deadline))) {
+                low = middle;
+            } else {
+                high = middle - 1;
+            }
+        }
+        return this.floorQuantity(low);
+    }
+
+    /**
+     * 限定指定班次在节点前的合法产量，保留后续夜班容量和原始时间换算基数。
+     * 仅由阶段式余量收尾使用，使19:00后的中班余量转到后续夜班，不改原结果和硬边界。
+     * @param shiftIndex 需要截短的真实班次序号
+     * @param deadline 包含端点的生产截止
+     */
+    public void restrictShiftToDeadline(int shiftIndex, Date deadline) {
+        int prefixQty = 0;
+        for (int position = 0; position < shifts.size(); position++) {
+            if (shifts.get(position).getShiftIndex() == shiftIndex) {
+                capacities[position] = Math.min(capacities[position],
+                        Math.max(0, this.quantityUntil(deadline) - prefixQty));
+                return;
+            }
+            prefixQty += capacities[position];
+        }
+        throw new IllegalArgumentException("续作收尾限制班次不在排程窗口内");
     }
 
     /**
@@ -211,51 +253,18 @@ public final class ContinuationEndingMachineProfile {
     }
 
     /**
-     * 反算指定收尾班次的连续量上限，仅截取最后中班尾量，不裁减前序满产中班。
-     * @param shiftIndex 收尾班次序号
-     * @return 该班次截止前的最大合法连续量；本班无合法尾量时不超过前序总量
-     */
-    public int endingQuantityLimit(int shiftIndex) {
-        long prefix = 0;
-        for (int position = 0; position < capacities.length; position++) {
-            LhShiftConfigVO shift = shifts.get(position);
-            if (shift.getShiftIndex() != shiftIndex) {
-                prefix += capacities[position];
-                continue;
-            }
-            int maximum = (int) Math.min(Integer.MAX_VALUE, prefix + capacities[position]);
-            if (!shift.isAfternoonShift() || capacities[position] <= 0) {
-                return maximum;
-            }
-            int low = (int) Math.min(Integer.MAX_VALUE, prefix);
-            int high = maximum;
-            // 使用完整有效时间轴二分，清洗、维修及单控较晚侧均由completionTime处理。
-            while (low < high) {
-                int middle = low + (int) (((long) high - low + 1) / 2);
-                int quantity = this.floorQuantity(middle);
-                if (quantity <= prefix || isEndingBeforeAfternoonCutoff(context, shift, this.completionTime(quantity))) {
-                    low = middle;
-                } else {
-                    high = middle - 1;
-                }
-            }
-            return this.floorQuantity(low);
-        }
-        return 0;
-    }
-
-    /**
-     * 候选、提交和最终审计共用中班生产截止口径，20:00整不满足“之前”。
+     * 判断前日交替的实际收尾时间是否允许当天交接，中班必须严格早于禁换模起点。
      * @param context 排程参数快照
      * @param shift 最后有量班次
      * @param completed 真实生产结束时间，单控整机取较晚侧
-     * @return 时间完整且中班收尾严格早于既有禁换模起点；其他生产班次不限制
+     * @return 时间完整且中班收尾早于禁换模起点；其他生产班次不限制
      */
     public static boolean isEndingBeforeAfternoonCutoff(LhScheduleContext context,
             LhShiftConfigVO shift, Date completed) {
         if (Objects.isNull(completed)) {
             return false;
         }
+        // 沿用调用方的交替准入条件，20:00整不满足“20:00之前”。
         Date cutoff = LhScheduleTimeUtil.buildTime(LhScheduleTimeUtil.clearTime(shift.getShiftStartDateTime()),
                 LhScheduleTimeUtil.getNoMouldChangeStartHour(context), 0, 0);
         return !shift.isAfternoonShift() || completed.before(cutoff);
@@ -271,6 +280,19 @@ public final class ContinuationEndingMachineProfile {
         for (LhScheduleResult result : originals) {
             if (context.isContinuousStopHoldMachine(result.getLhMachineCode())) {
                 return shifts.get(shifts.size() - 1).getShiftEndDateTime();
+            }
+        }
+        if (quantity == 0) {
+            readyTime = shifts.get(0).getShiftStartDateTime();
+            for (LhScheduleResult result : originals) {
+                MachineScheduleDTO machine = context.getMachineScheduleMap().get(result.getLhMachineCode());
+                Date sideReady = MachineCleaningOverlapUtil.resolveEarliestAvailableTime(readyTime,
+                        Objects.nonNull(machine) ? machine.getCleaningWindowList() : null,
+                        Objects.nonNull(machine) ? machine.getPlanStopStartTime() : null,
+                        Objects.nonNull(machine) ? machine.getPlanStopEndTime() : null);
+                if (sideReady.after(readyTime)) {
+                    readyTime = sideReady;
+                }
             }
         }
         if (Objects.isNull(readyTime)) {

@@ -334,6 +334,12 @@ public class DayPlanAdjustRequireAssembler {
         dto.setSkuTag(SkuTagEnum.NORMAL.getCode());
         dto.setStrictTargetQty(true);
 
+        // 日计划调整没有正向月计划SKU，按其既有归属月份补齐专供查询范围，避免绕过强专供。
+        YearMonth planMonth = MonthPlanSurplusCalculator.getProductionYearAndMonth(context.getScheduleDate());
+        dto.setMonthPlanYear(planMonth.getYear());
+        dto.setMonthPlanMonth(planMonth.getMonthValue());
+        dto.setProductionVersion(context.getProductionVersionByYearMonthMap().get(
+                MonthPlanDateResolver.buildYearMonthKey(planMonth.getYear(), planMonth.getMonthValue())));
         this.fillMaterialAttribute(context, dto);
         this.fillCapacity(context, dto);
         this.fillMould(context, dto);

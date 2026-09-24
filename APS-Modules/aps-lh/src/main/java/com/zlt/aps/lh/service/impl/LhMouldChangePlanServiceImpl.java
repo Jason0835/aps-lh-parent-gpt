@@ -217,7 +217,7 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
     }
 
     /**
-     * 批量加载关联硫化排程结果，并汇总到工厂、批次、机台、日期和班次维度。
+     * 批量加载关联硫化排程结果，并汇总到工厂、批次、机台、日期、班次和物料维度。
      *
      * @param planList 模具交替计划列表
      * @return 计划量匹配键到计划量的映射
@@ -257,7 +257,7 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
 
         Map<String, Integer> quantityMap = new HashMap<>();
         for (LhScheduleResult result : resultList) {
-            if (result == null) {
+            if (result == null || StringUtils.isBlank(result.getMaterialCode())) {
                 continue;
             }
             for (int classNumber = 1; classNumber <= 8; classNumber++) {
@@ -271,7 +271,7 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
                         String.format("class%dPlanQty", classNumber));
                 int quantity = quantityValue instanceof Number ? ((Number) quantityValue).intValue() : 0;
                 String key = this.buildPlanQuantityKey(result.getFactoryCode(), result.getBatchNo(),
-                        result.getLhMachineCode(), shiftStartTime, shiftCode);
+                        result.getLhMachineCode(), result.getMaterialCode(), shiftStartTime, shiftCode);
                 quantityMap.merge(key, quantity, Integer::sum);
             }
         }
@@ -287,7 +287,8 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
      */
     private int resolvePlanQuantity(LhMouldChangePlan plan, Map<String, Integer> quantityMap) {
         if (plan == null || plan.getPlanDate() == null || StringUtils.isBlank(plan.getClassIndex())
-                || StringUtils.isBlank(plan.getLhResultBatchNo())) {
+                || StringUtils.isBlank(plan.getLhResultBatchNo())
+                || StringUtils.isBlank(plan.getAfterMaterialCode())) {
             return 0;
         }
         String shiftCode = this.normalizeShiftCode(plan.getClassIndex());
@@ -295,7 +296,7 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
             return 0;
         }
         String key = this.buildPlanQuantityKey(plan.getFactoryCode(), plan.getLhResultBatchNo(),
-                plan.getLhMachineCode(), plan.getPlanDate(), shiftCode);
+                plan.getLhMachineCode(), plan.getAfterMaterialCode(), plan.getPlanDate(), shiftCode);
         return quantityMap.getOrDefault(key, 0);
     }
 
@@ -308,7 +309,8 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
      */
     private int resolveNextShiftQuantity(LhMouldChangePlan plan, Map<String, Integer> quantityMap) {
         if (plan == null || plan.getPlanDate() == null || StringUtils.isBlank(plan.getClassIndex())
-                || StringUtils.isBlank(plan.getLhResultBatchNo())) {
+                || StringUtils.isBlank(plan.getLhResultBatchNo())
+                || StringUtils.isBlank(plan.getAfterMaterialCode())) {
             return 0;
         }
         String currentShiftCode = this.normalizeShiftCode(plan.getClassIndex());
@@ -327,7 +329,7 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
             nextShiftCode = ShiftEnum.NIGHT_SHIFT.getCode();
         }
         String key = this.buildPlanQuantityKey(plan.getFactoryCode(), plan.getLhResultBatchNo(),
-                plan.getLhMachineCode(), nextShiftDate, nextShiftCode);
+                plan.getLhMachineCode(), plan.getAfterMaterialCode(), nextShiftDate, nextShiftCode);
         return quantityMap.getOrDefault(key, 0);
     }
 
@@ -337,15 +339,17 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
      * @param factoryCode 工厂编码
      * @param batchNo     关联硫化批次
      * @param machineCode 硫化机台
+     * @param materialCode 物料编码
      * @param shiftDate   班次日期
      * @param shiftCode   班次编码
      * @return 计划量匹配键
      */
     private String buildPlanQuantityKey(String factoryCode, String batchNo, String machineCode,
-                                        Date shiftDate, String shiftCode) {
+                                        String materialCode, Date shiftDate, String shiftCode) {
         return StringUtils.defaultString(factoryCode).trim() + "|"
                 + StringUtils.defaultString(batchNo).trim() + "|"
                 + StringUtils.defaultString(machineCode).trim() + "|"
+                + StringUtils.defaultString(materialCode).trim() + "|"
                 + (shiftDate == null ? "" : DateUtil.formatDate(DateUtil.beginOfDay(shiftDate))) + "|"
                 + StringUtils.defaultString(shiftCode).trim();
     }
