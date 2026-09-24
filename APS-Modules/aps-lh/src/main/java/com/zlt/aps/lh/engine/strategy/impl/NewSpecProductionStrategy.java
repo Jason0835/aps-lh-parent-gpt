@@ -14185,7 +14185,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         String dateKey = LhScheduleTimeUtil.formatDate(sameDayMorningSwitchTime);
         int[] counts = context.getDailyMouldChangeCountMap().get(dateKey);
         int totalUsed = counts == null ? 0 : (counts[0] + counts[1]);
-        return totalUsed < LhScheduleTimeUtil.getDailyMouldChangeLimit(context);
+        return totalUsed < LhScheduleTimeUtil.getDailyMouldChangeLimit(context, dateKey);
     }
 
     /**

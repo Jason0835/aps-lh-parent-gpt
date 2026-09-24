@@ -1507,9 +1507,10 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
                                                              EmbryoEndingBalanceState state) {
         List<String> dateKeyList = new ArrayList<String>(state.getSimulatedCountMap().keySet());
         dateKeyList.sort(String::compareTo);
-        int morningLimit = LhScheduleTimeUtil.getMorningMouldChangeLimit(context);
-        int afternoonLimit = LhScheduleTimeUtil.getAfternoonMouldChangeLimit(context);
         for (String dateKey : dateKeyList) {
+            // 每个模拟日期桶使用该日限额，保持评分和比较公式不变。
+            int morningLimit = LhScheduleTimeUtil.getMorningMouldChangeLimit(context, dateKey);
+            int afternoonLimit = LhScheduleTimeUtil.getAfternoonMouldChangeLimit(context, dateKey);
             int[] counts = state.getSimulatedCountMap().get(dateKey);
             int morningCount = Objects.nonNull(counts) && counts.length > 0 ? counts[0] : 0;
             int afternoonCount = Objects.nonNull(counts) && counts.length > 1 ? counts[1] : 0;
@@ -1639,10 +1640,11 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
                                                   EmbryoEndingBalanceState afterState) {
         Set<String> dateKeySet = new LinkedHashSet<String>(beforeState.getSimulatedCountMap().keySet());
         dateKeySet.addAll(afterState.getSimulatedCountMap().keySet());
-        int[] limits = new int[]{LhScheduleTimeUtil.getMorningMouldChangeLimit(context),
-                LhScheduleTimeUtil.getAfternoonMouldChangeLimit(context)};
-        int dailyLimit = LhScheduleTimeUtil.getDailyMouldChangeLimit(context);
         for (String dateKey : dateKeySet) {
+            // 每个模拟日期桶使用该日限额，保持评分和比较公式不变。
+            int[] limits = new int[]{LhScheduleTimeUtil.getMorningMouldChangeLimit(context, dateKey),
+                    LhScheduleTimeUtil.getAfternoonMouldChangeLimit(context, dateKey)};
+            int dailyLimit = LhScheduleTimeUtil.getDailyMouldChangeLimit(context, dateKey);
             int[] beforeCounts = beforeState.getSimulatedCountMap().getOrDefault(dateKey, new int[]{0, 0});
             int[] afterCounts = afterState.getSimulatedCountMap().getOrDefault(dateKey, new int[]{0, 0});
             int beforeDailyCount = beforeCounts[0] + beforeCounts[1];
@@ -1753,13 +1755,16 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
                 hardViolationCount++;
             }
         }
-        int morningLimit = LhScheduleTimeUtil.getMorningMouldChangeLimit(context);
-        int afternoonLimit = LhScheduleTimeUtil.getAfternoonMouldChangeLimit(context);
-        int dailyLimit = LhScheduleTimeUtil.getDailyMouldChangeLimit(context);
         int exceededShiftCount = 0;
         int overflowQty = 0;
         long balanceDeviation = 0L;
-        for (int[] counts : state.getSimulatedCountMap().values()) {
+        for (Map.Entry<String, int[]> entry : state.getSimulatedCountMap().entrySet()) {
+            String dateKey = entry.getKey();
+            int[] counts = entry.getValue();
+            // 每个模拟日期桶使用该日限额，保持评分和比较公式不变。
+            int morningLimit = LhScheduleTimeUtil.getMorningMouldChangeLimit(context, dateKey);
+            int afternoonLimit = LhScheduleTimeUtil.getAfternoonMouldChangeLimit(context, dateKey);
+            int dailyLimit = LhScheduleTimeUtil.getDailyMouldChangeLimit(context, dateKey);
             int morningCount = counts.length > 0 ? counts[0] : 0;
             int afternoonCount = counts.length > 1 ? counts[1] : 0;
             if (morningCount + afternoonCount > dailyLimit) {

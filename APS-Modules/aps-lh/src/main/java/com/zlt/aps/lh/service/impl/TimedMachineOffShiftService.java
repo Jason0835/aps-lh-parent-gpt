@@ -73,12 +73,14 @@ public class TimedMachineOffShiftService {
         if (Objects.isNull(startDate) || CollectionUtils.isEmpty(shifts)) {
             throw new IllegalArgumentException("按时间下机缺少需求日期或排程班次");
         }
-        int morningMax = LhScheduleTimeUtil.getMorningMouldChangeLimit(context);
-        int middleMax = LhScheduleTimeUtil.getAfternoonMouldChangeLimit(context);
-        int dailyMax = LhScheduleTimeUtil.getDailyMouldChangeLimit(context);
         LocalDate lastDate = shifts.stream().map(shift -> this.toLocalDate(shift.getWorkDate()))
                 .max(LocalDate::compareTo).get();
         for (LocalDate date = startDate; !date.isAfter(lastDate); date = date.plusDays(1)) {
+            // 逐日重新读取限额及其中位阈值，不沿用顺延前日期的历史上限。
+            int morningMax = LhScheduleTimeUtil.getMorningMouldChangeLimit(context, date.toString());
+            int middleMax = LhScheduleTimeUtil.getAfternoonMouldChangeLimit(context, date.toString());
+            int dailyMax = LhScheduleTimeUtil.getDailyMouldChangeLimit(context, date.toString());
+
             int[] counts = context.getDailyMouldChangeCountMap().get(date.toString());
             int morning = Objects.nonNull(counts) ? counts[MORNING_INDEX] : 0;
             int middle = Objects.nonNull(counts) ? counts[AFTERNOON_INDEX] : 0;

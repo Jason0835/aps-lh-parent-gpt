@@ -12,6 +12,8 @@ import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.ShiftEnum;
 import com.zlt.aps.lh.api.util.ShiftBoundaryUtil;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.context.MouldChangeQuotaLimits;
+import com.zlt.aps.lh.context.MouldChangeQuotaSnapshot;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -434,6 +436,54 @@ public final class LhScheduleTimeUtil {
             return LhScheduleConstant.DEFAULT_AFTERNOON_MOULD_CHANGE_LIMIT;
         }
         return context.getScheduleConfig().getAfternoonMouldChangeLimit();
+    }
+
+    /**
+     * 按实际计数日期解析限额；原T锚点来自快照，不读取当前工作日期或派生窗口。
+     * @param context 本次上下文
+     * @param dateKey 与次数账本一致的yyyy-MM-dd日期键
+     * @return 该日有效限额；非覆盖日期保持原参数入口语义
+     */
+    public static MouldChangeQuotaLimits resolveMouldChangeQuota(LhScheduleContext context, String dateKey) {
+        LocalDate date = LocalDate.parse(dateKey);
+        MouldChangeQuotaSnapshot snapshot = Objects.isNull(context) ? null : context.getMouldChangeQuotaSnapshot();
+        if (Objects.nonNull(snapshot) && (date.equals(snapshot.getOriginalStartDate())
+                || date.equals(snapshot.getOriginalStartDate().plusDays(1)))) {
+            return snapshot.getEffectiveLimits().get(dateKey);
+        }
+        // 无历史快照的独立调用及原窗口之外的日期继续读取基础参数，不修改配置。
+        return new MouldChangeQuotaLimits(getMorningMouldChangeLimit(context),
+                getAfternoonMouldChangeLimit(context), getDailyMouldChangeLimit(context));
+    }
+
+    /** @param context 上下文 @param targetDate 实际候选日期 @return 该日早班上限 */
+    public static int getMorningMouldChangeLimit(LhScheduleContext context, Date targetDate) {
+        return getMorningMouldChangeLimit(context, formatDate(targetDate));
+    }
+
+    /** @param context 上下文 @param dateKey 实际账本日期键 @return 该日早班上限 */
+    public static int getMorningMouldChangeLimit(LhScheduleContext context, String dateKey) {
+        return resolveMouldChangeQuota(context, dateKey).getMorningLimit();
+    }
+
+    /** @param context 上下文 @param targetDate 实际候选日期 @return 该日中班上限 */
+    public static int getAfternoonMouldChangeLimit(LhScheduleContext context, Date targetDate) {
+        return getAfternoonMouldChangeLimit(context, formatDate(targetDate));
+    }
+
+    /** @param context 上下文 @param dateKey 实际账本日期键 @return 该日中班上限 */
+    public static int getAfternoonMouldChangeLimit(LhScheduleContext context, String dateKey) {
+        return resolveMouldChangeQuota(context, dateKey).getAfternoonLimit();
+    }
+
+    /** @param context 上下文 @param targetDate 实际候选日期 @return 该日每日上限 */
+    public static int getDailyMouldChangeLimit(LhScheduleContext context, Date targetDate) {
+        return getDailyMouldChangeLimit(context, formatDate(targetDate));
+    }
+
+    /** @param context 上下文 @param dateKey 实际账本日期键 @return 该日每日上限 */
+    public static int getDailyMouldChangeLimit(LhScheduleContext context, String dateKey) {
+        return resolveMouldChangeQuota(context, dateKey).getDailyLimit();
     }
 
     /**

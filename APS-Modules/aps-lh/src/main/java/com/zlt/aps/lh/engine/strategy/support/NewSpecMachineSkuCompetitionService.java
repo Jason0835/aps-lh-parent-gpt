@@ -599,7 +599,7 @@ public class NewSpecMachineSkuCompetitionService {
     /**
      * 从每台机台的最佳提案中选出当前轮唯一胜出组合。
      *
-     * <p>先按声明范围合并重复物理机台，再在存在合法单控试制/量试提案时收窄到单控作用域；
+     * <p>先按声明范围合并重复物理机台，仅在纯单控组存在合法试制/量试提案时保留组内候选优先；
      * 标准作用域内先让普通提案优先于目标日跨日准备提案，再比较历史来源班次和完整适配指标；
      * 全部同分后55组先比余量再比物料名次，非55组直接比名次，最后沿用收尾时间、机台编码。</p>
      *
@@ -640,7 +640,11 @@ public class NewSpecMachineSkuCompetitionService {
         if (Objects.nonNull(roundCache)) {
             roundCache.recordRetainedBestProposalCount(resourceProposalList.size());
         }
-        boolean hasSingleControlTrialProposal = resourceProposalList.stream()
+        // 仅保留单控组内部的试制/量试候选优先，禁止旧筛选规则从混合提案中剔除普通机台。
+        boolean singleControlGroup = resourceProposalList.stream()
+                .allMatch(proposal -> LhSingleControlMachineUtil.isConfiguredSingleControlMachine(
+                        context, proposal.getMatchResult().getMachine().getMachineCode()));
+        boolean hasSingleControlTrialProposal = singleControlGroup && resourceProposalList.stream()
                 .anyMatch(proposal -> this.isSingleControlTrialOrMassTrialProposal(
                         context, proposal));
         List<NewSpecScheduleProposal> competitionProposalList = hasSingleControlTrialProposal

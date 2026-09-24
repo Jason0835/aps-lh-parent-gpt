@@ -957,6 +957,9 @@ public class LhScheduleContext {
      * 每日模具切换计数, key=dateString, value=[早班切换数, 中班切换数]
      */
     private Map<String, int[]> dailyMouldChangeCountMap = new LinkedHashMap<>();
+
+    /** 本次原窗口的历史限额快照；只读共享，不预占真实或模拟次数。 */
+    private MouldChangeQuotaSnapshot mouldChangeQuotaSnapshot;
     /** 前置选机冻结的按时间下机需求，顺序与原下机优先级一致。 */
     private List<TimedMachineOffRequest> timedMachineOffRequests = new ArrayList<>(8);
     /** 已提交时间边界以结果身份索引，零量生产行移除后仍保留资源释放事实。 */

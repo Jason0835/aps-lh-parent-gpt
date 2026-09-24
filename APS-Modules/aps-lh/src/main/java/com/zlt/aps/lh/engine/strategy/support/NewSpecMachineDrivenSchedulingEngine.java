@@ -32,11 +32,13 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * S4.5 新增排产机台驱动资源竞争引擎。
  *
- * <p>先按业务日合法班次查找专供承接机会，再按“班次→机台→日期池→候选 SKU”普通竞争。本引擎只生成一轮
+ * <p>按“班次→普通/单控资源组→机台→日期池→候选 SKU”竞争，组内保留业务日专供优选。本引擎只生成一轮
  * Machine→SKU 轻量分配计划，不直接修改结果、机台、模具、首检或数量账本；
  * 正式时间轴和一次性提交继续交给现有新增排产内核。</p>
  *
@@ -60,7 +62,7 @@ public class NewSpecMachineDrivenSchedulingEngine {
     /** 固定指令作用域。 */
     private static final String COMPETITION_SCOPE_FIXED = "固定指令";
     /** 单控试制、量试优先作用域。 */
-    private static final String COMPETITION_SCOPE_SINGLE_CONTROL_TRIAL = "单控试制量试优先";
+    private static final String COMPETITION_SCOPE_SINGLE_CONTROL_TRIAL = "单控组内试制量试优先";
     /** 共享辅助入口原机台顺序作用域。 */
     private static final String COMPETITION_SCOPE_SHARED_ORDER = "共享入口原机台顺序";
 
@@ -131,13 +133,14 @@ public class NewSpecMachineDrivenSchedulingEngine {
             return null;
         }
         /*
-         * 专供优先后，尺寸建立同班次机台处理层级；组内完整适配同分后，55组先比余量再比名次，非55组直接比名次。
-         * 组内继续保持现有固定指令、最新可用时间和机台编码顺序。
+         * 班次内统一先处理普通资源组，再处理单控资源组；每组保留专供、尺寸、固定指令和资源顺序。
+         * 完整适配同分后，55尺寸组先比余量再比名次，非55尺寸组直接比名次，类型分组不改SKU竞争规则。
          */
-        List<List<MachineResource>> dimensionMachineGroups =
-                dynamicBestMatchCompetitionEnabled
-                        ? this.groupMachineResourcesByDimension(context, machineResources)
-                        : Collections.<List<MachineResource>>emptyList();
+        List<List<MachineResource>> controlModeGroups =
+                this.groupMachineResourcesByControlMode(context, machineResources);
+        // 每组仅缓存本轮一个专供提案（含无提案结果），不登记预留、不消费运行态账本。
+        Map<List<MachineResource>, NewSpecScheduleProposal> supplyProposalByGroup =
+                new IdentityHashMap<>(controlModeGroups.size());
         Set<String> normalizedFailureSet = Objects.isNull(failedAssignmentKeySet)
                 ? Collections.<String>emptySet() : failedAssignmentKeySet;
         boolean actualAvailableTimeMode = Objects.isNull(context.getScheduleConfig())
@@ -150,126 +153,160 @@ public class NewSpecMachineDrivenSchedulingEngine {
                 context, dayContext, candidatePoolMap);
         Set<String> fixedPhysicalMachineCodeSet = this.resolveFixedPhysicalMachineCodes(
                 context, dayContext, candidatePoolMap);
-        // 先扫描本业务日全部合法班次的专供机会，再允许普通机台消费目标名额。
-        // 提案正式提交后外层会刷新运行态；失败组合仍由现有失败缓存排除，不登记虚拟预留。
-        NewSpecScheduleProposal supplyProposal = this.findSupplyPriorityProposal(
-                context, dayContext, machineResources, orderedPoolDates, candidatePoolMap,
-                machineMatch, normalizedFailureSet, availabilityResolver, actualAvailableTimeMode,
-                pendingSkuIdentitySet, roundCache, dynamicBestMatchCompetitionEnabled);
-        if (Objects.nonNull(supplyProposal)) {
-            return supplyProposal;
-        }
         NewSpecScheduleProposal deferredCrossDayProposal = null;
         LhShiftConfigVO deferredCrossDayShift = null;
         for (LhShiftConfigVO shift : dayContext.getDayShifts()) {
             if (Objects.isNull(shift) || Objects.isNull(shift.getShiftEndDateTime())) {
                 continue;
             }
-            // 匹配专供结构已在上方完整试排；其余候选不新增硬限制，仍保护固定指令。
-            NewSpecScheduleProposal dedicatedMachineWinner = this.selectFirstDimensionGroupWinner(
-                    context, dayContext, shift,
-                    dynamicBestMatchCompetitionEnabled ? dimensionMachineGroups : Collections.singletonList(machineResources),
-                    orderedPoolDates, candidatePoolMap, machineMatch, normalizedFailureSet,
-                    availabilityResolver, actualAvailableTimeMode, pendingSkuIdentitySet,
-                    resource -> machineSupplyStructureRule.getMachinePriority(context, resource.getPhysicalMachineCode()) == 0,
-                    resource -> candidate -> this.canSelectUnderFixedInstructions(
-                            context, dayContext, resource, candidate, fixedPhysicalMachineCodeSet),
-                    roundCache, dynamicBestMatchCompetitionEnabled);
-            if (Objects.nonNull(dedicatedMachineWinner)
-                    && !dedicatedMachineWinner.getAvailabilityPlan().isSourceDayCrossDayPreparation()) {
-                this.traceWinningProposal(context, dayContext, shift, dedicatedMachineWinner,
-                        actualAvailableTimeMode, COMPETITION_SCOPE_DYNAMIC);
-                return dedicatedMachineWinner;
-            }
-            if (!dynamicBestMatchCompetitionEnabled) {
-                NewSpecScheduleProposal existingOrderProposal =
-                        this.findFirstProposalByExistingMachineOrder(
-                                context, dayContext, shift, machineResources,
-                                orderedPoolDates, candidatePoolMap, machineMatch,
-                                normalizedFailureSet, availabilityResolver,
-                                actualAvailableTimeMode, pendingSkuIdentitySet,
-                                fixedPhysicalMachineCodeSet, roundCache);
-                if (Objects.nonNull(existingOrderProposal)) {
-                    this.traceWinningProposal(
-                            context, dayContext, shift, existingOrderProposal,
-                            actualAvailableTimeMode, COMPETITION_SCOPE_SHARED_ORDER);
-                    return existingOrderProposal;
+            for (List<MachineResource> controlModeResources : controlModeGroups) {
+                if (!supplyProposalByGroup.containsKey(controlModeResources)) {
+                    // 到达该类型组后才试算专供机会，保留组内强/弱专供及整业务日扫描顺序。
+                    supplyProposalByGroup.put(controlModeResources, this.findSupplyPriorityProposal(
+                            context, dayContext, controlModeResources, orderedPoolDates, candidatePoolMap,
+                            machineMatch, normalizedFailureSet, availabilityResolver, actualAvailableTimeMode,
+                            pendingSkuIdentitySet, roundCache, dynamicBestMatchCompetitionEnabled));
                 }
-                continue;
-            }
-            /*
-             * 固定机台和续作原机台属于独立指令作用域。只有固定组合完整不可排时，
-             * 才允许进入普通动态竞争，避免把固定指令作为普通匹配分值污染 bestSku 比较。
-             */
-            if (!CollectionUtils.isEmpty(fixedPhysicalMachineCodeSet)) {
-                NewSpecScheduleProposal fixedWinner =
+                NewSpecScheduleProposal supplyProposal = supplyProposalByGroup.get(controlModeResources);
+                if (Objects.nonNull(supplyProposal)) {
+                    Integer supplyShiftIndex = supplyProposal.getAssignmentPlan().getTargetShiftIndex();
+                    // 首组保留原跨班专供优选；后组必须等目标班次首组处理完成，不能提前插队。
+                    if (controlModeResources == controlModeGroups.get(0)
+                            || Objects.equals(supplyShiftIndex, shift.getShiftIndex())) {
+                        LhShiftConfigVO supplyShift = dayContext.getDayShifts().stream()
+                                .filter(candidateShift -> Objects.nonNull(candidateShift)
+                                        && Objects.equals(candidateShift.getShiftIndex(), supplyShiftIndex))
+                                .findFirst().get();
+                        this.traceWinningProposal(context, dayContext, supplyShift, supplyProposal,
+                                actualAvailableTimeMode, COMPETITION_SCOPE_SUPPLY);
+                        return supplyProposal;
+                    }
+                    continue;
+                }
+                // 类型层在尺寸和其它作用域之外，后续分组不得把单控资源重新提前。
+                List<List<MachineResource>> dimensionMachineGroups = dynamicBestMatchCompetitionEnabled
+                        ? this.groupMachineResourcesByDimension(context, controlModeResources)
+                        : Collections.singletonList(controlModeResources);
+                // 匹配专供结构已在上方完整试排；其余候选不新增硬限制，仍保护固定指令。
+                NewSpecScheduleProposal dedicatedMachineWinner = this.selectFirstDimensionGroupWinner(
+                        context, dayContext, shift,
+                        dimensionMachineGroups,
+                        orderedPoolDates, candidatePoolMap, machineMatch, normalizedFailureSet,
+                        availabilityResolver, actualAvailableTimeMode, pendingSkuIdentitySet,
+                        resource -> machineSupplyStructureRule.getMachinePriority(context, resource.getPhysicalMachineCode()) == 0,
+                        resource -> candidate -> this.canSelectUnderFixedInstructions(
+                                context, dayContext, resource, candidate, fixedPhysicalMachineCodeSet),
+                        roundCache, dynamicBestMatchCompetitionEnabled);
+                if (Objects.nonNull(dedicatedMachineWinner)
+                        && !dedicatedMachineWinner.getAvailabilityPlan().isSourceDayCrossDayPreparation()) {
+                    this.traceWinningProposal(context, dayContext, shift, dedicatedMachineWinner,
+                            actualAvailableTimeMode, COMPETITION_SCOPE_DYNAMIC);
+                    return dedicatedMachineWinner;
+                }
+                if (!dynamicBestMatchCompetitionEnabled) {
+                    NewSpecScheduleProposal existingOrderProposal =
+                            this.findFirstProposalByExistingMachineOrder(
+                                    context, dayContext, shift, controlModeResources,
+                                    orderedPoolDates, candidatePoolMap, machineMatch,
+                                    normalizedFailureSet, availabilityResolver,
+                                    actualAvailableTimeMode, pendingSkuIdentitySet,
+                                    fixedPhysicalMachineCodeSet, roundCache);
+                    if (Objects.nonNull(existingOrderProposal)
+                            && existingOrderProposal.getAvailabilityPlan().isSourceDayCrossDayPreparation()) {
+                        // 共享入口也先检查另一类型组的当班可开产机会，再使用本班跨日准备提案。
+                        if (Objects.isNull(deferredCrossDayProposal)) {
+                            deferredCrossDayProposal = existingOrderProposal;
+                            deferredCrossDayShift = shift;
+                        }
+                        continue;
+                    }
+                    if (Objects.nonNull(existingOrderProposal)) {
+                        this.traceWinningProposal(
+                                context, dayContext, shift, existingOrderProposal,
+                                actualAvailableTimeMode, COMPETITION_SCOPE_SHARED_ORDER);
+                        return existingOrderProposal;
+                    }
+                    continue;
+                }
+                /*
+                 * 固定机台和续作原机台属于独立指令作用域。只有固定组合完整不可排时，
+                 * 才允许进入普通动态竞争，避免把固定指令作为普通匹配分值污染 bestSku 比较。
+                 */
+                if (!CollectionUtils.isEmpty(fixedPhysicalMachineCodeSet)) {
+                    NewSpecScheduleProposal fixedWinner =
+                            this.selectFirstDimensionGroupWinner(
+                                    context, dayContext, shift, dimensionMachineGroups,
+                                    orderedPoolDates, candidatePoolMap, machineMatch,
+                                    normalizedFailureSet, availabilityResolver,
+                                    actualAvailableTimeMode, pendingSkuIdentitySet,
+                                    machineResource -> fixedPhysicalMachineCodeSet.contains(
+                                            machineResource.getPhysicalMachineCode()),
+                                    machineResource -> candidate ->
+                                            this.resolveFixedInstructionScore(
+                                                    context, dayContext, candidate.getSku(),
+                                                    machineResource.getMachine()) == 0,
+                                    roundCache, false);
+                    if (Objects.nonNull(fixedWinner)) {
+                        this.traceWinningProposal(
+                                context, dayContext, shift, fixedWinner,
+                                actualAvailableTimeMode, COMPETITION_SCOPE_FIXED);
+                        return fixedWinner;
+                    }
+                }
+                /*
+                 * 单控组内的试制/量试优先仍在本组 bestSku 计算前形成独立作用域。
+                 * 否则单控机台可能因正规 SKU 匹配等级更高而把自身 bestSku 选成正规 SKU，
+                 * 进而漏掉池内已经完整可排的试制/量试组合；此处不得越过普通资源组。
+                 */
+                NewSpecScheduleProposal singleControlTrialWinner =
                         this.selectFirstDimensionGroupWinner(
                                 context, dayContext, shift, dimensionMachineGroups,
                                 orderedPoolDates, candidatePoolMap, machineMatch,
                                 normalizedFailureSet, availabilityResolver,
                                 actualAvailableTimeMode, pendingSkuIdentitySet,
-                                machineResource -> fixedPhysicalMachineCodeSet.contains(
-                                        machineResource.getPhysicalMachineCode()),
-                                machineResource -> candidate ->
-                                        this.resolveFixedInstructionScore(
-                                                context, dayContext, candidate.getSku(),
-                                                machineResource.getMachine()) == 0,
-                                roundCache, false);
-                if (Objects.nonNull(fixedWinner)) {
+                                machineResource -> LhSingleControlMachineUtil
+                                        .isConfiguredSingleControlMachine(
+                                                context,
+                                                machineResource.getMachine().getMachineCode()),
+                                machineResource -> this::isTrialOrMassTrialCandidate,
+                                roundCache, true);
+                if (Objects.nonNull(singleControlTrialWinner)) {
                     this.traceWinningProposal(
-                            context, dayContext, shift, fixedWinner,
-                            actualAvailableTimeMode, COMPETITION_SCOPE_FIXED);
-                    return fixedWinner;
+                            context, dayContext, shift, singleControlTrialWinner,
+                            actualAvailableTimeMode, COMPETITION_SCOPE_SINGLE_CONTROL_TRIAL);
+                    return singleControlTrialWinner;
+                }
+                NewSpecMachineProposalBuckets dimensionGroupWinnerBuckets =
+                        this.selectFirstDimensionGroupProposalBuckets(
+                                context, dayContext, shift, dimensionMachineGroups,
+                                orderedPoolDates, candidatePoolMap, machineMatch,
+                                normalizedFailureSet, availabilityResolver,
+                                actualAvailableTimeMode, pendingSkuIdentitySet, roundCache);
+                NewSpecScheduleProposal ordinaryWinner =
+                        dimensionGroupWinnerBuckets.getOrdinaryProposal();
+                if (Objects.nonNull(ordinaryWinner)) {
+                    this.traceWinningProposal(
+                            context, dayContext, shift, ordinaryWinner,
+                            actualAvailableTimeMode, COMPETITION_SCOPE_DYNAMIC);
+                    return ordinaryWinner;
+                }
+                NewSpecScheduleProposal crossDayWinner =
+                        dimensionGroupWinnerBuckets.getCrossDayProposal();
+                if (Objects.nonNull(crossDayWinner)) {
+                    if (Objects.isNull(deferredCrossDayProposal)) {
+                        deferredCrossDayProposal = crossDayWinner;
+                        deferredCrossDayShift = shift;
+                        this.logSourceDayCrossDayProposalAction(
+                                "暂存并继续查找当前业务日普通提案",
+                                context, dayContext, shift, crossDayWinner);
+                    }
+                    continue;
                 }
             }
-            /*
-             * 单控试制/量试优先必须在“每台机台普通 bestSku”计算前形成独立作用域。
-             * 否则单控机台可能因正规 SKU 匹配等级更高而把自身 bestSku 选成正规 SKU，
-             * 进而漏掉池内已经完整可排的试制/量试组合，违背单控资源优先目的。
-             */
-            NewSpecScheduleProposal singleControlTrialWinner =
-                    this.selectFirstDimensionGroupWinner(
-                            context, dayContext, shift, dimensionMachineGroups,
-                            orderedPoolDates, candidatePoolMap, machineMatch,
-                            normalizedFailureSet, availabilityResolver,
-                            actualAvailableTimeMode, pendingSkuIdentitySet,
-                            machineResource -> LhSingleControlMachineUtil
-                                    .isConfiguredSingleControlMachine(
-                                            context,
-                                            machineResource.getMachine().getMachineCode()),
-                            machineResource -> this::isTrialOrMassTrialCandidate,
-                            roundCache, true);
-            if (Objects.nonNull(singleControlTrialWinner)) {
-                this.traceWinningProposal(
-                        context, dayContext, shift, singleControlTrialWinner,
-                        actualAvailableTimeMode, COMPETITION_SCOPE_SINGLE_CONTROL_TRIAL);
-                return singleControlTrialWinner;
-            }
-            NewSpecMachineProposalBuckets dimensionGroupWinnerBuckets =
-                    this.selectFirstDimensionGroupProposalBuckets(
-                            context, dayContext, shift, dimensionMachineGroups,
-                            orderedPoolDates, candidatePoolMap, machineMatch,
-                            normalizedFailureSet, availabilityResolver,
-                            actualAvailableTimeMode, pendingSkuIdentitySet, roundCache);
-            NewSpecScheduleProposal ordinaryWinner =
-                    dimensionGroupWinnerBuckets.getOrdinaryProposal();
-            if (Objects.nonNull(ordinaryWinner)) {
-                this.traceWinningProposal(
-                        context, dayContext, shift, ordinaryWinner,
-                        actualAvailableTimeMode, COMPETITION_SCOPE_DYNAMIC);
-                return ordinaryWinner;
-            }
-            NewSpecScheduleProposal crossDayWinner =
-                    dimensionGroupWinnerBuckets.getCrossDayProposal();
-            if (Objects.nonNull(crossDayWinner)) {
-                if (Objects.isNull(deferredCrossDayProposal)) {
-                    deferredCrossDayProposal = crossDayWinner;
-                    deferredCrossDayShift = shift;
-                    this.logSourceDayCrossDayProposalAction(
-                            "暂存并继续查找当前业务日普通提案",
-                            context, dayContext, shift, crossDayWinner);
-                }
-                continue;
+            if (!dynamicBestMatchCompetitionEnabled && Objects.nonNull(deferredCrossDayProposal)) {
+                this.traceWinningProposal(context, dayContext, deferredCrossDayShift,
+                        deferredCrossDayProposal, actualAvailableTimeMode, COMPETITION_SCOPE_SHARED_ORDER);
+                return deferredCrossDayProposal;
             }
         }
         if (Objects.nonNull(deferredCrossDayProposal)) {
@@ -331,8 +368,7 @@ public class NewSpecMachineDrivenSchedulingEngine {
                                 context, dayContext, resource, candidate, fixedMachines),
                         cache, dynamicCompetition);
                 if (Objects.nonNull(proposal)) {
-                    this.traceWinningProposal(context, dayContext, shift, proposal,
-                            actualTimeMode, COMPETITION_SCOPE_SUPPLY);
+                    // 仅返回组内专供候选；最终获准进入该类型组时再记录胜出，避免预演日志误报。
                     return proposal;
                 }
             }
@@ -722,11 +758,14 @@ public class NewSpecMachineDrivenSchedulingEngine {
                 && !CollectionUtils.isEmpty(machineSupplyStructureRule.getPreferredLhMachines(
                 context, proposal.getCandidate().getSku()))) {
             decisionEvidence = new StringBuilder(decisionEvidence)
-                    .append(", 专供优先结果=本业务日合法范围内无剩余可提交匹配专供提案，进入普通竞争")
+                    .append(", 专供优先结果=当前机台类型组内无剩余可提交匹配专供提案，进入组内普通竞争")
                     .toString();
         }
         String machineCode = proposal.getMatchResult().getMachine().getMachineCode();
         decisionEvidence = new StringBuilder(decisionEvidence)
+                .append(", 机台资源组=").append(LhSingleControlMachineUtil.isConfiguredSingleControlMachine(
+                        context, machineCode) ? "单控机台组" : "普通机台组")
+                .append(", 资源组顺序=普通机台→单控机台")
                 .append(", 专供结构类型=").append(machineSupplyStructureRule.getDedicatedType(context, proposal.getCandidate().getSku()))
                 .append(", 专供匹配层级=").append(machineSupplyStructureRule.getMatchPriority(context, machineCode, proposal.getCandidate().getSku()))
                 .toString();
@@ -997,6 +1036,25 @@ public class NewSpecMachineDrivenSchedulingEngine {
                         fixedPhysicalMachineCodeSet.contains(resource.getPhysicalMachineCode()) ? 0 : 1)
                 .thenComparing(MachineResource.RESOURCE_ORDER));
         return resources;
+    }
+
+    /**
+     * 按普通机台、单控机台稳定划分班次资源组，不改组内既有资源顺序。
+     *
+     * @param context 本次排程上下文，复用工厂单控配置及L/R识别口径
+     * @param machineResources 已按专供、固定指令、收尾时间和编码排序的机台资源
+     * @return 普通组在前、单控组在后的非空资源组；空资源不生成组
+     */
+    private List<List<MachineResource>> groupMachineResourcesByControlMode(
+            LhScheduleContext context, List<MachineResource> machineResources) {
+        Map<Boolean, List<MachineResource>> groups = machineResources.stream()
+                .collect(Collectors.partitioningBy(resource -> LhSingleControlMachineUtil
+                                .isConfiguredSingleControlMachine(context, resource.getMachine().getMachineCode()),
+                        Collectors.toCollection(() -> new ArrayList<MachineResource>(machineResources.size()))));
+        return Stream.of(false, true)
+                .map(groups::get)
+                .filter(resources -> !CollectionUtils.isEmpty(resources))
+                .collect(Collectors.toCollection(() -> new ArrayList<List<MachineResource>>(groups.size())));
     }
 
     /**

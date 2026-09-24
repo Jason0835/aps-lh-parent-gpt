@@ -5653,7 +5653,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     /**
      * 输出续作排产后全量启用机台排序日志（不依赖具体SKU）。
      * <p>排除续作排满机台（续作机台且非收尾且未释放），保留续作收尾机台、续作释放机台和非续作机台；
-     * 排序规则：L1单控优先 -> L2收尾时间(升序,null末位) -> L3普通机台优先 -> L4特殊支持能力数(升序)。</p>
+     * 排序规则：L1非单控优先 -> L2收尾时间(升序,null末位) -> L3普通机台优先 -> L4特殊支持能力数(升序)。</p>
      *
      * @param context 排程上下文
      */
@@ -5700,21 +5700,21 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                         + ", " + PriorityTraceLogHelper.kv("排除续作排满数", excludedFullContinuousCount)
                         + ", " + PriorityTraceLogHelper.kv("参与排序数", sortMachines.size()));
         PriorityTraceLogHelper.appendLine(detailBuilder,
-                "排序规则: L1单控优先 -> L2收尾时间(升序,null末位) -> L3普通机台优先 -> L4特殊支持能力数(升序)");
+                "排序规则: L1非单控优先 -> L2收尾时间(升序,null末位) -> L3普通机台优先 -> L4特殊支持能力数(升序)");
         List<String> levelNames = java.util.Arrays.asList(
-                "L1_单控优先", "L2_收尾时间", "L3_普通机台优先", "L4_特殊支持能力数量");
+                "L1_非单控优先", "L2_收尾时间", "L3_普通机台优先", "L4_特殊支持能力数量");
         for (int i = 0; i < sortMachines.size(); i++) {
             MachineScheduleDTO machine = sortMachines.get(i);
             boolean isSingleCtrl = isSingleControlMachine(context, machine.getMachineCode());
             int normalMachinePriority = LhMachineHardMatchUtil.resolveNormalMachinePriority(machine);
             int specialSupportCapabilityCount = resolveSpecialSupportCapabilityCount(machine);
             List<String> sortKeyLevels = java.util.Arrays.asList(
-                    "L1_单控优先=" + (isSingleCtrl ? 1 : 0),
+                    "L1_非单控优先=" + (isSingleCtrl ? 0 : 1),
                     "L2_收尾时间=" + PriorityTraceLogHelper.formatDateTime(machine.getEstimatedEndTime()),
                     "L3_普通机台优先=" + (normalMachinePriority == 0 ? 1 : 0),
                     "L4_特殊支持能力数量=" + specialSupportCapabilityCount);
             List<Integer> scores = java.util.Arrays.asList(
-                    isSingleCtrl ? 0 : 1,
+                    isSingleCtrl ? 1 : 0,
                     resolveEndingTimeScore(machine),
                     normalMachinePriority,
                     specialSupportCapabilityCount);
@@ -5747,7 +5747,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
      */
     private Comparator<MachineScheduleDTO> buildStandaloneMachineComparator(LhScheduleContext context) {
         return (left, right) -> {
-            // L1 单控优先：单控机台排前
+            // L1 非单控优先：单控机台统一排在末组
             int compareResult = Integer.compare(resolveStandaloneSingleControlScore(context, left),
                     resolveStandaloneSingleControlScore(context, right));
             if (compareResult != 0) {
@@ -5780,14 +5780,14 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     }
 
     /**
-     * 解析全量排序场景下单控机台得分：单控=0，普通=1。
+     * 解析全量排序场景下单控机台得分：普通=0，单控=1。
      *
      * @param context 排程上下文
      * @param machine 机台
      * @return 单控得分
      */
     private int resolveStandaloneSingleControlScore(LhScheduleContext context, MachineScheduleDTO machine) {
-        return isSingleControlMachine(context, machine.getMachineCode()) ? 0 : 1;
+        return isSingleControlMachine(context, machine.getMachineCode()) ? 1 : 0;
     }
 
     /**

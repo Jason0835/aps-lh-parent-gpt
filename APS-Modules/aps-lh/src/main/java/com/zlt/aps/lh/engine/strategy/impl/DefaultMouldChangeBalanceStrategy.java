@@ -42,7 +42,7 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
         String dateKey = formatDateKey(targetDate);
         int[] counts = context.getDailyMouldChangeCountMap().getOrDefault(dateKey, new int[]{0, 0});
         int totalUsed = counts[IDX_MORNING] + counts[IDX_AFTERNOON];
-        int dailyLimit = getDailyLimit(context);
+        int dailyLimit = this.getDailyLimit(context, dateKey);
         return totalUsed < dailyLimit;
     }
 
@@ -213,9 +213,10 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
                 cursor = LhScheduleTimeUtil.resolveNextMorningAfterNoMouldChangeWindow(context, cursor);
                 continue;
             }
+            // 停机、禁换模或跨日顺延后，限额与已用次数均按最新落点日期读取。
             String dateKey = this.formatDateKey(cursor);
             int[] counts = countMap.getOrDefault(dateKey, new int[]{0, 0});
-            if ((balanced || timedOff) && this.getTotalUsed(counts) >= this.getDailyLimit(context)) {
+            if ((balanced || timedOff) && this.getTotalUsed(counts) >= this.getDailyLimit(context, dateKey)) {
                 if (this.isOnOrAfterScheduleTargetDate(context, cursor)) {
                     return null;
                 }
@@ -228,7 +229,7 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
                 return cursor;
             }
             if (LhScheduleTimeUtil.isMorningShift(context, cursor)) {
-                if (counts[IDX_MORNING] < this.getMorningLimit(context)) {
+                if (counts[IDX_MORNING] < this.getMorningLimit(context, dateKey)) {
                     return cursor;
                 }
                 if (!balanced && !timedOff) {
@@ -237,12 +238,12 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
                     continue;
                 }
                 Date afternoon = this.resolveAfternoonBalanceCandidate(context, machineCode, dateKey,
-                        cursor, durationHours, counts, this.getAfternoonLimit(context), dayEnd);
+                        cursor, durationHours, counts, this.getAfternoonLimit(context, dateKey), dayEnd);
                 if (Objects.nonNull(afternoon)) {
                     return afternoon;
                 }
             } else if (LhScheduleTimeUtil.isAfternoonShift(context, cursor)
-                    && counts[IDX_AFTERNOON] < this.getAfternoonLimit(context)) {
+                    && counts[IDX_AFTERNOON] < this.getAfternoonLimit(context, dateKey)) {
                 return cursor;
             }
             if ((balanced || timedOff) && this.isOnOrAfterScheduleTargetDate(context, cursor)) {
@@ -269,9 +270,11 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
             return;
         }
         if (Objects.isNull(allocatedTime) && Objects.nonNull(context.getWindowEndDate())) {
-            int[] counts = context.getDailyMouldChangeCountMap().get(this.formatDateKey(context.getWindowEndDate()));
-            if (this.getTotalUsed(counts) >= this.getDailyLimit(context)) {
-                this.recordBlockedReason(context, sku, this.getDailyLimit(context));
+            String endDateKey = this.formatDateKey(context.getWindowEndDate());
+            int[] counts = context.getDailyMouldChangeCountMap().get(endDateKey);
+            int dailyLimit = this.getDailyLimit(context, endDateKey);
+            if (this.getTotalUsed(counts) >= dailyLimit) {
+                this.recordBlockedReason(context, sku, dailyLimit);
             }
         }
         if (Objects.isNull(dayEnd)) {
@@ -283,10 +286,10 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
         }
         String dateKey = this.formatDateKey(first);
         int[] counts = context.getDailyMouldChangeCountMap().getOrDefault(dateKey, new int[]{0, 0});
-        if (counts[IDX_MORNING] >= this.getMorningLimit(context)
-                && this.getTotalUsed(counts) < this.getDailyLimit(context)
+        if (counts[IDX_MORNING] >= this.getMorningLimit(context, dateKey)
+                && this.getTotalUsed(counts) < this.getDailyLimit(context, dateKey)
                 && Objects.isNull(this.resolveAfternoonBalanceCandidate(context, machineCode, dateKey, first,
-                durationHours, counts, this.getAfternoonLimit(context), dayEnd))) {
+                durationHours, counts, this.getAfternoonLimit(context, dateKey), dayEnd))) {
             this.appendDayEndDeferProcessLog(context, dateKey, first, sku, dayEnd);
         }
     }
@@ -401,13 +404,14 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
         registerMouldChangeCount(context, allocatedTime);
         int[] updatedCounts = context.getDailyMouldChangeCountMap().get(dateKey);
         log.info("换模/换活字块班次落点完成, materialCode: {}, embryoCode: {}, 是否共用胎胚: {}, "
-                        + "actionType: {}, 日期: {}, 当天总次数: {}/{}, 早班次数: {}, 中班次数: {}, 最终换模班次: {}",
+                        + "actionType: {}, 日期: {}, 当天总次数: {}/{}, 早班次数: {}/{}, 中班次数: {}/{}, 最终换模班次: {}",
                 sku == null ? null : sku.getMaterialCode(),
                 sku == null ? null : sku.getEmbryoCode(),
                 isSharedEmbryo(context, sku),
                 StringUtils.defaultIfEmpty(actionType, ACTION_CHANGEOVER),
-                dateKey, getTotalUsed(updatedCounts), getDailyLimit(context),
-                updatedCounts[IDX_MORNING], updatedCounts[IDX_AFTERNOON],
+                dateKey, getTotalUsed(updatedCounts), this.getDailyLimit(context, dateKey),
+                updatedCounts[IDX_MORNING], this.getMorningLimit(context, dateKey),
+                updatedCounts[IDX_AFTERNOON], this.getAfternoonLimit(context, dateKey),
                 LhScheduleTimeUtil.isMorningShift(context, allocatedTime) ? "早班" : "中班");
         return allocatedTime;
     }
@@ -431,9 +435,9 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
                 + ", 日期=" + dateKey
                 + ", 早班候选=" + LhScheduleTimeUtil.formatDateTime(morningTime)
                 + ", 业务日日终=" + LhScheduleTimeUtil.formatDateTime(businessDayEndTime)
-                + ", 每日上限=" + getDailyLimit(context)
-                + ", 早班参考上限=" + getMorningLimit(context)
-                + ", 中班参考上限=" + getAfternoonLimit(context);
+                + ", 每日上限=" + this.getDailyLimit(context, dateKey)
+                + ", 早班参考上限=" + this.getMorningLimit(context, dateKey)
+                + ", 中班参考上限=" + this.getAfternoonLimit(context, dateKey);
         PriorityTraceLogHelper.appendProcessLog(context, "换模班次日终顺延", detail);
         log.info("{}", detail);
     }
@@ -549,7 +553,7 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
             int[] currentCounts = countMap.getOrDefault(dateKey, new int[]{0, 0});
             int morningCount = currentCounts.length > IDX_MORNING ? currentCounts[IDX_MORNING] : 0;
             int afternoonCount = currentCounts.length > IDX_AFTERNOON ? currentCounts[IDX_AFTERNOON] : 0;
-            if (morningCount + afternoonCount >= getDailyLimit(context)) {
+            if (morningCount + afternoonCount >= this.getDailyLimit(context, dateKey)) {
                 continue;
             }
             int projectedMorningCount = morningCount
@@ -559,12 +563,12 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
             if (projectedMorningCount == morningCount && projectedAfternoonCount == afternoonCount) {
                 continue;
             }
-            int exceededShiftCount = (projectedMorningCount > getMorningLimit(context) ? 1 : 0)
-                    + (projectedAfternoonCount > getAfternoonLimit(context) ? 1 : 0);
-            int overflowQty = Math.max(0, projectedMorningCount - getMorningLimit(context))
-                    + Math.max(0, projectedAfternoonCount - getAfternoonLimit(context));
+            int exceededShiftCount = (projectedMorningCount > this.getMorningLimit(context, dateKey) ? 1 : 0)
+                    + (projectedAfternoonCount > this.getAfternoonLimit(context, dateKey) ? 1 : 0);
+            int overflowQty = Math.max(0, projectedMorningCount - this.getMorningLimit(context, dateKey))
+                    + Math.max(0, projectedAfternoonCount - this.getAfternoonLimit(context, dateKey));
             long balanceDeviation = calculateShiftBalanceDeviation(
-                    context, projectedMorningCount, projectedAfternoonCount);
+                    context, dateKey, projectedMorningCount, projectedAfternoonCount);
             if (isBetterEndingStaggerPreviewCandidate(
                     exceededShiftCount, overflowQty, balanceDeviation, candidateTime,
                     selectedExceededShiftCount, selectedOverflowQty, selectedBalanceDeviation, selectedTime)) {
@@ -653,15 +657,16 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
      * 计算早中班模拟次数与目标比例的偏差。
      *
      * @param context 排程上下文
+     * @param dateKey 当前候选的实际日期键
      * @param morningCount 早班次数
      * @param afternoonCount 中班次数
      * @return 偏差绝对值，越小越接近目标比例
      */
-    private long calculateShiftBalanceDeviation(LhScheduleContext context,
+    private long calculateShiftBalanceDeviation(LhScheduleContext context, String dateKey,
                                                 int morningCount,
                                                 int afternoonCount) {
-        return Math.abs((long) morningCount * getAfternoonLimit(context)
-                - (long) afternoonCount * getMorningLimit(context));
+        return Math.abs((long) morningCount * this.getAfternoonLimit(context, dateKey)
+                - (long) afternoonCount * this.getMorningLimit(context, dateKey));
     }
 
     @Override
@@ -669,7 +674,7 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
         String dateKey = formatDateKey(targetDate);
         int[] counts = context.getDailyMouldChangeCountMap().getOrDefault(dateKey, new int[]{0, 0});
         int totalUsed = counts[IDX_MORNING] + counts[IDX_AFTERNOON];
-        int dailyLimit = getDailyLimit(context);
+        int dailyLimit = this.getDailyLimit(context, dateKey);
         return Math.max(0, dailyLimit - totalUsed);
     }
 
@@ -730,7 +735,7 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
         }
         // 共用胎胚换模均衡：只有原本落早班且早班次数已超过阈值时，才挪到中班
         // 中班不强制挪动，单胎胚不进入此方法
-        int morningLimit = getMorningLimit(context);
+        int morningLimit = this.getMorningLimit(context, this.formatDateKey(candidateTime));
         if (LhScheduleTimeUtil.isMorningShift(context, candidateTime)
                 && counts[IDX_MORNING] >= morningLimit) {
             return LhScheduleTimeUtil.getAfternoonShiftStart(context, candidateTime);
@@ -870,15 +875,18 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
         return LhScheduleTimeUtil.formatDate(date);
     }
 
-    private int getDailyLimit(LhScheduleContext context) {
-        return LhScheduleTimeUtil.getDailyMouldChangeLimit(context);
+    /** @param context 上下文 @param dateKey 实际账本日期键 @return 该日每日上限 */
+    private int getDailyLimit(LhScheduleContext context, String dateKey) {
+        return LhScheduleTimeUtil.getDailyMouldChangeLimit(context, dateKey);
     }
 
-    private int getMorningLimit(LhScheduleContext context) {
-        return LhScheduleTimeUtil.getMorningMouldChangeLimit(context);
+    /** @param context 上下文 @param dateKey 实际账本日期键 @return 该日早班上限 */
+    private int getMorningLimit(LhScheduleContext context, String dateKey) {
+        return LhScheduleTimeUtil.getMorningMouldChangeLimit(context, dateKey);
     }
 
-    private int getAfternoonLimit(LhScheduleContext context) {
-        return LhScheduleTimeUtil.getAfternoonMouldChangeLimit(context);
+    /** @param context 上下文 @param dateKey 实际账本日期键 @return 该日中班上限 */
+    private int getAfternoonLimit(LhScheduleContext context, String dateKey) {
+        return LhScheduleTimeUtil.getAfternoonMouldChangeLimit(context, dateKey);
     }
 }

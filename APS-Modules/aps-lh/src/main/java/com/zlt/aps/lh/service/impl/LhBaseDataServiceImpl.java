@@ -68,6 +68,9 @@ import java.util.stream.Collectors;
 @Service
 public class LhBaseDataServiceImpl implements ILhBaseDataService {
 
+    @Resource
+    private HistoricalMouldChangeQuotaService historicalMouldChangeQuotaService;
+
     /**
      * 排产版本已定稿（与 MpFactoryProductionVersion.isFinal 一致）
      */
@@ -486,6 +489,10 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                     LhScheduleTimeUtil.formatDate(scheduleDate), context.getInterruptReason());
             return;
         }
+        // 基础数据屏障和中断检查完成后冻结一次上限，早于续作预演及分配；异常沿用加载失败机制。
+        this.executeDataInitTask("历史换模限额快照",
+                () -> historicalMouldChangeQuotaService.initializeSnapshot(context),
+                () -> context.getMouldChangeQuotaSnapshot().getEffectiveLimits().size());
         log.info("基础数据加载完成, 工厂: {}, 目标日: {}, T日: {}",
                 factoryCode, LhScheduleTimeUtil.formatDate(targetDate), LhScheduleTimeUtil.formatDate(scheduleDate));
         log.info("[DataInit] 全部初始化完成：totalCost={}ms", System.currentTimeMillis() - totalStartTime);

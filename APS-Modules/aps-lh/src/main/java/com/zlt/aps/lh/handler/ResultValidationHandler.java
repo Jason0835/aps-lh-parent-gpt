@@ -3050,13 +3050,13 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         for (String dateKey : dateKeySet) {
             this.validateMouldChangeShiftLimit(
                     context, dateKey, morningMachineMap.get(dateKey),
-                    LhScheduleTimeUtil.getMorningMouldChangeLimit(context), "早班");
+                    LhScheduleTimeUtil.getMorningMouldChangeLimit(context, dateKey), "早班");
             this.validateMouldChangeShiftLimit(
                     context, dateKey, afternoonMachineMap.get(dateKey),
-                    LhScheduleTimeUtil.getAfternoonMouldChangeLimit(context), "中班");
+                    LhScheduleTimeUtil.getAfternoonMouldChangeLimit(context, dateKey), "中班");
             this.validateMouldChangeShiftLimit(
                     context, dateKey, dailyMachineMap.get(dateKey),
-                    LhScheduleTimeUtil.getDailyMouldChangeLimit(context), "全日");
+                    LhScheduleTimeUtil.getDailyMouldChangeLimit(context, dateKey), "全日");
         }
     }
 
