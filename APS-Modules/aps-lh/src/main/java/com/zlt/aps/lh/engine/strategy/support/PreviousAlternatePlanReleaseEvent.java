@@ -11,7 +11,7 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.Objects;
 
-/** 前日交替强制下机的不可变来源快照；完成状态由上下文结果关联维护。 */
+/** 前日交替来源及班次边界快照；实际释放随最终续作收口同步，完成状态由结果关联维护。 */
 @Data
 public class PreviousAlternatePlanReleaseEvent implements Serializable {
     private static final long serialVersionUID = 1L;
@@ -25,8 +25,24 @@ public class PreviousAlternatePlanReleaseEvent implements Serializable {
     private String materialCode;
     /** 下机前实际产品状态。 */
     private String productStatus;
-    /** 本机历史前料零余量或未进入本次续作，历史动作从T日首个合法班次执行。 */
+    /** 本机历史前料最终未排产，交替从T日历史班次起点尝试。 */
     private boolean beforeMaterialNotScheduled;
+    /** 历史计划日期及班次解析出的起点，前料未完成时必须在此下机。 */
+    private Date plannedShiftStartTime;
+    /** 历史计划班次结束，不允许换模或换活字块开始于该时刻及之后。 */
+    private Date plannedShiftEndTime;
+    /** 本轮准备资源窗口截止；未来生产提案不能借此抢占尚未轮到的准备班次。 */
+    private Date preparationWindowEndTime;
+
+    /** @return 历史计划截止与当前准备窗口截止中的较早值，采用半开区间 */
+    public Date getPreparationDeadline() {
+        Date plannedEnd = Objects.requireNonNull(plannedShiftEndTime, "历史计划班次截止未冻结");
+        return Objects.nonNull(preparationWindowEndTime) && preparationWindowEndTime.before(plannedEnd)
+                ? preparationWindowEndTime : plannedEnd;
+    }
+
+    /** 前料最终未排时，T日对应历史班次的承接起点。 */
+    private Date noProductionStartTime;
     /** 登记时为本次动作边界；有余量的严格收尾可收敛为更早的真实下机时刻。 */
     private Date offlineTime;
     /** 下机前整组实际模具，供单副置换及整组替换判定。 */

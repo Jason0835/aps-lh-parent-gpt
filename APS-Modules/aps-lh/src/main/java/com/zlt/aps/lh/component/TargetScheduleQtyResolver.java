@@ -1127,6 +1127,23 @@ public class TargetScheduleQtyResolver {
                                                  LhScheduleResult result,
                                                  List<LhShiftConfigVO> shifts,
                                                  String scene) {
+        return this.capResultByProductionRemainingQty(context, sku, result, shifts, scene, null, 1);
+    }
+
+    /**
+     * 按真实余量裁量，逐班首检单独保留，只有其后的正式生产量参与模数及P0归整。
+     * @param context 本次数量及结构账本
+     * @param sku 当前物料
+     * @param result 待提交结果
+     * @param shifts 包含全部首检分摊的扣账班次
+     * @param scene 排产场景
+     * @param inspectionPlan 已冻结的单侧首检计划，无首检时为空
+     * @param inspectionMultiplier 普通结果为1，L/R整机合计为2
+     * @return 实际保留量；真实余量不足以容纳完整首检时返回0，由调用方回滚
+     */
+    public int capResultByProductionRemainingQty(LhScheduleContext context, SkuScheduleDTO sku,
+            LhScheduleResult result, List<LhShiftConfigVO> shifts, String scene,
+            FirstInspectionAllocationPlan inspectionPlan, int inspectionMultiplier) {
         int resultQty = ShiftFieldUtil.resolveScheduledQty(result);
         if (resultQty <= 0 || Objects.isNull(sku)) {
             return 0;
@@ -1137,6 +1154,15 @@ public class TargetScheduleQtyResolver {
         int remainingQty = resolveEffectiveProductionRemainingQty(context, sku);
         int allowedOverQty = resolveEndingAllowedOverQty(context, result);
         int retainedLimitQty = remainingQty + allowedOverQty;
+        Map<Integer, Integer> inspectionQuantities = FirstInspectionAllocationUtil.toShiftQtyMap(inspectionPlan);
+        int remainingInspectionQty = inspectionQuantities.values().stream()
+                .mapToInt(quantity -> quantity * inspectionMultiplier).sum();
+        if (remainingInspectionQty > remainingQty
+                || !FirstInspectionQtyUtil.isFirstInspectionAllocationRetained(result, inspectionPlan, inspectionMultiplier)) {
+            log.warn("真实余量或结果不足以保留完整首检，拒绝裁量, 批次={}, 物料={}, 机台={}, 余量={}, 首检量={}",
+                    context.getBatchNo(), sku.getMaterialCode(), result.getLhMachineCode(), remainingQty, remainingInspectionQty);
+            return 0;
+        }
         boolean hasSwitchPlan = !CollectionUtils.isEmpty(shifts) && shifts.stream().anyMatch(shift ->
                 StructureSwitchSchedulingPolicy.isFirstBatch(context, context.getStructureSwitchResultPlanMap().get(result), shift)
                         && StructureSwitchSchedulingPolicy.quantity(result, shift.getShiftIndex()) > 0);
@@ -1161,10 +1187,15 @@ public class TargetScheduleQtyResolver {
             if (Objects.isNull(planQty) || planQty <= 0) {
                 continue;
             }
-            int currentShiftQty = resolveRetainedShiftQty(
-                    context, sku, Math.min(planQty, remainingRetainQty), mouldQty, result, shift);
-            currentShiftQty = StructureSwitchSchedulingPolicy.capRetainedQuantity(context, result, shift,
-                    currentShiftQty, remainingQty - actualRetainedQty);
+            int inspectionQty = inspectionQuantities.getOrDefault(shift.getShiftIndex(), 0) * inspectionMultiplier;
+            remainingInspectionQty -= inspectionQty;
+            // 先预留后续班次首检，再分配当前正式产量，不能让前班用尽后班首检的真实余量。
+            int normalLimit = Math.max(0, remainingRetainQty - remainingInspectionQty - inspectionQty);
+            int normalQty = this.resolveRetainedShiftQty(context, sku,
+                    Math.min(Math.max(0, planQty - inspectionQty), normalLimit), mouldQty, result, shift);
+            normalQty = StructureSwitchSchedulingPolicy.capRetainedQuantity(context, result, shift,
+                    normalQty, Math.max(0, remainingQty - actualRetainedQty - remainingInspectionQty - inspectionQty));
+            int currentShiftQty = inspectionQty + normalQty;
             Date shiftStartTime = ShiftFieldUtil.getShiftStartTime(result, shift.getShiftIndex());
             Date originalShiftEndTime = ShiftFieldUtil.getShiftEndTime(result, shift.getShiftIndex());
             if (currentShiftQty <= 0) {
@@ -1181,6 +1212,11 @@ public class TargetScheduleQtyResolver {
                 ShiftFieldUtil.setShiftPlanQty(
                         result, shift.getShiftIndex(), currentShiftQty,
                         shiftStartTime, retainedShiftEndTime);
+            }
+            if (inspectionQty > 0 && currentShiftQty == inspectionQty) {
+                // 只剩首检时恢复真实重叠区间，不能继续保留整班的生产结束时间。
+                FirstInspectionQtyUtil.trimShiftPlanQtyPreservingInspection(result, shift.getShiftIndex(),
+                        currentShiftQty, inspectionPlan, inspectionMultiplier);
             }
             remainingRetainQty -= currentShiftQty;
             actualRetainedQty += currentShiftQty;
@@ -1626,7 +1662,7 @@ public class TargetScheduleQtyResolver {
 
     /**
      * 按模台数向下规整实际保留量。
-     * <p>结果行被账本回裁时，双模/多模班次不能保留奇数或非模数倍计划量。</p>
+     * <p>本方法只收敛正式生产部分；调用方独立保护首检真实分摊，不将其尾数一并裁掉。</p>
      *
      * @param retainedQty 当前保留量
      * @param mouldQty 模台数

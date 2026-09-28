@@ -1,7 +1,6 @@
 package com.zlt.aps.lh.controller;
 
 import cn.hutool.core.bean.BeanUtil;
-import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -11,10 +10,8 @@ import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.api.gateway.system.service.IExportLogService;
 import com.ruoyi.api.gateway.system.service.IImportErrorLogService;
 import com.ruoyi.api.gateway.system.service.IImportLogService;
-import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
 import com.ruoyi.common.constant.HttpStatus;
 import com.ruoyi.common.core.annotation.Excel;
-import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.ServletUtils;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
@@ -40,9 +37,10 @@ import com.zlt.aps.lh.api.domain.entity.LhSharedMouldPat;
 import com.zlt.aps.lh.api.domain.vo.LhMouldChangePlanVo;
 import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
 import com.zlt.aps.lh.api.enums.ReleaseStatusEnum;
+import com.zlt.aps.lh.api.enums.ShiftEnum;
+import com.zlt.aps.lh.api.enums.TrialStatusEnum;
 import com.zlt.aps.lh.component.OrderNoGenerator;
 import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
-import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.mapper.LhSharedMouldPatEntityMapper;
 import com.zlt.aps.lh.service.ILhMouldChangePlanService;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
@@ -112,13 +110,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
     private IImportLogService iImportLogService;
 
     @Autowired
-    private ISysDictDataCacheService iSysDictDataCacheService;
-
-    @Autowired
     private LhSharedMouldPatEntityMapper lhSharedMouldPatEntityMapper;
-
-    @Autowired
-    private LhScheduleResultMapper lhScheduleResultMapper;
 
     @Autowired
     private ILhScheduleResultService lhScheduleResultService;
@@ -336,6 +328,13 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         return ajaxResult;
     }
 
+    /**
+     * 将导入模板数据转换为模具交替计划实体，保留班次和示方类型原始文本供服务层枚举校验。
+     *
+     * @param list         模具交替计划导入行
+     * @param scheduleDate 排程日期
+     * @return 模具交替计划实体列表
+     */
     public List<LhMouldChangePlan> buildLhMouldChangePlanList(List<LhMouldChangePlanVo> list, Date scheduleDate) {
         List<LhMouldChangePlan> resultList = new ArrayList<>();
         for (LhMouldChangePlanVo lhMouldChangePlanVo : list) {
@@ -348,6 +347,8 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             if (StringUtil.isBlank(lhMouldChangePlan.getFactoryCode())) {
                 lhMouldChangePlan.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
             }
+            // 保留模板示方类型原文，由导入服务统一校验并转换为字典值。
+            lhMouldChangePlan.setProductStatus(lhMouldChangePlanVo.getAfterMaterialType());
 
             if (YesOrNoEnum.YES.getCode().equals(lhMouldChangePlanVo.getIsReplaceBlock())) {
                 lhMouldChangePlan.setChangeMouldType(MouldChangeTypeEnum.TYPE_BLOCK.getCode());
@@ -685,42 +686,6 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
                 list = list.stream().sorted(this.buildLegacyExportComparator()).collect(Collectors.toList());
             }
         }
-        // 查询字典用于转义
-        List<SysDictData> classNumDictList = iSysDictDataCacheService.getType("class_num_two_mm");
-        Map<String, String> classNumDictDictMap = new HashMap<>(16);
-        if (CollectionUtils.isNotEmpty(classNumDictList)) {
-            classNumDictDictMap = classNumDictList.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel));
-        }
-        // 查询字典用于转义
-        List<SysDictData> lhTrialStatusDictList = iSysDictDataCacheService.getType("lh_trial_status");
-        Map<String, String> lhTrialStatusDictDictMap = new HashMap<>(16);
-        if (CollectionUtils.isNotEmpty(lhTrialStatusDictList)) {
-            lhTrialStatusDictDictMap = lhTrialStatusDictList.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel));
-        }
-        // 查询硫化排程，取后规格示方类型
-        List<String> materialCodeList = new ArrayList<>();
-        for (LhMouldChangePlanVo mouldChangePlanVo : list) {
-            if (StringUtils.isNotBlank(mouldChangePlanVo.getAfterMaterialCode())) {
-                materialCodeList.add(mouldChangePlanVo.getAfterMaterialCode());
-            }
-        }
-        // 查询硫化排程结果，获取规格产品状态
-        Map<String, String> lhScheduleResultMap = new HashMap<>();
-        if (CollUtil.isNotEmpty(materialCodeList)) {
-            LambdaQueryWrapper<LhScheduleResult> queryWrapper = new LambdaQueryWrapper<>();
-            queryWrapper.eq(LhScheduleResult::getFactoryCode, queryVO.getFactoryCode());
-            queryWrapper.eq(LhScheduleResult::getScheduleDate, queryVO.getScheduleDate());
-            queryWrapper.eq(LhScheduleResult::getIsDelete, YesOrNoEnum.NO.getCode());
-            queryWrapper.in(LhScheduleResult::getMaterialCode, materialCodeList);
-            List<LhScheduleResult> lhScheduleResultList = lhScheduleResultMapper.selectList(queryWrapper);
-            if (CollectionUtils.isNotEmpty(lhScheduleResultList)) {
-                lhScheduleResultMap = lhScheduleResultList.stream()
-                        .sorted(Comparator.comparing(item -> StringUtils.defaultIfBlank(item.getProductStatus(), "")))
-                        .collect(Collectors.toMap(item -> StringUtils.defaultIfBlank(item.getMaterialCode(), ""),
-                                item -> StringUtils.defaultIfBlank(item.getProductStatus(), ""),
-                                (s1, s2) -> s1));
-            }
-        }
         // 查询共用模具
         Map<String, List<LhSharedMouldPat>> lhSharedMouldPatMap = this.buildSharedMouldPatMap(list, queryVO);
 
@@ -731,7 +696,10 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             row.put("seq", i + 1);
             row.put("planDate", item.getPlanDate() == null ? "" : DateUtil.format(item.getPlanDate(), "yyyy-MM-dd"));
             String classIndex = item.getClassIndex();
-            row.put("classIndex", classNumDictDictMap.getOrDefault(classIndex, classIndex));
+            ShiftEnum shiftEnum = ShiftEnum.getByMouldChangePlanStoredCode(classIndex);
+            String shiftText = shiftEnum == null ? null : shiftEnum.getMouldChangePlanExcelText();
+            row.put("classIndex", StringUtils.isBlank(shiftText)
+                    ? StringUtils.defaultString(classIndex, "") : shiftText);
             row.put("lhMachineCode", item.getLhMachineCode());
             row.put("planOrder", item.getPlanOrder());
             row.put("leftRightMould", item.getLeftRightMould());
@@ -741,9 +709,10 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             row.put("afterMaterialCode", afterMaterialCode);
             String afterMaterialDesc = item.getAfterMaterialDesc();
             row.put("afterMaterialDesc", afterMaterialDesc);
-            // 产品状态
-            String productStatus = lhScheduleResultMap.getOrDefault(afterMaterialCode, "");
-            row.put("afterMaterialType", lhTrialStatusDictDictMap.getOrDefault(productStatus, ""));
+            // 示方类型直接取模具交替计划库表中的产品状态。
+            String productStatus = StringUtils.defaultIfBlank(item.getProductStatus(), "");
+            TrialStatusEnum statusEnum = TrialStatusEnum.getByCode(productStatus);
+            row.put("afterMaterialType", statusEnum == null ? "" : statusEnum.getMouldChangePlanExcelText());
             // 按时间下机
             String endType = item.getEndType();
             if (YesOrNoEnum.YES.getCode().equals(endType)) {

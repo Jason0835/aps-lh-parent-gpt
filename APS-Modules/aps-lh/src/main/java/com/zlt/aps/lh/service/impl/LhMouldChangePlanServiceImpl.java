@@ -19,6 +19,7 @@ import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.lh.api.domain.vo.LhMouldChangePlanVo;
 import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
 import com.zlt.aps.lh.api.enums.ShiftEnum;
+import com.zlt.aps.lh.api.enums.TrialStatusEnum;
 import com.zlt.aps.lh.component.OrderNoGenerator;
 import com.zlt.aps.lh.mapper.LhMachineOnlineInfoMapper;
 import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
@@ -1102,12 +1103,16 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
         for (int i = 0; i < list.size(); i++) {
             int errorNum = i + 2;
             LhMouldChangePlan docEntity = list.get(i);
+            List<ImportErrorLog> enumErrors = new ArrayList<>();
+            boolean enumInvalid = this.normalizeMouldChangePlanImportTypes(
+                    docEntity, importLogId, errorNum, enumErrors);
             List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, docEntity);
             ImportExcelValidatedUtils.validatedRepeat(list, docEntity, i, 2, importLogId, validated,
                     this.getCheckUniqueFields().toArray(new String[0]));
-            if (CollectionUtils.isNotEmpty(validated)) {
+            if (enumInvalid || CollectionUtils.isNotEmpty(validated)) {
                 failureNum++;
                 docEntity.setId(-999L);
+                importErrorLogs.addAll(enumErrors);
                 importErrorLogs.addAll(validated);
             }
         }
@@ -1115,6 +1120,7 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
         // 2.进行数据库唯一性校验 + 硫化机台/物料存在性校验
         // 先批量查询，提升性能
         Map<String, List<LhMouldChangePlan>> factoryCodeMap = list.stream()
+                .filter(item -> item.getId() == null || item.getId() != -999L)
                 .collect(Collectors.groupingBy(LhMouldChangePlan::getFactoryCode));
 
         // 查询硫化机台
@@ -1287,6 +1293,44 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
             String message = StringUtils.format(I18nUtil.getMessage("ui.message.import.success"), successNum);
             return AjaxResult.success(message);
         }
+    }
+
+    /**
+     * 校验并转换模具交替计划导入文本中的班次和示方类型。
+     *
+     * @param plan            模具交替计划导入行
+     * @param importLogId     导入日志编号
+     * @param errorRow        Excel行号
+     * @param importErrorLogs 当前行错误日志集合
+     * @return 任一字段为空或无法匹配枚举时返回true
+     */
+    private boolean normalizeMouldChangePlanImportTypes(LhMouldChangePlan plan, Long importLogId,
+                                                        int errorRow, List<ImportErrorLog> importErrorLogs) {
+        boolean invalid = false;
+        String classIndexText = plan.getClassIndex();
+        ShiftEnum shiftEnum = ShiftEnum.getByMouldChangePlanExcelText(classIndexText);
+        if (shiftEnum == null) {
+            String message = I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.classIndexInvalid");
+            ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorRow,
+                    MessageFormat.format(message, errorRow, StringUtils.defaultString(classIndexText, "")),
+                    importErrorLogs);
+            invalid = true;
+        } else {
+            plan.setClassIndex(shiftEnum.getCode());
+        }
+
+        String productStatusText = plan.getProductStatus();
+        TrialStatusEnum statusEnum = TrialStatusEnum.getByMouldChangePlanExcelText(productStatusText);
+        if (statusEnum == null) {
+            String message = I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.productStatusInvalid");
+            ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorRow,
+                    MessageFormat.format(message, errorRow, StringUtils.defaultString(productStatusText, "")),
+                    importErrorLogs);
+            invalid = true;
+        } else {
+            plan.setProductStatus(statusEnum.getCode());
+        }
+        return invalid;
     }
 
     /**

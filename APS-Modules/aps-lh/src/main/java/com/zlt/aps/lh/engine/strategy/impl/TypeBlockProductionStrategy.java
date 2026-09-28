@@ -2021,6 +2021,9 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                 && context.getStructureSwitchResultPlanMap().containsKey(result)) {
             context.getStructureSwitchResultPlanMap().put(pairResult, context.getStructureSwitchResultPlanMap().get(result));
         }
+        if (Objects.nonNull(pairResult) && context.getFirstInspectionResultPlanMap().containsKey(result)) {
+            context.getFirstInspectionResultPlanMap().put(pairResult, context.getFirstInspectionResultPlanMap().get(result));
+        }
         int precisionPlannedQty = wholeSingleControlUnit
                 ? ShiftFieldUtil.resolveScheduledQty(result) + ShiftFieldUtil.resolveScheduledQty(pairResult)
                 : ShiftFieldUtil.resolveScheduledQty(result);
@@ -5749,7 +5752,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             FirstInspectionAllocationPlan firstInspectionAllocationPlan,
             int inspectionQuantityMultiplier) {
         int cappedQty = getTargetScheduleQtyResolver().capResultByProductionRemainingQty(
-                context, sku, result, shifts, "换活字块");
+                context, sku, result, shifts, "换活字块", firstInspectionAllocationPlan, inspectionQuantityMultiplier);
         if (cappedQty <= 0) {
             return 0;
         }
@@ -5776,6 +5779,8 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     context, sku, actualQty, "换活字块", result.getLhMachineCode());
             return actualQty;
         }
+        boolean continuousProduction = !this.shouldApplyStrictTypeBlockQuotaLimit(sku, false);
+        Map<Integer, Integer> inspectionQuantities = FirstInspectionAllocationUtil.toShiftQtyMap(firstInspectionAllocationPlan);
         int totalShiftFillOverQty = 0;
         for (LhShiftConfigVO shift : shifts) {
             Integer planQty = ShiftFieldUtil.getShiftPlanQty(result, shift.getShiftIndex());
@@ -5792,14 +5797,18 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             if (quota == null) {
                 continue;
             }
-            LocalDate lookAheadEndDate = resolveLookAheadEndDate(context, quotaMap, productionDate);
+            LocalDate lookAheadEndDate = continuousProduction && !YES_FLAG.equals(result.getIsEarlyProduction())
+                    ? SkuDailyPlanQuotaUtil.resolveWindowConsumptionEndDate(quotaMap,
+                    LhScheduleTimeUtil.getScheduleShifts(context, context.getScheduleDate()))
+                    : resolveLookAheadEndDate(context, quotaMap, productionDate);
             // 先按只读账本计算本班允许落地量，再按模台数收敛，避免双模回裁出奇数计划量。
             int quotaCap = resolveConsumableRollingQuota(quotaMap, productionDate, planQty, lookAheadEndDate);
             int mouldQty = ShiftCapacityResolverUtil.resolveMachineMouldQty(
                     result.getMouldQty() != null ? result.getMouldQty() : 0);
+            int inspectionQty = inspectionQuantities.getOrDefault(shift.getShiftIndex(), 0) * inspectionQuantityMultiplier;
             int allowedPlanQty = Math.min(planQty, quotaCap);
             int normalizedPlanQty = getTargetScheduleQtyResolver().resolveAllocatedShiftQty(
-                    context, sku, allowedPlanQty, planQty, mouldQty,
+                    context, sku, Math.max(0, allowedPlanQty - inspectionQty), Math.max(0, planQty - inspectionQty), mouldQty,
                     this.resolveEffectiveCleaningWindowList(context, result,
                             ShiftFieldUtil.getShiftStartTime(result, shift.getShiftIndex())),
                     ShiftFieldUtil.getShiftStartTime(result, shift.getShiftIndex()), shift.getShiftEndDateTime());
@@ -5807,7 +5816,11 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     context.getStructureSwitchResultPlanMap().get(result), shift);
             if (switchFirstBatch) {
                 normalizedPlanQty = StructureSwitchSchedulingPolicy.capRetainedQuantity(
-                        context, result, shift, planQty, allowedPlanQty);
+                        context, result, shift, Math.max(0, planQty - inspectionQty), Math.max(0, allowedPlanQty - inspectionQty));
+            }
+            normalizedPlanQty += inspectionQty;
+            if (continuousProduction && !switchFirstBatch) {
+                normalizedPlanQty = planQty;
             }
             // 按历史欠产、当日计划、受限追补窗口消费同一SKU的日计划账本
             int consumed = normalizedPlanQty > 0
@@ -5817,9 +5830,8 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             int overQty = planQty - consumed;
             if (overQty > 0) {
                 boolean endingResult = YES_FLAG.equals(result.getIsEnd());
-                // 收尾结果必须严格截断，不再记录满班补齐超排；
-                // 试制等严格目标量场景仍需回裁，但保留超排账本用于追踪被截掉的补满量。
-                if (endingResult || shouldApplyStrictTypeBlockQuotaLimit(sku, endingResult) || switchFirstBatch) {
+                // 普通已上机连续生产由真实余量控制，独立严格场景及P0仍保留对应数量边界。
+                if (!continuousProduction || switchFirstBatch) {
                     /*
                      * 收尾/严格目标只能回裁首检之后的正式生产量。换活字块阶段
                      * 已经发生的首检必须保留，且回裁到仅余首检时恢复真实首检区间。

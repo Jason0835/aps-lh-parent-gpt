@@ -221,7 +221,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
              * 所有会改变最终结果数量的后置处理已经结束。此处只整理未排诊断投影，
              * 不再执行准入、选机、排量或资源扣账，并保证汇总日志和落库读取同一最终列表。
              */
-            unscheduledResultCollector.finalizeResults(context);
+            unscheduledResultCollector.finalizeBeforePersistence(context);
             // 所有回裁完成后只读审计动态S0/S1，与本次实际保存的正量结果保持一致。
             StructureSwitchShiftAudit.appendFinalSummary(context);
             addSummaryLog(context);
@@ -1556,7 +1556,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
 
     /**
      * 保存前统一收敛双模/多模班次计划量。
-     * <p>最终结果落库前不允许双模机台出现奇数计划量；目标尾量为奇数时按模台数向上取整。</p>
+     * <p>普通生产按模台数收敛；已扣账的首检真实分摊和严格目标量不得在保存前再次补量。</p>
      *
      * @param context 排程上下文
      * @param result 排程结果
@@ -1598,14 +1598,17 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                     result.getLhMachineCode(), mouldQty);
             return;
         }
+        Map<Integer, Integer> inspectionQuantities = FirstInspectionAllocationUtil.toShiftQtyMap(
+                context.getFirstInspectionResultPlanMap().get(result));
         boolean adjusted = false;
         for (int shiftIndex = 1; shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
             Integer planQty = ShiftFieldUtil.getShiftPlanQty(result, shiftIndex);
             if (Objects.isNull(planQty) || planQty <= 0) {
                 continue;
             }
-            // 喷砂班次由主链按“独立首检量＋正常生产模数”收敛，不能把首检尾数再次向上补齐。
-            if (ShiftFieldUtil.hasShiftAnalysis(result, shiftIndex, SAND_BLAST_FIRST_INSPECTION_ANALYSIS)) {
+            // 主链已按“冻结首检分摊＋正常生产模数”扣账，保存前不能再把首检奇数补成偶数。
+            if (ShiftFieldUtil.hasShiftAnalysis(result, shiftIndex, SAND_BLAST_FIRST_INSPECTION_ANALYSIS)
+                    || inspectionQuantities.getOrDefault(shiftIndex, 0) > 0) {
                 continue;
             }
             int normalizedQty = ShiftCapacityResolverUtil.roundUpQtyToMouldMultiple(planQty, mouldQty);

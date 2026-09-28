@@ -794,10 +794,8 @@ public final class StructureSwitchSchedulingPolicy {
             int existing = constraint.resolveCurrentShiftQty(context, shift.getShiftIndex());
             quantity = Math.min(quantity, Math.max(0, limit - existing) / sides);
         }
-        // 首检已经写入结果，按“首检+普通生产”总量取偶后再扣回已写量，单控两侧按物理整机收敛。
-        int existingQty = quantity(result, shift.getShiftIndex());
-        int finalQty = Math.max(0, floorEven(BigDecimalUtils.valueOf((long) (quantity + existingQty) * sides))
-                / sides - existingQty);
+        // 首检已按真实时间独立分摊，只有本次普通生产量按物理整机取偶，不能混入首检尾数。
+        int finalQty = floorEven(BigDecimalUtils.valueOf((long) quantity * sides)) / sides;
         StructureSwitchRuntimeState state = context.getStructureSwitchRuntimeMap().get(result.getStructureName());
         Date firstShiftStart = Objects.isNull(state) ? plan.getFirstQuantityShift().getShiftStartDateTime() : state.getFirstShiftStart();
         log.info("大换英寸P0分量, structure={}, sku={}, machine={}, waitNotify={}, largeInch=1, S0={}, P0={}, "

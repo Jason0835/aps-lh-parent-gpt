@@ -1,6 +1,15 @@
 package com.zlt.aps.lh.service.impl;
 
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
+import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
+import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
+import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
+import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
+import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.engine.strategy.support.PreviousAlternatePlanReleaseEvent;
+import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
+import com.zlt.aps.lh.util.PriorityTraceLogHelper;
+import org.apache.commons.lang3.StringUtils;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationEndingMachineProfile;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationEndingQuantityReachability;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationFinishScheduleResult;
@@ -16,6 +25,13 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Objects;
+import java.util.Map;
+import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.stream.Collectors;
+import javax.annotation.Resource;
 
 /**
  * 续作余量收尾的唯一分配器。输入顺序由调用方按场景角色确定，本服务不选机、不扣账、不预占后料。
@@ -24,6 +40,9 @@ import java.util.Objects;
 @Slf4j
 @Service
 public class ContinuationRemainderFinishScheduleService {
+    /** 复用前日最新有效批次来源，只为本次收尾纠偏读取唯一关系。 */
+    @Resource
+    private PreviousAlternatePlanEligibilityService previousAlternatePlanEligibilityService;
     /** 早班资源交接节点。 */
     private static final int MORNING_RELEASE_HOUR = 6;
     /** 中班生产硬截止，允许恰好19:00结束。 */
@@ -32,6 +51,141 @@ public class ContinuationRemainderFinishScheduleService {
     private static final int NIGHT_THRESHOLD_NUMERATOR = 3;
     /** 两机阈值分母。 */
     private static final int NIGHT_THRESHOLD_DENOMINATOR = 2;
+
+    /**
+     * 计算完成后的最后一步：生成槽位到机台的完整置换，不修改数量、时间、历史事件或真实结果。
+     * @param context 排程上下文
+     * @param sku 当前续作余量收尾SKU
+     * @param profiles 已计算的固定物理机台画像
+     * @param calculated 已确定的收尾槽位
+     * @param proposed 已完成计算及校验的结果副本
+     * @param stopHoldResults 不能交换的停产保机结果
+     * @return 原槽位对象到目标机台原对象的映射；空映射表示保留当前绑定
+     */
+    public Map<LhScheduleResult, LhScheduleResult> adjustContinuationRemainingFinishMachineOrder(
+            LhScheduleContext context, SkuScheduleDTO sku, List<ContinuationEndingMachineProfile> profiles,
+            ContinuationFinishScheduleResult calculated, Map<LhScheduleResult, LhScheduleResult> proposed,
+            List<LhScheduleResult> stopHoldResults) {
+        if (profiles.size() < 2 || CollectionUtils.isEmpty(context.getHistoricalReverseMouldChangePlanList())) {
+            return Collections.emptyMap();
+        }
+        List<String> codes = profiles.stream().flatMap(profile -> profile.getOriginals().stream())
+                .map(LhScheduleResult::getLhMachineCode).collect(Collectors.toList());
+        Map<String, LhMouldChangePlan> plans = previousAlternatePlanEligibilityService
+                .resolveRemainingFinishPlans(context, sku.getMaterialCode(), codes);
+        Map<Integer, LhMouldChangePlan> eligible = new LinkedHashMap<>(profiles.size());
+        for (int position = 0; position < profiles.size(); position++) {
+            LhMouldChangePlan plan = this.resolveFinishProfilePlan(context, sku, profiles.get(position), plans, stopHoldResults);
+            ContinuationMachineFinishPlan finish = calculated.getMachinePlans().get(position);
+            if (Objects.nonNull(plan) && Objects.nonNull(finish.getOfflineTime())) {
+                eligible.put(position, plan);
+            }
+        }
+        if (eligible.size() < 2) {
+            this.logFinishMachineOrder(context, sku, "保持原结果：有效且唯一的历史机台不足两台", codes.toString());
+            return Collections.emptyMap();
+        }
+        // 槽位按真实完成时刻排序；零量仅使用既有释放事实，不伪造生产班次。
+        List<Integer> slots = new ArrayList<>(eligible.keySet());
+        slots.sort(Comparator.comparing(position -> this.finishSlotTime(calculated.getMachinePlans().get(position))));
+        if (slots.stream().map(position -> this.finishSlotTime(calculated.getMachinePlans().get(position)))
+                .distinct().count() < 2) {
+            return Collections.emptyMap();
+        }
+        List<Integer> machines = new ArrayList<>(slots);
+        // 从槽位顺序做稳定排序，同历史日期同班次时不制造ID优先级。
+        machines.sort(Comparator.comparing((Integer position) -> this.planDay(eligible.get(position)))
+                .thenComparing(position -> eligible.get(position).getClassIndex()));
+        Map<LhScheduleResult, LhScheduleResult> bindings = new IdentityHashMap<>(codes.size());
+        for (int position = 0; position < slots.size(); position++) {
+            int slotIndex = slots.get(position);
+            int machineIndex = machines.get(position);
+            if (slotIndex == machineIndex) {
+                continue;
+            }
+            ContinuationEndingMachineProfile source = profiles.get(slotIndex);
+            ContinuationEndingMachineProfile target = profiles.get(machineIndex);
+            if (!target.canAcceptFinishSlot(source, proposed, calculated.getMachinePlans().get(slotIndex))) {
+                this.logFinishMachineOrder(context, sku, "保持原结果：目标机台产能、侧别或占用窗口不兼容", codes.toString());
+                return Collections.emptyMap();
+            }
+            for (LhScheduleResult original : source.getOriginals()) {
+                LhScheduleResult targetOriginal = target.getOriginals().stream()
+                        .filter(result -> Objects.equals(LhSingleControlMachineUtil.resolveSplitSide(result.getLhMachineCode()),
+                                LhSingleControlMachineUtil.resolveSplitSide(original.getLhMachineCode())))
+                        .findFirst().orElseThrow(() -> new IllegalStateException("已校验的收尾机台侧别映射丢失"));
+                bindings.put(original, targetOriginal);
+            }
+        }
+        if (!CollectionUtils.isEmpty(bindings)) {
+            String detail = slots.stream().map(position -> {
+                LhMouldChangePlan plan = eligible.get(position);
+                return plan.getLhMachineCode() + ":" + this.planDay(plan) + "/" + plan.getClassIndex();
+            }).collect(Collectors.joining(","));
+            this.logFinishMachineOrder(context, sku, "历史顺序与槽位映射校验通过，等待整组提交", detail);
+        }
+        return bindings;
+    }
+
+    /**
+     * 校验同SKU物理机台及L/R计划能否可靠对应；设备专属强制处置不能随槽位移动。
+     * @param context 上下文 @param sku 来源SKU @param profile 物理机台画像
+     * @param plans 有效唯一历史计划 @param stopHoldResults 前置保机结果
+     * @return 物理机台统一的历史顺序计划；无法对应时返回null
+     */
+    private LhMouldChangePlan resolveFinishProfilePlan(LhScheduleContext context, SkuScheduleDTO sku,
+            ContinuationEndingMachineProfile profile, Map<String, LhMouldChangePlan> plans,
+            List<LhScheduleResult> stopHoldResults) {
+        LhMouldChangePlan first = null;
+        for (LhScheduleResult result : profile.getOriginals()) {
+            String code = result.getLhMachineCode();
+            LhMouldChangePlan plan = plans.get(code);
+            SkuScheduleDTO source = context.getScheduleResultSourceSkuMap().get(result);
+            if (Objects.isNull(plan) || Objects.isNull(source) || !context.getMachineScheduleMap().containsKey(code)
+                    || !StringUtils.equals(ScheduleTypeEnum.CONTINUOUS.getCode(), result.getScheduleType())
+                    || !StringUtils.equals(sku.getMaterialCode(), result.getMaterialCode())
+                    || !StringUtils.equals(sku.getProductStatus(), result.getProductStatus())
+                    || !StringUtils.equals(sku.getMaterialCode(), source.getMaterialCode())
+                    || !StringUtils.equals(sku.getProductStatus(), source.getProductStatus())
+                    || stopHoldResults.contains(result) || context.isContinuousStopHoldMachine(code)
+                    || context.getOnlySandBlastContinuationReleaseWindowMap().containsKey(code)
+                    || context.getContinuationTemporaryFaultTransferEventMap().containsKey(code)
+                    || context.getTimedMachineOffDecisionMap().containsKey(result)) {
+                return null;
+            }
+            PreviousAlternatePlanReleaseEvent event = context.getPreviousAlternateReleaseEventMap().get(code);
+            if (Objects.nonNull(event) && (event.getPlan() != plan
+                    || !StringUtils.equals(event.getMaterialCode(), sku.getMaterialCode())
+                    || !StringUtils.equals(event.getProductStatus(), sku.getProductStatus()))) {
+                return null;
+            }
+            if (Objects.nonNull(first) && (!Objects.equals(this.planDay(first), this.planDay(plan))
+                    || !StringUtils.equals(first.getClassIndex(), plan.getClassIndex()))) {
+                return null;
+            }
+            first = plan;
+        }
+        return first;
+    }
+
+    /** @param plan 前日交替计划 @return 业务日期；同日时分秒不得覆盖早中班顺序 */
+    private LocalDate planDay(LhMouldChangePlan plan) {
+        return plan.getPlanDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+    }
+
+    /** @param finish 已计算槽位 @return 有量取生产结束，无量取既有物理释放时间 */
+    private Date finishSlotTime(ContinuationMachineFinishPlan finish) {
+        return Objects.nonNull(finish.getFinishTime()) ? finish.getFinishTime() : finish.getOfflineTime();
+    }
+
+    /** @param context 上下文 @param sku 收尾SKU @param reason 纠偏决定 @param detail 机台对应详情 */
+    private void logFinishMachineOrder(LhScheduleContext context, SkuScheduleDTO sku, String reason, String detail) {
+        String message = String.format("工厂=%s, 批次=%s, 目标日=%s, 物料=%s, 状态=%s, 决定=%s, 机台=%s",
+                context.getFactoryCode(), context.getBatchNo(), context.getScheduleTargetDate(),
+                sku.getMaterialCode(), sku.getProductStatus(), reason, detail);
+        PriorityTraceLogHelper.appendProcessLog(context, "续作余量收尾机台顺序纠正", message);
+        log.info("续作余量收尾机台顺序纠正, {}", message);
+    }
 
     /**
      * 计算整窗实际排量，先保留目标日前的连续生产前缀，再对目标日剩余量执行节点规则。

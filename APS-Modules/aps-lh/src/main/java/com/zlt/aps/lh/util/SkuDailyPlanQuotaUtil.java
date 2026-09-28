@@ -1,6 +1,8 @@
 package com.zlt.aps.lh.util;
 
 import com.zlt.aps.lh.api.domain.dto.SkuDailyPlanQuotaDTO;
+import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
+import java.time.ZoneId;
 import org.springframework.util.CollectionUtils;
 
 import java.time.LocalDate;
@@ -15,13 +17,28 @@ import java.util.Objects;
 /**
  * SKU dayN节奏账本工具类。
  * <p>统一处理滚动补欠产、未来计划预占和窗口总量封顶，避免续作、新增排产各自消费dayN节奏额度。</p>
- * <p>该工具返回的是节奏账本消费量，不作为非收尾SKU实际落地排产量的硬上限。</p>
+ * <p>该工具返回的是节奏账本消费量，不作为普通已上机SKU（含窗口收尾）实际落地排产量的硬上限。</p>
  *
  * @author APS
  */
 public final class SkuDailyPlanQuotaUtil {
 
     private SkuDailyPlanQuotaUtil() {
+    }
+
+    /**
+     * 已准入机台连续生产可消费的dayN截止，只覆盖当前真实排程窗口。
+     * @param quotaMap 原始或共享日计划账本
+     * @param windowShifts 完整排程窗口
+     * @return 账本末日与排程窗口末日中的较早值
+     */
+    public static LocalDate resolveWindowConsumptionEndDate(
+            Map<LocalDate, SkuDailyPlanQuotaDTO> quotaMap, List<LhShiftConfigVO> windowShifts) {
+        LocalDate windowEnd = windowShifts.stream().map(LhShiftConfigVO::getWorkDate)
+                .filter(Objects::nonNull).map(date -> date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate())
+                .max(LocalDate::compareTo).orElseThrow(() -> new IllegalStateException("连续生产扣账缺少排程窗口"));
+        LocalDate quotaEnd = Objects.requireNonNull(resolveLastQuotaDate(quotaMap), "连续生产扣账缺少日计划日期");
+        return quotaEnd.isBefore(windowEnd) ? quotaEnd : windowEnd;
     }
 
     /**

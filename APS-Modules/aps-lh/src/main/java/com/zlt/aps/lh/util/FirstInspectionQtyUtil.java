@@ -649,6 +649,8 @@ public final class FirstInspectionQtyUtil {
                     plan.getInspectionQty(), writtenQty);
             return 0;
         }
+        // 冻结真实分摊供保存前保护；不能用只标在完成班的首检备注反推前班首检量。
+        context.getFirstInspectionResultPlanMap().put(result, plan);
         recordFirstInspectionSequence(context, plan.getCountingShift());
         String sceneName = resolveSceneName(scheduleType);
         log.info("首检按真实时间跨班分摊完成, scene: {}, batchNo: {}, materialCode: {}, machineCode: {}, "

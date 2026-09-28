@@ -1,6 +1,7 @@
 package com.zlt.aps.lh.service.impl;
 
 import com.zlt.aps.lh.engine.strategy.support.ContinuationEndingAllocationSnapshot;
+import com.zlt.aps.lh.engine.strategy.support.FirstInspectionAllocationPlan;
 import cn.hutool.core.bean.BeanUtil;
 import com.zlt.aps.lh.api.domain.dto.CapsuleReplacementTimeWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.CleaningScheduleDateFillItem;
@@ -58,6 +59,8 @@ final class ScheduleSubstitutionAttemptSnapshot {
     private Map<String, StructureSwitchRuntimeState> structureSwitchRuntimeMap;
     /** 置换前结果与冻结切换计划的关联。 */
     private Map<LhScheduleResult, StructureSwitchPlan> structureSwitchResultPlanMap;
+    /** 首检保护关系随候选结果一起回滚，不能污染后续重试。 */
+    private Map<LhScheduleResult, FirstInspectionAllocationPlan> firstInspectionResultPlanMap;
 
     /** 置换前排程结果对象顺序 */
     private List<LhScheduleResult> scheduleResultList;
@@ -253,6 +256,7 @@ final class ScheduleSubstitutionAttemptSnapshot {
         snapshot.nextShiftNewPlanPoolDateMap = new LinkedHashMap<>(context.getNextShiftNewPlanPoolDateMap());
         snapshot.structureSwitchRuntimeMap = new LinkedHashMap<>(context.getStructureSwitchRuntimeMap());
         snapshot.structureSwitchResultPlanMap = new IdentityHashMap<>(context.getStructureSwitchResultPlanMap());
+        snapshot.firstInspectionResultPlanMap = new IdentityHashMap<>(context.getFirstInspectionResultPlanMap());
         snapshot.scheduleResultList = new ArrayList<LhScheduleResult>(context.getScheduleResultList());
         snapshot.scheduleResultStateMap = new IdentityHashMap<LhScheduleResult, LhScheduleResult>(
                 Math.max(16, context.getScheduleResultList().size() * 2));
@@ -474,6 +478,7 @@ final class ScheduleSubstitutionAttemptSnapshot {
     private void restore(LhScheduleContext context, boolean restoreSourceObjects) {
         context.setStructureSwitchRuntimeMap(new LinkedHashMap<>(structureSwitchRuntimeMap));
         context.setStructureSwitchResultPlanMap(new IdentityHashMap<>(structureSwitchResultPlanMap));
+        context.setFirstInspectionResultPlanMap(new IdentityHashMap<>(firstInspectionResultPlanMap));
 
         context.setPreScheduledMachineBindingList(new ArrayList<>(preScheduledMachineBindingList));
         context.setPreScheduledMouldReleaseTimeMap(new LinkedHashMap<>(preScheduledMouldReleaseTimeMap));

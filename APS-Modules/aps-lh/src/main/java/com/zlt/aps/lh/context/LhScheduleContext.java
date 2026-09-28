@@ -328,6 +328,9 @@ public class LhScheduleContext {
     /** 已落地结果对应的冻结切换计划；单控两侧可引用同一计划。 */
     private Map<LhScheduleResult, StructureSwitchPlan> structureSwitchResultPlanMap = new IdentityHashMap<>(16);
 
+    /** 已写入结果的首检分摊，供保存前保护各班真实数量；L/R两侧分别关联单侧计划。 */
+    private Map<LhScheduleResult, FirstInspectionAllocationPlan> firstInspectionResultPlanMap = new IdentityHashMap<>(16);
+
     /** 正式提交作用域内的冻结计划，仅供分量调用，退出提交作用域即恢复。 */
     private Map<String, StructureSwitchPlan> structureSwitchAttemptPlanMap = new LinkedHashMap<>(4);
 

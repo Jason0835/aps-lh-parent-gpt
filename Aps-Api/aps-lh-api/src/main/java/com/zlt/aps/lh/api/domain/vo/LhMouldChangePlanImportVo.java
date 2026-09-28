@@ -58,7 +58,7 @@ public class LhMouldChangePlanImportVo extends BaseEntity implements Serializabl
     private Integer planOrder;
 
     @ApiModelProperty(value = "班次")
-    @Excel(name = "ui.data.column.lhMouldChangePlan.classIndex", dictType = "class_num_two_mm")
+    @Excel(name = "ui.data.column.lhMouldChangePlan.classIndex")
     @TableField(value = "CLASS_INDEX")
     private String classIndex;
 

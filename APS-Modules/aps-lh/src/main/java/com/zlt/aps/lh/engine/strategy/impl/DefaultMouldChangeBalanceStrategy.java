@@ -7,6 +7,8 @@ import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.enums.MachineStopTypeEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IMouldChangeBalanceStrategy;
+import com.zlt.aps.lh.engine.strategy.support.PreviousAlternatePlanReleaseEvent;
+import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.PriorityTraceLogHelper;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
@@ -200,7 +202,16 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
         Date cursor = timedOff && timedBoundary.after(readyTime) ? timedBoundary : readyTime;
         Date timedWindowEnd = timedOff ? context.getScheduleWindowShifts().stream()
                 .map(shift -> shift.getShiftEndDateTime()).max(Date::compareTo).orElse(null) : null;
+        PreviousAlternatePlanReleaseEvent event = context.getActivePreviousAlternateEvent();
+        Date historicalDeadline = Objects.nonNull(event)
+                && StringUtils.equals(LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode),
+                LhSingleControlMachineUtil.resolvePhysicalMachineCode(event.getMachineCode()))
+                ? event.getPreparationDeadline() : null;
         for (int attempt = 0; attempt < MAX_ALLOCATION_ATTEMPTS; attempt++) {
+            // 历史指定交替只能在计划班次及之前开始；顺延、停机避让及额度判断共用此截止。
+            if (Objects.nonNull(historicalDeadline) && !cursor.before(historicalDeadline)) {
+                return null;
+            }
             if (timedOff && (Objects.isNull(timedWindowEnd) || !cursor.before(timedWindowEnd))) {
                 return null;
             }
@@ -223,7 +234,9 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
                 cursor = this.getNextCalendarDayMorningStart(context, cursor);
                 continue;
             }
-            if (balanced && !timedOff && this.isCrossDayPreparationAction(actionType)
+            // 历史指定承接的跨日准备也须遵守有效早中班额度，不能仅因生产日较晚而跳过班次上限。
+            if (balanced && !timedOff && Objects.isNull(historicalDeadline)
+                    && this.isCrossDayPreparationAction(actionType)
                     && this.isPreparationBeforeBoundary(cursor, preparationBeforeTime)
                     && this.isSwitchCompletionBeforeBusinessDayEnd(cursor, durationHours, dayEnd)) {
                 return cursor;
@@ -240,7 +253,9 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
                 Date afternoon = this.resolveAfternoonBalanceCandidate(context, machineCode, dateKey,
                         cursor, durationHours, counts, this.getAfternoonLimit(context, dateKey), dayEnd);
                 if (Objects.nonNull(afternoon)) {
-                    return afternoon;
+                    // 中班候选也要重新校验历史班次截止，不能从早班分支直接越过截止返回。
+                    return Objects.nonNull(historicalDeadline) && !afternoon.before(historicalDeadline)
+                            ? null : afternoon;
                 }
             } else if (LhScheduleTimeUtil.isAfternoonShift(context, cursor)
                     && counts[IDX_AFTERNOON] < this.getAfternoonLimit(context, dateKey)) {

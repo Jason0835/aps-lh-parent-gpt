@@ -62,8 +62,16 @@ public class LhMouldChangePlanVo extends BaseEntity implements Serializable {
     @DateTimeFormat(pattern = "yyyy-MM-dd")
     private Date planDate;
 
+    /**
+     * 模具交替计划示方类型，按 lh_trial_status 字典值存储。
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.constructionStage", type = Excel.Type.IMPORT)
+    @ApiModelProperty(value = "示方类型")
+    @TableField(value = "PRODUCT_STATUS")
+    private String productStatus;
+
     @ApiModelProperty(value = "班次")
-    @Excel(name = "ui.data.column.lhMouldChangePlan.classIndex", dictType = "class_num_two_mm")
+    @Excel(name = "ui.data.column.lhMouldChangePlan.classIndex")
     @TableField(value = "CLASS_INDEX")
     private String classIndex;
 

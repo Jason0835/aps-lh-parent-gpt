@@ -29,6 +29,8 @@ public class UnscheduledDemandSnapshot {
     private boolean effectiveDemand;
     /** 原始需求数量，仅用于诊断展示。 */
     private int originalDemandQty;
+    /** 初始化硫化余量，仅用于续作零结果诊断的最终数量核对；日调整需求不设置。 */
+    private Integer initialSurplusQty;
     /** 月计划年份。 */
     private Integer monthPlanYear;
     /** 月计划月份。 */
@@ -52,6 +54,7 @@ public class UnscheduledDemandSnapshot {
         target.setNormalProductionDate(normalProductionDate);
         target.setEffectiveDemand(effectiveDemand);
         target.setOriginalDemandQty(originalDemandQty);
+        target.setInitialSurplusQty(initialSurplusQty);
         target.setMonthPlanYear(monthPlanYear);
         target.setMonthPlanMonth(monthPlanMonth);
         target.setMonthPlanVersion(monthPlanVersion);

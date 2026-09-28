@@ -59,7 +59,7 @@ public class LhMouldChangePlan extends BaseEntity implements Serializable {
     private Integer planOrder;
 
     @ApiModelProperty(value = "班次")
-    @Excel(name = "ui.data.column.lhMouldChangePlan.classIndex", dictType = "class_num_two_mm")
+    @Excel(name = "ui.data.column.lhMouldChangePlan.classIndex")
     @TableField(value = "CLASS_INDEX")
     private String classIndex;
 
@@ -112,9 +112,10 @@ public class LhMouldChangePlan extends BaseEntity implements Serializable {
     private String afterMaterialDesc;
 
     /**
-     * 产品状态（本条计划物料对应的产品状态，取值口径与硫化排程结果 PRODUCT_STATUS 一致，字典：lh_trial_status）
+     * 模具交替计划示方类型，按 lh_trial_status 字典值存储。
      */
-    @ApiModelProperty(value = "产品状态")
+    @Excel(name = "ui.data.column.lhScheduleResult.constructionStage", type = Excel.Type.IMPORT)
+    @ApiModelProperty(value = "示方类型")
     @TableField(value = "PRODUCT_STATUS")
     private String productStatus;
 

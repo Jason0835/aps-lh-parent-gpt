@@ -5,6 +5,8 @@ package com.zlt.aps.lh.service.impl;
 
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
+import com.zlt.aps.lh.api.enums.ShiftEnum;
+import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
 import com.zlt.aps.lh.component.EarlyProductionQuantityCalculator;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.DailyMachineExpansionPlanner;
@@ -12,6 +14,8 @@ import com.zlt.aps.lh.engine.strategy.support.DailyNewSpecCandidate;
 import com.zlt.aps.lh.engine.strategy.support.PreviousAlternatePlanReleaseEvent;
 import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
+import com.zlt.aps.lh.util.LhScheduleTimeUtil;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
@@ -37,10 +41,11 @@ import java.util.stream.Collectors;
  * 供续作降模排序与后续独立复用阶段共同使用。历史关系只提供释放优先级，
  * 不预占机台、模具、月计划、日计划或生产余量。</p>
  */
+@Slf4j
 @Service
 public class PreviousAlternatePlanEligibilityService {
 
-    /** 历史日期只用于排序；同日期采用记录主键保持顺序稳定。 */
+    /** 有效历史动作按日期排序；同日期采用记录主键保持顺序稳定。 */
     private static final Comparator<LhMouldChangePlan> PLAN_ORDER = Comparator
             .comparing(LhMouldChangePlan::getPlanDate, Comparator.nullsLast(Date::compareTo))
             .thenComparing(LhMouldChangePlan::getId, Comparator.nullsLast(Long::compareTo));
@@ -51,7 +56,7 @@ public class PreviousAlternatePlanEligibilityService {
     private ILhDailyMouldCalcService lhDailyMouldCalcService;
 
     /**
-     * 冻结前日最近有效批次的全部交替关系。
+     * 先锁定前日最近有效批次，再冻结尚未过期的交替关系。
      *
      * @param context 排程上下文
      * @return 机台加前物料对应的有序计划
@@ -82,11 +87,37 @@ public class PreviousAlternatePlanEligibilityService {
                 .filter(plan -> StringUtils.isNotEmpty(plan.getLhMachineCode())
                         && StringUtils.isNotEmpty(plan.getBeforeMaterialCode())
                         && StringUtils.isNotEmpty(plan.getAfterMaterialCode()))
+                // 过期动作不能再参与强制下机、余量收尾纠偏或指定承接，也不补捞旧批次。
+                .filter(plan -> this.isUnexpiredPlan(context, plan))
                 .sorted(PLAN_ORDER)
                 .forEach(plan -> index.computeIfAbsent(
                         this.buildKey(plan.getLhMachineCode(), plan.getBeforeMaterialCode()),
                         ignored -> new ArrayList<LhMouldChangePlan>(2)).add(plan));
         return index;
+    }
+
+    /**
+     * 按实际动作日期排除窗口开始前已经截止的历史交替。
+     *
+     * @param context 本次固定窗口上下文
+     * @param plan 最新历史批次的交替计划
+     * @return 动作日期有效且未早于窗口起点时返回true
+     */
+    private boolean isUnexpiredPlan(LhScheduleContext context, LhMouldChangePlan plan) {
+        if (Objects.isNull(plan.getPlanDate()) || Objects.isNull(context.getScheduleDate())) {
+            return false;
+        }
+        boolean expired = LhScheduleTimeUtil.clearTime(plan.getPlanDate())
+                .before(LhScheduleTimeUtil.clearTime(context.getScheduleDate()));
+        if (expired) {
+            log.debug("历史交替动作已过期，不参与本次续作及承接, factoryCode: {}, batchNo: {}, "
+                            + "planId: {}, machineCode: {}, beforeMaterial: {}, afterMaterial: {}, "
+                            + "planDate: {}, windowStart: {}",
+                    context.getFactoryCode(), context.getBatchNo(), plan.getId(), plan.getLhMachineCode(),
+                    plan.getBeforeMaterialCode(), plan.getAfterMaterialCode(), plan.getPlanDate(),
+                    context.getScheduleDate());
+        }
+        return !expired;
     }
 
     /**
@@ -96,6 +127,35 @@ public class PreviousAlternatePlanEligibilityService {
      */
     Comparator<LhMouldChangePlan> getPlanOrder() {
         return PLAN_ORDER;
+    }
+
+    /**
+     * 读取余量收尾纠偏所需的唯一历史关系，不改变降模和正式复用的公共排序。
+     * @param context 已加载目标日前一日历史计划的上下文
+     * @param materialCode 当前续作前物料
+     * @param machineCodes 当前收尾组运行态机台编码
+     * @return 最新有效批次内可唯一对应且日期、早中班有效的计划；歧义机台不参与纠偏
+     */
+    public Map<String, LhMouldChangePlan> resolveRemainingFinishPlans(LhScheduleContext context,
+            String materialCode, List<String> machineCodes) {
+        Map<String, List<LhMouldChangePlan>> index = this.buildPlanIndex(context);
+        Map<String, LhMouldChangePlan> plans = new LinkedHashMap<>(machineCodes.size());
+        for (String machineCode : machineCodes) {
+            List<LhMouldChangePlan> matches = index.get(this.buildKey(machineCode, materialCode));
+            // 同机前料多条计划不能靠ID猜测本次应承接哪一条，保持原收尾结果。
+            if (CollectionUtils.isEmpty(matches) || matches.size() != 1) {
+                continue;
+            }
+            LhMouldChangePlan plan = matches.get(0);
+            if (Objects.nonNull(plan.getPlanDate())
+                    && (ShiftEnum.MORNING_SHIFT.getCode().equals(plan.getClassIndex())
+                    || ShiftEnum.AFTERNOON_SHIFT.getCode().equals(plan.getClassIndex()))
+                    && MouldChangeTypeEnum.containsAnyCode(plan.getChangeMouldType(),
+                    MouldChangeTypeEnum.REGULAR.getCode(), MouldChangeTypeEnum.TYPE_BLOCK.getCode())) {
+                plans.put(machineCode, plan);
+            }
+        }
+        return plans;
     }
 
     /**
