@@ -172,4 +172,12 @@ public class LhDayPlanAdjustRequire extends BaseEntity implements Serializable {
     /** 每页条数 */
     @TableField(exist = false)
     private Integer pageSize;
+
+    /** 列表排序字段，仅支持调整1、2、3 */
+    @TableField(exist = false)
+    private String orderByColumn;
+
+    /** 列表排序方向：asc 或 desc */
+    @TableField(exist = false)
+    private String isAsc;
 }

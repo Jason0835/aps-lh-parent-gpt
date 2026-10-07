@@ -42,7 +42,7 @@ public final class ContinuationEndingMachineProfile {
     private final List<List<MachineMaintenanceWindowDTO>> maintenanceWindows;
     /** 应用已有释放和后续占用上限后的物理机台合计容量。 */
     private final int[] capacities;
-    /** 残班数量归整单位；普通机台余量收尾为1，与原结果中的实际模具数量独立。 */
+    /** 残班数量归整单位；普通双模为2，单控整机同时包含两侧配对约束。 */
     private final int multiple;
     /** 当前物理机台的设备停机，避免候选反复扫描全工厂停机列表。 */
     private final List<MdmDevicePlanShut> deviceStops;
@@ -97,6 +97,11 @@ public final class ContinuationEndingMachineProfile {
     /** @return 残班归整单位 */
     public int getMultiple() {
         return multiple;
+    }
+
+    /** @return 已冻结的物理交接硬截止；无后续强制动作时为空 */
+    public Date getReleaseDeadline() {
+        return releaseDeadline;
     }
 
     /**

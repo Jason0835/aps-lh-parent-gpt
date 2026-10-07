@@ -4,6 +4,8 @@
 package com.zlt.aps.lh.service.impl;
 
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
+import com.zlt.aps.lh.api.enums.SkuScheduleSourceTypeEnum;
+import com.zlt.aps.lh.engine.strategy.support.NewSpecCandidatePoolBuilder;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.api.enums.ShiftEnum;
 import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
@@ -23,6 +25,7 @@ import org.springframework.util.CollectionUtils;
 import javax.annotation.Resource;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
@@ -33,6 +36,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * 前日交替计划资格公共服务。
@@ -45,13 +49,28 @@ import java.util.stream.Collectors;
 @Service
 public class PreviousAlternatePlanEligibilityService {
 
-    /** 有效历史动作按日期排序；同日期采用记录主键保持顺序稳定。 */
+    /**
+     * 有效历史动作统一排序：计划日期升序 -> 班次升序 -> 换模类型降序 -> 机台编码升序 -> 左右模升序。
+     *
+     * <p>班次按编码字符串升序（01夜班 -> 02早班 -> 03中班），与实际生产时间顺序一致；
+     * 换模类型降序使更换活字块(02)先于正规换模(01)被冻结和复用；
+     * 机台编码加左右模升序保证同日期同班次同类型时多机台按机台+模具侧稳定展开；
+     * 最后以记录主键兜底，保持排序稳定。</p>
+     */
     private static final Comparator<LhMouldChangePlan> PLAN_ORDER = Comparator
             .comparing(LhMouldChangePlan::getPlanDate, Comparator.nullsLast(Date::compareTo))
+            .thenComparing(LhMouldChangePlan::getClassIndex, Comparator.nullsLast(String::compareTo))
+            .thenComparing(PreviousAlternatePlanEligibilityService::resolveChangeMouldTypeSortKey,
+                    Comparator.nullsLast(Comparator.reverseOrder()))
+            .thenComparing(LhMouldChangePlan::getLhMachineCode, Comparator.nullsLast(String::compareTo))
+            .thenComparing(LhMouldChangePlan::getLeftRightMould, Comparator.nullsLast(String::compareTo))
             .thenComparing(LhMouldChangePlan::getId, Comparator.nullsLast(Long::compareTo));
 
     @Resource
     private NewSpecMaterialEligibilityService materialEligibilityService;
+    /** 调整需求复用新增内核既有机台机会规则，不改写月计划目标 Map。 */
+    @Resource
+    private NewSpecCandidatePoolBuilder newSpecCandidatePoolBuilder;
     @Resource
     private ILhDailyMouldCalcService lhDailyMouldCalcService;
 
@@ -61,7 +80,7 @@ public class PreviousAlternatePlanEligibilityService {
      * @param context 排程上下文
      * @return 机台加前物料对应的有序计划
      */
-    Map<String, List<LhMouldChangePlan>> buildPlanIndex(LhScheduleContext context) {
+    public Map<String, List<LhMouldChangePlan>> buildPlanIndex(LhScheduleContext context) {
         if (Objects.isNull(context)
                 || CollectionUtils.isEmpty(context.getHistoricalReverseMouldChangePlanList())) {
             return Collections.emptyMap();
@@ -93,6 +112,12 @@ public class PreviousAlternatePlanEligibilityService {
                 .forEach(plan -> index.computeIfAbsent(
                         this.buildKey(plan.getLhMachineCode(), plan.getBeforeMaterialCode()),
                         ignored -> new ArrayList<LhMouldChangePlan>(2)).add(plan));
+        // 资格快照只保存已过滤的关系；早于资源尝试冻结，失败不能重新获得虚拟机资格。
+        context.setEligiblePreviousAlternatePlans(index.values().stream()
+                .flatMap(List::stream).collect(Collectors.toList()));
+        Stream.of(context.getPreviousAlternateNewSpecCandidates(), context.getContinuousSkuList(),
+                context.getTrialVirtualMachineCandidateList()).flatMap(List::stream)
+                .forEach(context::registerPreviousAlternateTrialSku);
         return index;
     }
 
@@ -121,12 +146,33 @@ public class PreviousAlternatePlanEligibilityService {
     }
 
     /**
-     * 获取前日交替计划的稳定排序规则。
+     * 获取前日交替计划的稳定排序规则（公共静态口径，供复用链路及降模选机等非 Spring 场景统一使用）。
      *
-     * @return 先按计划日期、再按主键排序的比较器
+     * @return 计划日期升序 -> 班次升序 -> 换模类型降序 -> 机台编码升序 -> 左右模升序 -> 主键升序的比较器
      */
-    Comparator<LhMouldChangePlan> getPlanOrder() {
+    public static Comparator<LhMouldChangePlan> planOrder() {
         return PLAN_ORDER;
+    }
+
+    /**
+     * 解析换模类型降序排序键。
+     *
+     * <p>历史计划 CHANGE_MOULD_TYPE 可能存英文逗号分隔的多值，排序时取其中最大类型编码，
+     * 保证含更换活字块(02)的组合在降序中优先于纯正规换模(01)。</p>
+     *
+     * @param plan 前日交替计划
+     * @return 多值中最大的类型编码；字段为空时返回null，排序时排在最后
+     */
+    private static String resolveChangeMouldTypeSortKey(LhMouldChangePlan plan) {
+        String changeMouldType = plan.getChangeMouldType();
+        if (StringUtils.isEmpty(changeMouldType)) {
+            return null;
+        }
+        return Arrays.stream(changeMouldType.split(","))
+                .map(String::trim)
+                .filter(StringUtils::isNotEmpty)
+                .max(String::compareTo)
+                .orElse(null);
     }
 
     /**
@@ -173,7 +219,7 @@ public class PreviousAlternatePlanEligibilityService {
         if (Objects.isNull(context) || Objects.isNull(sourceSku)
                 || StringUtils.isEmpty(sourceSku.getMaterialCode())
                 || CollectionUtils.isEmpty(businessDateList)
-                || CollectionUtils.isEmpty(context.getNewSpecSkuList())) {
+                || CollectionUtils.isEmpty(context.getPreviousAlternateNewSpecCandidates())) {
             return Collections.emptySet();
         }
         Map<String, List<LhMouldChangePlan>> planIndex = this.buildPlanIndex(context);
@@ -188,7 +234,7 @@ public class PreviousAlternatePlanEligibilityService {
                 .filter(plan -> !StringUtils.equals(
                         sourceSku.getMaterialCode(), plan.getAfterMaterialCode()))
                 .filter(plan -> this.hasEligibleAfterMaterialDemand(
-                        context, plan.getAfterMaterialCode(), businessDateList))
+                        context, plan, businessDateList))
                 .map(LhMouldChangePlan::getLhMachineCode)
                 .map(LhSingleControlMachineUtil::resolvePhysicalMachineCode)
                 .filter(StringUtils::isNotEmpty)
@@ -207,6 +253,18 @@ public class PreviousAlternatePlanEligibilityService {
                            LocalDate businessDate,
                            DailyNewSpecCandidate candidate) {
         SkuScheduleDTO sku = candidate.getSku();
+        if (StringUtils.equals(SkuScheduleSourceTypeEnum.PREVIOUS_ALTERNATE_TRIAL.getCode(), sku.getSourceType())) {
+            // 独立承接需求没有月计划目标台数，只允许一台指定物理机消费共享的严格余量。
+            candidate.setTargetMachineCount(1);
+            candidate.setScheduledMachineCount(DailyMachineExpansionPlanner.countCommittedMachineDemand(
+                    context, sku, businessDate));
+            return;
+        }
+        if (StringUtils.equals(SkuScheduleSourceTypeEnum.DAY_PLAN_ADJUST.getCode(), sku.getSourceType())) {
+            // 调整需求无原始 dayN 时，沿用 S4.5.2 的合法首次尝试机会及已提交机台计数。
+            newSpecCandidatePoolBuilder.refreshRemainingMachineCount(context, businessDate, candidate);
+            return;
+        }
         LocalDate requiredDate = EarlyProductionQuantityCalculator.resolveRequiredMachineCountDate(
                 context, sku, candidate.getEarlyProductionPreview(), businessDate);
         candidate.setTargetMachineCount(this.lhDailyMouldCalcService.getRequiredMachineCount(
@@ -223,6 +281,8 @@ public class PreviousAlternatePlanEligibilityService {
                     activeMachineCount + Math.max(1, sku.getContinuationShortageMachineCount())));
         }
         candidate.setScheduledMachineCount(scheduledMachineCount);
+        candidate.setTargetMachineCount(context.resolvePreviousAlternateMachineCount(
+                sku, businessDate, candidate.getTargetMachineCount()));
         PreviousAlternatePlanReleaseEvent event = context.getActivePreviousAlternateEvent();
         if (Objects.nonNull(event) && event.isBeforeMaterialNotScheduled()
                 && context.isPreviousAlternateAction(sku, event.getMachineCode())
@@ -238,21 +298,22 @@ public class PreviousAlternatePlanEligibilityService {
      * 判断历史后物料在窗口内是否仍有可消费的有效机台需求。
      *
      * @param context 排程上下文
-     * @param afterMaterialCode 历史后物料编码
+     * @param plan 历史交替计划，提供后物料及对应产品状态
      * @param businessDateList 本次排程窗口业务日期
      * @return 是否存在有效资格且目标机台仍有缺口
      */
     private boolean hasEligibleAfterMaterialDemand(LhScheduleContext context,
-                                                   String afterMaterialCode,
+                                                   LhMouldChangePlan plan,
                                                    List<LocalDate> businessDateList) {
-        List<SkuScheduleDTO> candidateSkuList = context.getNewSpecSkuList().stream()
+        List<SkuScheduleDTO> candidateSkuList = context.getPreviousAlternateNewSpecCandidates().stream()
                 .filter(Objects::nonNull)
-                .filter(sku -> StringUtils.equals(afterMaterialCode, sku.getMaterialCode()))
+                .filter(sku -> context.matchesPreviousAlternateAfterMaterial(
+                        plan, sku.getMaterialCode(), sku.getProductStatus()))
                 .collect(Collectors.toList());
         for (SkuScheduleDTO sku : candidateSkuList) {
             for (LocalDate businessDate : businessDateList) {
-                DailyNewSpecCandidate candidate = this.materialEligibilityService.resolveCandidate(
-                        context, sku, businessDate);
+                DailyNewSpecCandidate candidate = this.materialEligibilityService.resolvePreviousAlternateCandidate(
+                        context, sku, businessDate, plan, plan.getLhMachineCode());
                 if (candidate.getReasons().isEmpty()) {
                     continue;
                 }

@@ -306,7 +306,7 @@ public final class StructureSwitchSchedulingPolicy {
         Date machineStart = resolveLargeMachineStart(readyTime, changeStart, changeEnd,
                 inspection.getInspectionDurationSeconds());
         Date baseStart = later(machineStart, source.getEarliestLhTime());
-        Date formulaStart = resolveLargeFormulaStart(context, baseStart);
+        Date formulaStart = later(resolveLargeFormulaStart(context, machineStart), source.getEarliestLhTime());
         inspection = FirstInspectionAllocationUtil.buildPlan(context, sku, shifts, changeEnd,
                 inspectionStart, capacity, remaining, scheduleType, machineCode, capacityResolver.apply(inspection),
                 FirstInspectionTimingMode.START_AT_OCCUPATION_BOUNDARY);
@@ -325,7 +325,7 @@ public final class StructureSwitchSchedulingPolicy {
                 source.getId(), source.getNextStructureName(), sku.getMaterialCode(), machineCode, changeStart, changeEnd,
                 machineStart, source.getEarliestLhTime(), formulaStart, inspectionStart, formalStart, firstShift.getShiftIndex());
         return FirstInspectionTimelinePlan.of(inspection, FirstInspectionTimingMode.START_AT_OCCUPATION_BOUNDARY,
-                "按实际首检可开始时间与供胚取晚后加延迟，名额只后移生产，首检包含在班次总量内",
+                "设备首检起点加延迟后与供胚取晚，名额只后移生产，首检包含在班次总量内",
                 changeStart, changeEnd, inspectionStart, formalStart, formalShift, occupationShift).withStructureSwitchPlan(plan);
     }
 
@@ -362,7 +362,7 @@ public final class StructureSwitchSchedulingPolicy {
                 continue;
             }
             Date machineStart = resolveLargeMachineStart(readyTime, changeStart, changeEnd, duration);
-            Date formulaStart = resolveLargeFormulaStart(context, later(machineStart, embryoTime));
+            Date formulaStart = later(resolveLargeFormulaStart(context, machineStart), embryoTime);
             // 名额和计数班次都只抬高起点，不能在顺延后的班次重新追加一小时。
             Date requestedStart = later(later(formulaStart, notBefore), shift.getShiftStartDateTime());
             if (!requestedStart.before(shift.getShiftEndDateTime())) {
@@ -398,9 +398,9 @@ public final class StructureSwitchSchedulingPolicy {
     }
 
     /**
-     * 在设备与供胚共同下限上应用一次大换英寸延迟。
+     * 仅在设备首检下限上应用一次大换英寸延迟；调用方再与供胚时间取晚。
      * @param context 参数快照
-     * @param baseStart 设备与供胚取晚后的起点
+     * @param baseStart 设备可开始首检的起点
      * @return 含首检的公式起点
      */
     private static Date resolveLargeFormulaStart(LhScheduleContext context, Date baseStart) {
@@ -783,7 +783,8 @@ public final class StructureSwitchSchedulingPolicy {
             LhShiftConfigVO shift, int proposed, int capacity, int remaining) {
         StructureSwitchPlan plan = context.getStructureSwitchResultPlanMap().get(result);
         if (!isFirstBatch(context, plan, shift)) {
-            return proposed;
+            // 供胚首班上限也适用于非大换英寸，不能被P0判断跳过。
+            return StructureSwitchFirstShiftQuantityPolicy.capIncrement(context, sku, result, shift, proposed);
         }
         int sides = LhSingleControlMachineUtil.isConfiguredSingleControlMachine(context, result.getLhMachineCode())
                 && LhSingleControlMachineUtil.isWholeMachineGranularitySku(context, sku) ? EVEN_UNIT : 1;
@@ -793,6 +794,10 @@ public final class StructureSwitchSchedulingPolicy {
         if (limit > 0) {
             int existing = constraint.resolveCurrentShiftQty(context, shift.getShiftIndex());
             quantity = Math.min(quantity, Math.max(0, limit - existing) / sides);
+        }
+        // 命中供胚首班配置时只对最终含首检总量归整，避免普通量先取偶造成重复损失。
+        if (StructureSwitchFirstShiftQuantityPolicy.isLimited(context, result, shift)) {
+            return StructureSwitchFirstShiftQuantityPolicy.capIncrement(context, sku, result, shift, quantity);
         }
         // 首检已按真实时间独立分摊，只有本次普通生产量按物理整机取偶，不能混入首检尾数。
         int finalQty = floorEven(BigDecimalUtils.valueOf((long) quantity * sides)) / sides;
@@ -804,7 +809,8 @@ public final class StructureSwitchSchedulingPolicy {
                 Objects.equals(YES, plan.getSource().getIsWaitNotify()) ? YES : 0,
                 firstShiftStart, plan.getFirstBatchShift().getShiftStartDateTime(),
                 shift.getShiftIndex(), plan.getBaseStart(), plan.getProductionStart(), capacity, remaining, finalQty);
-        return finalQty;
+        // 首检已写入当前结果，最终按含首检总量限制共享额度并归整。
+        return StructureSwitchFirstShiftQuantityPolicy.capIncrement(context, sku, result, shift, finalQty);
     }
 
     /**
@@ -825,6 +831,13 @@ public final class StructureSwitchSchedulingPolicy {
     public static String validateCommittedResults(LhScheduleContext context, int firstNewResultIndex) {
         if (!isEnabled(context)) {
             return null;
+        }
+        // 在已提交结果上复核供胚首班共享额度，失败交回原提交快照完整回滚。
+        String quantityFailure = StructureSwitchFirstShiftQuantityPolicy.validateResults(context);
+        if (StringUtils.isNotEmpty(quantityFailure)) {
+            log.warn("结构胎胚首班提交校验未通过，当前提案回滚, batchNo={}, detail={}",
+                    context.getBatchNo(), quantityFailure);
+            return quantityFailure;
         }
         // 日计划回裁可能移除原首班，先依据实际正量重新定位，再检查新的S0/S1。
         rebuildCommittedState(context);
@@ -989,6 +1002,10 @@ public final class StructureSwitchSchedulingPolicy {
      */
     public static int capRetainedQuantity(LhScheduleContext context, LhScheduleResult result,
             LhShiftConfigVO shift, int original, int remaining) {
+        // 供胚首班由调用方合并首检后统一归整，普通生产不能提前取偶丢失可排量。
+        if (StructureSwitchFirstShiftQuantityPolicy.isLimited(context, result, shift)) {
+            return Math.min(original, Math.max(0, remaining));
+        }
         if (!isFirstBatch(context, context.getStructureSwitchResultPlanMap().get(result), shift)) {
             return original;
         }

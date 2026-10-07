@@ -50,6 +50,9 @@ public class FirstInspectionAllocationPlan {
     /** 按真实时间重叠形成的各班次首检分摊。 */
     private final List<FirstInspectionShiftAllocation> shiftAllocations;
 
+    /** 首检已包含在精度及预热完整时长内，不再另排首检量或追加时长。 */
+    private final boolean includedInMaintenance;
+
     private FirstInspectionAllocationPlan(boolean valid,
                                           String invalidReason,
                                           int sequence,
@@ -59,7 +62,8 @@ public class FirstInspectionAllocationPlan {
                                           Date inspectionStartTime,
                                           Date inspectionEndTime,
                                           LhShiftConfigVO countingShift,
-                                          List<FirstInspectionShiftAllocation> shiftAllocations) {
+                                          List<FirstInspectionShiftAllocation> shiftAllocations,
+                                          boolean includedInMaintenance) {
         this.valid = valid;
         this.invalidReason = invalidReason;
         this.sequence = sequence;
@@ -71,6 +75,7 @@ public class FirstInspectionAllocationPlan {
         this.countingShift = countingShift;
         this.shiftAllocations = Collections.unmodifiableList(
                 new ArrayList<FirstInspectionShiftAllocation>(shiftAllocations));
+        this.includedInMaintenance = includedInMaintenance;
     }
 
     /**
@@ -96,7 +101,7 @@ public class FirstInspectionAllocationPlan {
                                                       List<FirstInspectionShiftAllocation> allocations) {
         return new FirstInspectionAllocationPlan(
                 true, null, sequence, inspectionQty, hourlyOutput, inspectionDurationSeconds,
-                inspectionStartTime, inspectionEndTime, countingShift, allocations);
+                inspectionStartTime, inspectionEndTime, countingShift, allocations, false);
     }
 
     /**
@@ -112,7 +117,28 @@ public class FirstInspectionAllocationPlan {
                                                         Date inspectionEndTime) {
         return new FirstInspectionAllocationPlan(
                 false, invalidReason, 0, 0, BigDecimal.ZERO, 0L, null, inspectionEndTime,
-                countingShift, Collections.<FirstInspectionShiftAllocation>emptyList());
+                countingShift, Collections.<FirstInspectionShiftAllocation>emptyList(), false);
+    }
+
+    /**
+     * 创建精度内已完成首检的计划，保留首检资源计数但不虚构精度期间的生产量。
+     * @param sequence 当前计数班次首检顺序
+     * @param readyTime 换模与精度完整时长取最大值后的生产就绪时间
+     * @param countingShift 就绪时刻所在班次
+     * @return 首检包含在精度内的只读计划
+     */
+    public static FirstInspectionAllocationPlan includedInMaintenance(int sequence, Date readyTime,
+                                                                      LhShiftConfigVO countingShift) {
+        if (Objects.isNull(readyTime) || Objects.isNull(countingShift)) {
+            return invalid("精度并行首检完成时间未命中排程班次", countingShift, readyTime);
+        }
+        return new FirstInspectionAllocationPlan(true, null, sequence, 0, BigDecimal.ZERO, 0L,
+                readyTime, readyTime, countingShift, Collections.<FirstInspectionShiftAllocation>emptyList(), true);
+    }
+
+    /** @return 首检是否已包含在精度完整时长中 */
+    public boolean isIncludedInMaintenance() {
+        return includedInMaintenance;
     }
 
     /**

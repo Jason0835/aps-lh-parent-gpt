@@ -22,6 +22,7 @@ import com.zlt.aps.lh.engine.strategy.IEndingJudgmentStrategy;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionChecker;
 import com.zlt.aps.lh.engine.strategy.support.PendingSkuUnscheduledRule;
 import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
+import com.zlt.aps.lh.service.impl.PreviousAlternateTrialDemandService;
 import com.zlt.aps.lh.util.*;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
@@ -58,6 +59,10 @@ import java.util.*;
 @Slf4j
 @Component
 public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
+
+    /** 日计划清理前保留历史指定试制量试的独立需求。 */
+    @Resource
+    private PreviousAlternateTrialDemandService previousAlternateTrialDemandService;
 
     /**
      * 无排产目标量未排产提示
@@ -174,6 +179,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
          * 和未来原始日计划重新建立，并由 S4.5 持续使用至整个三天窗口结束。
          */
         context.clearEarlyProductionRuntimePlans();
+        context.setInactiveFutureDemandQtySnapshotMap(Collections.emptyMap());
 
         // S4.3.2 按产品结构归集SKU，计算硫化余量
         gatherSkuByStructure(context);
@@ -306,12 +312,12 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
             }
             /*
              * 原始月计划 TOTAL_QTY 为0但存在正向日计划调整量时，不生成普通月计划零目标未排，
-             * 也不进入新增/提前生产主链。该独立需求统一交给 S4.5.2 按调整余量严格排产，
+             * 也不进入新增/提前生产主链。该独立需求由历史指定承接与 S4.5.2 共享调整余量严格排产，
              * 避免原始 TOTAL_QTY 门禁与日计划调整入口相互覆盖。
              */
             if (!exactOnlineContinuation
                     && dayPlanAdjustRequireAssembler.isDayPlanAdjustOnlyDemand(context, plan)) {
-                log.info("纯日计划调整需求延后至S4.5.2处理, factoryCode: {}, batchNo: {}, "
+                log.info("纯日计划调整需求交由独立来源准备，优先参与历史指定承接，剩余量延后至S4.5.2, factoryCode: {}, batchNo: {}, "
                                 + "materialCode: {}, productStatus: {}, originalTotalQty: {}, surplusQty: {}",
                         context.getFactoryCode(), context.getBatchNo(), dto.getMaterialCode(),
                         dto.getProductStatus(), safeInt(plan.getTotalQty()), Math.max(0, dto.getSurplusQty()));
@@ -2316,6 +2322,10 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                     excludedLegacySkuList.add(sku);
                     continue;
                 }
+                // 无窗口日计划的历史指定试验余量单独承接，不进入普通新增或虚拟候选。
+                if (previousAlternateTrialDemandService.preserve(context, sku)) {
+                    continue;
+                }
                 /*
                  * 非续作SKU正式进入换活字块、历史交替反选和普通新增选机前，统一判断T～窗口结束日后N天
                  * 是否存在日计划量；完整范围无量时，再按后物料检查前日排程T+1交替承接关系。
@@ -2326,9 +2336,22 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                 if (Objects.nonNull(dailyPlanUnscheduledResult)) {
                     /*
                      * 无日计划仍保持原逻辑，不进入续作、换活字块、真实机台新增或特殊置换。
+                     * 命中SKU减量清单的SKU优先于无日计划兜底拦截：只写减量未排，
+                     * 不保留S4.5.3虚拟机台候选，避免虚拟机台兜底绕过减量清单过滤。
                      * 仅试制/量试且硫化余量大于0时，额外保留对象给S4.5.3虚拟机台最终兜底；
                      * 正规SKU继续只写未排，不进入虚拟候选。
                      */
+                    if (skuDecrementChecker.isDecrementHit(context, sku)) {
+                        // 未排原因固定为减量清单文案，后续统一走blockedDailyPlanSkuList清理运行态
+                        skuDecrementChecker.handleDecrementHit(context, sku);
+                        blockedDailyPlanSkuList.add(sku);
+                        log.info("SKU命中减量清单，无日计划源头拦截, 工厂: {}, 批次号: {}, 物料: {}, 产品状态: {}, "
+                                        + "月计划年月: {}-{}, 未排数量: {}",
+                                context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(),
+                                sku.getProductStatus(), sku.getMonthPlanYear(), sku.getMonthPlanMonth(),
+                                Math.max(0, sku.getSurplusQty()));
+                        continue;
+                    }
                     this.preserveNoDailyPlanTrialVirtualCandidate(context, sku);
                     unscheduledResultCollector.add(context, sku, dailyPlanUnscheduledResult);
                     blockedDailyPlanSkuList.add(sku);

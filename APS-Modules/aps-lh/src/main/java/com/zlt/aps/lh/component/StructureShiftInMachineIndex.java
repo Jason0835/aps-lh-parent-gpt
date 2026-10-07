@@ -4,7 +4,6 @@ import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
-import com.zlt.aps.lh.util.ShiftFieldUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -43,6 +42,23 @@ public class StructureShiftInMachineIndex {
             new LinkedHashMap<String, Map<Integer, Set<String>>>(16);
 
     /**
+     * 深复制结构、班次和物理机台集合，供候选预演回滚及独立排程副本使用。
+     * <p>各层容器均独立，后续增量提交、单机刷新和清空不会改写已捕获的占用状态。</p>
+     *
+     * @return 与当前统计内容相同、可独立修改的索引
+     */
+    public StructureShiftInMachineIndex copy() {
+        StructureShiftInMachineIndex copied = new StructureShiftInMachineIndex();
+        structureShiftPhysicalMachineMap.forEach((structureName, shiftMachines) -> {
+            Map<Integer, Set<String>> copiedShiftMachines = new LinkedHashMap<>(shiftMachines.size());
+            shiftMachines.forEach((shiftIndex, machines) ->
+                    copiedShiftMachines.put(shiftIndex, new LinkedHashSet<>(machines)));
+            copied.structureShiftPhysicalMachineMap.put(structureName, copiedShiftMachines);
+        });
+        return copied;
+    }
+
+    /**
      * 基于当前实时排程结果与机台运行态一次性构建在机统计缓存。
      *
      * <p>构建前会清空旧数据，复用同一上下文时保证只统计本次窗口的最新结果。</p>
@@ -52,12 +68,11 @@ public class StructureShiftInMachineIndex {
      */
     public void build(LhScheduleContext context,
                       StructureMinMachineRetentionService retentionService) {
-        clear();
-        if (Objects.isNull(context) || Objects.isNull(retentionService)
-                || CollectionUtils.isEmpty(context.getStructureMinMachineSkuSnapshotMap())) {
+        this.clear();
+        if (Objects.isNull(context) || Objects.isNull(retentionService)) {
             return;
         }
-        for (String structureName : context.getStructureMinMachineSkuSnapshotMap().keySet()) {
+        for (String structureName : retentionService.collectStatisticsStructureNames(context)) {
             if (StringUtils.isEmpty(structureName)) {
                 continue;
             }
@@ -68,7 +83,7 @@ public class StructureShiftInMachineIndex {
                 if (CollectionUtils.isEmpty(physicalMachineCodes)) {
                     continue;
                 }
-                registerStructureShiftPhysicalCodes(structureName, shiftIndex, physicalMachineCodes);
+                this.registerStructureShiftPhysicalCodes(structureName, shiftIndex, physicalMachineCodes);
             }
         }
         log.info("结构班次在机统计缓存构建完成, structureCount: {}, shiftMachineCount: {}",
@@ -80,7 +95,7 @@ public class StructureShiftInMachineIndex {
     /**
      * 换活字块或新增结果提交后增量更新缓存。
      *
-     * <p>新结果代表机台从首个占用班次起可能切换到当前SKU。每个后续班次继续复用
+     * <p>新结果提交后重算该物理机台各班次的实际结构归属，继续复用
      * {@link StructureMinMachineRetentionService#isMachineInStructureAtShift} 判断正量生产、
      * 停产保机和业务停机，计划量为0且已经真实下机的班次不得继续占用结构机台名额。
      * 单控整机配对侧结果按物理机台编码去重。</p>
@@ -95,33 +110,8 @@ public class StructureShiftInMachineIndex {
         if (Objects.isNull(result) || StringUtils.isEmpty(result.getLhMachineCode())) {
             return;
         }
-        int firstOccupiedShiftIndex = resolveFirstOccupiedShiftIndex(result);
-        if (firstOccupiedShiftIndex < 1) {
-            // 无任何占用班次的结果不改变在机关系（例如纯未生产占位），交给 refreshMachine 兜底。
-            refreshMachine(context, retentionService, result.getLhMachineCode());
-            return;
-        }
-        String structureName = resolveResultStructureName(context, retentionService, result);
-        if (StringUtils.isEmpty(structureName)) {
-            // 结果结构归属缺失时按机台运行态整体重算，避免脏写缓存。
-            refreshMachine(context, retentionService, result.getLhMachineCode());
-            return;
-        }
-        String physicalMachineCode =
-                LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode());
-        for (int shiftIndex = firstOccupiedShiftIndex;
-             shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
-            this.removePhysicalCodeFromAllStructures(physicalMachineCode, shiftIndex);
-            if (retentionService.isMachineInStructureAtShift(
-                    context, structureName, result.getLhMachineCode(), shiftIndex)) {
-                this.addPhysicalCodeToStructureShift(
-                        structureName, shiftIndex, physicalMachineCode);
-            }
-        }
-        log.debug("结构班次在机缓存增量更新, batchNo: {}, machineCode: {}, physicalMachineCode: {}, "
-                        + "structureName: {}, firstOccupiedShift: {}",
-                context.getBatchNo(), result.getLhMachineCode(), physicalMachineCode,
-                structureName, firstOccupiedShiftIndex);
+        // 与全量构建共用实际在机口径，保留同班前后料及另一单控侧的真实占用。
+        this.refreshMachine(context, retentionService, result.getLhMachineCode());
     }
 
     /**
@@ -140,19 +130,29 @@ public class StructureShiftInMachineIndex {
         }
         String physicalMachineCode =
                 LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode);
+        Set<String> runtimeMachineCodes = new LinkedHashSet<>(context.getMachineScheduleMap().keySet());
+        context.getScheduleResultList().stream().filter(Objects::nonNull)
+                .map(LhScheduleResult::getLhMachineCode).filter(StringUtils::isNotEmpty)
+                .forEach(runtimeMachineCodes::add);
+        runtimeMachineCodes.add(machineCode);
+        runtimeMachineCodes.removeIf(runtimeMachineCode -> !StringUtils.equals(physicalMachineCode,
+                LhSingleControlMachineUtil.resolvePhysicalMachineCode(runtimeMachineCode)));
         for (int shiftIndex = 1;
              shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
-            removePhysicalCodeFromAllStructures(physicalMachineCode, shiftIndex);
+            this.removePhysicalCodeFromAllStructures(physicalMachineCode, shiftIndex);
         }
-        for (String structureName : context.getStructureMinMachineSkuSnapshotMap().keySet()) {
+        for (String structureName : retentionService.collectStatisticsStructureNames(context)) {
             if (StringUtils.isEmpty(structureName)) {
                 continue;
             }
             for (int shiftIndex = 1;
                  shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
-                if (retentionService.isMachineInStructureAtShift(
-                        context, structureName, machineCode, shiftIndex)) {
-                    addPhysicalCodeToStructureShift(structureName, shiftIndex, physicalMachineCode);
+                for (String runtimeMachineCode : runtimeMachineCodes) {
+                    if (retentionService.isMachineInStructureAtShift(
+                            context, structureName, runtimeMachineCode, shiftIndex)) {
+                        this.addPhysicalCodeToStructureShift(structureName, shiftIndex, physicalMachineCode);
+                        break;
+                    }
                 }
             }
         }
@@ -220,51 +220,6 @@ public class StructureShiftInMachineIndex {
      */
     public void clear() {
         structureShiftPhysicalMachineMap.clear();
-    }
-
-    /**
-     * 解析结果首个占用班次：优先正量班次，其次有明确班次计划量，最后回退有班次分析或起止时间的班次。
-     *
-     * @param result 排程结果
-     * @return 首个占用班次；不存在返回-1
-     */
-    private int resolveFirstOccupiedShiftIndex(LhScheduleResult result) {
-        int fallbackShiftIndex = -1;
-        for (int shiftIndex = 1;
-             shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
-            Integer planQty = ShiftFieldUtil.getShiftPlanQty(result, shiftIndex);
-            if (Objects.nonNull(planQty) && planQty > 0) {
-                return shiftIndex;
-            }
-            if (Objects.nonNull(planQty) || StringUtils.isNotEmpty(
-                    ShiftFieldUtil.getShiftAnalysis(result, shiftIndex))
-                    || Objects.nonNull(ShiftFieldUtil.getShiftStartTime(result, shiftIndex))) {
-                if (fallbackShiftIndex < 1) {
-                    fallbackShiftIndex = shiftIndex;
-                }
-            }
-        }
-        return fallbackShiftIndex;
-    }
-
-    /**
-     * 解析结果所属结构名称，优先结果结构字段，其次按物料归属结构。
-     *
-     * @param context 排程上下文
-     * @param retentionService 结构在机统计工具
-     * @param result 排程结果
-     * @return 结构名称；无法解析返回null
-     */
-    private String resolveResultStructureName(
-            LhScheduleContext context,
-            StructureMinMachineRetentionService retentionService,
-            LhScheduleResult result) {
-        if (StringUtils.isNotEmpty(result.getStructureName())) {
-            return result.getStructureName();
-        }
-        return Objects.isNull(retentionService)
-                ? null
-                : retentionService.resolveStructureNameByMaterial(context, result.getMaterialCode());
     }
 
     /**

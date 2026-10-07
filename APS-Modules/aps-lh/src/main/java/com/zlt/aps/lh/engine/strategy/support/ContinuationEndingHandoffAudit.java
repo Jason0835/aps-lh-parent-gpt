@@ -67,6 +67,24 @@ public final class ContinuationEndingHandoffAudit {
             expectedGroups.computeIfAbsent(snapshot.getGroupKey(), key -> new HashSet<String>(4)).add(machine);
             LhScheduleResult following = findFollowing(context, original, snapshot, byMachine.get(machine));
             List<String> reasons = inspectResult(context, original, snapshot, following);
+            if (Objects.nonNull(snapshot.getHistoricalFinishPlanId())) {
+                boolean roleValid = StringUtils.equals(machine, snapshot.getFinishRoleMachineCode())
+                        && Objects.nonNull(snapshot.getFinishDeadline())
+                        && Objects.nonNull(lastEnd(original))
+                        && !lastEnd(original).after(snapshot.getFinishDeadline());
+                String roleDetail = String.format("批次=%s, 物料=%s, 状态=%s, 机台=%s, 历史计划=%s, 规则=%s, "
+                                + "应释放机台=%s, 规则截止=%s, 最终生产结束=%s, 节点满足=%s",
+                        context.getBatchNo(), original.getMaterialCode(), original.getProductStatus(), machine,
+                        snapshot.getHistoricalFinishPlanId(), snapshot.getFinishRule(), snapshot.getFinishRoleMachineCode(),
+                        LhScheduleTimeUtil.formatDateTime(snapshot.getFinishDeadline()),
+                        LhScheduleTimeUtil.formatDateTime(lastEnd(original)), roleValid);
+                PriorityTraceLogHelper.appendProcessLog(context, "历史余量释放节点复核", roleDetail);
+                log.info("历史余量释放节点复核, {}", roleDetail);
+                if (!roleValid) {
+                    reasons.add("历史余量释放机台或业务节点不满足");
+                    invalidProductionGroups.add(snapshot.getGroupKey());
+                }
+            }
             boolean retained = finalResults.contains(original);
             if (!retained) {
                 reasons.add("续作原结果已被后续阶段移除或替换，快照量不能冒充最终量");

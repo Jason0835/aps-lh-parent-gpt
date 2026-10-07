@@ -201,8 +201,8 @@ public final class LhScheduleConstant {
 
     // ======================== 设备保养相关 ========================
 
-    /** 保养耗时（小时） */
-    public static final int MAINTENANCE_DURATION_HOURS = 7;
+    /** 保养耗时（小时）；精度保养新口径为10小时，2小时首件首检由排程主流程另行追加 */
+    public static final int MAINTENANCE_DURATION_HOURS = 10;
 
     /** 保养开始小时 */
     public static final int MAINTENANCE_START_HOUR = 8;

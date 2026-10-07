@@ -6,6 +6,7 @@ import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.context.StructureDedicatedMachineContext;
+import com.zlt.aps.lh.engine.strategy.support.PreviousAlternatePlanReleaseEvent;
 import com.zlt.aps.lh.mapper.CxLhMachineSupplyConfigMapper;
 import com.zlt.aps.lh.mapper.LhMpStructureAllocationMapper;
 import com.zlt.aps.lh.mapper.LhMachineInfoMapper;
@@ -31,7 +32,8 @@ import java.util.stream.Collectors;
 
 /**
  * 统一结构专供关系：月计划转产表 → 成型机 → 启用专供硫化机。
- * 全部配置为硬限制，部分配置仅优先；查询只发生在批次初始化阶段。
+ * 结构全部配置时限制去向，部分配置时优先专供机；专供机同时限制可承接结构。
+ * 查询只发生在批次初始化阶段，双向准入复用同一年月版本快照。
  *
  * @author APS
  */
@@ -163,9 +165,23 @@ public class LhMachineSupplyStructureRule {
         if (Objects.isNull(sku) || StringUtils.isEmpty(sku.getStructureName())) {
             return null;
         }
-        String planKey = String.format(PLAN_KEY_FORMAT, sku.getMonthPlanYear(), sku.getMonthPlanMonth(), sku.getProductionVersion());
-        Map<String, StructureDedicatedMachineContext> structures = context.getStructureDedicatedMachineContextMap().get(planKey);
-        return Objects.isNull(structures) ? null : structures.get(sku.getStructureName().trim());
+        return this.getPlanStructureContexts(context, sku).get(sku.getStructureName().trim());
+    }
+
+    /**
+     * 获取SKU所属年月版本的全部结构，正反向准入禁止跨月或跨版本借用关系。
+     * @param context 本批排程上下文，工厂已在加载时隔离
+     * @param sku 待排SKU
+     * @return 当前范围内的结构快照；未加载该范围时为空
+     */
+    private Map<String, StructureDedicatedMachineContext> getPlanStructureContexts(
+            LhScheduleContext context, SkuScheduleDTO sku) {
+        if (Objects.isNull(sku)) {
+            return Collections.emptyMap();
+        }
+        String planKey = String.format(PLAN_KEY_FORMAT,
+                sku.getMonthPlanYear(), sku.getMonthPlanMonth(), sku.getProductionVersion());
+        return context.getStructureDedicatedMachineContextMap().getOrDefault(planKey, Collections.emptyMap());
     }
 
     /**
@@ -202,15 +218,62 @@ public class LhMachineSupplyStructureRule {
     }
 
     /**
-     * 只对强专供结构执行范围硬限制，弱专供和普通结构不增加拒绝条件。
+     * 同时校验结构去向和专供机允许承接的结构，在资源预占前执行。
+     * 弱专供结构仍可使用普通机，但不能进入只服务其他结构的专供机。
      * @param context 上下文
      * @param machineCode 候选机台
      * @param sku 待排SKU
      * @return 是否通过专供准入，仍须执行其它硬约束
      */
     public boolean canMachineSelectStructure(LhScheduleContext context, String machineCode, SkuScheduleDTO sku) {
-        return this.getDedicatedType(context, sku) != DedicatedType.EXCLUSIVE
-                || this.isPreferredMachine(context, machineCode, sku);
+        if (this.getDedicatedType(context, sku) == DedicatedType.EXCLUSIVE
+                && !this.isPreferredMachine(context, machineCode, sku)) {
+            return false;
+        }
+        // 仅本批有效、机台及后料状态精确匹配的历史动作沿用原准入，不扩展到普通候选。
+        if (this.isEligibleHistoricalAction(context, machineCode, sku)) {
+            return true;
+        }
+        Set<String> allowedStructures = this.getAllowedStructuresForMachine(context, machineCode, sku);
+        // 无本年月版本转产关系时保持既有行为，不从固定结构或其他月份推断限制。
+        return allowedStructures.isEmpty()
+                || (Objects.nonNull(sku) && allowedStructures.contains(StringUtils.trim(sku.getStructureName())));
+    }
+
+    /**
+     * 新增反向限制不改变有效历史指令；整机动作的L/R硬校验仍属于同一次历史承接。
+     * @param context 本批排程上下文
+     * @param machineCode 当前校验机台或配对侧
+     * @param sku 待排SKU
+     * @return 是否属于已验证的历史动作，单侧动作不能扩展到另一侧
+     */
+    private boolean isEligibleHistoricalAction(LhScheduleContext context, String machineCode, SkuScheduleDTO sku) {
+        PreviousAlternatePlanReleaseEvent event = context.getActivePreviousAlternateEvent();
+        if (Objects.isNull(event)
+                || !context.isEligiblePreviousAlternateCombination(sku, event.getPlan(), event.getMachineCode())) {
+            return false;
+        }
+        return StringUtils.equals(event.getMachineCode(), machineCode)
+                || (LhSingleControlMachineUtil.isWholeMachineGranularitySku(context, sku)
+                && StringUtils.equals(LhSingleControlMachineUtil.resolvePhysicalMachineCode(event.getMachineCode()),
+                LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode)));
+    }
+
+    /**
+     * 从同一快照反查专供硫化机对应的全部结构，供硬准入和拒绝日志共用。
+     * 多成型机、多结构取并集，L/R按物理机归一；不依赖候选数量或当前可用模具。
+     * @param context 本批排程上下文
+     * @param machineCode 候选硫化机
+     * @param sku 用于确定月计划年月和排产版本的待排SKU
+     * @return 该范围内机台允许承接的结构集合
+     */
+    public Set<String> getAllowedStructuresForMachine(
+            LhScheduleContext context, String machineCode, SkuScheduleDTO sku) {
+        String physicalMachineCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode);
+        return this.getPlanStructureContexts(context, sku).values().stream()
+                .filter(snapshot -> snapshot.getDedicatedVulcanizingMachines().contains(physicalMachineCode))
+                .map(StructureDedicatedMachineContext::getStructure)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     /**

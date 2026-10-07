@@ -2804,13 +2804,15 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
     /**
      * 判断机台编码是否为虚拟机台。
-     * <p>导出时过滤掉以 V 开头的虚拟机台，数据库原始排程数据不做删除。</p>
+     * <p>导出时过滤掉以 V 开头的虚拟机台，数据库原始排程数据不做删除。
+     * 统一委托 {@link LhSingleControlMachineUtil#isVirtualMachineCode(String)}，
+     * 与排产小结统计共用同一口径。</p>
      *
      * @param machineCode 机台编码
      * @return true-虚拟机台；false-实体机台或编码为空
      */
     private static boolean isVirtualMachineCode(String machineCode) {
-        return StringUtils.startsWithIgnoreCase(StringUtils.trimToEmpty(machineCode), "V");
+        return LhSingleControlMachineUtil.isVirtualMachineCode(machineCode);
     }
 
     /**
@@ -3326,10 +3328,13 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         if (StringUtils.isBlank(factoryCode)) {
             return Collections.emptyList();
         }
+        // 已排程机台集合按物理机台编码归一：单控机台排程使用 L/R 运行码（如 K1501L/K1501R），
+        // 而机台主数据可能同时存在物理码（如 K1501）；两侧统一归一到物理码后再比对，
+        // 避免物理码被误判为"已启用未排程"而多补一行占位（同一台单控机在明细中出现 3 行）。
         Set<String> scheduledMachineCodeSet = scheduledResultList.stream()
                 .map(LhScheduleResult::getLhMachineCode)
                 .filter(StringUtils::isNotBlank)
-                .map(this::normalizeMachineCode)
+                .map(this::normalizePhysicalMachineCode)
                 .collect(Collectors.toSet());
         List<LhMachineInfo> unscheduledMachineInfoList = lhMachineInfoMapper.selectList(
                         new LambdaQueryWrapper<LhMachineInfo>()
@@ -3339,7 +3344,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 .filter(machineInfo -> StringUtils.isNotBlank(machineInfo.getMachineCode()))
                 .filter(machineInfo -> !isVirtualMachineCode(machineInfo.getMachineCode()))
                 .filter(machineInfo -> !scheduledMachineCodeSet.contains(
-                        this.normalizeMachineCode(machineInfo.getMachineCode())))
+                        this.normalizePhysicalMachineCode(machineInfo.getMachineCode())))
                 .collect(Collectors.toList());
         if (CollUtil.isEmpty(unscheduledMachineInfoList)) {
             return Collections.emptyList();
@@ -3424,6 +3429,21 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      */
     private String normalizeMachineCode(String machineCode) {
         return StringUtils.trimToEmpty(machineCode).toUpperCase(Locale.ROOT);
+    }
+
+    /**
+     * 归一为物理机台编码后标准化。
+     * <p>在 {@link #normalizeMachineCode(String)} 基础上，将单控 L/R 运行码（如 K1501L/K1501R）
+     * 归并到物理机台码（如 K1501），用于"已排程机台 vs 主数据机台"的归属比对，
+     * 与排产小结的机台归并口径保持一致。</p>
+     *
+     * @param machineCode 机台编码
+     * @return 物理机台编码（大写、去首尾空格）
+     */
+    private String normalizePhysicalMachineCode(String machineCode) {
+        String normalized = this.normalizeMachineCode(machineCode);
+        String physicalCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(normalized);
+        return StringUtils.isNotBlank(physicalCode) ? physicalCode : normalized;
     }
 
     /**

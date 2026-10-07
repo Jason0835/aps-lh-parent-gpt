@@ -6,6 +6,7 @@ import com.zlt.aps.lh.api.enums.SkuScheduleSourceTypeEnum;
 import com.zlt.aps.lh.api.enums.UnscheduledGroupTypeEnum;
 import com.zlt.aps.lh.api.enums.UnscheduledReasonEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.engine.strategy.support.ContinuationRemainderFinishGroup;
 import com.zlt.aps.lh.engine.strategy.support.UnscheduledDemandSnapshot;
 import com.zlt.aps.lh.engine.strategy.support.UnscheduledReasonEvent;
 import com.zlt.aps.lh.engine.strategy.support.UnscheduledResultRuntime;
@@ -17,6 +18,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
+import javax.annotation.Resource;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
@@ -42,6 +44,9 @@ import java.util.Set;
 @Slf4j
 @Component
 public class UnscheduledResultCollector {
+
+    @Resource
+    private TargetScheduleQtyResolver targetScheduleQtyResolver;
 
     private static final String AUTO_DATA_SOURCE = "0";
     private static final int NORMAL_DELETE_FLAG = 0;
@@ -379,7 +384,99 @@ public class UnscheduledResultCollector {
      * @param context 即将持久化的最终八班上下文
      */
     public void finalizeBeforePersistence(LhScheduleContext context) {
+        // 指定试制量试不进入虚拟机，必须在全部后置裁量结束后按最终真实产量补齐未排。
+        this.reconcilePreviousAlternateTrials(context);
         this.finalizeResults(context, true);
+        // 先归并已有原因，再按最终八班结果补齐或清除本批余量收尾需求的真实缺口。
+        this.reconcileRemainderFinishGroups(context);
+    }
+
+    /**
+     * 对指定交替试制量试核对最终真实缺口；登记关系不代表已排成功。
+     * @param context 已完成全部真实排产及后置裁量的上下文
+     */
+    private void reconcilePreviousAlternateTrials(LhScheduleContext context) {
+        if (Objects.isNull(context)) {
+            return;
+        }
+        for (Map.Entry<String, SkuScheduleDTO> entry : context.getPreviousAlternateTrialSkuMap().entrySet()) {
+            SkuScheduleDTO sku = entry.getValue();
+            int scheduledQty = context.getScheduleResultList().stream().filter(Objects::nonNull)
+                    .filter(result -> StringUtils.equals(sku.getMaterialCode(), result.getMaterialCode())
+                            && StringUtils.equals(sku.getProductStatus(), result.getProductStatus()))
+                    .mapToInt(ShiftFieldUtil::resolveScheduledQty).sum();
+            Integer targetQty = context.getSkuProductionTargetQtyMap().get(entry.getKey());
+            // 已建账需求以最终合法总目标减实际结果；尚未建账的拒绝需求复用中心只读余量口径。
+            int remainingQty = Objects.nonNull(targetQty) ? Math.max(0, targetQty - scheduledQty)
+                    : targetScheduleQtyResolver.previewProductionRemainingQty(context, sku);
+            if (remainingQty <= 0) {
+                // 实际完成才清除未排；无合法需求的零量准入诊断仍沿用原保留规则。
+                if (scheduledQty > 0) {
+                    this.remove(context, sku);
+                }
+                continue;
+            }
+            LhUnscheduledResult existing = this.find(context, sku);
+            String failure = context.getPreviousAlternateTrialFailureMap().get(entry.getKey());
+            UnscheduledReasonEnum reason = StringUtils.isNotEmpty(failure)
+                    ? this.resolveReasonCode(failure) : UnscheduledReasonEnum.WINDOW_FINAL_UNSCHEDULED;
+            if (StringUtils.isEmpty(failure) && Objects.nonNull(existing)) {
+                // 日计划、减量等前置拒绝仍使用实际原因，禁止虚构模具或结构失败。
+                failure = existing.getUnscheduledReason();
+                reason = this.ensureReasonMetadata(existing);
+            }
+            String detail = String.format("前日指定交替试制量试不进入虚拟机, 工厂=%s, 批次=%s, "
+                            + "物料=%s, 状态=%s, 真实已排=%s, 未排=%s, 指定承接证据=%s",
+                    context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(), sku.getProductStatus(),
+                    scheduledQty, remainingQty, StringUtils.defaultIfEmpty(failure, "排程窗口结束仍有未完成需求"));
+            this.addOrReplace(context, sku, this.buildResult(context, sku, remainingQty,
+                    reason, reason.getSummary(), StringUtils.left(detail, MAX_REASON_DETAIL_LENGTH)));
+        }
+    }
+
+    /**
+     * 按收尾提交时冻结的合法目标核对最终缺口，不修改生产、日计划或资源账本。
+     * 同源未排沿用已有原因；后续补排完成时删除同源投影，其他独立需求保持不变。
+     * @param context 全部数量调整完成、即将保存的排程上下文
+     */
+    private void reconcileRemainderFinishGroups(LhScheduleContext context) {
+        if (Objects.isNull(context)) {
+            return;
+        }
+        for (ContinuationRemainderFinishGroup group : context.getContinuationRemainderFinishGroups()) {
+            if (Objects.isNull(group.getFinalTargetQty())) {
+                continue;
+            }
+            SkuScheduleDTO sku = group.getSourceSku();
+            int scheduledQty = context.getScheduleResultList().stream()
+                    .filter(result -> StringUtils.equals(sku.getMaterialCode(), result.getMaterialCode())
+                            && StringUtils.equals(sku.getProductStatus(), result.getProductStatus()))
+                    .mapToInt(ShiftFieldUtil::resolveScheduledQty).sum();
+            int remainingQty = Math.max(0, group.getFinalTargetQty() - scheduledQty);
+            String detail = String.format("工厂=%s, 批次=%s, 排程日期=%s, 物料=%s, 状态=%s, 合法目标=%s, 最终已排=%s, 未排=%s",
+                    context.getFactoryCode(), context.getBatchNo(), context.getScheduleTargetDate(),
+                    sku.getMaterialCode(), sku.getProductStatus(), group.getFinalTargetQty(), scheduledQty, remainingQty);
+            if (remainingQty == 0) {
+                // 只移除同一原始需求，不能影响同物料的其他状态或独立日调整需求。
+                this.remove(context, sku);
+            } else {
+                LhUnscheduledResult result = this.find(context, sku);
+                if (Objects.isNull(result)) {
+                    // 本组合法窗口及数量约束下仍有缺口，复用窗口未完成原因，不猜测具体资源阻断。
+                    result = this.buildResult(context, sku, remainingQty,
+                            UnscheduledReasonEnum.WINDOW_FINAL_UNSCHEDULED, null, detail);
+                    this.add(context, sku, result);
+                } else if (!Objects.equals(result.getUnscheduledQty(), remainingQty)) {
+                    // 数量未变化时保留原详情；保存前追加诊断仍遵守既有字段长度，避免超过数据库上限。
+                    result.setUnscheduledQty(remainingQty);
+                    this.updateReason(context, sku, result,
+                            UnscheduledReasonEnum.fromCode(result.getUnscheduledReasonCode()),
+                            result.getUnscheduledReason(), StringUtils.left(
+                                    detail + "；原原因=" + result.getUnscheduledReasonDetail(), MAX_REASON_DETAIL_LENGTH));
+                }
+            }
+            log.info("续作余量收尾最终缺口核对, {}", detail);
+        }
     }
 
     /**
@@ -401,7 +498,7 @@ public class UnscheduledResultCollector {
             }
             this.ensureReasonMetadata(result);
             this.attachDemand(context, null, result);
-            // 只核对续作零结果诊断；其他未排继续使用各自需求口径，不改生产账本。
+            // 核对续作零结果及单胎胚硬目标诊断；其他未排继续使用各自需求口径，不改生产账本。
             if (reconcileFinalQty && this.reconcileContinuationZeroPlan(context, result)) {
                 continue;
             }
@@ -459,17 +556,18 @@ public class UnscheduledResultCollector {
      * @return 已无剩余需求、应移除此记录时返回true
      */
     private boolean reconcileContinuationZeroPlan(LhScheduleContext context, LhUnscheduledResult result) {
-        if (!StringUtils.equals(CONTINUATION_ZERO_PLAN_REASON, result.getUnscheduledReason())) {
-            return false;
-        }
         UnscheduledDemandSnapshot snapshot = this.findSnapshot(context, result);
-        if (Objects.isNull(snapshot) || Objects.isNull(snapshot.getInitialSurplusQty())
-                || snapshot.getInitialSurplusQty() <= 0) {
-            // 零硫化余量的胎胚需求仍沿用原数量规则，不按零余量删除。
+        if (Objects.isNull(snapshot)) {
             return false;
         }
         String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
                 result.getMaterialCode(), result.getProductStatus());
+        Integer embryoTargetQty = this.resolveNonSharedEmbryoEndingDemandTarget(context, snapshot, skuKey);
+        if (Objects.isNull(embryoTargetQty)
+                && (!StringUtils.equals(CONTINUATION_ZERO_PLAN_REASON, result.getUnscheduledReason())
+                || Objects.isNull(snapshot.getInitialSurplusQty()) || snapshot.getInitialSurplusQty() <= 0)) {
+            return false;
+        }
         long demandCount = context.getUnscheduledResultRuntime().getDemandSnapshotMap().values().stream()
                 .filter(Objects::nonNull)
                 .filter(demand -> StringUtils.equals(skuKey, MonthPlanDateResolver.buildMaterialStatusKey(
@@ -484,16 +582,38 @@ public class UnscheduledResultCollector {
                 .filter(scheduled -> StringUtils.equals(skuKey, MonthPlanDateResolver.buildMaterialStatusKey(
                         scheduled.getMaterialCode(), scheduled.getProductStatus())))
                 .mapToInt(ShiftFieldUtil::resolveScheduledQty).sum();
-        int remainingQty = Math.max(0, snapshot.getInitialSurplusQty() - scheduledQty);
+        int demandTargetQty = Objects.nonNull(embryoTargetQty) ? embryoTargetQty : snapshot.getInitialSurplusQty();
+        int remainingQty = Math.max(0, demandTargetQty - scheduledQty);
         int originalQty = Objects.isNull(result.getUnscheduledQty()) ? 0 : result.getUnscheduledQty();
         if (originalQty > remainingQty) {
             result.setUnscheduledQty(remainingQty);
-            log.info("续作零结果未排按最终产量收口, factoryCode: {}, batchNo: {}, materialCode: {}, "
-                            + "productStatus: {}, initialSurplusQty: {}, scheduledQty: {}, beforeQty: {}, afterQty: {}",
+            log.info("续作或单胎胚未排按最终产量收口, factoryCode: {}, batchNo: {}, materialCode: {}, "
+                            + "productStatus: {}, demandTargetQty: {}, scheduledQty: {}, beforeQty: {}, afterQty: {}",
                     context.getFactoryCode(), context.getBatchNo(), result.getMaterialCode(), result.getProductStatus(),
-                    snapshot.getInitialSurplusQty(), scheduledQty, originalQty, remainingQty);
+                    demandTargetQty, scheduledQty, originalQty, remainingQty);
         }
         return remainingQty == 0;
+    }
+
+    /**
+     * 从同源SKU及补偿副本确认单胎胚收尾身份，读取已建立的合法硬目标，不按零月余量删除需求。
+     * @param context 最终排产上下文
+     * @param snapshot 原始需求快照
+     * @param skuKey 物料及产品状态键
+     * @return 单胎胚硬目标；其他需求返回null
+     */
+    private Integer resolveNonSharedEmbryoEndingDemandTarget(LhScheduleContext context,
+            UnscheduledDemandSnapshot snapshot, String skuKey) {
+        Integer targetQty = context.getSkuProductionTargetQtyMap().get(skuKey);
+        if (Objects.isNull(targetQty)) {
+            return null;
+        }
+        boolean exactEndingDemand = context.getUnscheduledResultRuntime().getDemandKeyBySku().entrySet().stream()
+                .filter(entry -> StringUtils.equals(snapshot.getDemandKey(), entry.getValue()))
+                .map(Map.Entry::getKey).filter(Objects::nonNull)
+                .anyMatch(sku -> sku.isStrictTargetQty()
+                        && targetScheduleQtyResolver.isNonSharedEmbryoStockEnding(context, sku));
+        return exactEndingDemand ? Math.max(0, targetQty) : null;
     }
 
     private void registerSnapshot(LhScheduleContext context,

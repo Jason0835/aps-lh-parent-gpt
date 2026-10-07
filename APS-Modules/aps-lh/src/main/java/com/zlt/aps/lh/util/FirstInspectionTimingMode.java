@@ -12,6 +12,9 @@ public enum FirstInspectionTimingMode {
      */
     INCLUDED_IN_CHANGEOVER,
 
+    /** 正规换模与精度并行：精度完整时长已含首检，不再追加首检产量和时长。 */
+    INCLUDED_IN_MAINTENANCE,
+
     /**
      * 试制、量试或明确的生产门禁场景：首检从生产就绪时间开始。
      */

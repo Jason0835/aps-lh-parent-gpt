@@ -4,6 +4,7 @@ import com.zlt.aps.common.engine.domain.LhDayPlanAdjustVo;
 import com.zlt.aps.common.engine.utils.MonthPlanSurplusCalculator;
 import com.zlt.aps.lh.api.domain.dto.SkuDailyPlanQuotaDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
+import com.zlt.aps.lh.api.enums.ConstructionStageEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.api.enums.SkuScheduleSourceTypeEnum;
 import com.zlt.aps.lh.api.enums.SkuTagEnum;
@@ -52,6 +53,33 @@ public class DayPlanAdjustRequireAssembler {
 
     @javax.annotation.Resource
     private UnscheduledResultCollector unscheduledResultCollector;
+
+    @javax.annotation.Resource
+    private TargetScheduleQtyResolver targetScheduleQtyResolver;
+
+    /**
+     * 在历史承接前准备独立调整需求，后置阶段复用相同来源及已消费账本。
+     *
+     * @param context 本批排程上下文
+     * @return 本批唯一的独立调整需求列表
+     */
+    public List<SkuScheduleDTO> prepare(LhScheduleContext context) {
+        if (!context.isDayPlanAdjustPrepared()) {
+            List<SkuScheduleDTO> candidates = this.assemble(context);
+            candidates.forEach(sku -> {
+                // 仅初始化缺失账本，不覆盖 S4.3 已建立的同物料状态余量。
+                int remainingQty = targetScheduleQtyResolver.initializeProductionRemainingQty(
+                        context, sku, sku.resolveTargetScheduleQty(), "独立调整需求准备");
+                sku.setRemainingScheduleQty(remainingQty);
+                context.registerNextShiftNewPlanCandidate(sku);
+            });
+            context.setDayPlanAdjustSkuList(candidates);
+            context.setDayPlanAdjustPrepared(true);
+            log.info("独立调整需求准备完成, 工厂: {}, 批次: {}, 目标日: {}, 候选数: {}",
+                    context.getFactoryCode(), context.getBatchNo(), context.getScheduleTargetDate(), candidates.size());
+        }
+        return context.getDayPlanAdjustSkuList();
+    }
 
     /**
      * 加载并汇总没有正向原始月计划量的日计划调整待排物料。
@@ -344,6 +372,7 @@ public class DayPlanAdjustRequireAssembler {
         this.fillCapacity(context, dto);
         this.fillMould(context, dto);
         this.fillEmbryoStock(context, dto);
+        this.fillMonthPlanFinalFields(context, dto, adjustVo);
 
         dto.setSurplusQty(surplusQty);
         dto.setMonthPlanQty(surplusQty);
@@ -457,6 +486,71 @@ public class DayPlanAdjustRequireAssembler {
         if (Objects.nonNull(embryoStock)) {
             dto.setEmbryoStock(embryoStock);
         }
+    }
+
+    /**
+     * 从月计划定稿回填日计划调整SKU缺失的月计划来源字段。
+     *
+     * <p>日计划调整物料在月计划定稿中存在原始总量为0的记录，其施工阶段、结构类型、寸口、
+     * 品牌、主材描述、需求计划版本和试制量试需求量应与正常月计划SKU同源取值。仅在DTO字段
+     * 为空（或试制需求量为初始0）时回填，不覆盖组装器已从调整记录或主数据取得的值；
+     * 月计划定稿记录未命中时保持现状，不引入默认值兜底。查找复用
+     * {@link MonthPlanDateResolver#resolvePlan} 中心规则，以调整记录的年月为需求身份，
+     * 与 {@code hasPositiveMonthPlan} 的匹配键保持一致。</p>
+     *
+     * @param context  排程上下文
+     * @param dto      日计划调整 SKU DTO
+     * @param adjustVo 汇总后的调整记录，提供年月身份
+     */
+    private void fillMonthPlanFinalFields(LhScheduleContext context, SkuScheduleDTO dto,
+                                          LhDayPlanAdjustVo adjustVo) {
+        if (Objects.isNull(adjustVo.getYear()) || Objects.isNull(adjustVo.getMonth())) {
+            log.warn("硫化日计划调整物料缺少年月身份, 月计划定稿字段不回填, factoryCode: {}, materialCode: {}, "
+                            + "productStatus: {}",
+                    context.getFactoryCode(), adjustVo.getMaterialCode(), adjustVo.getProductStatus());
+            return;
+        }
+        LocalDate planMonthDate = LocalDate.of(adjustVo.getYear(), adjustVo.getMonth(), 1);
+        FactoryMonthPlanProductionFinalResult monthPlan = MonthPlanDateResolver.resolvePlan(
+                context, adjustVo.getMaterialCode(), adjustVo.getProductStatus(), planMonthDate);
+        if (Objects.isNull(monthPlan)) {
+            log.warn("硫化日计划调整物料未命中月计划定稿, 月计划来源字段保持为空, factoryCode: {}, materialCode: {}, "
+                            + "productStatus: {}, year: {}, month: {}",
+                    context.getFactoryCode(), adjustVo.getMaterialCode(), adjustVo.getProductStatus(),
+                    adjustVo.getYear(), adjustVo.getMonth());
+            return;
+        }
+        String constructionStage = monthPlan.getConstructionStage();
+        if (StringUtils.isBlank(dto.getConstructionStage())) {
+            dto.setConstructionStage(constructionStage);
+            // 试制/量试识别与施工阶段同源派生，与正常月计划SKU口径一致
+            dto.setTrial(StringUtils.equals(ConstructionStageEnum.TRIAL.getCode(), constructionStage)
+                    || StringUtils.equals(ConstructionStageEnum.MASS_TRIAL.getCode(), constructionStage));
+        }
+        if (StringUtils.isBlank(dto.getStructureType())) {
+            dto.setStructureType(monthPlan.getStructureType());
+        }
+        if (StringUtils.isBlank(dto.getProSize())) {
+            dto.setProSize(monthPlan.getProSize());
+        }
+        if (StringUtils.isBlank(dto.getBrand())) {
+            dto.setBrand(monthPlan.getBrand());
+        }
+        if (StringUtils.isBlank(dto.getMainMaterialDesc())) {
+            dto.setMainMaterialDesc(monthPlan.getMainMaterialDesc());
+        }
+        if (StringUtils.isBlank(dto.getMonthPlanVersion())) {
+            dto.setMonthPlanVersion(monthPlan.getMonthPlanVersion());
+        }
+        if (dto.getTrialDemandQty() <= 0) {
+            dto.setTrialDemandQty(Objects.isNull(monthPlan.getTrialQty()) ? 0 : monthPlan.getTrialQty());
+        }
+        log.info("硫化日计划调整物料月计划定稿字段回填完成, factoryCode: {}, materialCode: {}, productStatus: {}, "
+                        + "constructionStage: {}, structureType: {}, proSize: {}, brand: {}, "
+                        + "monthPlanVersion: {}, trialDemandQty: {}",
+                context.getFactoryCode(), dto.getMaterialCode(), dto.getProductStatus(),
+                dto.getConstructionStage(), dto.getStructureType(), dto.getProSize(), dto.getBrand(),
+                dto.getMonthPlanVersion(), dto.getTrialDemandQty());
     }
 
     /**

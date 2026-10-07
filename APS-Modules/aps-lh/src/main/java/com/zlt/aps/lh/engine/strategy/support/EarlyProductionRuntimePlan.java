@@ -38,6 +38,9 @@ public class EarlyProductionRuntimePlan implements Serializable {
     /** 当前月 TOTAL_QTY 为0、只能走提前生产流程的候选标识 */
     private boolean futureOnlyCandidate;
 
+    /** 未来需求已到达正常计划日，正常目标账本已恢复；不改变原候选来源身份。 */
+    private boolean normalPlanActivated;
+
     /** 已通过当前业务日提前生产准入并完成临时账本初始化的激活标识 */
     private boolean active;
 

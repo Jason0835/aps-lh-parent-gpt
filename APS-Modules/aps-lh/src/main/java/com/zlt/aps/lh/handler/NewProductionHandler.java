@@ -33,6 +33,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * S4.5 新增规格排产处理器。
@@ -47,7 +48,7 @@ import java.util.Set;
  * <p>注意：试制、量试、小批量、正规 SKU 的差异主要在排序 tie-break、单控机台约束、
  * 严格目标量和班次补满策略中体现，不应在本 Handler 中新增并行业务分支；
  * 唯一例外是硫化参数 SYS0311004=0 时在入口统一拦截试制、量试 SKU 的真实机台排产
- * （续作排产不受该参数影响），同时在拦截前冻结候选，供 S4.5.3 虚拟机台最终兜底。</p>
+ * （续作排产不受该参数影响），同时在拦截前冻结未命中前日指定交替的候选，供 S4.5.3 虚拟机台最终兜底。</p>
  *
  * @author APS
  */
@@ -84,7 +85,7 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
 
         /*
          * SYS0311004 只控制试制/量试是否进入真实机台新增排产。参数未配置或为0时，
-         * 这些 SKU 仍属于虚拟机台最终兜底范围，因此必须在参数拦截前冻结候选；
+         * 未命中前日指定交替的 SKU 仍属于虚拟机台最终兜底范围，因此必须在参数拦截前冻结候选；
          * 正常新增选机结束后会把终局未排 SKU 移出待排列表，S4.5.3 只能读取该快照
          * 核对实际机台已排量，且不得把虚拟机台写回真实机台资源池。
          */
@@ -181,6 +182,8 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
              * isEnd 最终复核。必须等整个 S4.5 完成后再清理；异常退出时同样清理，避免临时
              * 前移日计划或中心目标泄漏到后续特殊材料置换及其他排程步骤。
              */
+            // 只冻结尚未激活的需求基数；提前资格和前移账本仍按原边界清理。
+            context.freezeInactiveFutureDemand();
             context.clearEarlyProductionRuntimePlans();
         }
     }
@@ -190,7 +193,8 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
      *
      * <p>硫化参数SYS0311004只控制新增排产：参数=0时施工阶段为试制（01）、量试（02）的SKU
      * 不得通过新增排产上机；续作排产、同物料多状态续作切换和续作加机台补偿（续作衍生）
-     * 均不受该参数影响。本方法在S4.5入口统一执行拦截：</p>
+     * 均不受该参数影响。前日指定交替残量仅退出普通竞争，不清零数量或覆盖未排原因。
+     * 其他SKU在S4.5入口统一执行拦截：</p>
      * <ul>
      *   <li>命中SKU写未排记录（按物料+产品状态去重替换，未排数量为0）；</li>
      *   <li>目标量清零、移出结构待排池、全量SKU复合索引和活跃胎胚清单，语义与S4.3准入拦截清理一致；</li>
@@ -204,6 +208,8 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
                 || CollectionUtils.isEmpty(context.getNewSpecSkuList())) {
             return;
         }
+        // 指定链已执行完整窗口，仅退出普通新增竞争；续作补偿继续沿用已有独立豁免。
+        this.detachPreviousAlternateTrialSkus(context);
         List<SkuScheduleDTO> blockedSkuList = new ArrayList<>(context.getNewSpecSkuList().size());
         List<LhUnscheduledResult> blockedResultList =
                 new ArrayList<>(context.getNewSpecSkuList().size());
@@ -237,9 +243,28 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
     }
 
     /**
+     * 开关关闭时结束指定试制量试的普通新增竞争，保留原机跨日绑定共用的数量和索引。
+     * @param context 已完成前日指定承接的上下文
+     */
+    private void detachPreviousAlternateTrialSkus(LhScheduleContext context) {
+        List<SkuScheduleDTO> specifiedSkus = context.getNewSpecSkuList().stream()
+                .filter(context::hasPreviousAlternateTrialPlan)
+                .filter(sku -> !sku.isContinuousCompensationSku())
+                .collect(Collectors.toList());
+        specifiedSkus.forEach(context::removePendingSkuFromStructureMap);
+        context.getNewSpecSkuList().removeIf(sku -> context.hasPreviousAlternateTrialPlan(sku)
+                && !sku.isContinuousCompensationSku());
+        if (!CollectionUtils.isEmpty(specifiedSkus)) {
+            log.info("前日指定交替试制量试退出普通新增竞争, factoryCode: {}, batchNo: {}, skuCount: {}, "
+                            + "保留原机绑定和数量账本，最终按真实结果收口未排",
+                    context.getFactoryCode(), context.getBatchNo(), specifiedSkus.size());
+        }
+    }
+
+    /**
      * 冻结本次新增排产归集形成的试制/量试候选。
      * <p>调用时点必须早于SYS0311004参数拦截，保证参数未配置或为0时，SKU只退出真实机台
-     * 新增排产，不退出S4.5.3虚拟机台最终兜底。</p>
+     * 新增排产；其中命中前日指定交替的SKU由统一登记方法排除虚拟机资格。</p>
      *
      * @param context 排程上下文
      * @return void

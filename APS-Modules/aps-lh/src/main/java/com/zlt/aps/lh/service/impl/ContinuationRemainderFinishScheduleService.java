@@ -35,7 +35,7 @@ import javax.annotation.Resource;
 
 /**
  * 续作余量收尾的唯一分配器。输入顺序由调用方按场景角色确定，本服务不选机、不扣账、不预占后料。
- * 数量及时间均复用机台真实容量画像，06:00和19:00只限定数量上限，不用于虚增计划。
+ * 数量及时间均复用机台真实容量画像；06:00和19:00按场景限定阶段容量，不用于虚增计划。
  */
 @Slf4j
 @Service
@@ -45,7 +45,7 @@ public class ContinuationRemainderFinishScheduleService {
     private PreviousAlternatePlanEligibilityService previousAlternatePlanEligibilityService;
     /** 早班资源交接节点。 */
     private static final int MORNING_RELEASE_HOUR = 6;
-    /** 中班生产硬截止，允许恰好19:00结束。 */
+    /** 中班优先交接节点；指定释放角色仍以此为硬截止，窗口末班阶段允许继续承接。 */
     private static final int AFTERNOON_RELEASE_HOUR = 19;
     /** 两机阈值采用整数交叉比较，避免浮点误差。 */
     private static final int NIGHT_THRESHOLD_NUMERATOR = 3;
@@ -66,6 +66,10 @@ public class ContinuationRemainderFinishScheduleService {
             LhScheduleContext context, SkuScheduleDTO sku, List<ContinuationEndingMachineProfile> profiles,
             ContinuationFinishScheduleResult calculated, Map<LhScheduleResult, LhScheduleResult> proposed,
             List<LhScheduleResult> stopHoldResults) {
+        // 历史等待组已在分配前固定物理机台角色，不能再把节点和承接量交换到其他机台。
+        if (calculated.getMachinePlans().stream().anyMatch(plan -> Objects.nonNull(plan.getHistoricalFinishPlanId()))) {
+            return Collections.emptyMap();
+        }
         if (profiles.size() < 2 || CollectionUtils.isEmpty(context.getHistoricalReverseMouldChangePlanList())) {
             return Collections.emptyMap();
         }
@@ -234,7 +238,173 @@ public class ContinuationRemainderFinishScheduleService {
     }
 
     /**
-     * 多机大余量按06:00、19:00、次日06:00顺序消化；中班截止之后仅使用后续夜班。
+     * 历史交替强制退出后的终末余量按原机真实时间轴逐班消化。
+     * 已退出机台的容量已在画像中截断；剩余机台不再套用“两台中第二台最多一个班产”的角色限制。
+     * 本方法同时给出原机完成能力与实际分配，补偿入口复用提交后的同一结果，不另算目标机台缺口。
+     * @param machines 已应用历史交替、维护、清洗、胶囊等硬边界的原机画像
+     * @param shifts 本次真实班次
+     * @param remainingQty 本组尚可消费的合法余量
+     * @return 原机分配及真实未消化余量，不修改日计划或生产账本
+     */
+    public ContinuationFinishScheduleResult calculateAfterPreviousAlternateRelease(
+            List<ContinuationEndingMachineProfile> machines, List<LhShiftConfigVO> shifts,
+            int remainingQty) {
+        if (CollectionUtils.isEmpty(machines) || CollectionUtils.isEmpty(shifts)
+                || remainingQty < 0) {
+            throw new IllegalArgumentException("历史交替续作余量计算缺少机台、班次或合法余量");
+        }
+        // 月计划末日只描述需求节奏；尚未清完的原机余量使用本窗口容量，各机真实硬截止已经进入画像。
+        Date windowEnd = shifts.get(shifts.size() - 1).getShiftEndDateTime();
+        int[] quantities = new int[machines.size()];
+        int[] limits = machines.stream().mapToInt(machine -> machine.quantityUntil(windowEnd)).toArray();
+        Date[] deadlines = new Date[machines.size()];
+        Arrays.fill(deadlines, windowEnd);
+        for (LhShiftConfigVO shift : shifts) {
+            this.allocateStage(machines, quantities, remainingQty, 0, machines.size(), shift.getShiftEndDateTime());
+            if (Arrays.stream(quantities).sum() == remainingQty) {
+                break;
+            }
+        }
+        ContinuationFinishScheduleResult result = this.buildResult(machines, shifts, quantities, new int[machines.size()],
+                limits, deadlines, remainingQty);
+        for (int machine = 0; machine < machines.size(); machine++) {
+            ContinuationEndingMachineProfile profile = machines.get(machine);
+            ContinuationMachineFinishPlan plan = result.getMachinePlans().get(machine);
+            Date hardDeadline = profile.getReleaseDeadline();
+            if (Objects.nonNull(hardDeadline) && hardDeadline.before(windowEnd)
+                    && plan.getPlanQty() == limits[machine]) {
+                plan.setFinishState(ContinuationMachineFinishPlan.FinishState.FORCED_RELEASE);
+            } else if (result.getRemainingQty() == 0) {
+                plan.setFinishState(ContinuationMachineFinishPlan.FinishState.SURPLUS_COMPLETED);
+            } else {
+                plan.setFinishState(ContinuationMachineFinishPlan.FinishState.WINDOW_UNFINISHED);
+                // 此时没有正常下机事实，资源可用边界必须延至窗口末端，不能按最后正量提前释放。
+                plan.setOfflineTime(windowEnd);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 历史交替等待余量的双机组先冻结释放角色，再一次分配原机余量。
+     * T日原始容量即可完成时，历史优先机台在早班班末释放；跨日收尾沿历史中班19点节点，
+     * 另一原机承接全部剩余合法量。真实强制退出及无法可靠确定角色的场景保留原机能力算法。
+     * @param context 包含最新有效历史关系的上下文
+     * @param sku 同物料同状态的共享需求
+     * @param machines 已应用真实硬截止的原物理机台画像
+     * @param shifts 本次真实班次
+     * @param remainingQty 本组唯一合法预算
+     * @param dateOffset 未施加角色节点前按整组真实容量确定的收尾日
+     * @param stopHoldResults 不参与角色调整的停产保机结果
+     * @return 固定机台身份的分配及节点事实，不修改账本或历史事件
+     */
+    public ContinuationFinishScheduleResult calculateWaitingPreviousAlternate(
+            LhScheduleContext context, SkuScheduleDTO sku, List<ContinuationEndingMachineProfile> machines,
+            List<LhShiftConfigVO> shifts, int remainingQty, int dateOffset,
+            List<LhScheduleResult> stopHoldResults) {
+        Date windowEnd = shifts.get(shifts.size() - 1).getShiftEndDateTime();
+        if (machines.size() != 2 || remainingQty <= sku.getShiftCapacity()
+                || machines.stream().anyMatch(profile -> Objects.nonNull(profile.getReleaseDeadline())
+                && profile.getReleaseDeadline().before(windowEnd))) {
+            return this.calculateAfterPreviousAlternateRelease(machines, shifts, remainingQty);
+        }
+        List<String> codes = machines.stream().flatMap(profile -> profile.getOriginals().stream())
+                .map(LhScheduleResult::getLhMachineCode).collect(Collectors.toList());
+        Map<String, LhMouldChangePlan> plans = previousAlternatePlanEligibilityService
+                .resolveRemainingFinishPlans(context, sku.getMaterialCode(), codes);
+        Map<Integer, LhMouldChangePlan> eligible = new LinkedHashMap<>();
+        for (int position = 0; position < machines.size(); position++) {
+            ContinuationEndingMachineProfile profile = machines.get(position);
+            LhMouldChangePlan plan = this.resolveFinishProfilePlan(context, sku, profile, plans, stopHoldResults);
+            boolean waiting = profile.getOriginals().stream()
+                    .map(result -> context.getPreviousAlternateReleaseEventMap().get(result.getLhMachineCode()))
+                    .allMatch(event -> Objects.nonNull(event) && event.isRemainderFinishDeferred());
+            if (Objects.nonNull(plan) && waiting) {
+                eligible.put(position, plan);
+            }
+        }
+        Integer releasePosition = eligible.keySet().stream()
+                .min(Comparator.comparing((Integer position) -> this.planDay(eligible.get(position)))
+                        .thenComparing(position -> eligible.get(position).getClassIndex())).orElse(null);
+        if (Objects.isNull(releasePosition)) {
+            this.logFinishMachineOrder(context, sku, "历史等待组无可靠释放角色，保留原机真实能力分配", codes.toString());
+            return this.calculateAfterPreviousAlternateRelease(machines, shifts, remainingQty);
+        }
+        LhMouldChangePlan historicalPlan = eligible.get(releasePosition);
+        Date deadline = this.resolveWaitingReleaseDeadline(shifts, historicalPlan, dateOffset);
+        // 窗口起点以前或没有生产容量的历史节点不能截掉原机余量，仍按真实完成能力处理。
+        if (Objects.isNull(deadline) || deadline.after(windowEnd)
+                || machines.get(releasePosition).quantityUntil(deadline) <= 0) {
+            return this.calculateAfterPreviousAlternateRelease(machines, shifts, remainingQty);
+        }
+        int[] quantities = new int[machines.size()];
+        int[] limits = machines.stream().mapToInt(profile -> profile.quantityUntil(windowEnd)).toArray();
+        Date[] deadlines = new Date[machines.size()];
+        Arrays.fill(deadlines, windowEnd);
+        this.restrict(machines, quantities, limits, deadlines, releasePosition, deadline);
+        this.allocate(machines, quantities, remainingQty, releasePosition, limits[releasePosition]);
+        int carrierPosition = 1 - releasePosition;
+        this.allocate(machines, quantities, remainingQty, carrierPosition, limits[carrierPosition]);
+        ContinuationFinishScheduleResult calculated = this.buildResult(machines, shifts, quantities,
+                new int[machines.size()], limits, deadlines, remainingQty);
+        ContinuationMachineFinishPlan releasePlan = calculated.getMachinePlans().get(releasePosition);
+        releasePlan.setHistoricalFinishPlanId(historicalPlan.getId());
+        releasePlan.setFinishRoleMachineCode(LhSingleControlMachineUtil.resolvePhysicalMachineCode(
+                machines.get(releasePosition).getOriginals().get(0).getLhMachineCode()));
+        releasePlan.setFinishRule(dateOffset == 0 ? "历史双机T日早班释放" : "历史双机交替节点释放");
+        for (int position = 0; position < machines.size(); position++) {
+            ContinuationMachineFinishPlan finish = calculated.getMachinePlans().get(position);
+            if (calculated.getRemainingQty() == 0) {
+                finish.setFinishState(ContinuationMachineFinishPlan.FinishState.SURPLUS_COMPLETED);
+            } else if (position == releasePosition && finish.getPlanQty() == limits[position]) {
+                finish.setFinishState(ContinuationMachineFinishPlan.FinishState.FORCED_RELEASE);
+            } else {
+                finish.setFinishState(ContinuationMachineFinishPlan.FinishState.WINDOW_UNFINISHED);
+                finish.setOfflineTime(windowEnd);
+            }
+        }
+        String detail = String.format("物料=%s, 状态=%s, 历史计划=%s, 规则=%s, 释放机台=%s, 节点=%s, 承接机台=%s, 分配=%s, 未完成=%s",
+                sku.getMaterialCode(), sku.getProductStatus(), historicalPlan.getId(), releasePlan.getFinishRule(),
+                releasePlan.getFinishRoleMachineCode(), deadline,
+                machines.get(carrierPosition).getOriginals().stream().map(LhScheduleResult::getLhMachineCode)
+                        .collect(Collectors.joining(",")),
+                calculated.getMachinePlans().stream().map(ContinuationMachineFinishPlan::getPlanQty).collect(Collectors.toList()),
+                calculated.getRemainingQty());
+        PriorityTraceLogHelper.appendProcessLog(context, "历史交替余量角色分配", detail);
+        log.info("历史交替余量角色分配, {}", detail);
+        return calculated;
+    }
+
+    /**
+     * 从真实班次解析角色节点，不把班末时间或历史日期硬编码到物料规则。
+     * @param shifts 完整窗口班次
+     * @param historicalPlan 已验证的历史关系
+     * @param dateOffset 整组原始容量对应的收尾日
+     * @return T日早班班末或历史早中班节点，历史日期不在窗口时返回空
+     */
+    private Date resolveWaitingReleaseDeadline(List<LhShiftConfigVO> shifts,
+            LhMouldChangePlan historicalPlan, int dateOffset) {
+        if (dateOffset == 0) {
+            return shifts.stream().filter(shift -> Objects.equals(shift.getDateOffset(), 0) && shift.isMorningShift())
+                    .map(LhShiftConfigVO::getShiftEndDateTime).findFirst().orElse(null);
+        }
+        LocalDate historicalDay = this.planDay(historicalPlan);
+        LhShiftConfigVO releaseShift = shifts.stream()
+                .filter(shift -> historicalDay.equals(shift.getWorkDate().toInstant()
+                        .atZone(ZoneId.systemDefault()).toLocalDate()))
+                .filter(shift -> StringUtils.equals(historicalPlan.getClassIndex(), shift.getShiftType()))
+                .findFirst().orElse(null);
+        if (Objects.isNull(releaseShift)) {
+            return null;
+        }
+        if (releaseShift.isAfternoonShift()) {
+            return this.node(historicalDay, AFTERNOON_RELEASE_HOUR);
+        }
+        return releaseShift.getShiftStartDateTime();
+    }
+
+    /**
+     * 多机大余量先按06:00、19:00分配；窗口末中班承接至班末，其余日期使用后续夜班。
      * @param machines 按保留优先级排序的机台画像
      * @param shifts 真实排程班次
      * @param quantities 当前累计量，包含目标日前缀
@@ -249,16 +419,21 @@ public class ContinuationRemainderFinishScheduleService {
         Date morning = this.node(day, MORNING_RELEASE_HOUR);
         Date afternoon = this.node(day, AFTERNOON_RELEASE_HOUR);
         Date nextMorning = this.node(day.plusDays(1), MORNING_RELEASE_HOUR);
-        // 只截短本日中班，后续班次仍保留已校验的真实容量，不改变原始产量与时间比例。
+        LhShiftConfigVO lastShift = shifts.get(shifts.size() - 1);
+        boolean endingAfternoon = Objects.equals(lastShift.getDateOffset(), dateOffset)
+                && lastShift.isAfternoonShift();
+        // 窗口最后中班保留真实容量，19:00只作为优先节点；已有交替、维护等硬截止仍在画像内。
+        // 其他日期继续把19:00后的余量交给后续夜班，不改变既有阶段规则。
         for (LhShiftConfigVO shift : shifts) {
-            if (Objects.equals(shift.getDateOffset(), dateOffset) && shift.isAfternoonShift()) {
+            if (!endingAfternoon && Objects.equals(shift.getDateOffset(), dateOffset) && shift.isAfternoonShift()) {
                 for (ContinuationEndingMachineProfile profile : machines) {
                     profile.restrictShiftToDeadline(shift.getShiftIndex(), afternoon);
                 }
             }
         }
-        Date finalDeadline = nextMorning;
-        for (Date node : Arrays.asList(morning, afternoon, nextMorning)) {
+        Date lastNode = endingAfternoon ? lastShift.getShiftEndDateTime() : nextMorning;
+        Date finalDeadline = lastNode;
+        for (Date node : Arrays.asList(morning, afternoon, lastNode)) {
             this.allocateStage(machines, quantities, total, 0, machines.size(), node);
             log.info("续作余量分阶段分配, 批次={}, 物料={}, 状态={}, 节点={}, 总预算={}, 累计分配={}, 剩余={}",
                     machines.get(0).getOriginals().get(0).getBatchNo(),

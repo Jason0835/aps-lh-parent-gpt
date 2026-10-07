@@ -312,6 +312,12 @@ public class LhScheduleContext {
      */
     private Map<String, Date> structureEarliestLhTimeMap = new HashMap<>();
 
+    /** 本批结构首班限量只读快照：结构名称 -> 胎胚编码 -> 含首检总量上限。 */
+    private Map<String, Map<String, Integer>> structureTreadCountMap = Collections.emptyMap();
+
+    /** 班次9副本冻结原窗口在供胚首班的已用量；主窗口为空。 */
+    private Map<String, Map<String, Integer>> structureTreadBaselineQtyMap = Collections.emptyMap();
+
     /** 后结构对应的有效供胚来源记录；时间与两个标识必须来自同一行。 */
     private Map<String, CxEmbryoLhTime> structureSwitchSourceMap =
             new LinkedHashMap<>(16);
@@ -494,6 +500,9 @@ public class LhScheduleContext {
     private Map<String, String> previousAlternateReleasedSkuKeyMap = new LinkedHashMap<>(16);
     /** 历史动作与最终结果精确关联，同料同模具也必须生成交替计划。 */
     private Map<LhScheduleResult, LhMouldChangePlan> previousAlternateResultPlanMap = new IdentityHashMap<>(16);
+    /** 按历史目标机台登记的独立增机需求；不可变值对象随尝试及负荷预演整体回滚。 */
+    private Map<String, PreviousAlternateAdditionalMachineDemand>
+            previousAlternateAdditionalMachineDemandMap = new LinkedHashMap<>(16);
     /** 当前指定交替指令，只在一次预演和正式提交的作用域内存在。 */
     private PreviousAlternatePlanReleaseEvent activePreviousAlternateEvent;
     /** 仅标识历史关联预演日志，不参与排程决策。 */
@@ -512,7 +521,110 @@ public class LhScheduleContext {
     public boolean isPreviousAlternateAction(SkuScheduleDTO sku, String machineCode) {
         return Objects.nonNull(activePreviousAlternateEvent) && Objects.nonNull(sku)
                 && StringUtils.equals(activePreviousAlternateEvent.getMachineCode(), machineCode)
-                && StringUtils.equals(activePreviousAlternateEvent.getPlan().getAfterMaterialCode(), sku.getMaterialCode());
+                // 历史计划的产品状态属于后物料，事件中的状态属于实际下机前物料。
+                && this.matchesPreviousAlternateAfterMaterial(activePreviousAlternateEvent.getPlan(),
+                        sku.getMaterialCode(), sku.getProductStatus());
+    }
+
+    /**
+     * 查询当前精确历史动作登记的增机需求，普通候选不能借用该名额。
+     * @param sku 后物料及状态
+     * @return 当前计划对应的不可变需求，未命中时为空
+     */
+    public PreviousAlternateAdditionalMachineDemand
+            resolvePreviousAlternateAdditionalMachineDemand(SkuScheduleDTO sku) {
+        if (Objects.isNull(activePreviousAlternateEvent)
+                || !this.isPreviousAlternateAction(sku, activePreviousAlternateEvent.getMachineCode())) {
+            return null;
+        }
+        PreviousAlternateAdditionalMachineDemand demand =
+                previousAlternateAdditionalMachineDemandMap.get(activePreviousAlternateEvent.getMachineCode());
+        return Objects.nonNull(demand) && demand.getPlan() == activePreviousAlternateEvent.getPlan()
+                && StringUtils.equals(demand.getSkuKey(),
+                        MonthPlanDateResolver.buildMaterialStatusKey(sku.getMaterialCode(), sku.getProductStatus()))
+                ? demand : null;
+    }
+
+    /**
+     * 指定动作共用登记后的目标份数；普通新增仍读取原统一Map。
+     * @param sku 当前物料
+     * @param businessDate 实际生产业务日
+     * @param ordinaryTarget 原普通目标
+     * @return 当前指定动作获准的目标份数
+     */
+    public int resolvePreviousAlternateMachineCount(SkuScheduleDTO sku, LocalDate businessDate, int ordinaryTarget) {
+        PreviousAlternateAdditionalMachineDemand demand =
+                this.resolvePreviousAlternateAdditionalMachineDemand(sku);
+        return Objects.nonNull(demand) && Objects.nonNull(businessDate)
+                && !businessDate.isBefore(demand.getProductionDate())
+                ? Math.max(ordinaryTarget, demand.getTargetMachineCount()) : ordinaryTarget;
+    }
+
+    /**
+     * 判断当前预演或提交是否为指定历史交替动作的后物料承接，不校验机台。
+     * <p>供首检归属、首检时间模式等无机台上下文的工具方法使用；指定交替作用域内
+     * 排产动作绑定事件机台，与 {@link #isPreviousAlternateAction} 等价。</p>
+     * @param sku 待排物料
+     * @return 是否命中当前指定交替动作的后料
+     */
+    public boolean isPreviousAlternateAfterMaterialSku(SkuScheduleDTO sku) {
+        return Objects.nonNull(activePreviousAlternateEvent) && Objects.nonNull(sku)
+                && this.matchesPreviousAlternateAfterMaterial(activePreviousAlternateEvent.getPlan(),
+                        sku.getMaterialCode(), sku.getProductStatus());
+    }
+
+    /**
+     * 按历史后物料及产品状态识别同一排产需求，供资格、承接和结果关联共用。
+     *
+     * @param plan 前日交替计划，产品状态描述历史后物料
+     * @param materialCode 当前候选或结果物料编码
+     * @param productStatus 当前候选或结果产品状态
+     * @return 历史身份完整且物料、状态均相同时返回true；缺失状态不推测为正规
+     */
+    public boolean matchesPreviousAlternateAfterMaterial(LhMouldChangePlan plan,
+            String materialCode, String productStatus) {
+        return Objects.nonNull(plan)
+                && StringUtils.isNotEmpty(plan.getAfterMaterialCode())
+                && StringUtils.isNotEmpty(plan.getProductStatus())
+                && StringUtils.equals(plan.getAfterMaterialCode(), materialCode)
+                && StringUtils.equals(plan.getProductStatus(), productStatus);
+    }
+
+    /**
+     * 校验调用携带的计划确属本批有效历史关系，且精确指向当前机台和后料状态。
+     * @param sku 待排物料
+     * @param plan 已经最新批次和日期过滤的源计划
+     * @param machineCode 本次指定运行态机台，不能把单侧关系扩散到另一侧
+     * @return 是否为有效指定组合
+     */
+    public boolean isEligiblePreviousAlternateCombination(SkuScheduleDTO sku,
+            LhMouldChangePlan plan, String machineCode) {
+        return Objects.nonNull(sku) && Objects.nonNull(plan)
+                && eligiblePreviousAlternatePlans.stream().anyMatch(eligible -> eligible == plan)
+                && StringUtils.equals(plan.getLhMachineCode(), machineCode)
+                && this.matchesPreviousAlternateAfterMaterial(plan, sku.getMaterialCode(), sku.getProductStatus());
+    }
+
+    /**
+     * 判断试制量试是否命中有效历史指定关系；成功、失败和部分成功均不进入虚拟机。
+     * @param sku 待判断SKU
+     * @return 是否属于本轮指定交替试制量试
+     */
+    public boolean hasPreviousAlternateTrialPlan(SkuScheduleDTO sku) {
+        return PendingSkuUnscheduledRule.isTrialOrMassTrialSku(sku)
+                && eligiblePreviousAlternatePlans.stream().anyMatch(plan ->
+                        this.matchesPreviousAlternateAfterMaterial(plan, sku.getMaterialCode(), sku.getProductStatus()));
+    }
+
+    /**
+     * 冻结命中关系的原始候选身份，不修改数量和资源，也不随失败预演撤销。
+     * @param sku 可能被后续阶段移出待排池的候选
+     */
+    public void registerPreviousAlternateTrialSku(SkuScheduleDTO sku) {
+        if (this.hasPreviousAlternateTrialPlan(sku)) {
+            previousAlternateTrialSkuMap.putIfAbsent(MonthPlanDateResolver.buildMaterialStatusKey(
+                    sku.getMaterialCode(), sku.getProductStatus()), sku);
+        }
     }
 
     /**
@@ -580,11 +692,11 @@ public class LhScheduleContext {
      */
     private Map<String, List<SkuScheduleDTO>> structureSkuMap = new LinkedHashMap<>();
     /**
-     * 结构最低机台规则使用的全量结构SKU快照。
+     * 通用结构归属与在机统计使用的全量结构SKU快照。
      * <p>该快照在S4.3按现有结构分组一次性冻结，不受后续待排结构视图出队影响；
-     * 结构收尾对齐规则统一从该快照解析结构归属，并比较待排SKU与候选机台前物料的结构。</p>
+     * 跨月或最低机台配置异常不得剔除结构；最低保机资格由独立配置Map控制。</p>
      */
-    private Map<String, List<SkuScheduleDTO>> structureMinMachineSkuSnapshotMap = new LinkedHashMap<>();
+    private Map<String, List<SkuScheduleDTO>> structureSkuSnapshotMap = new LinkedHashMap<>();
     /**
      * 结构最低硫化机台数，key=结构名称，value=周期结构配置或常规结构工厂参数解析值
      */
@@ -648,6 +760,30 @@ public class LhScheduleContext {
      * 新增SKU列表，续作和换活字块未消费完的 SKU 会继续保留到 S4.5 新增链路
      */
     private List<SkuScheduleDTO> newSpecSkuList = new ArrayList<>();
+    /** 独立调整需求只准备一次，历史指定承接与 S4.5.2 共用原对象和日计划账本。 */
+    private List<SkuScheduleDTO> dayPlanAdjustSkuList = new ArrayList<>(8);
+    /** 空候选也标记已准备，禁止后置阶段重新汇总并恢复已消费需求。 */
+    private boolean dayPlanAdjustPrepared;
+    /** 无窗口日计划的指定试制量试独立需求，普通新增、换活字块及虚拟机不可读取。 */
+    private List<SkuScheduleDTO> previousAlternateTrialDemandList = new ArrayList<>(4);
+
+    /**
+     * 取得历史后料可读取的新增来源，不将独立调整需求放入普通新增竞争列表。
+     *
+     * @return 普通新增与独立调整候选，保留各来源原对象和既有顺序
+     */
+    public List<SkuScheduleDTO> getPreviousAlternateNewSpecCandidates() {
+        List<SkuScheduleDTO> candidates = new ArrayList<>(newSpecSkuList.size() + dayPlanAdjustSkuList.size());
+        newSpecSkuList.stream().filter(Objects::nonNull).forEach(candidates::add);
+        // 普通历史提交临时加入工作列表的同一调整原对象只读取一次，不合并不同运行态副本。
+        dayPlanAdjustSkuList.stream().filter(Objects::nonNull)
+                .filter(sku -> candidates.stream().noneMatch(candidate -> candidate == sku))
+                .forEach(candidates::add);
+        previousAlternateTrialDemandList.stream().filter(Objects::nonNull)
+                .filter(sku -> candidates.stream().noneMatch(candidate -> candidate == sku))
+                .forEach(candidates::add);
+        return candidates;
+    }
     /**
      * 试制/量试虚拟机台兜底候选快照。
      * <p>S4.3 保留无日计划但有硫化余量的试制/量试，S4.5 再合并参数拦截前的正常新增候选；
@@ -655,6 +791,12 @@ public class LhScheduleContext {
      * 也不持久化虚拟机台主数据。</p>
      */
     private List<SkuScheduleDTO> trialVirtualMachineCandidateList = new ArrayList<>();
+    /** 本批最新有效历史关系，只提供指定组合资格，不授予普通新增开关豁免。 */
+    private List<LhMouldChangePlan> eligiblePreviousAlternatePlans = new ArrayList<>(16);
+    /** 命中指定交替的试制量试原始候选，失败恢复不删除，最终按真实结果核对未排。 */
+    private Map<String, SkuScheduleDTO> previousAlternateTrialSkuMap = new LinkedHashMap<>(16);
+    /** 指定交替实际失败证据，资源恢复后仍保留，不能被普通开关拦截覆盖。 */
+    private Map<String, String> previousAlternateTrialFailureMap = new LinkedHashMap<>(16);
     /**
      * 班次9独立后置计划候选快照。
      * <p>在真实新增排产和日计划调整排产消费候选前登记，仅作为后置服务恢复候选全集的只读来源；
@@ -764,6 +906,11 @@ public class LhScheduleContext {
      */
     private Map<SkuScheduleDTO, EarlyProductionRuntimePlan> earlyProductionRuntimePlanMap =
             new IdentityHashMap<SkuScheduleDTO, EarlyProductionRuntimePlan>();
+    /**
+     * S4.5结束时尚未激活的未来需求原始余量快照，key=物料_产品状态。
+     * <p>只保留需求基数，供后置阶段扣除最终结果；不保留提前生产资格或临时日计划账本。</p>
+     */
+    private Map<String, Integer> inactiveFutureDemandQtySnapshotMap = Collections.emptyMap();
     /**
      * 新增SKU进入S4.5时是否命中结构五天内收尾层级快照，使用对象身份避免SKU出队后判定漂移
      */
@@ -965,6 +1112,8 @@ public class LhScheduleContext {
     private MouldChangeQuotaSnapshot mouldChangeQuotaSnapshot;
     /** 前置选机冻结的按时间下机需求，顺序与原下机优先级一致。 */
     private List<TimedMachineOffRequest> timedMachineOffRequests = new ArrayList<>(8);
+    /** 本批一次性时间下机负荷预演标记，仅限制预演扫描，不改变正式排程。 */
+    private boolean timedMachineOffLoadPreview;
     /** 已提交时间边界以结果身份索引，零量生产行移除后仍保留资源释放事实。 */
     private Map<LhScheduleResult, OffMachineDecision> timedMachineOffDecisionMap = new IdentityHashMap<>(8);
 
@@ -1621,6 +1770,11 @@ public class LhScheduleContext {
         if (Objects.isNull(sku) || StringUtils.isEmpty(sku.getMaterialCode())) {
             return;
         }
+        // 指定交替只走真实资源链；保留来源供最终未排收口，不再登记虚拟候选。
+        this.registerPreviousAlternateTrialSku(sku);
+        if (this.hasPreviousAlternateTrialPlan(sku)) {
+            return;
+        }
         String targetSkuKey = MonthPlanDateResolver.buildMaterialStatusKey(
                 sku.getMaterialCode(), sku.getProductStatus());
         for (SkuScheduleDTO candidate : trialVirtualMachineCandidateList) {
@@ -1713,6 +1867,28 @@ public class LhScheduleContext {
     }
 
     /**
+     * 按实际业务日判断未来候选是否仍只能提前生产。
+     * <p>原候选身份保留供审计及日期回放使用；进入有总计划的来源月份且计划日已到达后，
+     * 普通新增和指定承接使用正常准入，不能继续被窗口开始月的零总量隔离。</p>
+     * @param sku 原需求
+     * @param businessDate 实际业务日期
+     * @return 是否仍仅允许提前生产
+     */
+    public boolean isFutureOnlyEarlyProductionCandidate(SkuScheduleDTO sku, LocalDate businessDate) {
+        EarlyProductionRuntimePlan runtimePlan = this.getEarlyProductionRuntimePlan(sku);
+        if (Objects.isNull(runtimePlan) || !runtimePlan.isFutureOnlyCandidate()) {
+            return false;
+        }
+        if (Objects.isNull(businessDate) || Objects.isNull(runtimePlan.getFuturePlanDate())
+                || businessDate.isBefore(runtimePlan.getFuturePlanDate())) {
+            return true;
+        }
+        FactoryMonthPlanProductionFinalResult plan = MonthPlanDateResolver.resolvePlan(
+                this, sku.getMaterialCode(), sku.getProductStatus(), businessDate);
+        return Objects.isNull(plan) || Objects.isNull(plan.getTotalQty()) || plan.getTotalQty() <= 0;
+    }
+
+    /**
      * 删除指定 SKU 的提前生产运行视图。
      *
      * <p>SKU 最终识别为续作、被减量规则移除或不再属于新增排产时调用，防止候选态
@@ -1745,6 +1921,47 @@ public class LhScheduleContext {
             return runtimePlan.getShiftedDailyPlanQuotaMap();
         }
         return Objects.isNull(sku) ? Collections.emptyMap() : sku.getDailyPlanQuotaMap();
+    }
+
+    /**
+     * 在S4.5清理临时视图前冻结未激活需求，避免班次9把隔离零账本误判为已经排完。
+     * <p>同物料同状态副本只保留一份需求，不累加重复的未来月余量；后置阶段实时扣除实际结果。</p>
+     */
+    public void freezeInactiveFutureDemand() {
+        inactiveFutureDemandQtySnapshotMap = Collections.unmodifiableMap(
+                earlyProductionRuntimePlanMap.entrySet().stream()
+                        .filter(entry -> entry.getValue().isFutureOnlyCandidate()
+                                && !entry.getValue().isActive() && !entry.getValue().isNormalPlanActivated())
+                        .collect(Collectors.toMap(
+                                entry -> MonthPlanDateResolver.buildMaterialStatusKey(
+                                        entry.getKey().getMaterialCode(), entry.getKey().getProductStatus()),
+                                entry -> Math.max(0, entry.getValue().getFutureMonthSurplusQty()),
+                                Math::max, LinkedHashMap::new)));
+    }
+
+    /**
+     * 读取尚未激活的未来需求基数，仅用于生命周期和剩余需求判断，不授予生产资格。
+     * @param sku 原需求或同物料状态的后置副本
+     * @return 未激活需求基数；没有此类需求或已有正式消费账本时为空
+     */
+    public Integer resolveInactiveFutureDemandQty(SkuScheduleDTO sku) {
+        if (Objects.isNull(sku)) {
+            return null;
+        }
+        EarlyProductionRuntimePlan runtimePlan = this.getEarlyProductionRuntimePlan(sku);
+        if (Objects.nonNull(runtimePlan)) {
+            if (runtimePlan.isFutureOnlyCandidate() && !runtimePlan.isActive()
+                    && !runtimePlan.isNormalPlanActivated()) {
+                return Math.max(0, runtimePlan.getFutureMonthSurplusQty());
+            }
+            return null;
+        }
+        String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(sku.getMaterialCode(), sku.getProductStatus());
+        // 后续阶段若已激活正式目标，即使剩余量已扣到0，也不能再从需求快照恢复产量。
+        if (skuProductionTargetQtyMap.getOrDefault(skuKey, 0) > 0) {
+            return null;
+        }
+        return inactiveFutureDemandQtySnapshotMap.get(skuKey);
     }
 
     /**
@@ -2791,6 +3008,39 @@ public class LhScheduleContext {
     public MdmSkuConstructionRef findSkuConstructionRef(String materialCode, String productStatus) {
         return SkuConstructionRefResolverUtil.resolveCuringRecipeRef(
                 materialCode, productStatus, skuConstructionRefCompositeKeyMap);
+    }
+
+    /**
+     * 续作补偿与新增选机共用原机完成能力结论，并用当前结果复核已分配量。
+     * 只有原机真实容量分配已覆盖合法目标且结果未被后处理撤回时才阻止补机；
+     * 原机不足、尚未提交或当前仍有缺口时均继续既有资源竞争，不改变余量和日计划账本。
+     * @param sku 当前来源续作或同源新增候选
+     * @return 是否已由原机完成本组合法余量
+     */
+    public boolean isOriginalContinuationFinishSatisfied(SkuScheduleDTO sku) {
+        if (Objects.isNull(sku) || StringUtils.isEmpty(sku.getMaterialCode())) {
+            return false;
+        }
+        String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(sku.getMaterialCode(), sku.getProductStatus());
+        for (ContinuationRemainderFinishGroup group : continuationRemainderFinishGroups) {
+            SkuScheduleDTO source = group.getSourceSku();
+            if (Objects.isNull(source) || Objects.isNull(group.getFinalTargetQty())
+                    || Objects.isNull(group.getOriginalMachineFinishPlan())
+                    || group.getOriginalMachineFinishPlan().getRemainingQty() != 0
+                    || !StringUtils.equals(skuKey, MonthPlanDateResolver.buildMaterialStatusKey(
+                    source.getMaterialCode(), source.getProductStatus()))
+                    || Objects.isNull(source.getDailyPlanQuotaMap())
+                    || source.getDailyPlanQuotaMap() != sku.getDailyPlanQuotaMap()) {
+                continue;
+            }
+            // 复核当前结果是否仍覆盖原目标；共享日计划对象隔离同物料独立日调整候选。
+            long scheduledQty = scheduleResultList.stream().filter(Objects::nonNull)
+                    .filter(result -> StringUtils.equals(skuKey, MonthPlanDateResolver.buildMaterialStatusKey(
+                            result.getMaterialCode(), result.getProductStatus())))
+                    .mapToLong(ShiftFieldUtil::resolveScheduledQty).sum();
+            return scheduledQty >= group.getFinalTargetQty();
+        }
+        return false;
     }
 
 }

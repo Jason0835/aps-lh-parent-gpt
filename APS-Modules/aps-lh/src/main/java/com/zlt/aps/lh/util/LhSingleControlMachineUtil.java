@@ -25,6 +25,8 @@ public final class LhSingleControlMachineUtil {
     private static final String SINGLE_CONTROL_MACHINE_SEPARATOR_REGEX = "[,，]";
     /** 硫化运行态机台编码前缀 */
     private static final String LH_MACHINE_CODE_PREFIX = "K";
+    /** 虚拟机台编码前缀：V 开头为引擎生成的虚拟聚合机台，仅存在于排程结果，不在机台主数据中 */
+    private static final String VIRTUAL_MACHINE_CODE_PREFIX = "V";
     private LhSingleControlMachineUtil() {
     }
 
@@ -268,6 +270,19 @@ public final class LhSingleControlMachineUtil {
             return LhScheduleConstant.RIGHT_MOULD;
         }
         return null;
+    }
+
+    /**
+     * 判断是否为虚拟机台。
+     * <p>导出与统计时过滤掉以 V 开头的虚拟机台（忽略大小写），数据库原始排程数据不做删除。
+     * 虚拟机台仅由引擎生成用于排程内部聚合，不在机台主数据中，明细导出不展示，
+     * 排产小结的产量/机台数统计也必须排除，否则会与明细 Sheet 对不上。</p>
+     *
+     * @param machineCode 机台编码
+     * @return true-虚拟机台；false-实体机台或编码为空
+     */
+    public static boolean isVirtualMachineCode(String machineCode) {
+        return StringUtils.startsWithIgnoreCase(StringUtils.trimToEmpty(machineCode), VIRTUAL_MACHINE_CODE_PREFIX);
     }
 
     /**

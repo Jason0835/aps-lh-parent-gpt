@@ -3,6 +3,7 @@ package com.zlt.aps.lh.handler;
 import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.component.DayPlanAdjustRequireAssembler;
 import com.zlt.aps.lh.engine.chain.validators.ContinuationOnlineMouldValidator;
 import com.zlt.aps.lh.engine.factory.ScheduleStrategyFactory;
 import com.zlt.aps.lh.engine.strategy.IProductionStrategy;
@@ -11,6 +12,7 @@ import com.zlt.aps.lh.engine.strategy.ITypeBlockProductionStrategy;
 import com.zlt.aps.lh.service.impl.LhMaintenanceScheduleService;
 import com.zlt.aps.lh.service.impl.PreviousAlternatePlanReuseService;
 import com.zlt.aps.lh.service.impl.TimedMachineOffShiftService;
+import com.zlt.aps.lh.service.impl.TimedMachineOffLoadPreviewService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -38,6 +40,9 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
 
     @Resource
     private ScheduleStrategyFactory strategyFactory;
+    /** 提前提供指定后料来源，不改变独立调整的普通后置排产顺序。 */
+    @Resource
+    private DayPlanAdjustRequireAssembler dayPlanAdjustRequireAssembler;
     @Resource
     private ITypeBlockProductionStrategy typeBlockProductionStrategy;
     @Resource
@@ -48,6 +53,8 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
     /** 余量收尾之后独立确定按时间下机边界，必须早于正式扣账和后料提交。 */
     @Resource
     private TimedMachineOffShiftService timedMachineOffShiftService;
+    @Resource
+    private TimedMachineOffLoadPreviewService timedMachineOffLoadPreviewService;
     /** S4.4 续作排产前校验 MES 实际在机模具与续作 SKU 模具关系。 */
     @Resource
     private ContinuationOnlineMouldValidator continuationOnlineMouldValidator;
@@ -60,6 +67,8 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
                 context.getScheduleResultList().size());
         // S4.4正式排产前校验真实在机模具，失败时不进入续作、换活字块及新增排产链路。
         continuationOnlineMouldValidator.validate(context);
+        // 历史资格、释放排序与正式承接必须看到同一份独立调整需求。
+        dayPlanAdjustRequireAssembler.prepare(context);
         // 冻结历史交替时刻，续作识别保持原样，排量及所有后置调整共同遵守下机边界。
         previousAlternatePlanReuseService.prepareReleaseEvents(context);
         ISkuPriorityStrategy priorityStrategy = strategyFactory.getSkuPriorityStrategy();
@@ -100,7 +109,7 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
         // 历史交替正式排产前计算真实收尾，禁止后料提交后再搬动前料。
         strategy.calculateContinuationRemainderFinish(context);
         // 不依赖余量收尾组是否存在，独立处理已选机台的时间下机需求。
-        timedMachineOffShiftService.resolveAndApply(context);
+        timedMachineOffShiftService.resolveAndApply(context, timedMachineOffLoadPreviewService.preview(context));
         // 数量稳定后只消费一次账本，同时发布机台、模具和待排余量。
         strategy.finalizeContinuousProduction(context);
 

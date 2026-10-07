@@ -2,6 +2,7 @@ package com.zlt.aps.lh.service.impl;
 
 import com.zlt.aps.lh.engine.strategy.support.ContinuationEndingAllocationSnapshot;
 import com.zlt.aps.lh.engine.strategy.support.FirstInspectionAllocationPlan;
+import com.zlt.aps.lh.engine.strategy.support.PreviousAlternateAdditionalMachineDemand;
 import cn.hutool.core.bean.BeanUtil;
 import com.zlt.aps.lh.api.domain.dto.CapsuleReplacementTimeWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.CleaningScheduleDateFillItem;
@@ -17,6 +18,7 @@ import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.context.EmbryoStockConsumeLedger;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.component.StructureEarlyProductionAdmission;
+import com.zlt.aps.lh.component.StructureShiftInMachineIndex;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionRuntimePlan;
 import com.zlt.aps.lh.engine.strategy.support.ActiveMachineBinding;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionDecision;
@@ -55,6 +57,8 @@ import java.util.Set;
  */
 final class ScheduleSubstitutionAttemptSnapshot {
 
+    /** 结构班次占用与结果同步回滚，预演机台不得残留并占用正式提交名额。 */
+    private StructureShiftInMachineIndex structureShiftInMachineIndex;
     /** 结构切换首班随候选整体回滚。 */
     private Map<String, StructureSwitchRuntimeState> structureSwitchRuntimeMap;
     /** 置换前结果与冻结切换计划的关联。 */
@@ -211,6 +215,9 @@ final class ScheduleSubstitutionAttemptSnapshot {
     private Map<SkuScheduleDTO, Date> previousAlternateCandidateAvailableTimeMap;
     /** 正式交替结果标记，避免失败结果残留影响同料计划生成。 */
     private Map<LhScheduleResult, LhMouldChangePlan> previousAlternateResultPlanMap;
+    /** 历史指定增机值对象不可变，复制映射即可恢复失败尝试及整批预演。 */
+    private Map<String, PreviousAlternateAdditionalMachineDemand>
+            previousAlternateAdditionalMachineDemandMap;
 
     /** 收尾只读快照采用写时复制，置换失败恢复原对象映射。 */
     private Map<LhScheduleResult, ContinuationEndingAllocationSnapshot> continuationFinishSnapshots;
@@ -251,9 +258,13 @@ final class ScheduleSubstitutionAttemptSnapshot {
         snapshot.previousAlternateReleasedSkuKeyMap = new LinkedHashMap<>(context.getPreviousAlternateReleasedSkuKeyMap());
         snapshot.previousAlternateCandidateAvailableTimeMap = new IdentityHashMap<>(context.getPreviousAlternateCandidateAvailableTimeMap());
         snapshot.previousAlternateResultPlanMap = new IdentityHashMap<>(context.getPreviousAlternateResultPlanMap());
+        snapshot.previousAlternateAdditionalMachineDemandMap =
+                new LinkedHashMap<>(context.getPreviousAlternateAdditionalMachineDemandMap());
         snapshot.continuationFinishSnapshots = new IdentityHashMap<>(context.getContinuationSurplusEndingSnapshotMap());
         snapshot.nextShiftNewPlanCandidateList = new ArrayList<>(context.getNextShiftNewPlanCandidateList());
         snapshot.nextShiftNewPlanPoolDateMap = new LinkedHashMap<>(context.getNextShiftNewPlanPoolDateMap());
+        snapshot.structureShiftInMachineIndex = Objects.isNull(context.getStructureShiftInMachineIndex())
+                ? null : context.getStructureShiftInMachineIndex().copy();
         snapshot.structureSwitchRuntimeMap = new LinkedHashMap<>(context.getStructureSwitchRuntimeMap());
         snapshot.structureSwitchResultPlanMap = new IdentityHashMap<>(context.getStructureSwitchResultPlanMap());
         snapshot.firstInspectionResultPlanMap = new IdentityHashMap<>(context.getFirstInspectionResultPlanMap());
@@ -430,15 +441,20 @@ final class ScheduleSubstitutionAttemptSnapshot {
                 new IdentityHashMap<SkuScheduleDTO, Map<LocalDate, SkuDailyPlanQuotaDTO>>(4);
         snapshot.skuDailyQuotaReferenceMap =
                 new IdentityHashMap<SkuScheduleDTO, Map<LocalDate, SkuDailyPlanQuotaDTO>>(4);
-        if (skuCollection != null) {
-            for (SkuScheduleDTO sku : skuCollection) {
-                if (sku == null || snapshot.skuStateMap.containsKey(sku)) {
-                    continue;
-                }
-                snapshot.skuStateMap.put(sku, copyBean(sku, SkuScheduleDTO.class));
-                snapshot.skuDailyQuotaMap.put(sku, copyDailyQuotaMap(sku.getDailyPlanQuotaMap()));
-                snapshot.skuDailyQuotaReferenceMap.put(sku, sku.getDailyPlanQuotaMap());
+        // 独立调整原对象不一定在普通候选集合中，必须一并恢复其字段和共享日计划账本。
+        List<SkuScheduleDTO> capturedSkus = new ArrayList<>(context.getDayPlanAdjustSkuList());
+        // 无日计划的指定试验原对象与派生候选共享额度，失败仍需一并恢复。
+        capturedSkus.addAll(context.getPreviousAlternateTrialDemandList());
+        if (Objects.nonNull(skuCollection)) {
+            capturedSkus.addAll(skuCollection);
+        }
+        for (SkuScheduleDTO sku : capturedSkus) {
+            if (Objects.isNull(sku) || snapshot.skuStateMap.containsKey(sku)) {
+                continue;
             }
+            snapshot.skuStateMap.put(sku, copyBean(sku, SkuScheduleDTO.class));
+            snapshot.skuDailyQuotaMap.put(sku, copyDailyQuotaMap(sku.getDailyPlanQuotaMap()));
+            snapshot.skuDailyQuotaReferenceMap.put(sku, sku.getDailyPlanQuotaMap());
         }
         snapshot.preScheduledMachineBindingList = new ArrayList<>(context.getPreScheduledMachineBindingList());
         snapshot.preScheduledMouldReleaseTimeMap = new LinkedHashMap<>(context.getPreScheduledMouldReleaseTimeMap());
@@ -476,6 +492,9 @@ final class ScheduleSubstitutionAttemptSnapshot {
      * @param restoreSourceObjects 是否恢复原结果和SKU对象
      */
     private void restore(LhScheduleContext context, boolean restoreSourceObjects) {
+        // 每次恢复再次复制，避免重试、嵌套回滚或班次9副本反向修改快照。
+        context.setStructureShiftInMachineIndex(Objects.isNull(structureShiftInMachineIndex)
+                ? null : structureShiftInMachineIndex.copy());
         context.setStructureSwitchRuntimeMap(new LinkedHashMap<>(structureSwitchRuntimeMap));
         context.setStructureSwitchResultPlanMap(new IdentityHashMap<>(structureSwitchResultPlanMap));
         context.setFirstInspectionResultPlanMap(new IdentityHashMap<>(firstInspectionResultPlanMap));
@@ -658,6 +677,7 @@ final class ScheduleSubstitutionAttemptSnapshot {
         context.setPreviousAlternateReleasedSkuKeyMap(new LinkedHashMap<>(previousAlternateReleasedSkuKeyMap));
         context.setPreviousAlternateCandidateAvailableTimeMap(new IdentityHashMap<>(previousAlternateCandidateAvailableTimeMap));
         context.setPreviousAlternateResultPlanMap(new IdentityHashMap<>(previousAlternateResultPlanMap));
+        context.setPreviousAlternateAdditionalMachineDemandMap(new LinkedHashMap<>(previousAlternateAdditionalMachineDemandMap));
         context.setContinuationSurplusEndingSnapshotMap(new IdentityHashMap<>(continuationFinishSnapshots));
         context.setMouldResourceContext(MouldResourceContext.from(context));
     }

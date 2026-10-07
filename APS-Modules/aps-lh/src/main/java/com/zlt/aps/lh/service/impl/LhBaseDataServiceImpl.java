@@ -5,6 +5,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.zlt.aps.common.engine.domain.LhDayPlanAdjustVo;
 import com.zlt.aps.common.engine.domain.LhMonthStartDayResult;
+import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
 import com.zlt.aps.cx.entity.CxStock;
 import com.zlt.aps.cx.entity.config.CxEmbryoLhTime;
 import com.zlt.aps.enums.YesOrNoEnum;
@@ -186,6 +187,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
 
     @Resource
     private CxEmbryoLhTimeMapper cxEmbryoLhTimeMapper;
+
+    @Resource
+    private CxStructureTreadConfigMapper cxStructureTreadConfigMapper;
 
     @Resource
     private LhSpecialMaterialBomEntityMapper lhSpecialMaterialBomEntityMapper;
@@ -407,6 +411,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 specialMaterialBomFuture,
                 embryoStockFuture,
                 embryoAvailableTimeFuture,
+                runDataInitTaskAsync("结构胎胚首班限量",
+                        () -> this.loadStructureTreadCount(context, factoryCode),
+                        () -> sizeOf(context.getStructureTreadCountMap())),
                 runDataInitTaskAsync("工作日历",
                         () -> loadWorkCalendar(context, factoryCode,
                                 requiredMachineCalendarStartDate, requiredMachineCalendarEndDate),
@@ -2106,6 +2113,42 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 LhScheduleTimeUtil.formatDateTime(windowEndTime),
                 CollectionUtils.isEmpty(configuredTimeList) ? 0 : configuredTimeList.size(),
                 earliestTimeMap.size(), duplicateCount, ignoredCount, earliestTimeMap);
+    }
+
+    /**
+     * 按工厂一次性加载结构胎胚首班限量，空配置沿用原数量规则，零值保留为零额度。
+     * @param context 当前批次上下文
+     * @param factoryCode 工厂编码
+     */
+    private void loadStructureTreadCount(LhScheduleContext context, String factoryCode) {
+        List<CxStructureTreadConfig> configs = cxStructureTreadConfigMapper.selectList(
+                new LambdaQueryWrapper<CxStructureTreadConfig>()
+                        .eq(CxStructureTreadConfig::getFactoryCode, factoryCode));
+        Map<String, Map<String, Integer>> counts = new LinkedHashMap<>(16);
+        Set<List<String>> invalidKeys = new HashSet<>(16);
+        for (CxStructureTreadConfig config : configs) {
+            if (StringUtils.isEmpty(config.getStructureCode()) || StringUtils.isEmpty(config.getEmbryoCode())
+                    || Objects.isNull(config.getTreadCount())) {
+                continue;
+            }
+            List<String> key = Arrays.asList(config.getStructureCode(), config.getEmbryoCode());
+            Map<String, Integer> embryos = counts.computeIfAbsent(config.getStructureCode(),
+                    structure -> new LinkedHashMap<>(4));
+            // 异常配置仅告警，不中止排程；整个冲突键不参与限量，禁止任取一条覆盖。
+            if (config.getTreadCount() < 0 || embryos.containsKey(config.getEmbryoCode()) || invalidKeys.contains(key)) {
+                embryos.remove(config.getEmbryoCode());
+                invalidKeys.add(key);
+                log.warn("结构胎胚首班配置无效，本键不参与限量, factoryCode={}, batchNo={}, configId={}, "
+                                + "structure={}, embryo={}, treadCount={}", factoryCode, context.getBatchNo(),
+                        config.getId(), config.getStructureCode(), config.getEmbryoCode(), config.getTreadCount());
+                continue;
+            }
+            embryos.put(config.getEmbryoCode(), config.getTreadCount());
+        }
+        counts.replaceAll((structure, embryos) -> Collections.unmodifiableMap(embryos));
+        context.setStructureTreadCountMap(Collections.unmodifiableMap(counts));
+        log.info("结构胎胚首班限量加载完成, factoryCode: {}, batchNo: {}, configCount: {}, structureCount: {}",
+                factoryCode, context.getBatchNo(), configs.size(), counts.size());
     }
 
     /**

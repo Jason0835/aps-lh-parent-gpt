@@ -1,7 +1,10 @@
 package com.zlt.aps.lh.service.impl;
 
+import org.apache.commons.lang3.StringUtils;
+
 import com.zlt.aps.lh.api.domain.dto.SkuDailyPlanQuotaDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
+import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.api.enums.SkuScheduleSourceTypeEnum;
 import com.zlt.aps.lh.component.EarlyProductionQuantityCalculator;
@@ -17,6 +20,8 @@ import com.zlt.aps.lh.engine.strategy.support.DailyNewSpecCandidate;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionChecker;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionRuntimePlan;
 import com.zlt.aps.lh.engine.strategy.support.PendingSkuUnscheduledRule;
+import com.zlt.aps.lh.util.PriorityTraceLogHelper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
@@ -29,6 +34,7 @@ import java.util.Objects;
  * <p>只读取日计划、生产余量、产品状态和提前生产中心规则，不查询机台、不比较尺寸或排序。
  * 日驱动候选和前置指定组合共用这些规则，历史关系本身不授予排产资格。</p>
  */
+@Slf4j
 @Service
 public class NewSpecMaterialEligibilityService {
 
@@ -40,6 +46,16 @@ public class NewSpecMaterialEligibilityService {
     private IEndingJudgmentStrategy endingJudgmentStrategy;
     @Resource
     private SkuDecrementChecker skuDecrementChecker;
+
+    /**
+     * 在实际业务日资源竞争前统一处理未来需求到期，不在只读候选预演中改写账本。
+     * @param context 排程上下文
+     * @param sku 原需求对象
+     * @param date 实际业务日期
+     */
+    public void prepareNormalPlanOnDueDate(LhScheduleContext context, SkuScheduleDTO sku, LocalDate date) {
+        earlyProductionRuntimePlanService.prepareNormalPlanOnDueDate(context, sku, date);
+    }
 
     /**
      * 读取原始日计划，保持现有月计划与日账本取数口径。
@@ -104,9 +120,60 @@ public class NewSpecMaterialEligibilityService {
      */
     public DailyNewSpecCandidate resolveCandidate(
             LhScheduleContext context, SkuScheduleDTO sku, LocalDate date) {
+        // 普通新增始终使用原开关，不因SKU曾命中过历史关系而获得全局豁免。
+        return this.resolveCandidate(context, sku, date, false);
+    }
+
+    /**
+     * 为前日指定组合构建资格，仅豁免试制量试开关，其他需求及资源规则继续共用。
+     * @param context 排程上下文
+     * @param sku 后物料及状态
+     * @param date 实际业务日
+     * @param plan 本批有效历史计划
+     * @param machineCode 本次指定机台
+     * @return 指定候选；关系不匹配时明确拒绝
+     */
+    public DailyNewSpecCandidate resolvePreviousAlternateCandidate(LhScheduleContext context,
+            SkuScheduleDTO sku, LocalDate date, LhMouldChangePlan plan, String machineCode) {
+        if (!context.isEligiblePreviousAlternateCombination(sku, plan, machineCode)) {
+            DailyNewSpecCandidate rejected = new DailyNewSpecCandidate(
+                    MonthPlanDateResolver.buildMaterialStatusKey(sku.getMaterialCode(), sku.getProductStatus()), sku);
+            rejected.setLastFailure("未匹配本批有效前日指定交替组合");
+            return rejected;
+        }
+        // 登记发生在预演前，指定承接受阻也不能转成虚拟机排产。
+        context.registerPreviousAlternateTrialSku(sku);
+        boolean trial = PendingSkuUnscheduledRule.isTrialOrMassTrialSku(sku);
+        if (trial && !PendingSkuUnscheduledRule.isTrialMassTrialSchedulingEnabled(context)) {
+            String detail = String.format("工厂=%s, 批次=%s, 业务日=%s, 计划ID=%s, 机台=%s, 后料=%s, 状态=%s, "
+                            + "SYS0311004=0，仅豁免指定组合开关，其他约束继续校验",
+                    context.getFactoryCode(), context.getBatchNo(), date, plan.getId(), machineCode,
+                    sku.getMaterialCode(), sku.getProductStatus());
+            log.info("前日指定交替试制量试开关豁免, {}", detail);
+            PriorityTraceLogHelper.appendProcessLog(context, "前日指定交替试制量试开关豁免", detail);
+        }
+        return this.resolveCandidate(context, sku, date, trial);
+    }
+
+    /**
+     * 共用日计划、减量清单、提前生产和真实余量判断，禁止指定关系绕过这些规则。
+     * @param context 排程上下文
+     * @param sku 当前候选
+     * @param date 实际业务日
+     * @param specifiedTrial 已精确校验的指定交替试制量试
+     * @return 普通或指定组合的物料资格
+     */
+    private DailyNewSpecCandidate resolveCandidate(LhScheduleContext context,
+            SkuScheduleDTO sku, LocalDate date, boolean specifiedTrial) {
         DailyNewSpecCandidate candidate = new DailyNewSpecCandidate(
                 MonthPlanDateResolver.buildMaterialStatusKey(sku.getMaterialCode(), sku.getProductStatus()), sku);
-        LhUnscheduledResult trialExclusion = PendingSkuUnscheduledRule.evaluateNewSpecTrialExclusion(context, sku);
+        if (!specifiedTrial && StringUtils.equals(
+                SkuScheduleSourceTypeEnum.PREVIOUS_ALTERNATE_TRIAL.getCode(), sku.getSourceType())) {
+            candidate.setLastFailure("历史指定试制量试余量只允许原指定组合承接");
+            return candidate;
+        }
+        LhUnscheduledResult trialExclusion = specifiedTrial ? null
+                : PendingSkuUnscheduledRule.evaluateNewSpecTrialExclusion(context, sku);
         if (Objects.nonNull(trialExclusion) || skuDecrementChecker.isDecrementHit(context, sku)) {
             candidate.setLastFailure(Objects.nonNull(trialExclusion)
                     ? trialExclusion.getUnscheduledReason() : "物料命中减量清单");
@@ -122,11 +189,11 @@ public class NewSpecMaterialEligibilityService {
         boolean continuationDue = !continuation || Objects.isNull(sku.getFirstAddMachineProductionDate())
                 || !sku.getFirstAddMachineProductionDate().isAfter(date);
         boolean normalDemand = continuation ? continuationDue : originalQty > 0 && remainingQty > 0;
-        if (!context.isFutureOnlyEarlyProductionCandidate(sku) && normalDemand && !continuationEarly) {
+        if (!context.isFutureOnlyEarlyProductionCandidate(sku, date) && normalDemand && !continuationEarly) {
             candidate.addReason(continuation ? DailyCandidateReason.ADD_MACHINE_REQUIREMENT
                     : DailyCandidateReason.TODAY_PLAN);
             candidate.setTargetPlanDate(date);
-        } else if (originalQty <= 0 || continuationEarly || context.isFutureOnlyEarlyProductionCandidate(sku)) {
+        } else if (originalQty <= 0 || continuationEarly || context.isFutureOnlyEarlyProductionCandidate(sku, date)) {
             EarlyProductionRuntimePlan plan = this.previewEarlyProduction(context, sku, date);
             candidate.setEarlyProductionPreview(plan);
             if (Objects.nonNull(plan) && Objects.nonNull(plan.getDecision())

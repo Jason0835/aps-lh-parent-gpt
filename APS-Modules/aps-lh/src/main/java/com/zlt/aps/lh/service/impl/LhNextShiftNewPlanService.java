@@ -1,6 +1,7 @@
 package com.zlt.aps.lh.service.impl;
 
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchRuntimeState;
+import com.zlt.aps.lh.engine.strategy.support.StructureSwitchFirstShiftQuantityPolicy;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchSchedulingPolicy;
 
 import cn.hutool.core.bean.BeanUtil;
@@ -300,6 +301,9 @@ public class LhNextShiftNewPlanService {
         isolatedContext.setStructureSwitchRuntimeMap(new LinkedHashMap<>(switchBaseline));
         isolatedContext.setStructureSwitchResultPlanMap(new IdentityHashMap<>());
         isolatedContext.setStructureSwitchAttemptPlanMap(new LinkedHashMap<>(4));
+        // 原窗口结果即将清空，冻结同一次供胚首班已用量，防止准备槽重复消费额度。
+        isolatedContext.setStructureTreadBaselineQtyMap(
+                StructureSwitchFirstShiftQuantityPolicy.snapshotUsedQuantities(sourceContext));
         isolatedContext.setScheduleResultList(new ArrayList<LhScheduleResult>());
         isolatedContext.setScheduleResultSourceSkuMap(
                 new IdentityHashMap<LhScheduleResult, SkuScheduleDTO>());
@@ -322,7 +326,7 @@ public class LhNextShiftNewPlanService {
                 new LinkedHashSet<String>(releaseTimeMap.keySet()));
         isolatedContext.setNewSpecSkuList(new ArrayList<SkuScheduleDTO>(remainingSkuList));
         isolatedContext.setStructureSkuMap(this.buildStructureSkuMap(remainingSkuList));
-        isolatedContext.setStructureMinMachineSkuSnapshotMap(
+        isolatedContext.setStructureSkuSnapshotMap(
                 this.buildStructureSkuMap(remainingSkuList));
         isolatedContext.setAllSkuScheduleDtoMap(remainingSkuList.stream()
                 .collect(Collectors.toMap(
@@ -403,6 +407,8 @@ public class LhNextShiftNewPlanService {
         context.setNextShiftNewPlanPoolDateMap(new LinkedHashMap<>(context.getNextShiftNewPlanPoolDateMap()));
         context.setContinuousSkuList(new ArrayList<>(0));
         context.setTrialVirtualMachineCandidateList(new ArrayList<>(0));
+        // 窗口内历史指定试验需求不扩散到独立班次9，也不能共享原来源对象供副本修改。
+        context.setPreviousAlternateTrialDemandList(new ArrayList<>(0));
         context.setInitialMachineScheduleMap(new LinkedHashMap<>(context.getInitialMachineScheduleMap()));
         context.setSingleControlInitialTargetQtyMap(new LinkedHashMap<>(context.getSingleControlInitialTargetQtyMap()));
         context.setSingleControlModeSnapshotMap(new LinkedHashMap<>(context.getSingleControlModeSnapshotMap()));
@@ -584,6 +590,10 @@ public class LhNextShiftNewPlanService {
             LhScheduleContext context,
             SkuScheduleDTO sku,
             String skuKey) {
+        // 未激活未来候选的隔离零账本不代表已排完；资格仍由班次9独立候选链判断。
+        if (Objects.nonNull(context.resolveInactiveFutureDemandQty(sku))) {
+            return targetScheduleQtyResolver.previewUnfulfilledProductionRemainingQty(context, sku);
+        }
         Integer ledgerRemainingQty = context.getSkuProductionRemainingQtyMap().get(skuKey);
         if (Objects.nonNull(ledgerRemainingQty)) {
             return Math.max(0, ledgerRemainingQty);

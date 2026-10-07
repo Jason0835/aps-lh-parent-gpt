@@ -92,6 +92,25 @@ public final class DailyMachineExpansionPlanner {
     }
 
     /**
+     * 汇总当前业务日已失效的物理机台，供指定承接、新增及换活字块共用。
+     * 历史交替释放按生效日排除，同料重新上机仍由上下文识别为有效承载。
+     *
+     * @param context 排程上下文
+     * @param sku 当前物料及产品状态
+     * @param productionDate 当前需求业务日
+     * @return 不再承接当前需求的物理机台集合
+     */
+    public static Set<String> resolveReleasedDemandMachines(LhScheduleContext context,
+                                                            SkuScheduleDTO sku,
+                                                            LocalDate productionDate) {
+        Set<String> machines = new LinkedHashSet<String>(context.resolveForcedReleasedPhysicalMachineCodes(sku));
+        if (Objects.nonNull(productionDate)) {
+            machines.addAll(context.resolvePreviousAlternateReleasedMachines(sku, productionDate));
+        }
+        return machines;
+    }
+
+    /**
      * 计算新开机台判断使用的已落实需求份数，不改写逐日生产机台索引。
      * <p>当日已排机台与同一需求的有效前置绑定取物理机台并集；强制释放机台仍予排除。</p>
      * @param context 排程上下文
@@ -104,8 +123,7 @@ public final class DailyMachineExpansionPlanner {
                                                   LocalDate productionDate) {
         Set<String> committedMachines = resolvePreScheduledDemandMachines(context, sku, productionDate);
         Set<String> excludedMachines = new LinkedHashSet<String>(committedMachines);
-        excludedMachines.addAll(context.resolveForcedReleasedPhysicalMachineCodes(sku));
-        excludedMachines.addAll(context.resolvePreviousAlternateReleasedMachines(sku, productionDate));
+        excludedMachines.addAll(resolveReleasedDemandMachines(context, sku, productionDate));
         // 已排集合排除绑定后再相加，避免同一天或左右侧已登记时重复占用需求。
         return committedMachines.size() + context.getSkuScheduledMachineCountExcluding(
                 productionDate, sku.getMaterialCode(), sku.getProductStatus(), excludedMachines);
@@ -129,7 +147,9 @@ public final class DailyMachineExpansionPlanner {
                         && StringUtils.equals(StringUtils.defaultIfEmpty(sku.getProductStatus(), FORMAL_PRODUCT_STATUS),
                                 StringUtils.defaultIfEmpty(result.getProductStatus(), FORMAL_PRODUCT_STATUS)));
         // 有前置记录时由统一有效性规则重新计算；失效或尚未生效的绑定不能被旧全窗口统计重新带回。
-        return hasPreScheduledDemand
+        // 历史释放也必须刷新需求，不能将旧全窗口正量带回新增或换活字块的上限判断。
+        return hasPreScheduledDemand || !CollectionUtils.isEmpty(
+                resolveReleasedDemandMachines(context, sku, productionDate))
                 ? countCommittedMachineDemand(context, sku, productionDate) : existingMachineCount;
     }
 
@@ -181,7 +201,7 @@ public final class DailyMachineExpansionPlanner {
         if (Objects.isNull(productionDate)) {
             return machines;
         }
-        Set<String> releasedMachines = context.resolveForcedReleasedPhysicalMachineCodes(sku);
+        Set<String> releasedMachines = resolveReleasedDemandMachines(context, sku, productionDate);
         for (ActiveMachineBinding binding : context.getPreScheduledMachineBindingList()) {
             if (Objects.isNull(binding) || Objects.isNull(binding.getMachineDemandStartDate())
                     || productionDate.isBefore(binding.getMachineDemandStartDate())

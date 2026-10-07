@@ -25,15 +25,14 @@ import java.util.Set;
  *
  * <p>业务职责：</p>
  * <ul>
- *   <li>S4.2 批量加载排程工厂的 SKU 减量清单，按「年+月+物料编码+产品状态」四维构建索引；</li>
+ *   <li>S4.2 批量加载排程工厂的 SKU 减量清单，按「物料编码+产品状态」两维构建索引；</li>
  *   <li>S4.3 SKU 归集完成后统一前置过滤，命中减量清单的 SKU 不进入任何排产入口；</li>
  *   <li>命中 SKU 写入未排结果（数量=月计划余量 surplusQty，备注固定文案），同一 SKU 全程只写一次；</li>
- *   <li>供续作、换活字块、新增排产等流程统一调用，禁止在多个流程重复实现不同口径。</li>
+ *   <li>供续作、换活字块、新增排产、试制/量试虚拟机台兜底等流程统一调用，禁止在多个流程重复实现不同口径。</li>
  * </ul>
  *
- * <p>匹配口径：年、月取自 SKU 所属月计划（FactoryMonthPlanProductionFinalResult.year/month），
- * 跨月排程时各 SKU 按各自月计划年月匹配，不固定使用排程 T 日所属年月。
- * 四维同时匹配视为命中，任一维度缺失或不匹配则继续现有排产流程。</p>
+ * <p>匹配口径：仅按「物料编码+产品状态」两维匹配，与减量清单维护的年/月无关。
+ * 清单记录维护后持续生效，跨月排程、SKU 月计划年月变化均不影响命中；需解除拦截时由维护侧删除对应记录。</p>
  *
  * @author APS
  */
@@ -60,8 +59,8 @@ public class SkuDecrementChecker {
      * 批量加载排程工厂的 SKU 减量清单并构建索引写入上下文。
      *
      * <p>按工厂编号查询全部减量清单（单表查询，复用 MyBatis-Plus BaseMapper，不写 XML），
-     * 内存按四维归一化构建 Set 索引。索引 key 含 year+month，SKU 按各自月计划年月匹配，
-     * 不会误命中其他月份，因此无需按排程窗口年月裁剪加载范围。</p>
+     * 内存按「物料编码+产品状态」两维归一化构建 Set 索引。年/月仅为清单维护信息，不参与匹配，
+     * 因此跨月排程无需按排程窗口年月裁剪加载范围。</p>
      *
      * @param context 排程上下文
      */
@@ -78,10 +77,9 @@ public class SkuDecrementChecker {
         Set<String> indexSet = new HashSet<>(decrementList.size() * 2);
         for (LhSkuDecrement decrement : decrementList) {
             if (Objects.isNull(decrement)
-                    || Objects.isNull(decrement.getYear()) || Objects.isNull(decrement.getMonth())
                     || StringUtils.isEmpty(decrement.getMaterialCode())
                     || StringUtils.isEmpty(decrement.getProductStatus())) {
-                // 四维任一缺失为无效记录，跳过索引构建并告警，便于数据治理
+                // 匹配维度（物料+产品状态）任一缺失为无效记录，跳过索引构建并告警，便于数据治理
                 log.warn("SKU减量清单存在无效记录，跳过索引构建, 工厂: {}, 年: {}, 月: {}, 物料: {}, 产品状态: {}",
                         context.getFactoryCode(),
                         Objects.isNull(decrement) ? null : decrement.getYear(),
@@ -90,8 +88,7 @@ public class SkuDecrementChecker {
                         Objects.isNull(decrement) ? null : decrement.getProductStatus());
                 continue;
             }
-            indexSet.add(buildKey(decrement.getYear(), decrement.getMonth(),
-                    decrement.getMaterialCode(), decrement.getProductStatus()));
+            indexSet.add(buildKey(decrement.getMaterialCode(), decrement.getProductStatus()));
         }
         context.setSkuDecrementKeySet(indexSet);
         log.info("SKU减量清单批量加载完成, 工厂: {}, 原始记录数: {}, 有效索引数: {}",
@@ -101,8 +98,8 @@ public class SkuDecrementChecker {
     /**
      * 判断 SKU 是否命中减量清单。
      *
-     * <p>用 SKU 所属月计划年月 + 物料编码 + 产品状态拼 key 查索引。
-     * SKU 月计划年月或匹配维度缺失时视为未命中，继续现有排产流程。</p>
+     * <p>用「物料编码+产品状态」拼 key 查索引，与月计划年月无关；
+     * 匹配维度缺失时视为未命中，继续现有排产流程。</p>
      *
      * @param context 排程上下文
      * @param sku     SKU排程DTO
@@ -111,13 +108,11 @@ public class SkuDecrementChecker {
     public boolean isDecrementHit(LhScheduleContext context, SkuScheduleDTO sku) {
         if (Objects.isNull(context) || Objects.isNull(sku)
                 || CollectionUtils.isEmpty(context.getSkuDecrementKeySet())
-                || Objects.isNull(sku.getMonthPlanYear()) || Objects.isNull(sku.getMonthPlanMonth())
                 || StringUtils.isEmpty(sku.getMaterialCode())
                 || StringUtils.isEmpty(sku.getProductStatus())) {
             return false;
         }
-        String key = buildKey(sku.getMonthPlanYear(), sku.getMonthPlanMonth(),
-                sku.getMaterialCode(), sku.getProductStatus());
+        String key = buildKey(sku.getMaterialCode(), sku.getProductStatus());
         return context.getSkuDecrementKeySet().contains(key);
     }
 
@@ -147,8 +142,9 @@ public class SkuDecrementChecker {
     /**
      * 处理命中减量清单的SKU：写未排结果（去重），返回是否本次实际写入。
      *
-     * <p>去重 key 为「物料编码+产品状态+月计划年月」，保证同一 SKU 在多个流程被识别时
-     * 未排结果只生成一次。供 S4.3 前置过滤和 S4.5 新增主循环兜底统一调用。</p>
+     * <p>去重 key 为「物料编码+产品状态」，保证同一 SKU 在多个流程被识别时
+     * 未排结果只生成一次。供 S4.3 前置过滤、无日计划源头拦截和
+     * 试制/量试虚拟机台兜底复核统一调用。</p>
      *
      * @param context 排程上下文
      * @param sku     SKU排程DTO
@@ -159,9 +155,8 @@ public class SkuDecrementChecker {
                 || StringUtils.isEmpty(sku.getMaterialCode())) {
             return false;
         }
-        // 去重：同一SKU（物料+产品状态+月计划年月）已处理过则不再写入未排结果
-        String handledKey = buildKey(sku.getMonthPlanYear(), sku.getMonthPlanMonth(),
-                sku.getMaterialCode(), sku.getProductStatus());
+        // 去重：同一SKU（物料+产品状态）已处理过则不再写入未排结果
+        String handledKey = buildKey(sku.getMaterialCode(), sku.getProductStatus());
         if (!context.getDecrementHandledSkuKeySet().add(handledKey)) {
             return false;
         }
@@ -223,17 +218,14 @@ public class SkuDecrementChecker {
     }
 
     /**
-     * 构建减量清单四维索引 key（归一化：trim 后转小写）。
+     * 构建减量清单两维索引 key（归一化：trim 后转小写）。
      *
-     * @param year          年
-     * @param month         月
      * @param materialCode  物料编码
      * @param productStatus 产品状态
      * @return 归一化后的索引 key
      */
-    private String buildKey(Object year, Object month, Object materialCode, Object productStatus) {
-        return normalize(year) + KEY_SEPARATOR + normalize(month) + KEY_SEPARATOR
-                + normalize(materialCode) + KEY_SEPARATOR + normalize(productStatus);
+    private String buildKey(Object materialCode, Object productStatus) {
+        return normalize(materialCode) + KEY_SEPARATOR + normalize(productStatus);
     }
 
     /**

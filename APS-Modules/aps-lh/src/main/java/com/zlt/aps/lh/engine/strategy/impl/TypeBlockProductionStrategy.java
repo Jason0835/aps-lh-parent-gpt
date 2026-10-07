@@ -57,6 +57,7 @@ import com.zlt.aps.lh.engine.strategy.support.SpecifiedMachineScheduleResult;
 import com.zlt.aps.lh.engine.strategy.support.StructureMachineLimitAdmissionService;
 import com.zlt.aps.lh.engine.strategy.support.StructureMachineLimitDecision;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchSchedulingPolicy;
+import com.zlt.aps.lh.engine.strategy.support.StructureSwitchFirstShiftQuantityPolicy;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchPlan;
 import com.zlt.aps.lh.engine.strategy.support.FirstInspectionTimelinePlan;
 import com.zlt.aps.cx.entity.config.CxEmbryoLhTime;
@@ -265,6 +266,10 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         }
         // 换活字块只处理窗口结束前已真实收尾或释放的机台；窗口上界之外的机台保留给 S4.5 新增排产。
         candidateMachines = filterScheduleWindowEndingMachines(context, candidateMachines);
+        if (context.isTimedMachineOffLoadPreview()) {
+            candidateMachines.removeIf(machine -> !context.getNewSpecMachineResourceScopeCodeSet()
+                    .contains(machine.getMachineCode()));
+        }
         for (MachineScheduleDTO candidateMachine : candidateMachines) {
             String triggerSource = machineTriggerSourceMap.get(candidateMachine.getMachineCode());
             if (StringUtils.equals(TYPE_BLOCK_TRIGGER_FIRST_DAY_NO_PLAN_RELEASE, triggerSource)
@@ -1188,8 +1193,11 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         if (Objects.nonNull(machine) && !machineSupplyStructureRule.canMachineSelectStructure(
                 context, machine.getMachineCode(), sku)) {
             if (writeDecisionLog) {
-                log.info("换活字块专供结构拒绝, batchNo: {}, machineCode: {}, materialCode: {}, structure: {}",
-                        context.getBatchNo(), machine.getMachineCode(), sku.getMaterialCode(), sku.getStructureName());
+                log.info("换活字块专供结构拒绝, factoryCode: {}, batchNo: {}, scheduleDate: {}, machineCode: {}, "
+                                + "materialCode: {}, productStatus: {}, structure: {}, 机台允许结构: {}",
+                        context.getFactoryCode(), context.getBatchNo(), context.getScheduleDate(),
+                        machine.getMachineCode(), sku.getMaterialCode(), sku.getProductStatus(), sku.getStructureName(),
+                        machineSupplyStructureRule.getAllowedStructuresForMachine(context, machine.getMachineCode(), sku));
             }
             return false;
         }
@@ -2686,9 +2694,13 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         LocalDate structureSwitchEarlyProductionCandidateDate = null;
         LocalDate earlyProductionSourceDate = null;
         boolean success = true;
-        if (originalDayPlanQty <= 0) {
-            earlyProductionSourceDate = EarlyProductionChecker.resolveFirstFuturePlanDate(
-                    context, sku, productionWorkDate);
+        // 续作补偿的增机需求日独立于原SKU当天日计划；当天有计划也不能提前借用未来机台缺口。
+        boolean continuationEarlyProduction = EarlyProductionChecker
+                .isEligibleContinuationAddMachineEarlyProduction(sku, productionWorkDate);
+        if (originalDayPlanQty <= 0 || continuationEarlyProduction) {
+            earlyProductionSourceDate = continuationEarlyProduction
+                    ? sku.getFirstAddMachineProductionDate()
+                    : EarlyProductionChecker.resolveFirstFuturePlanDate(context, sku, productionWorkDate);
             if (this.shouldDeferEarlyProductionToDailyNewSpec(
                     context, earlyProductionSourceDate)) {
                 String deferredReason = "提前生产必须等待当前业务日正常新增任务完成后执行";
@@ -2736,7 +2748,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             // 换活字块结果落地失败时，回滚本轮已占用的切换配额。
             getMouldChangeBalanceStrategy().rollbackMouldChange(context, switchStartTime);
         }
-        if (!success && originalDayPlanQty <= 0
+        if (!success && (originalDayPlanQty <= 0 || continuationEarlyProduction)
                 && Objects.nonNull(earlyProductionSourceDate)) {
             LhShiftConfigVO attemptShift = Objects.isNull(startTime)
                     ? null : NewSpecEmbryoAvailableTimeResolver.resolveProductionShift(
@@ -2754,8 +2766,8 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
     /**
      * 判断换活字块提前生产是否应统一后置到 S4.5 提前生产阶段。
      *
-     * <p>S4.4 位于 S4.5 按日正常新增之前，任何原始日计划为0的未来 SKU 若在这里直接
-     * 落地，都会先于对应业务日正常任务占用机台，并可能在跨日续排后突破结构计划机台数。
+     * <p>S4.4 位于 S4.5 按日正常新增之前，原始日计划为0的未来SKU或尚未到首次增机日
+     * 的续作补偿SKU若在这里直接落地，都会先于对应业务日正常任务占用机台，并可能在跨日续排后突破结构计划机台数。
      * 因此只要存在未来来源计划日，就保留 SKU 在新增队列中；S4.5 每日正常任务完成后，
      * 再复用同一换活字块关系、选机排序和提前生产中心运行视图使用真实剩余资源。</p>
      *
@@ -3319,7 +3331,8 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             sku.setStrictTargetQty(isEnding || sku.isStrictTargetQty());
             appliedRule = "多机台续排剩余目标量";
         } else if (isSingleMachine && isEnding) {
-            getTargetScheduleQtyResolver().upsizeEndingTargetQty(context, sku);
+            // 换活字块与新增共用实际机台收尾归整，不能等生成结果时才回写模数。
+            getTargetScheduleQtyResolver().upsizeEndingTargetQty(context, sku, machine);
             appliedRule = getTargetScheduleQtyResolver().isSharedEmbryoInWindow(context, sku)
                     ? "单机台收尾共用胎胚仅按余量" : "单机台收尾MAX(余量,胎胚库存)";
         } else if (isSingleMachine && getTargetScheduleQtyResolver().isFullCapacityMode(context)) {
@@ -3566,7 +3579,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
     private boolean isMachineHardMatched(LhScheduleContext context,
                                          MachineScheduleDTO machine,
                                          SkuScheduleDTO sku) {
-        // 定点、特殊材料置换和普通换活字块共用强专供范围限制，先过滤再分配切换资源。
+        // 定点、特殊材料置换和普通换活字块共用专供双向限制，先过滤再分配切换资源。
         return Objects.nonNull(machine) && Objects.nonNull(sku)
                 && machineSupplyStructureRule.canMachineSelectStructure(
                 context, machine.getMachineCode(), sku)
@@ -5822,6 +5835,10 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             if (continuousProduction && !switchFirstBatch) {
                 normalizedPlanQty = planQty;
             }
+            // 换活字块与新增共用首班共享额度，先确定实际落量再消费日计划账本。
+            boolean treadLimited = StructureSwitchFirstShiftQuantityPolicy.isLimited(context, result, shift);
+            normalizedPlanQty = StructureSwitchFirstShiftQuantityPolicy.capRetainedTotal(
+                    context, result, shift, normalizedPlanQty);
             // 按历史欠产、当日计划、受限追补窗口消费同一SKU的日计划账本
             int consumed = normalizedPlanQty > 0
                     ? SkuDailyPlanQuotaUtil.consumeRollingQuota(
@@ -5831,7 +5848,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             if (overQty > 0) {
                 boolean endingResult = YES_FLAG.equals(result.getIsEnd());
                 // 普通已上机连续生产由真实余量控制，独立严格场景及P0仍保留对应数量边界。
-                if (!continuousProduction || switchFirstBatch) {
+                if (!continuousProduction || switchFirstBatch || treadLimited) {
                     /*
                      * 收尾/严格目标只能回裁首检之后的正式生产量。换活字块阶段
                      * 已经发生的首检必须保留，且回裁到仅余首检时恢复真实首检区间。

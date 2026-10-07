@@ -19,8 +19,16 @@ public class ContinuationEndingAllocationSnapshot implements Serializable {
     private Date productionEndTime;
     /** 单控整机、停产保机及胶囊窗口约束后的物理释放时间。 */
     private Date releaseTime;
+    /** 历史交替终末余量的完成或退出事实，与逐机计算结果一致。 */
+    private ContinuationMachineFinishPlan.FinishState finishState;
     /** 新节点规则要求的生产收尾截止，允许恰好落在节点。 */
     private Date finishDeadline;
+    /** 分配前确定节点的历史计划来源，审计时不能用窗口末尾替代该节点。 */
+    private Long historicalFinishPlanId;
+    /** 分配前固定的物理释放机台。 */
+    private String finishRoleMachineCode;
+    /** 本次历史释放节点规则。 */
+    private String finishRule;
     /** 组级模拟次数快照下的预测换模时间，null表示当时无合法预测。 */
     private Date predictedChangeTime;
     /** 预测使用的动作类型，后料尚未选定时为通用交替。 */

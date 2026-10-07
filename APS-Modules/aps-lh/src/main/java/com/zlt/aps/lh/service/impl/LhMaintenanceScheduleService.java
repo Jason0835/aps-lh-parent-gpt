@@ -5,12 +5,17 @@ import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineMaintenanceWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
+import com.zlt.aps.lh.api.domain.dto.PrecisionMaintenanceJudgeDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhPrecisionPlan;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.engine.strategy.support.ContinuationEndingAllocationSnapshot;
+import com.zlt.aps.lh.engine.strategy.support.ContinuationMachineFinishPlan;
+import com.zlt.aps.lh.engine.strategy.support.PreviousAlternatePlanReleaseEvent;
+import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.PriorityTraceLogHelper;
@@ -27,11 +32,17 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * 硫化机精度保养计划排程服务。
@@ -263,6 +274,29 @@ public class LhMaintenanceScheduleService {
                                                         Date preparationStartTime,
                                                         Date productionStartTime,
                                                         Date completionTime) {
+        return this.resolvePrecisionCandidateRejectReason(context, machine, sku, pendingQty, plannedQty,
+                preparationStartTime, productionStartTime, completionTime, null);
+    }
+
+    /**
+     * 校验包含正规换模并行时间轴的候选。只有冻结首检已包含在精度内的换模调用方传入真实换模结束。
+     * 换模可以占用精度区间，但生产仍不得早于两项任务完整完成时间。
+     * @param context 排程上下文
+     * @param machine 候选机台
+     * @param sku 待排物料
+     * @param pendingQty 真实待排量
+     * @param plannedQty 本次计划量
+     * @param preparationStartTime 准备开始时间
+     * @param productionStartTime 正式生产开始时间
+     * @param completionTime 生产完成时间
+     * @param parallelMouldChangeEndTime 已确认并行换模的真实结束时间，普通入口为空
+     * @return 空字符串表示允许，否则返回排除原因
+     */
+    public String resolvePrecisionCandidateRejectReason(LhScheduleContext context,
+                                                        MachineScheduleDTO machine, SkuScheduleDTO sku,
+                                                        int pendingQty, int plannedQty, Date preparationStartTime,
+                                                        Date productionStartTime, Date completionTime,
+                                                        Date parallelMouldChangeEndTime) {
         MachineMaintenanceWindowDTO window = resolveFirstMaintenanceWindow(machine);
         if (Objects.isNull(window) || Objects.isNull(window.getProductionCutoffTime())
                 || Objects.isNull(window.getProductionResumeTime())) {
@@ -272,6 +306,14 @@ public class LhMaintenanceScheduleService {
                 ? preparationStartTime : productionStartTime;
         if (Objects.isNull(taskStartTime)) {
             return "候选缺少换型或开产开始时间";
+        }
+        if (Objects.nonNull(parallelMouldChangeEndTime)
+                && this.hasMouldChangeMaintenanceOverlap(context, machine,
+                preparationStartTime, parallelMouldChangeEndTime)) {
+            Date parallelReadyTime = this.resolveParallelMouldChangeReadyTime(
+                    context, machine, preparationStartTime, parallelMouldChangeEndTime);
+            return Objects.nonNull(productionStartTime) && !productionStartTime.before(parallelReadyTime)
+                    ? StringUtils.EMPTY : "换模与精度并行任务尚未全部完成，禁止生产";
         }
         /*
          * 中心预决策会一次性为30天内全部精度计划分配执行日；当每日台数限制使某些窗口被顺延到
@@ -498,7 +540,7 @@ public class LhMaintenanceScheduleService {
     }
 
     /**
-     * 普通精度遇到当前SKU中班真实收尾时，本轮跳过挂窗以保留后续夜班生产机会。
+     * 普通精度遇到当前SKU在08:00后早班或中班真实收尾时，跳过本轮挂窗并保留后续生产机会。
      *
      * @param context 已完成续作收口的上下文
      * @param machine 当前运行态机台
@@ -510,28 +552,16 @@ public class LhMaintenanceScheduleService {
                                                          MachineScheduleDTO machine,
                                                          LhPrecisionPlan plan,
                                                          Date endingTime) {
-        int forceDays = this.getParamInt(context, LhScheduleParamConstant.MAINTENANCE_FORCE_CHECK_DAYS,
-                LhScheduleConstant.MAINTENANCE_FORCE_CHECK_DAYS);
         Integer daysToDue = this.resolveDaysToDue(plan);
-        // 沿用数据源到期天数和已有硬优先参数；本次新增范围固定不超过30天。
-        boolean ordinaryPlan = Objects.nonNull(daysToDue)
-                && daysToDue > LhScheduleConstant.MAINTENANCE_FORCE_CHECK_DAYS
-                && daysToDue > forceDays && daysToDue <= LhScheduleConstant.MAINTENANCE_WARNING_DAYS;
-        // 只接受与物理机台最终收尾一致的有量生产结果，不用空闲或零量释放时间推断班次。
+        // 只接受与物理机台最终收尾一致的有量结果；历史释放后身份来自已提交快照。
         LhScheduleResult endingResult = this.resolveAccuracyEndingResult(context, machine, endingTime);
         int shiftIndex = ShiftFieldUtil.resolveLastPlannedShiftIndex(endingResult);
         LhShiftConfigVO shift = shiftIndex > 0
                 ? LhScheduleTimeUtil.getShiftByIndex(context, context.getScheduleDate(), shiftIndex) : null;
-        boolean delay = ordinaryPlan && Objects.nonNull(shift) && shift.isAfternoonShift();
-        String reason;
-        if (!ordinaryPlan) {
-            reason = "不属于本次普通精度过滤范围，保留原精度规则";
-        } else if (Objects.isNull(shift)) {
-            reason = "未确认当前SKU真实有量收尾班次，保留原精度规则";
-        } else {
-            reason = delay ? "当前SKU中班收尾，本轮跳过精度以保留后续夜班产能"
-                    : "当前SKU非中班收尾，继续原06:00截止及少量SKU补排规则";
-        }
+        boolean daytimeEnding = Objects.nonNull(shift) && (shift.isMorningShift() || shift.isAfternoonShift());
+        boolean delay = this.shouldDelayOrdinaryAccuracyPlan(context, plan, endingTime, daytimeEnding);
+        String reason = delay ? "普通精度遇到08:00后早班或中班真实收尾，本轮保留后续生产机会"
+                : "未命中普通精度日班收尾过滤，继续原截止及少量SKU补排规则";
         String decision = delay ? "本轮不触发精度" : "继续原规则，是否触发由后续挂窗决定";
         StringBuilder detail = new StringBuilder(192);
         detail.append("收尾侧=").append(Objects.nonNull(endingResult)
@@ -550,6 +580,26 @@ public class LhMaintenanceScheduleService {
     }
 
     /**
+     * 普通精度挂窗和纯判定共用触发条件，08:00后日班收尾不得通过顺延次日挂窗制造空班。
+     * 3天内硬优先、扩大硬优先参数、夜班及08:00前完成继续走原资源和日期校验。
+     * @param context 本批上下文
+     * @param plan 精度计划，直接使用接口到期天数
+     * @param endingTime 已确认的真实生产结束时间
+     * @param daytimeEnding 是否由真实结果或调用方明确提供的试算识别为早班或中班
+     * @return 是否应把机台留给后续生产
+     */
+    private boolean shouldDelayOrdinaryAccuracyPlan(LhScheduleContext context, LhPrecisionPlan plan,
+            Date endingTime, boolean daytimeEnding) {
+        Integer daysToDue = this.resolveDaysToDue(plan);
+        int forceDays = this.getParamInt(context, LhScheduleParamConstant.MAINTENANCE_FORCE_CHECK_DAYS,
+                LhScheduleConstant.MAINTENANCE_FORCE_CHECK_DAYS);
+        return Objects.nonNull(daysToDue) && Objects.nonNull(endingTime) && daytimeEnding
+                && daysToDue > Math.max(forceDays, LhScheduleConstant.MAINTENANCE_FORCE_CHECK_DAYS)
+                && daysToDue <= LhScheduleConstant.MAINTENANCE_WARNING_DAYS
+                && endingTime.after(this.buildMaintenanceStartTime(context, LhScheduleTimeUtil.clearTime(endingTime)));
+    }
+
+    /**
      * 定位物理机台当前SKU最终有量收尾结果，班末完成仍归最后生产班而非下一班。
      *
      * @param context 排程上下文
@@ -564,22 +614,49 @@ public class LhMaintenanceScheduleService {
             return null;
         }
         String physicalMachineCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(machine.getMachineCode());
-        // 按当前在机物料和物理机台匹配，避免同机历史结果、其他物料或提前释放结果参与判断。
+        // 最终结果必须仍在本轮上下文中；历史释放后的收尾事实由提交快照确认，不依赖已清空的在机身份。
         return context.getScheduleResultList().stream()
                 .filter(Objects::nonNull)
                 .filter(result -> Objects.equals(physicalMachineCode,
                         LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode())))
-                .filter(result -> {
-                    MachineScheduleDTO resultMachine = context.getMachineScheduleMap().get(result.getLhMachineCode());
-                    return Objects.nonNull(resultMachine) && resultMachine.isEnding()
-                            && StringUtils.isNotEmpty(resultMachine.getCurrentMaterialCode())
-                            && Objects.equals(resultMachine.getCurrentMaterialCode(), result.getMaterialCode());
-                })
                 .filter(result -> ShiftFieldUtil.resolveLastPlannedShiftIndex(result) > 0)
-                .filter(result -> endingTime.equals(ShiftFieldUtil.getShiftEndTime(result,
-                        ShiftFieldUtil.resolveLastPlannedShiftIndex(result))))
+                .filter(result -> this.isAccuracyEndingProduction(context, result, endingTime))
                 .max(Comparator.comparingInt(ShiftFieldUtil::resolveLastPlannedShiftIndex))
                 .orElse(null);
+    }
+
+    /**
+     * 用已提交收尾事实确认最终有量结果，生产收尾与物理释放分别核对。
+     * 历史交替释放会清空当前物料和收尾标记，不能因此丢失前料真实中班收尾；
+     * 强制退出、窗口未完成及被最终扣账改变的快照均不能冒充完整收尾。
+     *
+     * @param context 已完成续作最终收口的上下文
+     * @param result 本轮仍保留的有量结果
+     * @param endingTime 物理机台最晚释放时间
+     * @return 是否存在与最终结果一致的真实收尾依据
+     */
+    private boolean isAccuracyEndingProduction(LhScheduleContext context, LhScheduleResult result,
+                                               Date endingTime) {
+        int shiftIndex = ShiftFieldUtil.resolveLastPlannedShiftIndex(result);
+        Date productionEndTime = ShiftFieldUtil.getShiftEndTime(result, shiftIndex);
+        ContinuationEndingAllocationSnapshot snapshot = context.getContinuationSurplusEndingSnapshotMap().get(result);
+        if (Objects.nonNull(snapshot) && Objects.nonNull(snapshot.getFinishState())) {
+            // 快照按结果对象保存物料和状态身份；只消费完整完成且仍与最终八班量一致的提交事实。
+            int[] quantities = snapshot.getShiftQuantities();
+            return snapshot.getFinishState() == ContinuationMachineFinishPlan.FinishState.SURPLUS_COMPLETED
+                    && endingTime.equals(snapshot.getReleaseTime())
+                    && Objects.nonNull(productionEndTime)
+                    && Objects.equals(productionEndTime, snapshot.getProductionEndTime())
+                    && Objects.nonNull(quantities) && quantities.length == LhScheduleConstant.MAX_SHIFT_SLOT_COUNT
+                    && IntStream.rangeClosed(1, LhScheduleConstant.MAX_SHIFT_SLOT_COUNT).allMatch(index -> quantities[index - 1]
+                    == Optional.ofNullable(ShiftFieldUtil.getShiftPlanQty(result, index)).orElse(0));
+        }
+        // 未进入余量收尾快照的普通续作，继续使用原在机物料及最终收尾标记。
+        MachineScheduleDTO resultMachine = context.getMachineScheduleMap().get(result.getLhMachineCode());
+        return Objects.nonNull(resultMachine) && resultMachine.isEnding()
+                && StringUtils.isNotEmpty(resultMachine.getCurrentMaterialCode())
+                && Objects.equals(resultMachine.getCurrentMaterialCode(), result.getMaterialCode())
+                && endingTime.equals(productionEndTime);
     }
 
     /**
@@ -965,8 +1042,8 @@ public class LhMaintenanceScheduleService {
     public boolean shouldApplyMaintenanceOverlapSwitchRule(LhScheduleContext context,
                                                            MachineScheduleDTO machine,
                                                            Date referenceTime) {
-        // 最新规则明确禁止换模、换活字块与精度计划并行。所有调用方继续复用原入口，
-        // 但统一返回false，随后走正常切换时长并由delaySwitchStartByMaintenance顺延至预热结束。
+        // 正规换模并行仍使用正常8小时时长，不能回到旧的维保重叠4小时规则。
+        // 换活字块等调用方继续由delaySwitchStartByMaintenance避开精度及预热。
         return false;
     }
 
@@ -1092,6 +1169,15 @@ public class LhMaintenanceScheduleService {
                     productionResumeTime, productionCutoffTime, forceDown, preInsertAllowed, triggerReason);
         }
         increaseDailyMaintenanceCount(context, planDate, machine.getMachineCode());
+        if (this.isLastDayOfMonth(planDate) && !this.isMaintenanceOnInventoryDayAllowed(context)
+                && this.hasSameDayHistoricalMouldChange(context, planDate, machine.getMachineCode())) {
+            String detail = "工厂=" + context.getFactoryCode() + "，批次=" + context.getBatchNo()
+                    + "，机台=" + machine.getMachineCode() + "，精度开始="
+                    + LhScheduleTimeUtil.formatDateTime(startTime)
+                    + "，例外=历史指定正规换模与精度同日并行，原盘点日参数不变";
+            log.info("精度盘点日历史交替例外挂窗, {}", detail);
+            PriorityTraceLogHelper.appendProcessLog(context, "精度盘点日历史交替例外挂窗", detail);
+        }
         log.info("硫化机保养窗口已安排, 机台: {}, 配对侧: {}, 保养类型: {}, 计划到期: {}, 距到期天数: {}, "
                         + "生产截止: {}, 保养开始: {}, 保养结束: {}, 预热完成及最早开产: {}, "
                         + "允许精度前插排: {}, 强制下机: {}, 原因: {}",
@@ -1412,7 +1498,7 @@ public class LhMaintenanceScheduleService {
         if (!isSundayAllowed(context) && isSunday(targetDate)) {
             return "周日不安排保养";
         }
-        if (isLastDayOfMonth(targetDate)) {
+        if (this.isInventoryDayUnavailable(context, targetDate, machineCode)) {
             return "盘点日不安排保养";
         }
         if (isHolidayOrHolidayBeforeDay(context, targetDate)) {
@@ -2153,5 +2239,552 @@ public class LhMaintenanceScheduleService {
                 .append("，命中规则=").append(PriorityTraceLogHelper.safeText(hitRule))
                 .append("，处理结果=").append(PriorityTraceLogHelper.safeText(result));
         PriorityTraceLogHelper.appendProcessLog(context, title, detailBuilder.toString());
+    }
+
+    // ==================== 精度保养可行性判定（新排程主流程入口） ====================
+
+    /**
+     * 批量判断机台能否执行硫化精度保养（新排程主流程入口）。
+     *
+     * <p>内部先按精度紧急度对入参机台稳定排序（距到期天数升序→计划日期升序→物理机台编码升序），
+     * 保证"计划日期越靠近越先做"；随后逐台调用单机核心判定，并按"每天保养不超过1台"分配额度：
+     * 排序靠前的机台先占用合规执行日，排序靠后的机台搜索时扣除本批已分配日期。
+     * 超期（计划日期早于排程T日）或到计划日期仍无合规执行日的机台直接舍去。</p>
+     *
+     * <p>本方法为纯判定：不挂保养窗口、不写上下文每日额度，与换模、清洗、停机的重叠由排程
+     * 主流程依据返回的机台编码和开始/结束时间自行判断。结果列表与入参列表按机台编码一一对应，
+     * 不能做精度的机台返回占用时长0。</p>
+     *
+     * @param context 排程上下文（精度计划、班次配置、工作日历、每日额度等运行态数据）
+     * @param machineList 主流程一次给入的机台列表
+     * @param predictedNaturalEndingTimeMap 长期在机机台的预测自然收尾时间（机台编码→时间），可为null；
+     *                                      长期在机且进入3天检查期的机台不在Map中时视为无法自然收尾
+     * @return 判定结果列表（按入参顺序，与有效入参机台一一对应；不能做精度的机台占用时长为0）
+     */
+    public List<PrecisionMaintenanceJudgeDTO> resolvePrecisionMaintenanceList(
+            LhScheduleContext context,
+            List<MachineScheduleDTO> machineList,
+            Map<String, Date> predictedNaturalEndingTimeMap) {
+        List<PrecisionMaintenanceJudgeDTO> resultList = new ArrayList<>();
+        if (Objects.isNull(context) || CollectionUtils.isEmpty(machineList)) {
+            return resultList;
+        }
+        // 先解析每台机台命中的精度计划供排序使用；无计划的机台排序键取最大值，判定时直接返回0。
+        Map<String, LhPrecisionPlan> judgePlanMap = new HashMap<>(Math.max(16, machineList.size() * 2));
+        for (MachineScheduleDTO machine : machineList) {
+            if (Objects.isNull(machine) || StringUtils.isEmpty(machine.getMachineCode())) {
+                continue;
+            }
+            judgePlanMap.putIfAbsent(machine.getMachineCode(),
+                    this.resolveMaintenancePlan(context, machine.getMachineCode()));
+        }
+        // 拷贝后排序，只影响每日台数额度分配先后，不改变调用方入参集合。
+        List<MachineScheduleDTO> orderedMachineList = machineList.stream()
+                .filter(Objects::nonNull)
+                .filter(machine -> StringUtils.isNotEmpty(machine.getMachineCode()))
+                .sorted(Comparator
+                        .comparing((MachineScheduleDTO machine) -> {
+                            LhPrecisionPlan plan = judgePlanMap.get(machine.getMachineCode());
+                            Integer daysToDue = this.resolveDaysToDue(plan);
+                            return Objects.nonNull(daysToDue) ? daysToDue : Integer.MAX_VALUE;
+                        })
+                        .thenComparing(machine -> {
+                            LhPrecisionPlan plan = judgePlanMap.get(machine.getMachineCode());
+                            return Objects.nonNull(plan) ? plan.getPlanDate() : null;
+                        }, Comparator.nullsLast(Date::compareTo))
+                        .thenComparing(machine ->
+                                LhSingleControlMachineUtil.resolvePhysicalMachineCode(machine.getMachineCode()),
+                                Comparator.nullsLast(String::compareTo)))
+                .collect(Collectors.toList());
+
+        // 批内每日台数额度记账：日期键→已分配物理机台集合，仅本次调用内生效，不写上下文。
+        Map<String, Set<String>> batchAllocatedMachineMap = new HashMap<>();
+        Map<String, PrecisionMaintenanceJudgeDTO> judgeResultMap = new LinkedHashMap<>();
+        Set<String> handledPhysicalMachineSet = new HashSet<>();
+        for (MachineScheduleDTO machine : orderedMachineList) {
+            String machineCode = machine.getMachineCode();
+            // 防御入参列表重复机台编码：只判定一次，避免后一次判定结果覆盖前一次真实结果。
+            if (judgeResultMap.containsKey(machineCode)) {
+                continue;
+            }
+            // 同一物理机台（单控L/R两侧）只判定一次，后到侧直接判0，避免同一物理机台重复占用额度。
+            String physicalMachineCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode);
+            if (!handledPhysicalMachineSet.add(physicalMachineCode)) {
+                judgeResultMap.put(machineCode, this.buildZeroJudgeDTO(machineCode));
+                this.appendMaintenanceProcessLog(context, MAINTENANCE_PROCESS_LOG_TITLE, machineCode,
+                        judgePlanMap.get(machineCode), null,
+                        "同一物理机台已有更高优先级精度判定结果", "本批跳过重复机台，返回0");
+                continue;
+            }
+            // 收尾时间取物理机台两侧最晚真实收尾；预测自然收尾按机台编码从主流程入参获取。
+            Date endingTime = this.resolvePhysicalKnownEndingTime(context, machine);
+            Date predictedNaturalEndingTime = CollectionUtils.isEmpty(predictedNaturalEndingTimeMap)
+                    ? null : predictedNaturalEndingTimeMap.get(machineCode);
+            judgeResultMap.put(machineCode, this.resolvePrecisionMaintenanceInternal(
+                    context, machine, endingTime, predictedNaturalEndingTime, batchAllocatedMachineMap));
+        }
+        // 按入参顺序输出，保证主流程可以按机台一一取回结果。
+        for (MachineScheduleDTO machine : machineList) {
+            if (Objects.isNull(machine) || StringUtils.isEmpty(machine.getMachineCode())) {
+                continue;
+            }
+            PrecisionMaintenanceJudgeDTO judgeDTO = judgeResultMap.get(machine.getMachineCode());
+            if (Objects.nonNull(judgeDTO)) {
+                resultList.add(judgeDTO);
+            }
+        }
+        return resultList;
+    }
+
+    /**
+     * 单机核心：判断机台在给定收尾时间下能否执行硫化精度保养。
+     *
+     * <p>与批量入口的区别：收尾时间由调用方显式传入（后续实现1.2小余量SKU插排试算时，
+     * 可传模拟收尾时间反复调用），且不参与每日台数额度分配。判定口径与批量入口完全一致，
+     * 可重复调用、无副作用。</p>
+     *
+     * @param context 排程上下文
+     * @param machine 机台运行态
+     * @param endingTime 物理机台最晚收尾时间（建议传单控L/R两侧最晚，可复用resolvePhysicalKnownEndingTime）；
+     *                   无法确定自然收尾时传null
+     * @param predictedNaturalEndingTime 长期在机场景按真实班次产能预测的自然收尾时间；非长期在机场景传null
+     * @return 判定结果；不能做精度时占用时长为0
+     */
+    public PrecisionMaintenanceJudgeDTO resolvePrecisionMaintenance(
+            LhScheduleContext context,
+            MachineScheduleDTO machine,
+            Date endingTime,
+            Date predictedNaturalEndingTime) {
+        return this.resolvePrecisionMaintenanceInternal(context, machine, endingTime,
+                predictedNaturalEndingTime, null);
+    }
+
+    /**
+     * 精度保养判定核心实现。
+     *
+     * @param context 排程上下文
+     * @param machine 机台运行态
+     * @param endingTime 物理机台最晚收尾时间
+     * @param predictedNaturalEndingTime 长期在机预测自然收尾时间
+     * @param batchAllocatedMachineMap 批内每日台数额度记账（日期键→物理机台集合）；单机调用传null
+     * @return 判定结果；不能做精度时占用时长为0
+     */
+    private PrecisionMaintenanceJudgeDTO resolvePrecisionMaintenanceInternal(
+            LhScheduleContext context,
+            MachineScheduleDTO machine,
+            Date endingTime,
+            Date predictedNaturalEndingTime,
+            Map<String, Set<String>> batchAllocatedMachineMap) {
+        String machineCode = Objects.nonNull(machine) ? machine.getMachineCode() : null;
+        PrecisionMaintenanceJudgeDTO judgeDTO = this.buildZeroJudgeDTO(machineCode);
+        // 基础校验：上下文、机台有效，且机台尚未挂载保养窗口（已挂窗说明本轮已安排，不再重复判定）。
+        if (Objects.isNull(context) || Objects.isNull(machine) || StringUtils.isEmpty(machineCode)
+                || !CollectionUtils.isEmpty(machine.getMaintenanceWindowList())) {
+            return judgeDTO;
+        }
+        LhPrecisionPlan plan = this.resolveMaintenancePlan(context, machineCode);
+        Integer daysToDue = this.resolveDaysToDue(plan);
+        // 触发前提：存在未完成年度精度计划，且数据源已维护距到期天数。
+        if (!this.isPlanUncompleted(plan) || Objects.isNull(daysToDue)) {
+            this.appendMaintenanceProcessLog(context, MAINTENANCE_PROCESS_LOG_TITLE, machineCode, plan,
+                    null, "未找到未完成的年度精度计划或距到期天数为空", "不能做精度，返回0");
+            return judgeDTO;
+        }
+        // 超期舍去：计划日期早于排程T日的计划视为已错过可执行窗口，精度只能提前不能延后。
+        if (!this.isPlanDateEligible(context, plan)) {
+            this.appendMaintenanceProcessLog(context, MAINTENANCE_PROCESS_LOG_TITLE, machineCode, plan,
+                    null, "计划日期早于排程T日或计划日期为空", "超期舍去，返回0");
+            return judgeDTO;
+        }
+        // 触发条件1：距到期天数进入预警范围（默认30天）才参与精度判定。
+        int warningDays = this.getParamInt(context, LhScheduleParamConstant.MAINTENANCE_WARNING_DAYS,
+                LhScheduleConstant.MAINTENANCE_WARNING_DAYS);
+        if (daysToDue > warningDays) {
+            this.appendMaintenanceProcessLog(context, MAINTENANCE_PROCESS_LOG_TITLE, machineCode, plan,
+                    null, "距到期天数=" + daysToDue + "，预警阈值=" + warningDays, "未进入预警范围，返回0");
+            return judgeDTO;
+        }
+        int forceCheckDays = this.getParamInt(context, LhScheduleParamConstant.MAINTENANCE_FORCE_CHECK_DAYS,
+                LhScheduleConstant.MAINTENANCE_FORCE_CHECK_DAYS);
+        boolean withinForceWindow = daysToDue <= forceCheckDays;
+        // 处理条件2：在机超过30天且进入3天提前检查期，预测无法在保养开始前自然收尾时强制下机保证精度。
+        int onlineDays = this.resolvePhysicalOnlineDays(context, machine);
+        if (onlineDays > LONG_ONLINE_DAYS && withinForceWindow) {
+            return this.resolveForceDownJudgeResult(context, machine, plan,
+                    predictedNaturalEndingTime, batchAllocatedMachineMap);
+        }
+        // 常规路径必须依赖真实收尾时间；续作尚未收尾时无法证明满足8点前收尾，等待下一轮再判。
+        if (Objects.isNull(endingTime)) {
+            this.appendMaintenanceProcessLog(context, MAINTENANCE_PROCESS_LOG_TITLE, machineCode, plan,
+                    null, "机台尚未形成真实收尾时间", "本轮不做精度，返回0");
+            return judgeDTO;
+        }
+        // 处理条件1.1：3天预警窗口外，收尾落在早班或中班时段先不触发精度，防止空着夜班；
+        // 夜班收尾或空闲机台零点就绪等无法识别为早中班的时刻放行。
+        LhScheduleResult endingResult = this.resolveAccuracyEndingResult(context, machine, endingTime);
+        int endingShiftIndex = ShiftFieldUtil.resolveLastPlannedShiftIndex(endingResult);
+        LhShiftConfigVO endingShift = endingShiftIndex > 0
+                ? LhScheduleTimeUtil.getShiftByIndex(context, context.getScheduleDate(), endingShiftIndex) : null;
+        boolean daytimeEnding = Objects.nonNull(endingShift)
+                ? endingShift.isMorningShift() || endingShift.isAfternoonShift()
+                : this.isEndingInDayOrAfternoonShift(context, endingTime);
+        if (this.shouldDelayOrdinaryAccuracyPlan(context, plan, endingTime, daytimeEnding)) {
+            this.appendMaintenanceProcessLog(context, MAINTENANCE_PROCESS_LOG_TITLE, machineCode, plan,
+                    endingTime, "普通精度且08:00后收尾落在早班/中班时段", "先不触发精度保留夜班产能，返回0");
+            return judgeDTO;
+        }
+        // 处理条件1：前SKU须在保养开始（默认08:00）前收尾；晚于08:00收尾的从下一自然日开始找候选。
+        Date candidateDate = this.resolveJudgeCandidateDate(context, endingTime);
+        Date executeDate = this.searchAvailableJudgeDate(context, candidateDate, plan, machineCode,
+                batchAllocatedMachineMap);
+        if (Objects.isNull(executeDate)) {
+            this.appendMaintenanceProcessLog(context, MAINTENANCE_PROCESS_LOG_TITLE, machineCode, plan,
+                    candidateDate, "到计划日期前不存在满足每日台数、周日、盘点日、节假日约束的合规执行日",
+                    "超期舍去，返回0");
+            return judgeDTO;
+        }
+        return this.buildSuccessJudgeDTO(context, machine, plan, executeDate, false, batchAllocatedMachineMap);
+    }
+
+    /**
+     * 长期在机强制下机判定。
+     *
+     * <p>在机超过30天且进入3天提前检查期后，若预测自然收尾不晚于候选保养开始时间，
+     * 则等待自然收尾（返回0，由主流程下一轮以真实收尾时间再判）；否则强制下机保证精度。
+     * 候选日从排程T日起逐日顺延循环搜索，直到计划日期为止，仍无合规执行日则舍去。</p>
+     *
+     * @param context 排程上下文
+     * @param machine 机台运行态
+     * @param plan 精度计划
+     * @param predictedNaturalEndingTime 预测自然收尾时间；传null视为无法证明能自然收尾
+     * @param batchAllocatedMachineMap 批内每日台数额度记账；单机调用传null
+     * @return 判定结果
+     */
+    private PrecisionMaintenanceJudgeDTO resolveForceDownJudgeResult(
+            LhScheduleContext context,
+            MachineScheduleDTO machine,
+            LhPrecisionPlan plan,
+            Date predictedNaturalEndingTime,
+            Map<String, Set<String>> batchAllocatedMachineMap) {
+        String machineCode = machine.getMachineCode();
+        PrecisionMaintenanceJudgeDTO judgeDTO = this.buildZeroJudgeDTO(machineCode);
+        // 候选日从排程T日开始搜索；到计划日期仍无合规执行日则舍去，禁止延后执行。
+        Date executeDate = this.searchAvailableJudgeDate(context,
+                LhScheduleTimeUtil.clearTime(context.getScheduleDate()), plan, machineCode,
+                batchAllocatedMachineMap);
+        if (Objects.isNull(executeDate)) {
+            this.appendMaintenanceProcessLog(context, MAINTENANCE_PROCESS_LOG_TITLE, machineCode, plan,
+                    null, "长期在机强制检查期内到计划日期前无合规执行日", "超期舍去，返回0");
+            return judgeDTO;
+        }
+        Date candidateStartTime = this.buildMaintenanceStartTime(context, executeDate);
+        boolean canEndNaturally = Objects.nonNull(predictedNaturalEndingTime)
+                && !predictedNaturalEndingTime.after(candidateStartTime);
+        if (canEndNaturally) {
+            this.appendMaintenanceProcessLog(context, MAINTENANCE_PROCESS_LOG_TITLE, machineCode, plan,
+                    candidateStartTime, "长期在机检查命中，但预测自然收尾不晚于保养开始", "等待自然收尾，返回0");
+            return judgeDTO;
+        }
+        this.appendMaintenanceProcessLog(context, MAINTENANCE_PROCESS_LOG_TITLE, machineCode, plan,
+                candidateStartTime, "长期在机超过30天且进入3天检查期，预测无法自然收尾", "强制下机保证精度");
+        return this.buildSuccessJudgeDTO(context, machine, plan, executeDate, true, batchAllocatedMachineMap);
+    }
+
+    /**
+     * 从候选日开始逐日搜索第一个满足判定约束的精度执行日。
+     *
+     * <p>约束包含每日保养台数（含批内记账）、周日、月末盘点日、节假日前限制天数；与换模、
+     * 清洗、停机的重叠由排程主流程判断，本方法不校验。搜索上限定为精度计划日期，体现
+     * "精度只能提前、不能延后"，到计划日期仍无合规日返回null（舍去）。</p>
+     *
+     * @param context 排程上下文
+     * @param candidateDate 搜索起始候选日
+     * @param plan 精度计划
+     * @param machineCode 运行态机台编码
+     * @param batchAllocatedMachineMap 批内每日台数额度记账；单机调用传null
+     * @return 合规执行日；计划日期前无合规日返回null
+     */
+    private Date searchAvailableJudgeDate(LhScheduleContext context,
+                                          Date candidateDate,
+                                          LhPrecisionPlan plan,
+                                          String machineCode,
+                                          Map<String, Set<String>> batchAllocatedMachineMap) {
+        if (Objects.isNull(candidateDate) || Objects.isNull(plan) || Objects.isNull(plan.getPlanDate())) {
+            return null;
+        }
+        Date cursorDate = LhScheduleTimeUtil.clearTime(candidateDate);
+        Date planDateLimit = LhScheduleTimeUtil.clearTime(plan.getPlanDate());
+        while (!cursorDate.after(planDateLimit)) {
+            String unavailableReason = this.resolveJudgeDateUnavailableReason(
+                    context, cursorDate, machineCode, batchAllocatedMachineMap);
+            if (StringUtils.isEmpty(unavailableReason)) {
+                return cursorDate;
+            }
+            cursorDate = LhScheduleTimeUtil.addDays(cursorDate, 1);
+        }
+        return null;
+    }
+
+    /**
+     * 解析判定口径下候选日期不可用的原因。
+     *
+     * <p>每日保养台数取参数SYS0307004（保底1台），占用数=上下文既有额度+本批已分配额度；
+     * 周日受SYS0307005控制（0=不安排）；月末盘点日（每月最后一天）受SYS0307008开关控制
+     * （0=不安排）；节假日当天及前SYS0307006天不安排。与换模、清洗、停机的重叠不在此校验。</p>
+     *
+     * @param context 排程上下文
+     * @param targetDate 候选执行日
+     * @param machineCode 运行态机台编码
+     * @param batchAllocatedMachineMap 批内每日台数额度记账；单机调用传null
+     * @return 不可用原因；可用返回null
+     */
+    private String resolveJudgeDateUnavailableReason(LhScheduleContext context,
+                                                     Date targetDate,
+                                                     String machineCode,
+                                                     Map<String, Set<String>> batchAllocatedMachineMap) {
+        String dateKey = LhScheduleTimeUtil.formatDate(targetDate);
+        int dailyLimit = this.resolveMaintenanceDailyLimit(context);
+        int usedCount = Math.max(this.resolveDailyMaintenanceCount(context, dateKey),
+                this.resolveBatchAllocatedCount(batchAllocatedMachineMap, dateKey));
+        if (usedCount >= dailyLimit) {
+            return "当天保养台数已达上限(" + usedCount + "/" + dailyLimit + ")";
+        }
+        if (!this.isSundayAllowed(context) && this.isSunday(targetDate)) {
+            return "周日不安排保养";
+        }
+        if (this.isInventoryDayUnavailable(context, targetDate, machineCode)) {
+            return "月末盘点日不安排保养";
+        }
+        if (this.isHolidayOrHolidayBeforeDay(context, targetDate)) {
+            return "节假日当天及节假日前限制天数内不安排保养";
+        }
+        return null;
+    }
+
+    /**
+     * 解析每日最大保养台数。
+     * <p>读参数SYS0307004，配置异常时回落默认值，且最小值保底1台（与LhScheduleConfig口径一致）。</p>
+     *
+     * @param context 排程上下文
+     * @return 每日最大保养台数（至少1台）
+     */
+    private int resolveMaintenanceDailyLimit(LhScheduleContext context) {
+        return Math.max(1, this.getParamInt(context, LhScheduleParamConstant.MAINTENANCE_DAILY_LIMIT,
+                LhScheduleConstant.MAINTENANCE_DAILY_LIMIT));
+    }
+
+    /**
+     * 判断是否允许在月末盘点日（每月最后一天）安排保养。
+     * <p>读参数SYS0307008，默认0=不允许。</p>
+     *
+     * @param context 排程上下文
+     * @return true-允许盘点日保养
+     */
+    private boolean isMaintenanceOnInventoryDayAllowed(LhScheduleContext context) {
+        return this.getParamInt(context, LhScheduleParamConstant.ALLOW_MAINTENANCE_ON_INVENTORY_DAY,
+                LhScheduleConstant.ALLOW_MAINTENANCE_ON_INVENTORY_DAY) == ENABLED;
+    }
+
+    /**
+     * 统一实际挂窗与纯判定的盘点日规则。
+     * 历史指定正规换模在同日精度开始时具备准备条件时允许并行；其他场景继续读取原参数。
+     * 每日额度、周日、节假日、设备冲突及计划到期日仍由调用方逐项校验。
+     * @param context 排程上下文
+     * @param targetDate 候选精度执行日期
+     * @param machineCode 待保养机台
+     * @return 是否因盘点日禁止执行
+     */
+    private boolean isInventoryDayUnavailable(LhScheduleContext context, Date targetDate, String machineCode) {
+        return this.isLastDayOfMonth(targetDate)
+                && !this.isMaintenanceOnInventoryDayAllowed(context)
+                && !this.hasSameDayHistoricalMouldChange(context, targetDate, machineCode);
+    }
+
+    /**
+     * 检查历史指定交替与精度同日并行的盘点日例外，禁止按机台或物料写死例外。
+     * 仅使用已校验、冻结的正规换模事件，物理机台两侧必须真实在06:00前释放，
+     * 精度开始必须仍处于历史计划班次内；换活字块、跨日历史计划及未释放机台均不适用。
+     * @param context 排程上下文
+     * @param targetDate 候选精度执行日期
+     * @param machineCode 待保养机台
+     * @return 是否满足同日历史指定正规换模条件
+     */
+    private boolean hasSameDayHistoricalMouldChange(LhScheduleContext context, Date targetDate, String machineCode) {
+        MachineScheduleDTO machine = context.getMachineScheduleMap().get(machineCode);
+        if (Objects.isNull(machine)) {
+            return false;
+        }
+        Date endingTime = this.resolvePhysicalKnownEndingTime(context, machine);
+        if (Objects.isNull(endingTime) || endingTime.after(this.buildProductionCutoffTime(targetDate))) {
+            return false;
+        }
+        Date precisionStartTime = this.buildMaintenanceStartTime(context, targetDate);
+        String physicalMachineCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode);
+        return context.getPreviousAlternateReleaseEventMap().values().stream()
+                .filter(Objects::nonNull)
+                .filter(event -> Objects.nonNull(event.getPlan())
+                        && MouldChangeTypeEnum.REGULAR.getCode().equals(event.getPlan().getChangeMouldType())
+                        && StringUtils.isNotBlank(event.getPlan().getAfterMaterialCode()))
+                .filter(event -> StringUtils.equals(physicalMachineCode,
+                        LhSingleControlMachineUtil.resolvePhysicalMachineCode(event.getMachineCode())))
+                .anyMatch(event -> this.isHistoricalPreparationAtPrecisionStart(event, targetDate, precisionStartTime));
+    }
+
+    /**
+     * 校验冻结事件的真实释放与历史班次半开边界。
+     * @param event 已冻结历史交替事件
+     * @param targetDate 精度执行日期
+     * @param precisionStartTime 精度固定开始时间
+     * @return 精度开始时可执行该历史换模
+     */
+    private boolean isHistoricalPreparationAtPrecisionStart(PreviousAlternatePlanReleaseEvent event,
+                                                            Date targetDate, Date precisionStartTime) {
+        return Objects.nonNull(event.getOfflineTime())
+                && Objects.nonNull(event.getPlannedShiftStartTime())
+                && Objects.nonNull(event.getPlannedShiftEndTime())
+                && Objects.equals(LhScheduleTimeUtil.clearTime(event.getPlannedShiftStartTime()),
+                        LhScheduleTimeUtil.clearTime(targetDate))
+                && !event.getOfflineTime().after(precisionStartTime)
+                && !event.getPlannedShiftStartTime().after(precisionStartTime)
+                && precisionStartTime.before(event.getPlannedShiftEndTime());
+    }
+
+    /**
+     * 解析本次判定的精度保养占用时长（小时）。
+     * <p>读参数SYS0307001，默认10小时；2小时首件首检不含在内，由排程主流程后续追加。</p>
+     *
+     * @param context 排程上下文
+     * @return 精度保养占用时长（小时）
+     */
+    private int resolveMaintenanceDurationHours(LhScheduleContext context) {
+        int durationHours = this.getParamInt(context, LhScheduleParamConstant.MAINTENANCE_DURATION_HOURS,
+                LhScheduleConstant.MAINTENANCE_DURATION_HOURS);
+        if (durationHours <= 0) {
+            log.warn("硫化精度保养时长配置非正数，使用默认值, paramCode: {}, defaultValue: {}",
+                    LhScheduleParamConstant.MAINTENANCE_DURATION_HOURS,
+                    LhScheduleConstant.MAINTENANCE_DURATION_HOURS);
+            return LhScheduleConstant.MAINTENANCE_DURATION_HOURS;
+        }
+        return durationHours;
+    }
+
+    /**
+     * 解析8点收尾规则下的首个候选执行日。
+     * <p>前SKU须在保养开始（默认08:00）前收尾：收尾不晚于当天保养开始时刻可用当天，
+     * 否则从下一自然日开始搜索。</p>
+     *
+     * @param context 排程上下文
+     * @param endingTime 物理机台最晚收尾时间
+     * @return 首个候选执行日零点
+     */
+    private Date resolveJudgeCandidateDate(LhScheduleContext context, Date endingTime) {
+        Date endingDate = LhScheduleTimeUtil.clearTime(endingTime);
+        Date maintenanceStartTime = this.buildMaintenanceStartTime(context, endingDate);
+        return endingTime.after(maintenanceStartTime)
+                ? LhScheduleTimeUtil.addDays(endingDate, 1) : endingDate;
+    }
+
+    /**
+     * 判断收尾时间是否落在早班或中班时段。
+     * <p>3天预警窗口外的普通精度只在夜班收尾（或无法识别为早中班的时刻）时触发，
+     * 防止早/中班收尾后保养占用整个夜班产能。</p>
+     *
+     * @param context 排程上下文
+     * @param endingTime 收尾时间
+     * @return true-早班或中班时段收尾
+     */
+    private boolean isEndingInDayOrAfternoonShift(LhScheduleContext context, Date endingTime) {
+        return LhScheduleTimeUtil.isMorningShift(context, endingTime)
+                || LhScheduleTimeUtil.isAfternoonShift(context, endingTime);
+    }
+
+    /**
+     * 统计本批判定已分配到指定日期的物理机台数量。
+     *
+     * @param batchAllocatedMachineMap 批内每日台数额度记账；单机调用传null
+     * @param dateKey 日期键
+     * @return 已分配物理机台数量
+     */
+    private int resolveBatchAllocatedCount(Map<String, Set<String>> batchAllocatedMachineMap, String dateKey) {
+        if (Objects.isNull(batchAllocatedMachineMap)) {
+            return 0;
+        }
+        Set<String> allocatedMachineSet = batchAllocatedMachineMap.get(dateKey);
+        return CollectionUtils.isEmpty(allocatedMachineSet) ? 0 : allocatedMachineSet.size();
+    }
+
+    /**
+     * 登记本批判定占用的每日台数额度（按物理机台去重）。
+     *
+     * @param batchAllocatedMachineMap 批内每日台数额度记账；单机调用传null时不登记
+     * @param executeDate 精度执行日
+     * @param machineCode 运行态机台编码
+     */
+    private void registerBatchAllocatedMachine(Map<String, Set<String>> batchAllocatedMachineMap,
+                                               Date executeDate,
+                                               String machineCode) {
+        if (Objects.isNull(batchAllocatedMachineMap) || Objects.isNull(executeDate)) {
+            return;
+        }
+        String dateKey = LhScheduleTimeUtil.formatDate(executeDate);
+        batchAllocatedMachineMap.computeIfAbsent(dateKey, key -> new LinkedHashSet<>())
+                .add(LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode));
+    }
+
+    /**
+     * 构建占用时长为0的判定结果。
+     *
+     * @param machineCode 机台编码
+     * @return 不能做精度的判定结果
+     */
+    private PrecisionMaintenanceJudgeDTO buildZeroJudgeDTO(String machineCode) {
+        PrecisionMaintenanceJudgeDTO judgeDTO = new PrecisionMaintenanceJudgeDTO();
+        judgeDTO.setMachineCode(machineCode);
+        judgeDTO.setDurationHours(0);
+        return judgeDTO;
+    }
+
+    /**
+     * 构建可执行精度保养的判定结果。
+     *
+     * @param context 排程上下文
+     * @param machine 机台运行态
+     * @param plan 精度计划
+     * @param executeDate 精度执行日
+     * @param forceDown 是否强制下机
+     * @param batchAllocatedMachineMap 批内每日台数额度记账；单机调用传null
+     * @return 判定结果（占用时长、开始/结束时间、机台编码、计划主键）
+     */
+    private PrecisionMaintenanceJudgeDTO buildSuccessJudgeDTO(LhScheduleContext context,
+                                                              MachineScheduleDTO machine,
+                                                              LhPrecisionPlan plan,
+                                                              Date executeDate,
+                                                              boolean forceDown,
+                                                              Map<String, Set<String>> batchAllocatedMachineMap) {
+        int durationHours = this.resolveMaintenanceDurationHours(context);
+        Date startTime = this.buildMaintenanceStartTime(context, executeDate);
+        Date endTime = LhScheduleTimeUtil.addHours(startTime, durationHours);
+        PrecisionMaintenanceJudgeDTO judgeDTO = new PrecisionMaintenanceJudgeDTO();
+        judgeDTO.setMachineCode(machine.getMachineCode());
+        judgeDTO.setDurationHours(durationHours);
+        judgeDTO.setPrecisionStartTime(startTime);
+        judgeDTO.setPrecisionEndTime(endTime);
+        judgeDTO.setPrecisionPlanId(plan.getId());
+        judgeDTO.setForceDown(forceDown);
+        this.registerBatchAllocatedMachine(batchAllocatedMachineMap, executeDate, machine.getMachineCode());
+        log.info("硫化精度保养判定通过, 机台: {}, 物理机台: {}, 计划日期: {}, 距到期天数: {}, 执行日: {}, "
+                        + "占用时长: {}小时, 开始: {}, 结束: {}, 强制下机: {}",
+                machine.getMachineCode(),
+                LhSingleControlMachineUtil.resolvePhysicalMachineCode(machine.getMachineCode()),
+                LhScheduleTimeUtil.formatDate(plan.getPlanDate()), plan.getDaysToDue(),
+                LhScheduleTimeUtil.formatDate(executeDate), durationHours,
+                LhScheduleTimeUtil.formatDateTime(startTime), LhScheduleTimeUtil.formatDateTime(endTime),
+                forceDown);
+        this.appendMaintenanceProcessLog(context, MAINTENANCE_FINAL_LOG_TITLE, machine.getMachineCode(), plan,
+                startTime, "占用时长=" + durationHours + "小时，结束="
+                        + PriorityTraceLogHelper.formatDateTime(endTime)
+                        + "（2小时首件首检由排程主流程另行追加）",
+                (forceDown ? "强制下机" : "自然收尾后保养"));
+        return judgeDTO;
     }
 }

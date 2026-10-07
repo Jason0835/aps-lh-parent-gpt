@@ -81,8 +81,8 @@ public class StructureMinMachineRetentionService {
      * 初始化全部有效结构的SKU快照及最低硫化机台数。
      *
      * <p>调用方必须在续作、新增分类前执行，避免后续SKU出队导致结构配置丢失。
-     * 这里只校验结构配置是否完整一致并解析最低机台数；配置异常沿用现有行为，
-     * 记录告警并跳过该结构（等价规则不触发）。</p>
+     * 通用结构快照始终保留全部有效SKU。最低机台配置异常时只跳过最低保机规则，
+     * 不得使跨月结构从最大机台限制及提前生产在机统计中消失。</p>
      *
      * @param context 排程上下文
      */
@@ -94,7 +94,7 @@ public class StructureMinMachineRetentionService {
             return;
         }
         if (CollectionUtils.isEmpty(context.getStructureSkuMap())) {
-            context.setStructureMinMachineSkuSnapshotMap(structureSnapshotMap);
+            context.setStructureSkuSnapshotMap(structureSnapshotMap);
             context.setStructureMinVulcanizingMachineMap(minimumMachineMap);
             return;
         }
@@ -105,19 +105,38 @@ public class StructureMinMachineRetentionService {
                 continue;
             }
             List<SkuScheduleDTO> structureSnapshot = new ArrayList<SkuScheduleDTO>(structureSkuList);
-            int minimumMachineCount = resolveMinimumMachineCount(context, structureName, structureSnapshot);
-            // 配置或结构数据异常时沿用现有安全跳过行为，不改变本批其他结构的排程。
+            structureSnapshotMap.put(structureName, structureSnapshot);
+            int minimumMachineCount = this.resolveMinimumMachineCount(context, structureName, structureSnapshot);
+            // 最低保机配置独立校验，失败不影响结构归属和实际在机统计。
             if (minimumMachineCount < 0) {
                 continue;
             }
-            structureSnapshotMap.put(structureName, structureSnapshot);
             minimumMachineMap.put(structureName, minimumMachineCount);
         }
-        context.setStructureMinMachineSkuSnapshotMap(structureSnapshotMap);
+        context.setStructureSkuSnapshotMap(structureSnapshotMap);
         context.setStructureMinVulcanizingMachineMap(minimumMachineMap);
         log.info("结构最低机台数规则初始化完成, factoryCode: {}, scheduleDate: {}, structureCount: {}, config: {}",
                 context.getFactoryCode(), LhScheduleTimeUtil.formatDate(context.getScheduleDate()),
                 structureSnapshotMap.size(), minimumMachineMap);
+    }
+
+    /**
+     * 收集通用在机索引需要覆盖的结构，统一用于全量构建和单机刷新。
+     * 已提交结果和MES在机结构也必须纳入，避免待排SKU出队或无月计划前料造成漏计。
+     * @param context 本次排程上下文
+     * @return 去重后的完整结构名称集合，不依赖最低机台配置是否有效
+     */
+    public Set<String> collectStatisticsStructureNames(LhScheduleContext context) {
+        Set<String> structures = new LinkedHashSet<>(context.getStructureSkuSnapshotMap().keySet());
+        context.getScheduleResultList().stream().filter(Objects::nonNull)
+                .map(result -> StringUtils.isNotEmpty(result.getStructureName())
+                        ? result.getStructureName() : this.resolveStructureNameByMaterial(context, result.getMaterialCode()))
+                .filter(StringUtils::isNotEmpty).forEach(structures::add);
+        context.getMachineScheduleMap().values().stream().filter(Objects::nonNull)
+                .map(machine -> this.resolveStructureNameByMaterial(context, machine.getCurrentMaterialCode()))
+                .filter(StringUtils::isNotEmpty).forEach(structures::add);
+        structures.removeIf(StringUtils::isEmpty);
+        return structures;
     }
 
     /**
@@ -354,7 +373,7 @@ public class StructureMinMachineRetentionService {
             return null;
         }
         for (Map.Entry<String, List<SkuScheduleDTO>> entry
-                : context.getStructureMinMachineSkuSnapshotMap().entrySet()) {
+                : context.getStructureSkuSnapshotMap().entrySet()) {
             if (isSnapshotStructureMaterial(context, entry.getKey(), materialCode)) {
                 return entry.getKey();
             }
@@ -386,7 +405,7 @@ public class StructureMinMachineRetentionService {
     public String resolveStructureType(LhScheduleContext context,
                                        String structureName) {
         List<SkuScheduleDTO> skuList =
-                context.getStructureMinMachineSkuSnapshotMap().get(structureName);
+                context.getStructureSkuSnapshotMap().get(structureName);
         return CollectionUtils.isEmpty(skuList) || Objects.isNull(skuList.get(0))
                 ? null : skuList.get(0).getStructureType();
     }
@@ -692,7 +711,7 @@ public class StructureMinMachineRetentionService {
                                                 String structureName,
                                                 String materialCode) {
         List<SkuScheduleDTO> snapshotList =
-                context.getStructureMinMachineSkuSnapshotMap().get(structureName);
+                context.getStructureSkuSnapshotMap().get(structureName);
         if (CollectionUtils.isEmpty(snapshotList)) {
             return false;
         }

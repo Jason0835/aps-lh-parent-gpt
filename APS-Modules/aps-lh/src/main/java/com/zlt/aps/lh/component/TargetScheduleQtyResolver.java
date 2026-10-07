@@ -18,16 +18,19 @@ import com.zlt.aps.lh.api.enums.SkuTagEnum;
 import com.zlt.aps.lh.context.EmbryoStockConsumeLedger;
 import com.zlt.aps.lh.context.LhScheduleConfig;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.engine.strategy.support.EarlyProductionRuntimePlan;
 import com.zlt.aps.lh.engine.strategy.IMachineMatchStrategy;
 import com.zlt.aps.lh.engine.strategy.IMouldChangeBalanceStrategy;
 import com.zlt.aps.lh.engine.strategy.support.NewSpecEmbryoAvailableTimeResolver;
 import com.zlt.aps.lh.engine.strategy.support.PendingSkuUnscheduledRule;
 import com.zlt.aps.lh.engine.strategy.support.FirstInspectionAllocationPlan;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchSchedulingPolicy;
+import com.zlt.aps.lh.engine.strategy.support.StructureSwitchFirstShiftQuantityPolicy;
 import com.zlt.aps.lh.util.CleaningScheduleRuleUtil;
 import com.zlt.aps.lh.util.FirstInspectionAllocationUtil;
 import com.zlt.aps.lh.util.FirstInspectionQtyUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
+import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.MachineCleaningOverlapUtil;
 import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
@@ -70,6 +73,9 @@ import java.util.Set;
 @Slf4j
 @Component
 public class TargetScheduleQtyResolver {
+
+    /** 普通双模的数量归整单位。 */
+    private static final int DOUBLE_MOULD_QTY = 2;
 
     /** 成型胎胚库存收尾标识：是 */
     private static final int EMBRYO_STOCK_ENDING_YES = 1;
@@ -198,6 +204,28 @@ public class TargetScheduleQtyResolver {
                 ? context.getSkuProductionRemainingQtyMap().get(this.buildSkuKey(sku)) : null;
         return Objects.nonNull(remaining) ? Math.max(0, remaining)
                 : this.resolveInitialProductionRemainingQty(sku, sku.resolveTargetScheduleQty());
+    }
+
+    /**
+     * 只读解析候选生命周期、窗口收口及班次9需要保留的真实需求余量。
+     * <p>未激活未来候选的零生产账本表示路由隔离，并非已排完；读取冻结的未来月余量，
+     * 扣除同物料同状态实际结果。其余需求仍使用实际消费账本，不重复扣已消费量。</p>
+     * @param context 排程上下文
+     * @param sku 原需求对象
+     * @return 未完成需求量；不授予排产资格
+     */
+    public int previewUnfulfilledProductionRemainingQty(LhScheduleContext context, SkuScheduleDTO sku) {
+        Integer inactiveFutureDemandQty = Objects.isNull(context)
+                ? null : context.resolveInactiveFutureDemandQty(sku);
+        if (Objects.nonNull(inactiveFutureDemandQty)) {
+            int scheduledQty = context.getScheduleResultList().stream()
+                    .filter(Objects::nonNull)
+                    .filter(result -> StringUtils.equals(sku.getMaterialCode(), result.getMaterialCode())
+                            && StringUtils.equals(sku.getProductStatus(), result.getProductStatus()))
+                    .mapToInt(ShiftFieldUtil::resolveScheduledQty).sum();
+            return Math.max(0, inactiveFutureDemandQty - scheduledQty);
+        }
+        return this.previewProductionRemainingQty(context, sku);
     }
 
     /**
@@ -555,6 +583,16 @@ public class TargetScheduleQtyResolver {
         }
         // 共用胎胚：保持原有T日收尾判断，确保同日收尾分摊逻辑不变
         return isTDayEndingSku(sku);
+    }
+
+    /**
+     * 判断SKU是否按非共用胎胚库存收尾，包含运行态剔除其他SKU后转为单胎胚的情况。
+     * @param context 排程上下文
+     * @param sku 当前SKU
+     * @return 是否适用单胎胚硬目标收尾
+     */
+    public boolean isNonSharedEmbryoStockEnding(LhScheduleContext context, SkuScheduleDTO sku) {
+        return this.isEmbryoStockEnding(context, sku) && !this.isSharedEmbryoInWindow(context, sku);
     }
 
     /**
@@ -1164,7 +1202,8 @@ public class TargetScheduleQtyResolver {
             return 0;
         }
         boolean hasSwitchPlan = !CollectionUtils.isEmpty(shifts) && shifts.stream().anyMatch(shift ->
-                StructureSwitchSchedulingPolicy.isFirstBatch(context, context.getStructureSwitchResultPlanMap().get(result), shift)
+                (StructureSwitchSchedulingPolicy.isFirstBatch(context, context.getStructureSwitchResultPlanMap().get(result), shift)
+                        || StructureSwitchFirstShiftQuantityPolicy.isLimited(context, result, shift))
                         && StructureSwitchSchedulingPolicy.quantity(result, shift.getShiftIndex()) > 0);
         if (resultQty <= retainedLimitQty && !hasSwitchPlan) {
             return resultQty;
@@ -1191,11 +1230,21 @@ public class TargetScheduleQtyResolver {
             remainingInspectionQty -= inspectionQty;
             // 先预留后续班次首检，再分配当前正式产量，不能让前班用尽后班首检的真实余量。
             int normalLimit = Math.max(0, remainingRetainQty - remainingInspectionQty - inspectionQty);
-            int normalQty = this.resolveRetainedShiftQty(context, sku,
-                    Math.min(Math.max(0, planQty - inspectionQty), normalLimit), mouldQty, result, shift);
+            int normalQty = Math.min(Math.max(0, planQty - inspectionQty), normalLimit);
+            // 供胚首班统一归整含首检总量，其余场景保留已有普通生产模数口径。
+            if (!StructureSwitchFirstShiftQuantityPolicy.isLimited(context, result, shift)) {
+                normalQty = this.resolveRetainedShiftQty(context, sku, normalQty, mouldQty, result, shift);
+            }
             normalQty = StructureSwitchSchedulingPolicy.capRetainedQuantity(context, result, shift,
                     normalQty, Math.max(0, remainingQty - actualRetainedQty - remainingInspectionQty - inspectionQty));
-            int currentShiftQty = inspectionQty + normalQty;
+            // 同组共享首班额度按含首检总量回裁，实际消费账本继续使用最终保留量。
+            int currentShiftQty = StructureSwitchFirstShiftQuantityPolicy.capRetainedTotal(
+                    context, result, shift, inspectionQty + normalQty);
+            if (currentShiftQty < inspectionQty) {
+                log.warn("结构胎胚首班额度不足保留完整首检，当前候选不提交, batchNo={}, sku={}, machine={}, shift={}",
+                        context.getBatchNo(), result.getMaterialCode(), result.getLhMachineCode(), shift.getShiftIndex());
+                return 0;
+            }
             Date shiftStartTime = ShiftFieldUtil.getShiftStartTime(result, shift.getShiftIndex());
             Date originalShiftEndTime = ShiftFieldUtil.getShiftEndTime(result, shift.getShiftIndex());
             if (currentShiftQty <= 0) {
@@ -1377,6 +1426,44 @@ public class TargetScheduleQtyResolver {
     }
 
     /**
+     * 解析结果的数量归整单位，严格目标只控制总预算，不能豁免普通双模的逐班偶数约束。
+     * @param context 排程上下文
+     * @param result 当前机台结果
+     * @param mouldQty 实际使用模数
+     * @return 单模、单控或胎胚收尾为1，其余使用实际模数
+     */
+    public int resolveAllocationMultiple(LhScheduleContext context, LhScheduleResult result, int mouldQty) {
+        if (mouldQty <= 1 || this.isEmbryoStockEnding(context, result)
+                || (Objects.nonNull(result)
+                && LhSingleControlMachineUtil.isConfiguredSingleControlMachine(context, result.getLhMachineCode()))) {
+            return 1;
+        }
+        return mouldQty;
+    }
+
+    /**
+     * 校验已分配结果的逐班数量；提交和保存共用规则，不能只检查SKU合计量。
+     * @param context 排程上下文
+     * @param result 待校验结果
+     * @return 所有正量班次均符合数量归整单位时返回true
+     */
+    public boolean isAllocatedShiftQtyValid(LhScheduleContext context, LhScheduleResult result) {
+        int multiple = this.resolveAllocationMultiple(context, result,
+                ShiftCapacityResolverUtil.resolveMachineMouldQty(result.getMouldQty()));
+        for (int shiftIndex = 1; shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
+            Integer quantity = ShiftFieldUtil.getShiftPlanQty(result, shiftIndex);
+            if (Objects.nonNull(quantity) && quantity > 0 && quantity % multiple != 0) {
+                log.error("班次数量不符合模数约束, batchNo: {}, materialCode: {}, productStatus: {}, "
+                                + "machineCode: {}, shiftIndex: {}, planQty: {}, multiple: {}",
+                        context.getBatchNo(), result.getMaterialCode(), result.getProductStatus(),
+                        result.getLhMachineCode(), shiftIndex, quantity, multiple);
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
      * 解析班次分配量。
      * <p>成型胎胚库存收尾必须严格按胎胚库存落地，不做模台数向上修正；其余场景沿用既有模台数规则。</p>
      *
@@ -1413,10 +1500,12 @@ public class TargetScheduleQtyResolver {
                                         int allocationQty,
                                         int shiftMaxQty,
                                         int mouldQty) {
-        if (isEmbryoStockEnding(context, result)) {
+        // 结果已有实际机台身份，统一识别单控与胎胚收尾例外。
+        int multiple = this.resolveAllocationMultiple(context, result, mouldQty);
+        if (multiple == 1) {
             return Math.max(0, allocationQty);
         }
-        return ShiftCapacityResolverUtil.normalizeAllocatedShiftQty(allocationQty, shiftMaxQty, mouldQty);
+        return ShiftCapacityResolverUtil.normalizeAllocatedShiftQty(allocationQty, shiftMaxQty, multiple);
     }
 
     /**
@@ -1544,14 +1633,15 @@ public class TargetScheduleQtyResolver {
             return Math.max(0, earlyProductionTargetQty);
         }
         int surplusQty = Math.max(0, sku.getSurplusQty());
-        int roundedQty = ShiftCapacityResolverUtil.roundUpQtyToMouldMultiple(surplusQty, sku.getMouldQty());
+        int roundedQty = ShiftCapacityResolverUtil.roundUpQtyToMouldMultiple(surplusQty,
+                this.resolveEndingMouldQty(context, sku, null));
         Integer ledgerTarget = Objects.nonNull(context)
                 ? context.getSkuProductionTargetQtyMap().get(this.buildSkuKey(sku)) : null;
         // 补偿副本的DTO可能仅承载剩余量，仍按共享账本的唯一总目标判断是否真正排完。
         boolean roundedTargetEstablished = sku.resolveTargetScheduleQty() == roundedQty
                 || Objects.equals(ledgerTarget, roundedQty);
-        if (sku.isStrictTargetQty() && !sku.isStrictNewSpecShortageOnly()
-                && !PendingSkuUnscheduledRule.isTrialOrMassTrialSku(sku)
+        if ((sku.isStrictTargetQty() || Objects.equals(ledgerTarget, roundedQty))
+                && !sku.isStrictNewSpecShortageOnly()
                 && !this.isEmbryoStockEnding(context, sku) && roundedTargetEstablished) {
             return roundedQty;
         }
@@ -1573,6 +1663,14 @@ public class TargetScheduleQtyResolver {
             return originalTargetQty;
         }
         if (sku.isStrictTargetQty()) {
+            int roundedSurplusTarget = this.resolveSurplusEndingTargetQty(context, sku);
+            Integer ledgerTarget = Objects.nonNull(context)
+                    ? context.getSkuProductionTargetQtyMap().get(this.buildSkuKey(sku)) : null;
+            if (!sku.isStrictNewSpecShortageOnly() && roundedSurplusTarget > sku.getSurplusQty()
+                    && Objects.equals(ledgerTarget, roundedSurplusTarget)
+                    && context.resolveSubstitutionExactScheduleQty(sku) <= 0) {
+                return roundedSurplusTarget;
+            }
             log.info("最终收尾目标量解析, materialCode: {}, 胎胚编码: {}, 原始目标量: {}, "
                             + "精确硬目标: {}, 模台数: {}, 最终比较目标: {}, rule: 严格目标不做模台数归整",
                     sku.getMaterialCode(), sku.getEmbryoCode(), originalTargetQty,
@@ -2812,6 +2910,18 @@ public class TargetScheduleQtyResolver {
      * @return 调整后的目标排产量
      */
     public int upsizeEndingTargetQty(LhScheduleContext context, SkuScheduleDTO sku) {
+        return this.upsizeEndingTargetQty(context, sku, null);
+    }
+
+    /**
+     * 按已选真实机台归整收尾目标，单控和胎胚收尾保持精确数量。
+     * @param context 当前排程上下文
+     * @param sku 当前收尾需求
+     * @param machine 已选机台，尚未选机时沿用已提交结果或原SKU模数
+     * @return 同步生产及日计划账本后的总目标
+     */
+    public int upsizeEndingTargetQty(LhScheduleContext context, SkuScheduleDTO sku,
+            MachineScheduleDTO machine) {
         if (Objects.isNull(sku)) {
             return 0;
         }
@@ -2871,7 +2981,12 @@ public class TargetScheduleQtyResolver {
             endingBaseQty = Math.max(embryoStock, surplusQty);
             qtySource = embryoStock > surplusQty ? "单胎胚-取胎胚库存" : "单胎胚-取硫化余量";
         }
-        int endingTargetQty = ShiftCapacityResolverUtil.roundUpQtyToMouldMultiple(endingBaseQty, sku.getMouldQty());
+        int endingMouldQty = this.resolveEndingMouldQty(context, sku, machine);
+        if (Objects.nonNull(machine)) {
+            // 当前提案机台已确定，后续同次严格余量判断必须立即使用相同数量单位。
+            sku.setMouldQty(endingMouldQty);
+        }
+        int endingTargetQty = ShiftCapacityResolverUtil.roundUpQtyToMouldMultiple(endingBaseQty, endingMouldQty);
         String direction = endingTargetQty > currentTargetQty ? "上调"
                 : endingTargetQty < currentTargetQty ? "下调" : "保持";
         int windowRemainingPlanQty = Math.max(0, sku.getWindowRemainingPlanQty());
@@ -2881,14 +2996,68 @@ public class TargetScheduleQtyResolver {
                         + "胎胚库存: {}, 月计划余量: {}, 未排原因: {}",
                 direction, sku.getMaterialCode(), sku.getEmbryoCode(), originalSkuCount,
                 activeSkuCount, sharedEmbryo, qtySource,
-                currentTargetQty, endingBaseQty, sku.getMouldQty(), endingTargetQty,
+                currentTargetQty, endingBaseQty, endingMouldQty, endingTargetQty,
                 windowPlanQty, windowRemainingPlanQty, embryoStock, surplusQty, unscheduledReason);
         this.applyProductionTargetState(context, sku, endingTargetQty, "收尾目标量同步");
-        syncEndingDailyQuotaToTargetQty(context, sku, endingTargetQty, windowRemainingPlanQty);
+        // 奇数余量归整后，跨日只补足真实剩余额度；其余收尾保持原同步口径。
+        boolean roundedSurplus = endingBaseQty == surplusQty && endingTargetQty > surplusQty;
+        this.syncEndingDailyQuotaToTargetQty(context, sku,
+                roundedSurplus ? this.resolveProductionRemainingQty(context, sku) : endingTargetQty,
+                windowRemainingPlanQty);
         if (endingTargetQty <= 0) {
             removeActiveEmbryoSku(context, sku, unscheduledReason);
         }
         return endingTargetQty;
+    }
+
+    /**
+     * 预演普通双模奇数收尾可消费量，不写DTO或账本；正式提交才建立归整目标。
+     * @param context 排程上下文
+     * @param sku 候选SKU
+     * @param machine 已明确的候选机台
+     * @param remainingQty 原规则允许的剩余量
+     * @return 加入尚未登记的奇数归整差额后的预演余量
+     */
+    public int previewMachineEndingRemainingQty(LhScheduleContext context, SkuScheduleDTO sku,
+            MachineScheduleDTO machine, int remainingQty) {
+        if (remainingQty <= 0 || sku.isStrictNewSpecShortageOnly()
+                || this.isEmbryoStockEnding(context, sku)
+                || context.resolveSubstitutionExactScheduleQty(sku) > 0
+                || this.resolveEndingMouldQty(context, sku, machine) != DOUBLE_MOULD_QTY) {
+            return remainingQty;
+        }
+        int surplusQty = Math.max(0, sku.getSurplusQty());
+        int roundedQty = ShiftCapacityResolverUtil.roundUpQtyToMouldMultiple(surplusQty, DOUBLE_MOULD_QTY);
+        Integer ledgerTarget = context.getSkuProductionTargetQtyMap().get(this.buildSkuKey(sku));
+        int currentTarget = Objects.nonNull(ledgerTarget) ? ledgerTarget : surplusQty;
+        return remainingQty + Math.max(0, roundedQty - Math.max(surplusQty, currentTarget));
+    }
+
+    /**
+     * 使用真实机台的数量单位；跨日副本复用本SKU已提交的普通双模结果，避免回到选机前模数1。
+     * @param context 本批资源和结果
+     * @param sku 当前物料及产品状态
+     * @param machine 本次已选机台
+     * @return 普通双模为2，单模及单控保持对应精确单位
+     */
+    private int resolveEndingMouldQty(LhScheduleContext context, SkuScheduleDTO sku,
+            MachineScheduleDTO machine) {
+        if (Objects.nonNull(machine)) {
+            return LhSingleControlMachineUtil.isConfiguredSingleControlMachine(context, machine.getMachineCode())
+                    ? 1 : ShiftCapacityResolverUtil.resolveMachineMouldQty(machine);
+        }
+        if (Objects.nonNull(context)) {
+            boolean ordinaryDoubleMould = context.getScheduleResultList().stream().filter(Objects::nonNull)
+                    .filter(result -> StringUtils.equals(sku.getMaterialCode(), result.getMaterialCode())
+                            && StringUtils.equals(sku.getProductStatus(), result.getProductStatus()))
+                    .filter(result -> ShiftFieldUtil.resolveScheduledQty(result) > 0)
+                    .anyMatch(result -> this.resolveAllocationMultiple(context, result,
+                            ShiftCapacityResolverUtil.resolveMachineMouldQty(result.getMouldQty())) == DOUBLE_MOULD_QTY);
+            if (ordinaryDoubleMould) {
+                return DOUBLE_MOULD_QTY;
+            }
+        }
+        return ShiftCapacityResolverUtil.resolveMachineMouldQty(sku.getMouldQty());
     }
 
     /**

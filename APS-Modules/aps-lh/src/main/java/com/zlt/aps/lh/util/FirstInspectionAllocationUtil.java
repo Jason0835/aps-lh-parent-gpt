@@ -7,6 +7,7 @@ import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.FirstInspectionAllocationPlan;
 import com.zlt.aps.lh.engine.strategy.support.FirstInspectionShiftAllocation;
 import com.zlt.aps.lh.engine.strategy.support.FirstInspectionTimelinePlan;
+import com.zlt.aps.lh.engine.strategy.support.StructureSwitchFirstShiftQuantityPolicy;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
@@ -108,7 +109,8 @@ public final class FirstInspectionAllocationUtil {
      * 按统一时间与实际产能口径构建首检分摊计划。
      *
      * <p>新增排产确认“首检即开产”时，通过 {@code forwardFromProductionReadyTime}
-     * 将首检从真实生产就绪时间向后执行；其它共享入口继续保持既有倒推语义。</p>
+     * 将首检从真实生产就绪时间向后执行；其它共享入口继续保持既有倒推语义。
+     * 前日交替指定承接的后物料按正规排产方式解析，量试首检不再自动正向执行。</p>
      *
      * @param context 排程上下文
      * @param sku 当前SKU
@@ -140,7 +142,7 @@ public final class FirstInspectionAllocationUtil {
                 context, sku, shifts, changeoverEndTime, inspectionNotBeforeTime,
                 shiftCapacity, remainingQty, scheduleType, machineCode, availableCapacityMap,
                 resolveCompatibilityTimingMode(
-                        sku, scheduleType, forwardFromProductionReadyTime));
+                        context, sku, scheduleType, forwardFromProductionReadyTime));
     }
 
     /**
@@ -331,9 +333,11 @@ public final class FirstInspectionAllocationUtil {
             return FirstInspectionAllocationPlan.invalid(
                     "首检跨班分摊总量不守恒", countingShift, inspectionEndTime);
         }
-        return FirstInspectionAllocationPlan.valid(
+        FirstInspectionAllocationPlan plan = FirstInspectionAllocationPlan.valid(
                 sequence, faultAdjustedInspectionQty, hourlyOutput, durationSeconds,
                 inspectionStartTime, inspectionEndTime, countingShift, positiveAllocations);
+        // 完整首检参与结构胎胚首班共享额度预演；不足时拒绝整次首检，禁止截断后继续生产。
+        return StructureSwitchFirstShiftQuantityPolicy.validateInspection(context, sku, machineCode, plan);
     }
 
     /**
@@ -408,10 +412,13 @@ public final class FirstInspectionAllocationUtil {
             String scheduleType,
             Map<Integer, Integer> availableCapacityMap,
             Date productionOccupationNotBeforeTime) {
+        // 前日交替指定承接的后物料按正规排产方式解析，量试/试制首检仍包含在切换时长内倒推。
+        boolean previousAlternateNormalMode = Objects.nonNull(context)
+                && context.isPreviousAlternateAfterMaterialSku(sku);
         FirstInspectionTimingModeDecision decision = FirstInspectionTimingModeResolver.resolve(
                 sku, scheduleType, changeoverAction, businessScene,
                 productionReadyTime, changeoverEndTime,
-                productionOccupationNotBeforeTime);
+                productionOccupationNotBeforeTime, previousAlternateNormalMode);
         Date inspectionNotBeforeTime = Objects.nonNull(productionOccupationNotBeforeTime)
                 ? productionOccupationNotBeforeTime : productionReadyTime;
         FirstInspectionAllocationPlan allocationPlan = buildPlan(
@@ -448,17 +455,25 @@ public final class FirstInspectionAllocationUtil {
     /**
      * 解析旧布尔入口的兼容模式。
      *
+     * @param context 排程上下文
      * @param sku 当前SKU
      * @param scheduleType 排程类型
      * @param forwardFromProductionReadyTime 旧正向标识
      * @return 兼容模式
      */
     private static FirstInspectionTimingMode resolveCompatibilityTimingMode(
+            LhScheduleContext context,
             SkuScheduleDTO sku,
             String scheduleType,
             boolean forwardFromProductionReadyTime) {
-        if (forwardFromProductionReadyTime
-                || FirstInspectionQtyUtil.isMassTrialQuantityFirstInspection(sku, scheduleType)) {
+        if (forwardFromProductionReadyTime) {
+            return FirstInspectionTimingMode.START_AT_PRODUCTION_READY;
+        }
+        // 前日交替指定承接按正规排产方式解析，量试首检不再自动正向执行。
+        if (Objects.nonNull(context) && context.isPreviousAlternateAfterMaterialSku(sku)) {
+            return FirstInspectionTimingMode.INCLUDED_IN_CHANGEOVER;
+        }
+        if (FirstInspectionQtyUtil.isMassTrialQuantityFirstInspection(sku, scheduleType)) {
             return FirstInspectionTimingMode.START_AT_PRODUCTION_READY;
         }
         return FirstInspectionTimingMode.INCLUDED_IN_CHANGEOVER;

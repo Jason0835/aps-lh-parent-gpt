@@ -8,6 +8,7 @@ import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.api.enums.UnscheduledReasonEnum;
 import com.zlt.aps.lh.component.OrderNoGenerator;
+import com.zlt.aps.lh.component.SkuDecrementChecker;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.component.UnscheduledResultCollector;
 import com.zlt.aps.lh.context.LhScheduleContext;
@@ -74,6 +75,9 @@ public class TrialVirtualMachineProductionHandler extends AbsScheduleStepHandler
     @Resource
     private UnscheduledResultCollector unscheduledResultCollector;
 
+    @Resource
+    private SkuDecrementChecker skuDecrementChecker;
+
     /**
      * 执行试制/量试虚拟机台最终兜底排产。
      *
@@ -101,6 +105,26 @@ public class TrialVirtualMachineProductionHandler extends AbsScheduleStepHandler
         int scheduledSkuCount = 0;
         for (SkuScheduleDTO sku : context.getTrialVirtualMachineCandidateList()) {
             if (Objects.isNull(sku) || !PendingSkuUnscheduledRule.isTrialOrMassTrialSku(sku)) {
+                continue;
+            }
+            // S4.3可能早于历史资格冻结已登记候选，最终消费时仍须排除，不能只在登记处过滤。
+            if (context.hasPreviousAlternateTrialPlan(sku)) {
+                log.info("前日指定交替试制量试不进入虚拟机, factoryCode: {}, batchNo: {}, materialCode: {}, productStatus: {}",
+                        context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(), sku.getProductStatus());
+                continue;
+            }
+            /*
+             * 减量清单兜底复核：候选可能注册于S4.3统一减量过滤之前（无日计划保留、前日交替复用等），
+             * 消费时统一复核，防止虚拟机台兜底绕过减量清单拦截。
+             * 先清掉原准入未排投影再写减量未排，避免同一SKU残留两个未排原因。
+             */
+            if (skuDecrementChecker.isDecrementHit(context, sku)) {
+                unscheduledResultCollector.remove(context, sku);
+                skuDecrementChecker.handleDecrementHit(context, sku);
+                log.info("试制量试虚拟机台候选命中SKU减量清单，取消兜底排产, factoryCode: {}, batchNo: {}, "
+                                + "materialCode: {}, productStatus: {}, surplusQty: {}",
+                        context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(),
+                        sku.getProductStatus(), sku.getSurplusQty());
                 continue;
             }
             String skuKey = this.buildSkuKey(sku);

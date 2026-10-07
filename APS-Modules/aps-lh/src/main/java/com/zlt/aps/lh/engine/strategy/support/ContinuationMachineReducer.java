@@ -8,6 +8,7 @@ import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.service.impl.PreviousAlternatePlanEligibilityService;
 import com.zlt.aps.lh.util.LhMouldCodeUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
@@ -142,8 +143,9 @@ public final class ContinuationMachineReducer {
                     LocalDate planDate = plan.getPlanDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
                     return firstDate.equals(planDate) || firstDate.plusDays(1).equals(planDate);
                 })
-                .sorted(Comparator.comparing(LhMouldChangePlan::getPlanDate)
-                        .thenComparing(LhMouldChangePlan::getId, Comparator.nullsLast(Long::compareTo)))
+                // 与前日交替冻结、复用主链路共用统一排序口径，保证选机解释展示的计划
+                // 与实际冻结释放的是同一条，避免日志指向与真实动作不一致。
+                .sorted(PreviousAlternatePlanEligibilityService.planOrder())
                 .forEach(plan -> plans.putIfAbsent(
                         LhSingleControlMachineUtil.resolvePhysicalMachineCode(plan.getLhMachineCode()), plan));
         return plans;

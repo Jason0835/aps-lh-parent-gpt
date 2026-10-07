@@ -11,6 +11,8 @@ import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.engine.strategy.support.OffMachineDecision;
 import com.zlt.aps.lh.engine.strategy.support.TimedMachineOffRequest;
+import com.zlt.aps.lh.engine.strategy.support.TimedMachineOffLoadPreview;
+import com.zlt.aps.lh.engine.strategy.support.PreviousAlternatePlanReleaseEvent;
 import com.zlt.aps.lh.util.LhMouldCodeUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.PriorityTraceLogHelper;
@@ -55,7 +57,7 @@ public class TimedMachineOffShiftService {
      */
     public OffMachineDecision resolveOffMachineTime(LhScheduleContext context, LocalDate startDate,
             String machineCode, SkuScheduleDTO sku) {
-        return this.resolveOffMachineTime(context, startDate, machineCode, sku, null);
+        return this.resolveOffMachineTime(context, startDate, machineCode, sku, null, null);
     }
 
     /**
@@ -68,7 +70,16 @@ public class TimedMachineOffShiftService {
      * @return 日期、班次、实际下机或窗口占用决策
      */
     private OffMachineDecision resolveOffMachineTime(LhScheduleContext context, LocalDate startDate,
-            String machineCode, SkuScheduleDTO sku, TimedMachineOffRequest request) {
+            String machineCode, SkuScheduleDTO sku, TimedMachineOffRequest request,
+            TimedMachineOffLoadPreview preview) {
+        return this.resolveOffMachineTime(context, startDate, machineCode, sku, request, preview, false);
+    }
+
+    /** @param context 上下文 @param startDate 最早日期 @param machineCode 机台 @param sku 来源SKU
+     * @param request 冻结画像 @param preview 独立事件账本 @param preferStructureHandoff 是否复核已验证的结构接替 */
+    private OffMachineDecision resolveOffMachineTime(LhScheduleContext context, LocalDate startDate,
+            String machineCode, SkuScheduleDTO sku, TimedMachineOffRequest request,
+            TimedMachineOffLoadPreview preview, boolean preferStructureHandoff) {
         List<LhShiftConfigVO> shifts = context.getScheduleWindowShifts();
         if (Objects.isNull(startDate) || CollectionUtils.isEmpty(shifts)) {
             throw new IllegalArgumentException("按时间下机缺少需求日期或排程班次");
@@ -81,7 +92,9 @@ public class TimedMachineOffShiftService {
             int middleMax = LhScheduleTimeUtil.getAfternoonMouldChangeLimit(context, date.toString());
             int dailyMax = LhScheduleTimeUtil.getDailyMouldChangeLimit(context, date.toString());
 
-            int[] counts = context.getDailyMouldChangeCountMap().get(date.toString());
+            int[] counts = Objects.isNull(preview) ? context.getDailyMouldChangeCountMap().get(date.toString())
+                    : preview.countsFor(date, request.getProfile().getOriginals().stream()
+                            .map(LhScheduleResult::getLhMachineCode).collect(Collectors.toList()));
             int morning = Objects.nonNull(counts) ? counts[MORNING_INDEX] : 0;
             int middle = Objects.nonNull(counts) ? counts[AFTERNOON_INDEX] : 0;
             // 日额度独立于班次额度；用长整数避免求和或中位比较溢出。
@@ -93,6 +106,17 @@ public class TimedMachineOffShiftService {
             boolean afternoon = morning >= morningMax
                     || (2L * morning > morningMax && 2L * middle <= morningMax);
             String reason = this.resolveRuleReason(morning, middle, morningMax);
+            String handoffReason = preferStructureHandoff && Objects.nonNull(preview)
+                    ? preview.structureHandoffReason(request.getProfile().getOriginals().stream()
+                            .map(LhScheduleResult::getLhMachineCode).collect(Collectors.toList()), date) : null;
+            if (preferStructureHandoff && (Objects.isNull(handoffReason) || morning >= morningMax)) {
+                continue;
+            }
+            if (Objects.nonNull(handoffReason) && morning < morningMax) {
+                // 接替证据来自完整预演；只覆盖中位均衡偏好，不覆盖日/班硬额度、禁换模和物理交接。
+                afternoon = false;
+                reason = "同结构合法接替优先于中位均衡，" + handoffReason;
+            }
             String shiftType = afternoon ? ShiftEnum.AFTERNOON_SHIFT.getCode() : ShiftEnum.MORNING_SHIFT.getCode();
             LhShiftConfigVO candidate = this.findShift(shifts, date, shiftType);
             // 非默认参数下，中班上限可能小于早班中位值；不允许区间规则越过硬上限。
@@ -135,12 +159,19 @@ public class TimedMachineOffShiftService {
      * @param context 本批上下文
      */
     public void resolveAndApply(LhScheduleContext context) {
+        this.resolveAndApply(context, null);
+    }
+
+    /** @param context 本批上下文 @param preview 一次性有界负荷预演，空值只读取已提交次数 */
+    public void resolveAndApply(LhScheduleContext context, TimedMachineOffLoadPreview preview) {
         if (CollectionUtils.isEmpty(context.getTimedMachineOffRequests())) {
             return;
         }
         if (context.isContinuousDailyQuotaSynced() || !CollectionUtils.isEmpty(context.getTimedMachineOffDecisionMap())) {
             throw new IllegalStateException("按时间下机必须在统一扣账前执行且不可重复提交");
         }
+        TimedMachineOffLoadPreview ledger = Objects.isNull(preview) ? null : preview.copyForDecision();
+        // 保留原选机及请求顺序。首轮逐请求迁移自己的成功交接事件，后续请求读取更新后的负荷。
         for (TimedMachineOffRequest request : context.getTimedMachineOffRequests()) {
             if (this.hasFixedRelease(context, request)) {
                 PriorityTraceLogHelper.appendProcessLog(context, "按时间下机硬边界保留",
@@ -150,8 +181,55 @@ public class TimedMachineOffShiftService {
                 continue;
             }
             OffMachineDecision decision = this.resolveOffMachineTime(context, request.getStartDate(),
-                    request.getProfile().getOriginals().get(0).getLhMachineCode(), request.getSourceSku(), request);
+                    request.getProfile().getOriginals().get(0).getLhMachineCode(), request.getSourceSku(), request, ledger);
             this.applyProductionBoundary(context, request, decision);
+            this.movePreviewActions(context, ledger, request, decision);
+        }
+        if (Objects.isNull(ledger)) {
+            return;
+        }
+        // 第二轮只允许结构接替请求向前收敛，绝不再次搬回其他请求，避免早中班来回振荡。
+        // 最多两次线性请求扫描，不再次调用候选选机、历史承接或整批排程。
+        int adjustedCount = 0;
+        for (TimedMachineOffRequest request : context.getTimedMachineOffRequests()) {
+            LhScheduleResult original = request.getProfile().getOriginals().get(0);
+            OffMachineDecision current = context.getTimedMachineOffDecisionMap().get(original);
+            if (Objects.isNull(current) || this.hasFixedRelease(context, request)) {
+                continue;
+            }
+            List<String> machineCodes = request.getProfile().getOriginals().stream()
+                    .map(LhScheduleResult::getLhMachineCode).collect(Collectors.toList());
+            if (!ledger.hasStructureHandoff(machineCodes)) {
+                continue;
+            }
+            OffMachineDecision candidate = this.resolveOffMachineTime(context, request.getStartDate(),
+                    original.getLhMachineCode(), request.getSourceSku(), request, ledger, true);
+            if (Objects.nonNull(candidate.getOffMachineTime())
+                    && candidate.getOffMachineTime().before(current.getOccupancyEndTime())) {
+                this.applyProductionBoundary(context, request, candidate);
+                this.movePreviewActions(context, ledger, request, candidate);
+                adjustedCount++;
+            }
+        }
+        String detail = "批次=" + context.getBatchNo() + ", 请求数=" + context.getTimedMachineOffRequests().size()
+                + ", 请求扫描轮数=2, 结构接替提前释放数=" + adjustedCount + ", 额外候选预演次数=0, 正式次数账本=未修改";
+        log.info("按时间下机联合决策完成, {}", detail);
+        PriorityTraceLogHelper.appendProcessLog(context, "按时间下机联合决策完成", detail);
+    }
+
+    /** @param context 上下文 @param ledger 模拟事件账本 @param request 请求 @param decision 新的合法下机边界 */
+    private void movePreviewActions(LhScheduleContext context, TimedMachineOffLoadPreview ledger,
+            TimedMachineOffRequest request, OffMachineDecision decision) {
+        if (Objects.isNull(ledger)) {
+            return;
+        }
+        String movements = ledger.moveOwnActions(request.getProfile().getOriginals().stream()
+                .map(LhScheduleResult::getLhMachineCode).collect(Collectors.toList()), decision);
+        if (!movements.isEmpty()) {
+            String detail = "批次=" + context.getBatchNo() + ", 事件=" + movements
+                    + ", 槽位0=早班/1=中班, 仅迁移模拟次数，正式后料仍须重验时间轴";
+            log.info("按时间下机模拟事件迁移, {}", detail);
+            PriorityTraceLogHelper.appendProcessLog(context, "按时间下机模拟事件迁移", detail);
         }
     }
 
@@ -250,12 +328,13 @@ public class TimedMachineOffShiftService {
      * @param request 已选物理机台
      * @return 是否有不能搬动的既定时间边界
      */
-    private boolean hasFixedRelease(LhScheduleContext context, TimedMachineOffRequest request) {
+    boolean hasFixedRelease(LhScheduleContext context, TimedMachineOffRequest request) {
         List<LhScheduleResult> own = request.getProfile().getOriginals();
         for (LhScheduleResult result : own) {
             String code = result.getLhMachineCode();
             MachineScheduleDTO machine = context.getMachineScheduleMap().get(code);
-            if (context.getPreviousAlternateReleaseEventMap().containsKey(code)
+            if ((context.getPreviousAlternateReleaseEventMap().containsKey(code)
+                    && !this.isAdjustablePreviousAlternate(context, request, code))
                     || context.getOnlySandBlastContinuationReleaseWindowMap().containsKey(code)
                     || context.getContinuationTemporaryFaultTransferEventMap().containsKey(code)
                     || context.isContinuousStopHoldMachine(code)
@@ -271,6 +350,15 @@ public class TimedMachineOffShiftService {
             }
         }
         return false;
+    }
+
+    /** @param context 本批上下文 @param request 普通降模请求 @param code 运行态机台编码 @return 普通异料历史交替可参与动态下机 */
+    private boolean isAdjustablePreviousAlternate(LhScheduleContext context, TimedMachineOffRequest request, String code) {
+        PreviousAlternatePlanReleaseEvent event = context.getPreviousAlternateReleaseEventMap().get(code);
+        return Objects.nonNull(event) && !event.isRemainderFinishDeferred() && !event.isSingleMouldReplacement()
+                && !event.isBeforeMaterialNotScheduled() && !request.getSourceSku().isStrictTargetQty()
+                && StringUtils.equals(event.getMaterialCode(), request.getSourceSku().getMaterialCode())
+                && !StringUtils.equals(event.getPlan().getBeforeMaterialCode(), event.getPlan().getAfterMaterialCode());
     }
 
     /**
@@ -312,6 +400,12 @@ public class TimedMachineOffShiftService {
                 .filter(shift -> !shift.getShiftEndDateTime().after(decision.getOccupancyEndTime()))
                 .mapToInt(LhShiftConfigVO::getShiftIndex).max().orElse(0);
         context.registerContinuousReducedMachineReleaseBoundary(result.getLhMachineCode(), lastProductionShift);
+        PreviousAlternatePlanReleaseEvent event = context.getPreviousAlternateReleaseEventMap().get(result.getLhMachineCode());
+        if (Objects.nonNull(event)) {
+            // 普通降模历史承接必须消费同一时间下机事实，后置恢复不得将前料重新提前释放。
+            event.setOfflineTime(decision.getOccupancyEndTime());
+            context.getPreviousAlternateReleasedMachineTimeMap().put(result.getLhMachineCode(), decision.getOccupancyEndTime());
+        }
         context.markContinuousStopHoldMachineReleased(result.getLhMachineCode());
         // 该键与既有降模分组一致，正式补偿阶段从新的释放业务日评估需求。
         String groupKey = MonthPlanDateResolver.buildMaterialStatusKey(result.getMaterialCode(), result.getProductStatus());

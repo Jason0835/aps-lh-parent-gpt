@@ -82,8 +82,21 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
 
         List<FactoryMonthPlanProductionFinalResult> monthPlanList = this.queryMonthPlanList(queryVO, productionVersion);
         List<LhDayPlanAdjustRequire> allRows = this.aggregateMonthPlanRows(queryVO, productionVersion, monthPlanList);
+        boolean sortAdjustQty = Arrays.asList("adjustQty1", "adjustQty2", "adjustQty3")
+                .contains(queryVO.getOrderByColumn())
+                && Arrays.asList("asc", "desc").contains(queryVO.getIsAsc());
+        if (sortAdjustQty) {
+            this.fillAdjustRows(allRows);
+            Comparator<BigDecimal> quantityOrder = "desc".equals(queryVO.getIsAsc())
+                    ? Comparator.reverseOrder() : Comparator.naturalOrder();
+            allRows.sort(Comparator.comparing(
+                    (LhDayPlanAdjustRequire row) -> (BigDecimal) row.getFieldValueByFieldName(queryVO.getOrderByColumn()),
+                    Comparator.nullsLast(quantityOrder)));
+        }
         List<LhDayPlanAdjustRequire> pageRows = this.pageRows(allRows, queryVO.getPageNum(), queryVO.getPageSize());
-        this.fillAdjustRows(pageRows);
+        if (!sortAdjustQty) {
+            this.fillAdjustRows(pageRows);
+        }
         this.fillTreadGlueTd(pageRows, queryVO.getFactoryCode());
         pageRows.forEach(this::calculateAdjustedTotalQty);
         return this.buildTableData(pageRows, allRows.size());

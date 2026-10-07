@@ -7,6 +7,7 @@ import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.component.DayPlanAdjustRequireAssembler;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
+import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.factory.ScheduleStrategyFactory;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
@@ -26,12 +27,13 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * S4.5.2 硫化日计划调整排产处理器。
  *
  * <p>该步骤严格在 S4.5 新增排产全部完成后执行：先由 {@link DayPlanAdjustRequireAssembler}
- * 独立加载、汇总并筛选“本月没有正向原始月计划量、但日计划调整需求存在”的物料，再复用新增排产
+ * 复用历史承接前已准备的“本月没有正向原始月计划量、但日计划调整需求存在”物料及剩余账本，再复用新增排产
  * {@code scheduleNewSpecs} 的选机、换模、首检、产能、结果落库与账本扣减主链完成排产。
  * 本 Handler 不修改新增排产既有业务语义，仅通过临时替换待排列表实现独立入口。</p>
  *
@@ -47,23 +49,32 @@ public class DayPlanAdjustProductionHandler extends AbsScheduleStepHandler {
     @Resource
     private DayPlanAdjustRequireAssembler dayPlanAdjustRequireAssembler;
 
+    @Resource
+    private TargetScheduleQtyResolver targetScheduleQtyResolver;
+
     @Override
     protected void doHandle(LhScheduleContext context) {
         log.info("硫化日计划调整排产处理开始, 工厂: {}, 目标日: {}, 当前结果数: {}, 未排产数: {}",
                 context.getFactoryCode(), LhScheduleTimeUtil.formatDate(context.getScheduleTargetDate()),
                 context.getScheduleResultList().size(), context.getUnscheduledResultList().size());
 
-        List<SkuScheduleDTO> dayPlanAdjustSkuList = dayPlanAdjustRequireAssembler.assemble(context);
+        List<SkuScheduleDTO> dayPlanAdjustSkuList = dayPlanAdjustRequireAssembler.prepare(context);
         if (CollectionUtils.isEmpty(dayPlanAdjustSkuList)) {
             log.info("硫化日计划调整待排清单为空, 工厂: {}, 批次: {}",
                     context.getFactoryCode(), context.getBatchNo());
             return;
         }
 
-        // 日计划调整属于独立新增来源，正式排产消费前同步登记班次9候选身份。
-        dayPlanAdjustSkuList.stream()
-                .filter(Objects::nonNull)
-                .forEach(context::registerNextShiftNewPlanCandidate);
+        // 只消费指定承接后的真实余额；原始严格目标和共享日计划账本保持不变。
+        List<SkuScheduleDTO> pendingSkuList = dayPlanAdjustSkuList.stream()
+                .filter(sku -> targetScheduleQtyResolver.resolveProductionRemainingQty(context, sku) > 0)
+                .collect(Collectors.toList());
+        pendingSkuList.forEach(sku -> sku.setRemainingScheduleQty(
+                targetScheduleQtyResolver.resolveProductionRemainingQty(context, sku)));
+        if (CollectionUtils.isEmpty(pendingSkuList)) {
+            this.logDayPlanAdjustSummary(context, dayPlanAdjustSkuList);
+            return;
+        }
 
         IProductionStrategy strategy = strategyFactory.getProductionStrategy(
                 ScheduleTypeEnum.NEW_SPEC.getCode());
@@ -74,16 +85,15 @@ public class DayPlanAdjustProductionHandler extends AbsScheduleStepHandler {
 
         // 保存 S4.5 后仍保留的待排新增列表，日计划调整阶段仅临时消费独立候选，完成后原样恢复。
         List<SkuScheduleDTO> originalNewSpecSkuList = new ArrayList<>(context.getNewSpecSkuList());
-        int originalResultCount = context.getScheduleResultList().size();
         try {
-            context.setNewSpecSkuList(new ArrayList<>(dayPlanAdjustSkuList));
+            context.setNewSpecSkuList(new ArrayList<>(pendingSkuList));
             strategy.scheduleNewSpecs(context, machineMatchStrategy, mouldChangeStrategy,
                     inspectionStrategy, capacityStrategy);
         } finally {
             context.setNewSpecSkuList(originalNewSpecSkuList);
         }
 
-        this.logDayPlanAdjustSummary(context, dayPlanAdjustSkuList, originalResultCount);
+        this.logDayPlanAdjustSummary(context, dayPlanAdjustSkuList);
         log.info("硫化日计划调整排产处理完成, 工厂: {}, 结果数: {}, 未排产数: {}",
                 context.getFactoryCode(), context.getScheduleResultList().size(),
                 context.getUnscheduledResultList().size());
@@ -93,24 +103,21 @@ public class DayPlanAdjustProductionHandler extends AbsScheduleStepHandler {
      * 输出日计划调整阶段的可对账汇总日志。
      *
      * <p>逐物料记录“物料、产品状态、汇总调整量、硫化余量、实际排产量、所选机台及未排原因”，
-     * 其中汇总调整量与硫化余量取自候选 DTO，实际排产量与机台从本阶段新增结果反查。</p>
+     * 其中汇总调整量与硫化余量取自候选 DTO，实际排产量与机台合并本批历史承接及后置结果。</p>
      *
      * @param context            排程上下文
      * @param dayPlanAdjustSkuList 日计划调整候选列表
-     * @param originalResultCount 阶段开始前的结果数
      */
     private void logDayPlanAdjustSummary(LhScheduleContext context,
-                                        List<SkuScheduleDTO> dayPlanAdjustSkuList,
-                                        int originalResultCount) {
+                                        List<SkuScheduleDTO> dayPlanAdjustSkuList) {
         if (CollectionUtils.isEmpty(dayPlanAdjustSkuList)) {
             return;
         }
-        List<LhScheduleResult> newResultList = new ArrayList<>(context.getScheduleResultList());
+        List<LhScheduleResult> batchResultList = new ArrayList<>(context.getScheduleResultList());
         for (SkuScheduleDTO sku : dayPlanAdjustSkuList) {
             int scheduledQty = 0;
             Set<String> machineCodeSet = new LinkedHashSet<>();
-            for (int index = originalResultCount; index < newResultList.size(); index++) {
-                LhScheduleResult result = newResultList.get(index);
+            for (LhScheduleResult result : batchResultList) {
                 if (Objects.isNull(result) || !Objects.equals(sku.getMaterialCode(), result.getMaterialCode())
                         || !Objects.equals(sku.getProductStatus(), result.getProductStatus())) {
                     continue;

@@ -62,6 +62,39 @@ public class EarlyProductionRuntimePlanService {
     private IMouldChangeBalanceStrategy mouldChangeBalanceStrategy;
 
     /**
+     * 在业务日竞争开始前恢复已到期未来候选的正常目标。
+     * <p>只转换尚未提前生产的候选；已激活视图继续使用原临时账本和消费余额。
+     * 原始日计划与通用硫化余量不重建，目标同步保留同物料同状态已消费量。</p>
+     * @param context 排程上下文
+     * @param sku 原需求对象
+     * @param businessDate 实际业务日期
+     */
+    public void prepareNormalPlanOnDueDate(LhScheduleContext context, SkuScheduleDTO sku,
+                                          LocalDate businessDate) {
+        EarlyProductionRuntimePlan runtimePlan = context.getEarlyProductionRuntimePlan(sku);
+        if (Objects.isNull(runtimePlan) || !runtimePlan.isFutureOnlyCandidate()
+                || runtimePlan.isActive() || runtimePlan.isNormalPlanActivated()
+                || context.isFutureOnlyEarlyProductionCandidate(sku, businessDate)
+                || MonthPlanDateResolver.resolveDayQty(
+                        context, sku.getMaterialCode(), sku.getProductStatus(), businessDate) <= 0) {
+            return;
+        }
+        int targetQty = Math.max(0, runtimePlan.getFutureMonthSurplusQty());
+        // 使用统一目标入口恢复数量，禁止直接把隔离前总量重新写成未消费余额。
+        int remainingQty = targetScheduleQtyResolver.applyProductionTargetState(
+                context, sku, targetQty, "未来需求到达正常计划日");
+        sku.setPendingQty(remainingQty);
+        runtimePlan.setNormalPlanActivated(true);
+        targetScheduleQtyResolver.refreshActiveEmbryoSkuMap(context);
+        targetScheduleQtyResolver.refreshAllSharedEmbryoStockAllocations(context, "未来需求转正常计划");
+        String detail = String.format("工厂=%s, 批次=%s, 业务日=%s, 物料=%s, 状态=%s, 来源计划日=%s, 总目标=%s, 剩余量=%s",
+                context.getFactoryCode(), context.getBatchNo(), businessDate, sku.getMaterialCode(),
+                sku.getProductStatus(), runtimePlan.getFuturePlanDate(), targetQty, remainingQty);
+        log.info("未来需求转正常计划, {}", detail);
+        PriorityTraceLogHelper.appendProcessLog(context, "未来需求转正常计划", detail);
+    }
+
+    /**
      * 只读预览指定业务日的提前生产运行视图。
      *
      * <p>本方法会完整计算准入、未来来源日、临时前移dayN和有效目标量，但不会注册运行视图，

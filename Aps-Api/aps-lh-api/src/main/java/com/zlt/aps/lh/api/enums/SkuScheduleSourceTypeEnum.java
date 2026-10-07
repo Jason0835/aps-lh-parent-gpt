@@ -22,7 +22,9 @@ public enum SkuScheduleSourceTypeEnum {
     /** 续作阶段仅生成加机台需求，进入新增排产统一竞争的候选 */
     CONTINUATION_ADD_MACHINE("CONTINUATION_ADD_MACHINE", "续作加机台"),
     /** 硫化日计划调整需求：月计划中不存在、仅由日计划调整表新增的候选 */
-    DAY_PLAN_ADJUST("DAY_PLAN_ADJUST", "硫化日计划调整");
+    DAY_PLAN_ADJUST("DAY_PLAN_ADJUST", "硫化日计划调整"),
+    /** 无窗口日计划的历史指定试制量试余量，仅允许精确指定组合消费 */
+    PREVIOUS_ALTERNATE_TRIAL("PREVIOUS_ALTERNATE_TRIAL", "历史指定试制量试承接");
 
     /** 来源编码 */
     private final String code;

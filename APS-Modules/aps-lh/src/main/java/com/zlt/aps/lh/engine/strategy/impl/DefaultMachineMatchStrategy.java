@@ -317,7 +317,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                 || StringUtils.isEmpty(machine.getMachineCode())) {
             return MachineSkuMatchResult.failed(machine, sku, "排程上下文、机台或SKU为空");
         }
-        // 先校验强专供结构范围，拒绝发生在任何资源扣减前。
+        // 先校验结构去向与专供机允许结构，拒绝发生在任何资源扣减前。
         MachineSkuMatchResult supplyStructureMatch = this.matchSupplyStructureConstraint(
                 context, machine, sku);
         if (!supplyStructureMatch.isMatched()) {
@@ -383,7 +383,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     }
 
     /**
-     * 校验强专供结构的硫化机范围，弱专供仅参与优先级。
+     * 校验结构去向和专供机承接范围，输出同年月版本的双向关系。
      *
      * @param context 排程上下文
      * @param machine 当前候选硫化机
@@ -402,16 +402,20 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         Set<String> suppliedFormingMachines = machineSupplyStructureRule.getSuppliedFormingMachines(
                 context, machine.getMachineCode());
         String failureReason = new StringBuilder(192)
-                .append("强专供结构只能使用对应专供硫化机，结构=")
+                .append("结构与专供硫化机双向准入不匹配，结构=")
                 .append(sku.getStructureName())
                 .append("，成型机=").append(formingMachines)
                 .append("，允许专供硫化机=").append(machineSupplyStructureRule.getPreferredLhMachines(context, sku))
                 .append("，机台专供成型机=").append(suppliedFormingMachines)
+                .append("，机台允许结构=").append(machineSupplyStructureRule
+                        .getAllowedStructuresForMachine(context, machine.getMachineCode(), sku))
                 .toString();
         if (!context.isPriorityTraceMuted()) {
-            log.info("[专供结构约束] 过滤SKU, machineCode: {}, materialCode: {}, "
-                            + "skuStructure: {}, formingMachines: {}, suppliedFormingMachines: {}, reason: {}",
-                    machine.getMachineCode(), sku.getMaterialCode(), sku.getStructureName(),
+            log.info("[专供结构约束] 过滤SKU, factoryCode: {}, batchNo: {}, scheduleDate: {}, "
+                            + "machineCode: {}, materialCode: {}, productStatus: {}, skuStructure: {}, "
+                            + "formingMachines: {}, suppliedFormingMachines: {}, reason: {}",
+                    context.getFactoryCode(), context.getBatchNo(), context.getScheduleDate(),
+                    machine.getMachineCode(), sku.getMaterialCode(), sku.getProductStatus(), sku.getStructureName(),
                     formingMachines, suppliedFormingMachines, failureReason);
         }
         return MachineSkuMatchResult.failed(machine, sku, failureReason);
@@ -625,7 +629,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
      */
     private String resolveSpecifiedMachineFailureReason(MachineAvailabilityReason reason) {
         if (MachineAvailabilityReason.SUPPLY_STRUCTURE_MISMATCH == reason) {
-            return "专供硫化机与SKU唯一关联成型机不一致";
+            return "结构与专供硫化机双向准入不匹配";
         }
         if (MachineAvailabilityReason.DISABLED == reason) {
             return "历史指定机台已禁用";
@@ -3063,7 +3067,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                                                                       BigDecimal skuInch,
                                                                       SpecialMaterialMatchResult matchResult,
                                                                       MachineScheduleDTO machine) {
-        // 正向、反向和指定机台入口共同执行强专供范围硬约束。
+        // 正向、反向和指定机台入口共同执行结构与专供机双向硬约束。
         if (!machineSupplyStructureRule.canMachineSelectStructure(
                 context, machine.getMachineCode(), sku)) {
             return MachineAvailabilityReason.SUPPLY_STRUCTURE_MISMATCH;

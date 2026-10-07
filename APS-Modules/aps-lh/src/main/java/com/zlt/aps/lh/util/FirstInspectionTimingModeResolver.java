@@ -63,20 +63,34 @@ public final class FirstInspectionTimingModeResolver {
                                                             String businessScene,
                                                             Date productionReadyTime,
                                                             Date changeoverEndTime) {
-        if (Objects.nonNull(productionReadyTime) && Objects.nonNull(changeoverEndTime)
-                && productionReadyTime.after(changeoverEndTime)) {
-            return FirstInspectionTimingModeDecision.of(
-                    FirstInspectionTimingMode.START_AT_PRODUCTION_READY, REASON_PRODUCTION_GATE);
-        }
-        if (Objects.nonNull(sku)
-                && (FirstInspectionQtyUtil.isMassTrialQuantityFirstInspection(sku, scheduleType)
-                || isTrialSku(sku, scheduleType))) {
-            return FirstInspectionTimingModeDecision.of(
-                    FirstInspectionTimingMode.START_AT_PRODUCTION_READY, REASON_TRIAL_MASS_TRIAL);
-        }
-        return FirstInspectionTimingModeDecision.of(
-                FirstInspectionTimingMode.INCLUDED_IN_CHANGEOVER,
-                buildNormalReason(changeoverAction, businessScene));
+        return resolve(sku, scheduleType, changeoverAction, businessScene,
+                productionReadyTime, changeoverEndTime, null, false);
+    }
+
+    /**
+     * 解析带前日交替正规化豁免的首检时间模式。
+     *
+     * <p>前日交替指定承接的后物料按正规排产方式解析：即使 SKU 为试制或量试，
+     * 首检仍包含在切换总时长内按切换完成时间倒推，不再正向顺延到换模完成后执行。</p>
+     *
+     * @param sku 当前SKU
+     * @param scheduleType 排程类型
+     * @param changeoverAction 切换动作
+     * @param businessScene 业务场景
+     * @param productionReadyTime 生产就绪或硬性生产门禁时间
+     * @param changeoverEndTime 切换完成时间
+     * @param previousAlternateNormalMode 是否为前日交替指定承接的正规化解析
+     * @return 模式及原因
+     */
+    public static FirstInspectionTimingModeDecision resolve(SkuScheduleDTO sku,
+                                                            String scheduleType,
+                                                            String changeoverAction,
+                                                            String businessScene,
+                                                            Date productionReadyTime,
+                                                            Date changeoverEndTime,
+                                                            boolean previousAlternateNormalMode) {
+        return resolve(sku, scheduleType, changeoverAction, businessScene,
+                productionReadyTime, changeoverEndTime, null, previousAlternateNormalMode);
     }
 
     /**
@@ -99,13 +113,52 @@ public final class FirstInspectionTimingModeResolver {
             Date productionReadyTime,
             Date changeoverEndTime,
             Date productionOccupationNotBeforeTime) {
+        return resolve(sku, scheduleType, changeoverAction, businessScene,
+                productionReadyTime, changeoverEndTime, productionOccupationNotBeforeTime, false);
+    }
+
+    /**
+     * 解析同时携带结构占用起点约束与前日交替正规化豁免的首检时间模式。
+     *
+     * @param sku 当前SKU
+     * @param scheduleType 排程类型
+     * @param changeoverAction 切换动作
+     * @param businessScene 业务场景
+     * @param productionReadyTime 生产就绪或硬性生产门禁时间
+     * @param changeoverEndTime 切换完成时间
+     * @param productionOccupationNotBeforeTime 首检或正式生产不得早于的结构占用时刻
+     * @param previousAlternateNormalMode 是否为前日交替指定承接的正规化解析
+     * @return 模式及原因
+     */
+    public static FirstInspectionTimingModeDecision resolve(
+            SkuScheduleDTO sku,
+            String scheduleType,
+            String changeoverAction,
+            String businessScene,
+            Date productionReadyTime,
+            Date changeoverEndTime,
+            Date productionOccupationNotBeforeTime,
+            boolean previousAlternateNormalMode) {
         if (Objects.nonNull(productionOccupationNotBeforeTime)) {
             return FirstInspectionTimingModeDecision.of(
                     FirstInspectionTimingMode.START_AT_OCCUPATION_BOUNDARY,
                     REASON_PRODUCTION_OCCUPATION_BOUNDARY);
         }
-        return resolve(sku, scheduleType, changeoverAction, businessScene,
-                productionReadyTime, changeoverEndTime);
+        if (Objects.nonNull(productionReadyTime) && Objects.nonNull(changeoverEndTime)
+                && productionReadyTime.after(changeoverEndTime)) {
+            return FirstInspectionTimingModeDecision.of(
+                    FirstInspectionTimingMode.START_AT_PRODUCTION_READY, REASON_PRODUCTION_GATE);
+        }
+        // 前日交替指定承接按正规排产方式解析，试制/量试首检不再正向顺延到换模完成后。
+        if (!previousAlternateNormalMode && Objects.nonNull(sku)
+                && (FirstInspectionQtyUtil.isMassTrialQuantityFirstInspection(sku, scheduleType)
+                || isTrialSku(sku, scheduleType))) {
+            return FirstInspectionTimingModeDecision.of(
+                    FirstInspectionTimingMode.START_AT_PRODUCTION_READY, REASON_TRIAL_MASS_TRIAL);
+        }
+        return FirstInspectionTimingModeDecision.of(
+                FirstInspectionTimingMode.INCLUDED_IN_CHANGEOVER,
+                buildNormalReason(changeoverAction, businessScene));
     }
 
     /**

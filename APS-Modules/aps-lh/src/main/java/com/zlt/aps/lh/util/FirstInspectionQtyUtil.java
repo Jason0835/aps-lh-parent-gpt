@@ -11,6 +11,7 @@ import com.zlt.aps.lh.context.LhScheduleConfig;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.FirstInspectionAllocationPlan;
 import com.zlt.aps.lh.engine.strategy.support.FirstInspectionShiftAllocation;
+import com.zlt.aps.lh.engine.strategy.support.StructureSwitchFirstShiftQuantityPolicy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 
@@ -125,7 +126,8 @@ public final class FirstInspectionQtyUtil {
      *
      * <p>默认仍按切换完成时间归属；当试制或量试 SKU 的切换完成归属早班时，
      * 首检与生产开产归属调整为同业务日中班。找不到同日中班时返回 null，
-     * 由上游按无可归属班次处理，不构造兜底时间。</p>
+     * 由上游按无可归属班次处理，不构造兜底时间。
+     * 前日交替指定承接的后物料按正规排产方式解析，不做早班到中班的归属调整。</p>
      *
      * @param context 排程上下文
      * @param sku SKU 排程信息
@@ -140,7 +142,7 @@ public final class FirstInspectionQtyUtil {
                                                                          Date switchCompleteTime,
                                                                          String scheduleType) {
         LhShiftConfigVO defaultShift = resolveAttributionShift(shifts, switchCompleteTime);
-        if (!isTrialOrMassTrialMorningSwitchAttribution(sku, defaultShift, scheduleType)) {
+        if (!isTrialOrMassTrialMorningSwitchAttribution(context, sku, defaultShift, scheduleType)) {
             return defaultShift;
         }
         LhShiftConfigVO afternoonShift = resolveAfternoonShiftOnSameWorkDate(shifts, defaultShift);
@@ -166,7 +168,8 @@ public final class FirstInspectionQtyUtil {
      * 解析首检资源占用起点。
      *
      * <p>试制、量试 SKU 早班切换完成时，首检资源从同业务日中班开始占用；
-     * 其他 SKU 仍以切换完成时间作为首检资源占用起点。</p>
+     * 其他 SKU 仍以切换完成时间作为首检资源占用起点。
+     * 前日交替指定承接的后物料按正规排产方式解析，首检资源占用起点保持切换完成时间。</p>
      *
      * @param context 排程上下文
      * @param sku SKU 排程信息
@@ -186,7 +189,7 @@ public final class FirstInspectionQtyUtil {
         if (Objects.isNull(attributionShift)) {
             return null;
         }
-        if (isTrialOrMassTrialMorningSwitchAttribution(sku, defaultShift, scheduleType)) {
+        if (isTrialOrMassTrialMorningSwitchAttribution(context, sku, defaultShift, scheduleType)) {
             return attributionShift.getShiftStartDateTime();
         }
         return switchCompleteTime;
@@ -196,7 +199,8 @@ public final class FirstInspectionQtyUtil {
      * 解析试制、量试 SKU 切换后的实际开产时间。
      *
      * <p>当试制或量试 SKU 的切换完成归属早班时，开产时间不得早于同业务日中班开始；
-     * 正规、小批量沿用传入的默认开产时间。</p>
+     * 正规、小批量沿用传入的默认开产时间。前日交替指定承接的后物料按正规排产
+     * 方式解析，开产时间沿用传入的默认值，不做中班下限调整。</p>
      *
      * @param context 排程上下文
      * @param sku SKU 排程信息
@@ -216,7 +220,7 @@ public final class FirstInspectionQtyUtil {
             return null;
         }
         LhShiftConfigVO defaultShift = resolveAttributionShift(shifts, switchCompleteTime);
-        if (!isTrialOrMassTrialMorningSwitchAttribution(sku, defaultShift, scheduleType)) {
+        if (!isTrialOrMassTrialMorningSwitchAttribution(context, sku, defaultShift, scheduleType)) {
             return defaultProductionStartTime;
         }
         LhShiftConfigVO attributionShift = resolveFirstInspectionAttributionShift(
@@ -593,6 +597,12 @@ public final class FirstInspectionQtyUtil {
             String scheduleType) {
         if (Objects.isNull(result) || Objects.isNull(plan) || !plan.isValid()
                 || !plan.hasQuantityTimeline() || Objects.isNull(plan.getCountingShift())) {
+            return 0;
+        }
+        // 冻结首检也必须复核共享额度，失败不写任何分摊、不推进首检计数。
+        if (!StructureSwitchFirstShiftQuantityPolicy.canWriteInspection(context, result, plan)) {
+            log.warn("结构胎胚首班额度不足完整首检，拒绝写入, batchNo={}, sku={}, machine={}",
+                    context.getBatchNo(), result.getMaterialCode(), result.getLhMachineCode());
             return 0;
         }
         int currentSequence = resolveNextFirstInspectionSequence(context, plan.getCountingShift());
@@ -1374,10 +1384,15 @@ public final class FirstInspectionQtyUtil {
     }
 
     private static boolean isTrialOrMassTrialMorningSwitchAttribution(
+            LhScheduleContext context,
             SkuScheduleDTO sku,
             LhShiftConfigVO defaultShift,
             String scheduleType) {
         if (Objects.isNull(sku) || Objects.isNull(defaultShift)) {
+            return false;
+        }
+        // 前日交替指定承接的后物料按正规排产方式解析，早班切换的首检与开产不再调整到中班。
+        if (Objects.nonNull(context) && context.isPreviousAlternateAfterMaterialSku(sku)) {
             return false;
         }
         if (!Objects.equals(ConstructionStageEnum.TRIAL.getCode(), sku.getConstructionStage())

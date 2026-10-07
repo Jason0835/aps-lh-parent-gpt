@@ -463,19 +463,25 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         int shiftIndexMin = "".equals(keySuffix) ? 3 : 6;
         int shiftIndexMax = "".equals(keySuffix) ? 5 : 8;
 
+        // 虚拟机台（V开头）仅用于引擎内部聚合，不在机台主数据中且明细导出不展示；
+        // 产量与机台数统计必须排除，否则会与明细Sheet的SUM合计/可见机台数对不上。
+        List<LhScheduleResult> statLhResults = lhResults.stream()
+                .filter(r -> !LhSingleControlMachineUtil.isVirtualMachineCode(r.getLhMachineCode()))
+                .collect(Collectors.toList());
+
         BigDecimal lhNightTotal = BigDecimal.ZERO;
         BigDecimal lhMorningTotal = BigDecimal.ZERO;
         BigDecimal lhMiddleTotal = BigDecimal.ZERO;
 
-        for (LhScheduleResult result : lhResults) {
+        for (LhScheduleResult result : statLhResults) {
             lhNightTotal = lhNightTotal.add(sumLhQtyByShiftTypeInRange(result, classShiftTypeMap, "01", shiftIndexMin, shiftIndexMax));
             lhMorningTotal = lhMorningTotal.add(sumLhQtyByShiftTypeInRange(result, classShiftTypeMap, "02", shiftIndexMin, shiftIndexMax));
             lhMiddleTotal = lhMiddleTotal.add(sumLhQtyByShiftTypeInRange(result, classShiftTypeMap, "03", shiftIndexMin, shiftIndexMax));
         }
 
-        long nightMachines = countLhMachinesByShiftTypeInRange(lhResults, classShiftTypeMap, "01", shiftIndexMin, shiftIndexMax, machineMaxMouldMap);
-        long morningMachines = countLhMachinesByShiftTypeInRange(lhResults, classShiftTypeMap, "02", shiftIndexMin, shiftIndexMax, machineMaxMouldMap);
-        long middleMachines = countLhMachinesByShiftTypeInRange(lhResults, classShiftTypeMap, "03", shiftIndexMin, shiftIndexMax, machineMaxMouldMap);
+        long nightMachines = countLhMachinesByShiftTypeInRange(statLhResults, classShiftTypeMap, "01", shiftIndexMin, shiftIndexMax, machineMaxMouldMap);
+        long morningMachines = countLhMachinesByShiftTypeInRange(statLhResults, classShiftTypeMap, "02", shiftIndexMin, shiftIndexMax, machineMaxMouldMap);
+        long middleMachines = countLhMachinesByShiftTypeInRange(statLhResults, classShiftTypeMap, "03", shiftIndexMin, shiftIndexMax, machineMaxMouldMap);
 
         map.put("lhNightQty" + keySuffix, lhNightTotal.toString());
         map.put("lhMorningQty" + keySuffix, lhMorningTotal.toString());
@@ -1249,16 +1255,6 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     }
 
     /**
-     * 统计某班次类型下的硫化开动机台数
-     */
-    private long countLhMachinesByShiftType(List<LhScheduleResult> results,
-                                            Map<Integer, String> classShiftTypeMap, String shiftType) {
-        return results.stream()
-                .filter(r -> hasNonZeroQtyForShiftType(r, classShiftTypeMap, shiftType))
-                .count();
-    }
-
-    /**
      * 按班次类型和班次序号范围汇总硫化产量。
      * 用于区分T+1（班次1~5）和T+2（班次6~8）的硫化数据。
      *
@@ -1378,17 +1374,18 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     }
 
     /**
-     * 判断某台机器在指定班次类型和班次序号范围内是否有排程记录（含计划量为0的机台）。
+     * 判断某台机器在指定班次类型和班次序号范围内是否有计划产量（开动机台判定）。
      *
-     * <p>统计口径：只要机台在该班次序号范围内有排程记录（classNPlanQty 不为 null，即使为0），
-     * 即视为该班次开动，计入开动机台数。</p>
+     * <p>统计口径：机台在该班次序号范围内任一班次计划量 &gt; 0 才视为该班次开动，计入开动机台数；
+     * 与硫化日计划明细导出口径保持一致（明细 Sheet 中计划量为 0 时经 zeroToEmpty 显示为空白，
+     * 空白不计入开动机台数）。</p>
      *
      * @param result           硫化排程结果
      * @param classShiftTypeMap 班次类型映射
      * @param shiftType        班次类型（01-夜，02-早，03-中）
      * @param shiftIndexMin    班次序号下限（含）
      * @param shiftIndexMax    班次序号上限（含）
-     * @return true=该机台在该班次类型和范围内有排程记录，false=无排程记录
+     * @return true=该机台在范围内任一班次计划量大于0（开动），false=无计划产量
      */
     private boolean hasNonZeroQtyForShiftTypeInRange(LhScheduleResult result,
                                                       Map<Integer, String> classShiftTypeMap,
@@ -1428,53 +1425,8 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                     default:
                         break;
                 }
-                // 计划量不为null（即使为0）即表示该机台在该班次有排程记录，计入开动机台数
-                if (qty != null) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    /**
-     * 判断某台机器在指定班次类型下是否有计划产量
-     */
-    private boolean hasNonZeroQtyForShiftType(LhScheduleResult result,
-                                              Map<Integer, String> classShiftTypeMap, String shiftType) {
-        for (Map.Entry<Integer, String> entry : classShiftTypeMap.entrySet()) {
-            if (shiftType.equals(entry.getValue())) {
-                int shiftIndex = entry.getKey();
-                BigDecimal qty = BigDecimal.ZERO;
-                switch (shiftIndex) {
-                    case 1:
-                        qty = nvlInt(result.getClass1PlanQty());
-                        break;
-                    case 2:
-                        qty = nvlInt(result.getClass2PlanQty());
-                        break;
-                    case 3:
-                        qty = nvlInt(result.getClass3PlanQty());
-                        break;
-                    case 4:
-                        qty = nvlInt(result.getClass4PlanQty());
-                        break;
-                    case 5:
-                        qty = nvlInt(result.getClass5PlanQty());
-                        break;
-                    case 6:
-                        qty = nvlInt(result.getClass6PlanQty());
-                        break;
-                    case 7:
-                        qty = nvlInt(result.getClass7PlanQty());
-                        break;
-                    case 8:
-                        qty = nvlInt(result.getClass8PlanQty());
-                        break;
-                    default:
-                        break;
-                }
-                if (qty.compareTo(BigDecimal.ZERO) > 0) {
+                // 计划量>0才算该班次开动：与硫化日计划明细Sheet的zeroToEmpty展示口径一致（0显示为空白，不计入开动机台数）
+                if (qty != null && qty > 0) {
                     return true;
                 }
             }

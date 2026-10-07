@@ -14,6 +14,8 @@ import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.api.enums.UnscheduledGroupTypeEnum;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.engine.strategy.support.ContinuationEndingAllocationSnapshot;
+import com.zlt.aps.lh.engine.strategy.support.ContinuationMachineFinishPlan;
 import com.zlt.aps.lh.exception.ScheduleErrorCode;
 import com.zlt.aps.lh.exception.ScheduleException;
 import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
@@ -340,6 +342,13 @@ public class SchedulePersistenceService {
                     && currentLastPlannedShift < LhScheduleConstant.MAX_SHIFT_SLOT_COUNT;
             boolean windowEndShift = currentLastPlannedShift == LhScheduleConstant.MAX_SHIFT_SLOT_COUNT;
             boolean endingMachine = currentMachineLastPlan && (beforeWindowEndShift || (windowEndShift && skuEnding));
+            ContinuationEndingAllocationSnapshot finishSnapshot = Objects.nonNull(context)
+                    ? context.getContinuationSurplusEndingSnapshotMap().get(result) : null;
+            if (Objects.nonNull(finishSnapshot)
+                    && finishSnapshot.getFinishState() == ContinuationMachineFinishPlan.FinishState.WINDOW_UNFINISHED) {
+                // 历史交替终末余量尚未清完且本机没有强制退出，停止排量不代表机台正常收尾。
+                endingMachine = false;
+            }
             int lastPlannedShift = ShiftFieldUtil.applyLastPlannedShiftEndMark(result, endingMachine);
             // 正规状态的0/1收尾逻辑必须完整执行后，再按最终产品状态覆盖量试、试验/试制有量班次。
             ShiftFieldUtil.applyProductStatusShiftEndOverride(result);

@@ -100,8 +100,9 @@ public abstract class AbsLhScheduleTemplate {
             /*
              * S4.5.2 硫化日计划调整排产：
              * 必须严格在 S4.5 新增排产全部完成后执行，基于新增排产后的实时机台/产能状态，
-             * 只处理“本月月计划不存在、但 t_lh_day_plan_adjust_require 存在且汇总调整量与
-             * 硫化余量均大于0”的额外排产来源，避免混入新增排产主循环。
+             * 只处理“本月没有正向月计划、但 t_lh_day_plan_adjust_require 存在且汇总调整量与
+             * 硫化余量均大于0”的额外排产来源。历史指定承接已消费的数量沿共享账本扣除，
+             * 本阶段仅排剩余量，避免重新建单或混入普通新增排产主循环。
              */
             context.setCurrentStep(ScheduleStepEnum.S4_5_2_DAY_PLAN_ADJUST.getCode());
             log.info(">>> 步骤 S4.5.2: {}", ScheduleStepEnum.S4_5_2_DAY_PLAN_ADJUST.getDescription());

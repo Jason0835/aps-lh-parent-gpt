@@ -29,6 +29,7 @@ import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.component.UnscheduledResultCollector;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchShiftAudit;
+import com.zlt.aps.lh.engine.strategy.support.StructureSwitchFirstShiftQuantityPolicy;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.service.impl.ContinuationSandBlastDispositionService;
 import com.zlt.aps.lh.engine.observer.ScheduleEvent;
@@ -224,6 +225,12 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             unscheduledResultCollector.finalizeBeforePersistence(context);
             // 所有回裁完成后只读审计动态S0/S1，与本次实际保存的正量结果保持一致。
             StructureSwitchShiftAudit.appendFinalSummary(context);
+            // 后置回裁及补量全部结束后审计首班共享上限，仅告警，不通过异常中止保存。
+            String treadFailure = StructureSwitchFirstShiftQuantityPolicy.validateResults(context);
+            if (StringUtils.isNotEmpty(treadFailure)) {
+                log.warn("结构胎胚首班保存前审计未通过, factoryCode={}, batchNo={}, detail={}",
+                        context.getFactoryCode(), context.getBatchNo(), treadFailure);
+            }
             addSummaryLog(context);
 
             // S4.6.6 保存排程结果到数据库：由持久化服务统一做目标日原子替换。
@@ -1562,8 +1569,14 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
      * @param result 排程结果
      */
     private void normalizeMouldMultiplePlanQty(LhScheduleContext context, LhScheduleResult result) {
-        // 本场景已接管守恒分摊；成功提交或数据不足保留的原量都不能在扣账后再次向上补齐。
+        // 余量收尾已按整组目标扣账：保存前再次核对逐班模数，禁止通过补量破坏守恒与释放时间。
         if (Objects.nonNull(context) && context.getContinuationSurplusEndingAllocatedResults().contains(result)) {
+            if (!this.getTargetScheduleQtyResolver().isAllocatedShiftQtyValid(context, result)) {
+                log.warn("续作余量收尾班次数量不符合模数约束, batchNo: {}, materialCode: {}, "
+                                + "productStatus: {}, machineCode: {}, planQty: {}",
+                        context.getBatchNo(), result.getMaterialCode(), result.getProductStatus(),
+                        result.getLhMachineCode(), ShiftFieldUtil.resolveScheduledQty(result));
+            }
             return;
         }
         if (Objects.isNull(result)) {
@@ -2329,9 +2342,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             plan.setLhMachineName(result.getLhMachineName());
             // 排产结果描述完整装机产能；单副换模计划的动作范围单独沿用历史L/R。
             plan.setLeftRightMould(this.resolveMouldChangePlanLeftRightMould(context, result));
-            // 前规格取换模前机台当前在产规格，后规格取本次换模上机规格。
-            plan.setBeforeMaterialCode(state.getCurrentMaterialCode());
-            plan.setBeforeMaterialDesc(state.getCurrentMaterialDesc());
+            // 历史承接继承源计划前规格；普通换模保持真实运行态前规格，不改机台及数量账本。
+            this.fillMouldChangeBeforeMaterial(context, result, plan, state);
             plan.setAfterMaterialCode(result.getMaterialCode());
             plan.setAfterMaterialDesc(result.getMaterialDesc());
             // 保存本条计划物料（换模后上机物料）对应的产品状态，与排程结果 PRODUCT_STATUS 同口径。
@@ -2368,6 +2380,31 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         logOutOfWindowMouldChangePlans(context, plans);
         log.info("生成模具交替计划完成, 共 {} 条", plans.size());
         return planProductStatusMap;
+    }
+
+    /**
+     * 按成功承接结果的精确来源填写交替前物料，避免MES已上后料时生成后料到后料的计划。
+     *
+     * @param context 含历史承接结果关联的上下文
+     * @param result 本次换模结果
+     * @param plan 待生成的交替计划
+     * @param state 实际机台滚动状态，保持供下机方式、时间和后续普通换模使用
+     */
+    private void fillMouldChangeBeforeMaterial(LhScheduleContext context, LhScheduleResult result,
+            LhMouldChangePlan plan, RollingMachineState state) {
+        LhMouldChangePlan sourcePlan = context.getPreviousAlternateResultPlanMap().get(result);
+        if (Objects.nonNull(sourcePlan)) {
+            plan.setBeforeMaterialCode(sourcePlan.getBeforeMaterialCode());
+            plan.setBeforeMaterialDesc(sourcePlan.getBeforeMaterialDesc());
+            log.info("历史承接交替计划继承前物料, 工厂: {}, 批次: {}, 机台: {}, 历史计划ID: {}, "
+                            + "在机前物料: {}, 历史前物料: {}, 后物料: {}, 产品状态: {}",
+                    context.getFactoryCode(), context.getBatchNo(), result.getLhMachineCode(), sourcePlan.getId(),
+                    state.getCurrentMaterialCode(), sourcePlan.getBeforeMaterialCode(),
+                    result.getMaterialCode(), result.getProductStatus());
+        } else {
+            plan.setBeforeMaterialCode(state.getCurrentMaterialCode());
+            plan.setBeforeMaterialDesc(state.getCurrentMaterialDesc());
+        }
     }
 
     /**
@@ -3029,14 +3066,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             }
             String dateKey = LhScheduleTimeUtil.formatDate(plan.getPlanDate());
             dailyMachineMap.computeIfAbsent(dateKey, key -> new ArrayList<>()).add(physicalMachineCode);
-            if (context.isCrossDayPreparationMouldChange(
-                    plan.getLhMachineCode(), plan.getPlanDate())) {
-                /*
-                 * 生产日前跨日准备是贴近下一业务日首班的已确认时间轴：仍计入每日15次
-                 * 硬上限，但不参与早8/中7参考分布告警，否则合法的T日中班准备会被误报。
-                 */
-                continue;
-            }
+            // 跨日准备与普通换模使用同一班次口径；按实际动作日期复核，不能只计每日次数。
             if (LhScheduleTimeUtil.isMorningShift(context, plan.getPlanDate())) {
                 morningMachineMap.computeIfAbsent(dateKey, key -> new ArrayList<>()).add(physicalMachineCode);
                 continue;
