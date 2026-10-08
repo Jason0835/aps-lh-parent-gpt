@@ -76,6 +76,13 @@ public interface IProductionStrategy {
     }
 
     /**
+     * 确认收尾复评新发现强制精度后，撤销受影响续作的原消费并按约束重新提交。
+     * @param context 已扣账的续作上下文
+     */
+    default void reconcileEquipmentPlanConstraints(LhScheduleContext context) {
+    }
+
+    /**
      * 新增规格排产(新增策略使用)
      *
      * @param context            排程上下文

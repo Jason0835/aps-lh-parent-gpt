@@ -209,7 +209,7 @@ public final class FirstInspectionTimelinePlan {
     }
 
     public LhShiftConfigVO getInspectionCountShift() {
-        if (!hasInspection()) {
+        if (!hasInspection() || (allocationPlan.getInspectionQty() <= 0 && allocationPlan.getSequence() <= 0)) {
             return null;
         }
         List<FirstInspectionShiftAllocation> allocations = allocationPlan.getShiftAllocations();
@@ -240,7 +240,7 @@ public final class FirstInspectionTimelinePlan {
     private boolean hasInspection() {
         return Objects.nonNull(allocationPlan)
                 && allocationPlan.isValid()
-                && allocationPlan.getInspectionQty() > 0;
+                && (allocationPlan.getInspectionQty() > 0 || allocationPlan.getInspectionDurationSeconds() > 0L);
     }
 
     /**
@@ -268,6 +268,9 @@ public final class FirstInspectionTimelinePlan {
             appendValue(source, structureSwitchPlan.getProductionStart());
         }
         if (hasInspection()) {
+            if (Objects.nonNull(allocationPlan.getEquipmentPlanId())) {
+                appendValue(source, allocationPlan.getEquipmentPlanId());
+            }
             appendValue(source, allocationPlan.getInspectionQty());
             appendValue(source, allocationPlan.getHourlyOutput());
             appendValue(source, allocationPlan.getInspectionDurationSeconds());

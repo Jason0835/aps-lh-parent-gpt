@@ -24,6 +24,9 @@ import com.zlt.aps.lh.engine.strategy.IMouldChangeBalanceStrategy;
 import com.zlt.aps.lh.engine.strategy.support.NewSpecEmbryoAvailableTimeResolver;
 import com.zlt.aps.lh.engine.strategy.support.PendingSkuUnscheduledRule;
 import com.zlt.aps.lh.engine.strategy.support.FirstInspectionAllocationPlan;
+import com.zlt.aps.lh.engine.strategy.support.EquipmentPlanOverlapResult;
+import com.zlt.aps.lh.engine.strategy.support.EquipmentPlanTimeline;
+import com.zlt.aps.lh.service.impl.LhEquipmentPlanTimelineResolver;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchSchedulingPolicy;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchFirstShiftQuantityPolicy;
 import com.zlt.aps.lh.util.CleaningScheduleRuleUtil;
@@ -73,6 +76,10 @@ import java.util.Set;
 @Slf4j
 @Component
 public class TargetScheduleQtyResolver {
+
+    /** 目标量预演与正式切换共用精度重叠时间解析，不登记维护或生产资源。 */
+    @Resource
+    private LhEquipmentPlanTimelineResolver equipmentPlanTimelineResolver = new LhEquipmentPlanTimelineResolver();
 
     /** 普通双模的数量归整单位。 */
     private static final int DOUBLE_MOULD_QTY = 2;
@@ -1936,6 +1943,14 @@ public class TargetScheduleQtyResolver {
         }
         int mouldQty = ShiftCapacityResolverUtil.resolveMachineMouldQty(machine);
         Date mouldChangeCompleteTime = resolveMouldChangeCompleteTime(context, switchStartTime, scheduleType);
+        EquipmentPlanOverlapResult precisionOverlap = equipmentPlanTimelineResolver.resolveChangeoverOverlap(
+                context, machine, sku, switchStartTime, mouldChangeCompleteTime, scheduleType);
+        if (precisionOverlap.isUnsupported()) {
+            return 0;
+        }
+        if (precisionOverlap.isSupported() && productionStartTime.before(precisionOverlap.getTimeline().getProductionResumeTime())) {
+            productionStartTime = precisionOverlap.getTimeline().getProductionResumeTime();
+        }
         boolean plannedRepairAffectingSwitch = ShiftCapacityResolverUtil.isPlannedRepairAffectingSwitch(
                 context, context.getDevicePlanShutList(), machine.getMachineCode(), machine.getEstimatedEndTime(),
                 switchStartTime, mouldChangeCompleteTime);
@@ -1987,12 +2002,20 @@ public class TargetScheduleQtyResolver {
                 || Objects.isNull(firstInspectionShift.getShiftIndex()) ? -1 : firstInspectionShift.getShiftIndex();
         List<LhShiftConfigVO> inspectionShifts = CollectionUtils.isEmpty(context.getScheduleWindowShifts())
                 ? shifts : context.getScheduleWindowShifts();
-        FirstInspectionAllocationPlan firstInspectionAllocationPlan =
-                FirstInspectionAllocationUtil.buildPlan(
+        EquipmentPlanTimeline parallelTimeline = precisionOverlap.getTimeline();
+        FirstInspectionAllocationPlan firstInspectionAllocationPlan = precisionOverlap.isSupported()
+                ? FirstInspectionAllocationUtil.buildFixedDurationPlan(context, sku, inspectionShifts,
+                        parallelTimeline.getInspectionStartTime(), LhEquipmentPlanTimelineResolver.PRECISION_INSPECTION_SECONDS,
+                        shiftCapacity, Math.max(sku.resolveTargetScheduleQty(), shiftCapacity), scheduleType, machine.getMachineCode(), null)
+                        .withEquipmentPlanId(parallelTimeline.getPrecisionPlanId())
+                : FirstInspectionAllocationUtil.buildPlan(
                         context, sku, inspectionShifts, mouldChangeCompleteTime,
                         productionStartTime,
                         shiftCapacity, Math.max(sku.resolveTargetScheduleQty(), shiftCapacity),
                         scheduleType, machine.getMachineCode(), null);
+        if (precisionOverlap.isSupported() && !firstInspectionAllocationPlan.isValid()) {
+            return 0;
+        }
         Map<Integer, Integer> firstInspectionQtyMap =
                 FirstInspectionAllocationUtil.toShiftQtyMap(firstInspectionAllocationPlan);
         boolean crossShiftInspection = firstInspectionAllocationPlan.hasQuantityTimeline();

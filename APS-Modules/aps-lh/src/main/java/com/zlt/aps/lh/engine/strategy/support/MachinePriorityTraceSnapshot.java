@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * SKU 选机优先级日志快照。
@@ -695,7 +696,8 @@ public class MachinePriorityTraceSnapshot {
         copiedCandidate.setMaintenanceWindowList(
                 CollectionUtils.isEmpty(sourceCandidate.getMaintenanceWindowList())
                         ? new ArrayList<>(0)
-                        : new ArrayList<>(sourceCandidate.getMaintenanceWindowList()));
+                        : sourceCandidate.getMaintenanceWindowList().stream()
+                                .map(window -> Objects.isNull(window) ? null : window.copy()).collect(Collectors.toList()));
         copiedCandidate.setHasRepairPlan(sourceCandidate.isHasRepairPlan());
         copiedCandidate.setRepairPlanTime(copyDate(sourceCandidate.getRepairPlanTime()));
         copiedCandidate.setCapsuleUsageCount(sourceCandidate.getCapsuleUsageCount());

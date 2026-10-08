@@ -38,6 +38,12 @@ public class ScheduleExperimentSpecInfoModel {
     protected Integer formingWindowEndClass;
     /** 超过 CLASS8 后需要按末三班平均量估算的班次数。 */
     protected Integer formingWindowEstimatedShiftCount;
+    /** 实验规格需求原本对应的目标生产班次。 */
+    protected Integer normalTargetShift;
+    /** 按实验规格提前班数调整后的目标生产班次。 */
+    protected Integer adjustedTargetShift;
+    /** 调整后的目标生产班次窗口；当前只包含一个班次。 */
+    protected List<Integer> adjustedTargetWindow;
     /** 排程日期。 */
     protected LocalDate scheduleDate;
     /** 兼容旧解释字段；当前实验规格判断不读取实验月计划日期。 */

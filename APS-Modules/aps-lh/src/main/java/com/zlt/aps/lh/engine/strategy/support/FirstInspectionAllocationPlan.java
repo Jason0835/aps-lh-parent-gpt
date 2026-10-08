@@ -53,6 +53,9 @@ public class FirstInspectionAllocationPlan {
     /** 首检已包含在精度及预热完整时长内，不再另排首检量或追加时长。 */
     private final boolean includedInMaintenance;
 
+    /** 公共设备首检所属的有效精度计划主键；普通换模首检为空。 */
+    private final Long equipmentPlanId;
+
     private FirstInspectionAllocationPlan(boolean valid,
                                           String invalidReason,
                                           int sequence,
@@ -64,6 +67,14 @@ public class FirstInspectionAllocationPlan {
                                           LhShiftConfigVO countingShift,
                                           List<FirstInspectionShiftAllocation> shiftAllocations,
                                           boolean includedInMaintenance) {
+        this(valid, invalidReason, sequence, inspectionQty, hourlyOutput, inspectionDurationSeconds,
+                inspectionStartTime, inspectionEndTime, countingShift, shiftAllocations, includedInMaintenance, null);
+    }
+
+    private FirstInspectionAllocationPlan(boolean valid, String invalidReason, int sequence, int inspectionQty,
+            BigDecimal hourlyOutput, long inspectionDurationSeconds, Date inspectionStartTime,
+            Date inspectionEndTime, LhShiftConfigVO countingShift,
+            List<FirstInspectionShiftAllocation> shiftAllocations, boolean includedInMaintenance, Long equipmentPlanId) {
         this.valid = valid;
         this.invalidReason = invalidReason;
         this.sequence = sequence;
@@ -76,6 +87,19 @@ public class FirstInspectionAllocationPlan {
         this.shiftAllocations = Collections.unmodifiableList(
                 new ArrayList<FirstInspectionShiftAllocation>(shiftAllocations));
         this.includedInMaintenance = includedInMaintenance;
+        this.equipmentPlanId = equipmentPlanId;
+    }
+
+    /** @param planId 有效判定返回的主键 @return 带精度首检归属的新计划，不改变原计划 */
+    public FirstInspectionAllocationPlan withEquipmentPlanId(Long planId) {
+        return new FirstInspectionAllocationPlan(valid, invalidReason, sequence, inspectionQty, hourlyOutput,
+                inspectionDurationSeconds, inspectionStartTime, inspectionEndTime, countingShift,
+                shiftAllocations, false, planId);
+    }
+
+    /** @return 精度首检主键；普通生产首检为空 */
+    public Long getEquipmentPlanId() {
+        return equipmentPlanId;
     }
 
     /**

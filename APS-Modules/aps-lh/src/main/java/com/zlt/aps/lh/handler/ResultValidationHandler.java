@@ -46,6 +46,7 @@ import com.zlt.aps.lh.exception.ScheduleErrorCode;
 import com.zlt.aps.lh.exception.ScheduleException;
 import com.zlt.aps.lh.service.ILhMouldChangePlanService;
 import com.zlt.aps.lh.service.impl.SchedulePersistenceService;
+import com.zlt.aps.lh.service.impl.LhEquipmentPlanScheduleService;
 import com.zlt.aps.lh.service.impl.LhNextShiftNewPlanService;
 import com.zlt.aps.lh.service.impl.LhTemporaryFaultService;
 import com.zlt.aps.lh.util.*;
@@ -91,6 +92,10 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
 
     @Resource
     private SchedulePersistenceService schedulePersistenceService;
+
+    /** 全部后置裁量结束后收口设备安排，再绑定最终结果摘要。 */
+    @Resource
+    private LhEquipmentPlanScheduleService equipmentPlanScheduleService = new LhEquipmentPlanScheduleService();
 
     /** 交替计划保存前补充现有派生模具号。 */
     @Resource
@@ -146,18 +151,13 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             // 保存前对齐计划性维修后的首个有量班次：只修正时间与原因，不重新扣减任何业务账本。
             alignPlannedRepairResumeTimeToFinalResults(context);
 
-            // 保存前按机台实际挂载窗口绑定保养摘要：只处理本批班次覆盖范围内的保养，
-            // 优先绑定首条保养后结果，无后续SKU时绑定最后一条结果，并统一写入“精度计划”。
-            bindMaintenanceWindowsToFinalResults(context);
-
             // 喷砂首检量已经在排产主链扣账，保存前只核验归属和绑定摘要，禁止二次补量。
             applySandBlastFirstInspectionToFinalResults(context);
 
             // S4.6.1 排程后置校验：保存前校验结果必填字段和关键数量约束。
             postValidation(context);
 
-            // 数量规范化可能改变最终班次收尾时间，因此必须在保存前再次校验06:00截止。
-            // 若不再满足，只撤销带身份标记的精度前插排结果并恢复账本，机台保持空等。
+            // 仅兼容旧窗口的前插排身份；公共设备计划不登记此身份，不能套用旧06:00规则。
             rollbackInvalidPrecisionPreInsertResults(context);
             logPrecisionIdleFallbacks(context);
 
@@ -231,6 +231,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                 log.warn("结构胎胚首班保存前审计未通过, factoryCode={}, batchNo={}, detail={}",
                         context.getFactoryCode(), context.getBatchNo(), treadFailure);
             }
+            equipmentPlanScheduleService.finalizeArrangements(context);
+            bindMaintenanceWindowsToFinalResults(context);
             addSummaryLog(context);
 
             // S4.6.6 保存排程结果到数据库：由持久化服务统一做目标日原子替换。
@@ -532,6 +534,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                                                         MachineScheduleDTO machine) {
         for (MachineMaintenanceWindowDTO window : machine.getMaintenanceWindowList()) {
             if (Objects.isNull(window)
+                    || window.isEquipmentPlanManaged()
                     || Objects.isNull(window.getMaintenanceStartTime())
                     || Objects.isNull(window.getProductionResumeTime())) {
                 continue;
@@ -1583,6 +1586,12 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             return;
         }
         SkuScheduleDTO sourceSku = context.getScheduleResultSourceSkuMap().get(result);
+        MachineScheduleDTO resultMachine = context.getMachineScheduleMap().get(result.getLhMachineCode());
+        if (Objects.nonNull(resultMachine) && resultMachine.getMaintenanceWindowList().stream()
+                .anyMatch(window -> Objects.nonNull(window) && window.isEquipmentPlanManaged())) {
+            // 设备窗口结果已在策略中按实际占用和模数扣账；后置只复核，不补量穿透精度截止。
+            return;
+        }
         // 严格目标量已经由统一生产账本精确扣减，保存前不得再按模台数向上补齐。
         if (Objects.nonNull(sourceSku) && sourceSku.isStrictTargetQty()) {
             log.info("严格目标结果跳过模台数保存前收敛, batchNo: {}, materialCode: {}, "

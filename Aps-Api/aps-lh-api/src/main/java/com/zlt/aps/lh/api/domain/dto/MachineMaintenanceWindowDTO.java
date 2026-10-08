@@ -32,11 +32,17 @@ public class MachineMaintenanceWindowDTO {
     private Date maintenanceStartTime;
     /** 保养结束时间 */
     private Date maintenanceEndTime;
-    /** 保养结束并完成胶囊预热后的最早开产时间 */
+    /** 是否由设备计划公共编排发布；此类窗口不得再套用旧精度并行、预热和06:00规则。 */
+    private boolean equipmentPlanManaged;
+    /** 公共首检开始时间，与原始保养结束时间分别保存。 */
+    private Date firstInspectionStartTime;
+    /** 公共首检结束时间。 */
+    private Date firstInspectionEndTime;
+    /** 本次维护完整占用结束后的恢复生产边界。 */
     private Date productionResumeTime;
     /** 仅05容量窗口使用：每个来源维修日期的早班起止，跨日合并维修仍保留各自固定量班别。 */
     private Map<Date, Date> repairFixedQtyShiftWindowMap = new LinkedHashMap<>(3);
-    /** 精度执行日前生产、换模、换活字块和首检必须全部完成的截止时间，固定为执行日06:00 */
+    /** 当前生产截止时间；公共编排使用判定返回的维护开始，旧窗口保持原契约。 */
     private Date productionCutoffTime;
     /** 是否允许在前SKU自然收尾后、生产截止时间前插排完整小余量SKU */
     private boolean preInsertAllowed;
@@ -46,4 +52,40 @@ public class MachineMaintenanceWindowDTO {
     private boolean forceDown;
     /** 触发原因 */
     private String triggerReason;
+
+    /**
+     * 复制可变窗口及其日期、维修班次映射，供预演和恢复各自持有独立副本。
+     * @return 完整窗口副本
+     */
+    public MachineMaintenanceWindowDTO copy() {
+        MachineMaintenanceWindowDTO target = new MachineMaintenanceWindowDTO();
+        target.setPrecisionPlanId(precisionPlanId);
+        target.setMachineCode(machineCode);
+        target.setMaintenanceType(maintenanceType);
+        target.setSourcePlanDate(this.copyDate(sourcePlanDate));
+        target.setDueDate(this.copyDate(dueDate));
+        target.setDaysToDue(daysToDue);
+        target.setPlanDate(this.copyDate(planDate));
+        target.setMaintenanceStartTime(this.copyDate(maintenanceStartTime));
+        target.setMaintenanceEndTime(this.copyDate(maintenanceEndTime));
+        target.setEquipmentPlanManaged(equipmentPlanManaged);
+        target.setFirstInspectionStartTime(this.copyDate(firstInspectionStartTime));
+        target.setFirstInspectionEndTime(this.copyDate(firstInspectionEndTime));
+        target.setProductionResumeTime(this.copyDate(productionResumeTime));
+        target.setProductionCutoffTime(this.copyDate(productionCutoffTime));
+        target.setPreInsertAllowed(preInsertAllowed);
+        target.setPreInsertScheduled(preInsertScheduled);
+        target.setForceDown(forceDown);
+        target.setTriggerReason(triggerReason);
+        if (repairFixedQtyShiftWindowMap != null) {
+            repairFixedQtyShiftWindowMap.forEach((start, end) ->
+                    target.getRepairFixedQtyShiftWindowMap().put(this.copyDate(start), this.copyDate(end)));
+        }
+        return target;
+    }
+
+    /** @param value 来源日期 @return 独立日期副本 */
+    private Date copyDate(Date value) {
+        return value == null ? null : new Date(value.getTime());
+    }
 }

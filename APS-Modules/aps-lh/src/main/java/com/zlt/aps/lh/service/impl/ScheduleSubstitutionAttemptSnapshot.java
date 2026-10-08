@@ -31,6 +31,8 @@ import com.zlt.aps.lh.engine.strategy.support.SpecialMaterialSubstitutionRecord;
 import com.zlt.aps.lh.engine.strategy.support.UnscheduledResultRuntime;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchPlan;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchRuntimeState;
+import com.zlt.aps.lh.engine.strategy.support.EquipmentPlanRuntimeState;
+import com.zlt.aps.lh.engine.strategy.support.ContinuousProductionConsumption;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -43,6 +45,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 排程联动置换单候选的通用内存状态快照。
@@ -56,6 +59,16 @@ import java.util.Set;
  * @author APS
  */
 final class ScheduleSubstitutionAttemptSnapshot {
+
+    /** 公共设备计划全部状态，包含0判定缓存、待复评、候选时间计划、安排记录和版本。 */
+    private EquipmentPlanRuntimeState equipmentPlanRuntimeState;
+    /** 不可变实际消费记录随结果及账本一起恢复。 */
+    private Map<LhScheduleResult, ContinuousProductionConsumption> continuousProductionConsumptionMap;
+    /** 旧公共状态仍需与设备计划一起回滚，避免嵌套预演污染。 */
+    private Set<String> maintenanceDeferredPhysicalMachineCodeSet;
+    private boolean maintenancePreDecisionCompleted;
+    /** 消费记录与是否已最终扣账必须一起恢复。 */
+    private boolean continuousDailyQuotaSynced;
 
     /** 结构班次占用与结果同步回滚，预演机台不得残留并占用正式提交名额。 */
     private StructureShiftInMachineIndex structureShiftInMachineIndex;
@@ -260,7 +273,7 @@ final class ScheduleSubstitutionAttemptSnapshot {
         snapshot.previousAlternateResultPlanMap = new IdentityHashMap<>(context.getPreviousAlternateResultPlanMap());
         snapshot.previousAlternateAdditionalMachineDemandMap =
                 new LinkedHashMap<>(context.getPreviousAlternateAdditionalMachineDemandMap());
-        snapshot.continuationFinishSnapshots = new IdentityHashMap<>(context.getContinuationSurplusEndingSnapshotMap());
+        snapshot.continuationFinishSnapshots = copyContinuationFinishSnapshots(context.getContinuationSurplusEndingSnapshotMap());
         snapshot.nextShiftNewPlanCandidateList = new ArrayList<>(context.getNextShiftNewPlanCandidateList());
         snapshot.nextShiftNewPlanPoolDateMap = new LinkedHashMap<>(context.getNextShiftNewPlanPoolDateMap());
         snapshot.structureShiftInMachineIndex = Objects.isNull(context.getStructureShiftInMachineIndex())
@@ -321,6 +334,12 @@ final class ScheduleSubstitutionAttemptSnapshot {
                 copyScheduledMachineMap(context.getSkuScheduledMachineCodeMap());
         snapshot.dailyMaintenanceCountMap =
                 new LinkedHashMap<String, Integer>(context.getDailyMaintenanceCountMap());
+        snapshot.equipmentPlanRuntimeState = context.getEquipmentPlanRuntimeState().copy();
+        snapshot.continuousProductionConsumptionMap = new IdentityHashMap<>(context.getContinuousProductionConsumptionMap());
+        snapshot.maintenanceDeferredPhysicalMachineCodeSet =
+                new LinkedHashSet<>(context.getMaintenanceDeferredPhysicalMachineCodeSet());
+        snapshot.maintenancePreDecisionCompleted = context.isMaintenancePreDecisionCompleted();
+        snapshot.continuousDailyQuotaSynced = context.isContinuousDailyQuotaSynced();
         snapshot.dailyMaintenancePhysicalMachineSetMap =
                 copyStringSetMap(context.getDailyMaintenancePhysicalMachineSetMap());
         snapshot.maintenanceResumeDelayLogKeySet =
@@ -550,6 +569,11 @@ final class ScheduleSubstitutionAttemptSnapshot {
         context.setSkuScheduledMachineCodeMap(copyScheduledMachineMap(skuScheduledMachineCodeMap));
         context.setDailyMaintenanceCountMap(
                 new LinkedHashMap<String, Integer>(dailyMaintenanceCountMap));
+        context.setEquipmentPlanRuntimeState(equipmentPlanRuntimeState.copy());
+        context.setContinuousProductionConsumptionMap(new IdentityHashMap<>(continuousProductionConsumptionMap));
+        context.setMaintenanceDeferredPhysicalMachineCodeSet(new LinkedHashSet<>(maintenanceDeferredPhysicalMachineCodeSet));
+        context.setMaintenancePreDecisionCompleted(maintenancePreDecisionCompleted);
+        context.setContinuousDailyQuotaSynced(continuousDailyQuotaSynced);
         context.setDailyMaintenancePhysicalMachineSetMap(
                 copyStringSetMap(dailyMaintenancePhysicalMachineSetMap));
         context.setMaintenanceResumeDelayLogKeySet(
@@ -678,7 +702,7 @@ final class ScheduleSubstitutionAttemptSnapshot {
         context.setPreviousAlternateCandidateAvailableTimeMap(new IdentityHashMap<>(previousAlternateCandidateAvailableTimeMap));
         context.setPreviousAlternateResultPlanMap(new IdentityHashMap<>(previousAlternateResultPlanMap));
         context.setPreviousAlternateAdditionalMachineDemandMap(new LinkedHashMap<>(previousAlternateAdditionalMachineDemandMap));
-        context.setContinuationSurplusEndingSnapshotMap(new IdentityHashMap<>(continuationFinishSnapshots));
+        context.setContinuationSurplusEndingSnapshotMap(copyContinuationFinishSnapshots(continuationFinishSnapshots));
         context.setMouldResourceContext(MouldResourceContext.from(context));
     }
 
@@ -709,10 +733,35 @@ final class ScheduleSubstitutionAttemptSnapshot {
         target.setCleaningWindowList(source.getCleaningWindowList() == null
                 ? new ArrayList<>(0) : new ArrayList<>(source.getCleaningWindowList()));
         target.setMaintenanceWindowList(source.getMaintenanceWindowList() == null
-                ? new ArrayList<>(0) : new ArrayList<>(source.getMaintenanceWindowList()));
+                ? new ArrayList<>(0) : source.getMaintenanceWindowList().stream()
+                .map(window -> window == null ? null : window.copy()).collect(Collectors.toList()));
         target.setMouldChangeTasks(source.getMouldChangeTasks() == null
                 ? new ArrayList<>(0) : new ArrayList<>(source.getMouldChangeTasks()));
         return target;
+    }
+
+    /** 精度强制释放会更新收尾事实，捕获及恢复都复制数组与日期，防止嵌套预演污染原快照。 */
+    private static Map<LhScheduleResult, ContinuationEndingAllocationSnapshot> copyContinuationFinishSnapshots(
+            Map<LhScheduleResult, ContinuationEndingAllocationSnapshot> sources) {
+        Map<LhScheduleResult, ContinuationEndingAllocationSnapshot> copies = new IdentityHashMap<>();
+        sources.forEach((result, source) -> {
+            ContinuationEndingAllocationSnapshot copy = copyBean(source, ContinuationEndingAllocationSnapshot.class);
+            if (Objects.nonNull(copy)) {
+                copy.setShiftQuantities(source.getShiftQuantities() == null ? null : source.getShiftQuantities().clone());
+                copy.setProductionStartTime(copyDate(source.getProductionStartTime()));
+                copy.setProductionEndTime(copyDate(source.getProductionEndTime()));
+                copy.setReleaseTime(copyDate(source.getReleaseTime()));
+                copy.setFinishDeadline(copyDate(source.getFinishDeadline()));
+                copy.setPredictedChangeTime(copyDate(source.getPredictedChangeTime()));
+            }
+            copies.put(result, copy);
+        });
+        return copies;
+    }
+
+    /** @param source 来源日期 @return 独立日期副本 */
+    private static Date copyDate(Date source) {
+        return Objects.isNull(source) ? null : new Date(source.getTime());
     }
 
     private static Map<String, List<LhScheduleResult>> copyResultListMap(

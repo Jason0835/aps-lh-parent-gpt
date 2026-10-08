@@ -38,6 +38,14 @@ public abstract class ScheduleContextModel<T extends ScheduleTaskDraftModel,
     protected LocalDate scheduleDate;
     protected String operator;
     protected Map<String, ScheduleParamValueModel> paramMap = new HashMap<>();
+    /**
+     * 本批次固定使用的收尾后起排班次参数快照。
+     */
+    protected SchedulePostTailShiftParameter postTailShiftParameter;
+    /**
+     * 按工序产品保存的实际收尾确认状态。
+     */
+    protected Map<String, SchedulePostTailCloseOutState> postTailCloseOutStateMap = new LinkedHashMap<>();
     /** 排程日期为空消息工厂，保持领域国际化消息在使用时读取。 */
     @Getter(AccessLevel.NONE)
     @EqualsAndHashCode.Exclude
@@ -96,6 +104,19 @@ public abstract class ScheduleContextModel<T extends ScheduleTaskDraftModel,
     protected List<ScheduleLossRuleModel> lossRuleList = new ArrayList<>();
     protected ScheduleIssueCollector issueCollector = new ScheduleIssueCollector();
     protected Map<String, ScheduleTaskPredecessorModel> machinePredecessorMap = new HashMap<>();
+    /**
+     * 前一排程日早班形成的产品机台初始绑定，键为工序产品编码，值为机台编码。
+     */
+    protected Map<String, String> previousDayProductMachineBindingMap = new LinkedHashMap<>();
+    /**
+     * 本次排程运行中产品机台绑定的变更历史，键为产品编码，内层键为实际生产班次。
+     * 绑定解析时只读取不晚于目标班次的最近一次成功排产记录。
+     */
+    protected Map<String, NavigableMap<Integer, String>> productMachineBindingHistoryMap = new LinkedHashMap<>();
+    /**
+     * 排序重放快照轮次序号；只存在于本次运行上下文，不落库。
+     */
+    protected long sortSnapshotRoundSequence;
 
     /**
      * 创建公共排程上下文并初始化领域差异配置。
@@ -111,6 +132,20 @@ public abstract class ScheduleContextModel<T extends ScheduleTaskDraftModel,
         this.scheduleDateEmptyMessageSupplier = Objects.requireNonNull(scheduleDateEmptyMessageSupplier,
                 "排程日期为空消息工厂不能为空");
         this.maxShiftOrder = maxShiftOrder;
+    }
+
+    /**
+     * 生成本次运行内唯一的排序快照轮次编号。
+     *
+     * @param phase      排序阶段
+     * @param shiftOrder 参与排序的班次
+     * @return 轮次编号
+     */
+    public synchronized String nextSortSnapshotRoundId(String phase, Integer shiftOrder) {
+        this.sortSnapshotRoundSequence++;
+        return (phase == null ? "UNKNOWN" : phase) + "#"
+                + (shiftOrder == null ? "ALL" : shiftOrder) + "#"
+                + this.sortSnapshotRoundSequence;
     }
 
     /**
@@ -171,6 +206,48 @@ public abstract class ScheduleContextModel<T extends ScheduleTaskDraftModel,
             throw new ServiceException(this.scheduleDateEmptyMessageSupplier.get());
         }
         return this.taskChainGroup.get(machineCode, this.scheduleDate, shiftOrder);
+    }
+
+    /**
+     * 解析产品在目标班次的最近机台绑定。
+     *
+     * @param processCode 产品或工序代码
+     * @param shiftOrder  目标班次；为空时取本次运行内最后一次成功绑定
+     * @return 绑定机台编码；没有绑定时返回 {@code null}
+     */
+    public String resolveProductMachineBinding(String processCode, Integer shiftOrder) {
+        if (StrUtil.isBlank(processCode)) {
+            return null;
+        }
+        String normalizedProcessCode = processCode.trim();
+        NavigableMap<Integer, String> bindingHistory = this.productMachineBindingHistoryMap
+                .get(normalizedProcessCode);
+        if (bindingHistory != null && !bindingHistory.isEmpty()) {
+            Map.Entry<Integer, String> bindingEntry = shiftOrder == null
+                    ? bindingHistory.lastEntry()
+                    : bindingHistory.floorEntry(shiftOrder);
+            if (bindingEntry != null && StrUtil.isNotBlank(bindingEntry.getValue())) {
+                return bindingEntry.getValue();
+            }
+        }
+        return this.previousDayProductMachineBindingMap.get(normalizedProcessCode);
+    }
+
+    /**
+     * 记录产品一次成功排产后的机台绑定。
+     *
+     * @param processCode 产品或工序代码
+     * @param shiftOrder  实际成功排产班次
+     * @param machineCode 成功排产机台编码
+     */
+    public void recordProductMachineBinding(String processCode, Integer shiftOrder, String machineCode) {
+        if (StrUtil.isBlank(processCode) || StrUtil.isBlank(machineCode)) {
+            return;
+        }
+        int bindingShiftOrder = shiftOrder == null ? Integer.MAX_VALUE : shiftOrder;
+        this.productMachineBindingHistoryMap
+                .computeIfAbsent(processCode.trim(), key -> new TreeMap<>())
+                .put(bindingShiftOrder, machineCode.trim());
     }
 
     /**
@@ -812,6 +889,35 @@ public abstract class ScheduleContextModel<T extends ScheduleTaskDraftModel,
 
     public void setMachinePredecessorMap(Map<String, ScheduleTaskPredecessorModel> machinePredecessorMap) {
         this.machinePredecessorMap = machinePredecessorMap == null ? new HashMap<>() : machinePredecessorMap;
+    }
+
+    /**
+     * 设置前一排程日早班产品机台初始绑定。
+     *
+     * @param previousDayProductMachineBindingMap 产品编码到机台编码的初始绑定
+     */
+    public void setPreviousDayProductMachineBindingMap(Map<String, String> previousDayProductMachineBindingMap) {
+        this.previousDayProductMachineBindingMap = previousDayProductMachineBindingMap == null
+                ? new LinkedHashMap<>() : new LinkedHashMap<>(previousDayProductMachineBindingMap);
+    }
+
+    /**
+     * 设置本次运行产品机台绑定历史，供场景测试或领域加载器初始化。
+     *
+     * @param productMachineBindingHistoryMap 产品编码到班次绑定历史
+     */
+    public void setProductMachineBindingHistoryMap(
+            Map<String, NavigableMap<Integer, String>> productMachineBindingHistoryMap) {
+        this.productMachineBindingHistoryMap = new LinkedHashMap<>();
+        if (productMachineBindingHistoryMap == null) {
+            return;
+        }
+        productMachineBindingHistoryMap.forEach((processCode, bindingHistory) -> {
+            if (StrUtil.isBlank(processCode) || bindingHistory == null) {
+                return;
+            }
+            this.productMachineBindingHistoryMap.put(processCode.trim(), new TreeMap<>(bindingHistory));
+        });
     }
 
     public void setCandidateTraceMap(Map<String, List<M>> candidateTraceMap) {

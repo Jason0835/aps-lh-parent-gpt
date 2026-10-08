@@ -173,6 +173,66 @@ public final class FirstInspectionAllocationUtil {
             String machineCode,
             Map<Integer, Integer> availableCapacityMap,
             FirstInspectionTimingMode timingMode) {
+        return buildPlan(context, sku, shifts, changeoverEndTime, inspectionNotBeforeTime,
+                shiftCapacity, remainingQty, scheduleType, machineCode, availableCapacityMap, timingMode, 0L);
+    }
+
+    /**
+     * 按明确固定时长分配首检数量，数量、单控折算、跨班取整及容量校验沿用公共实现。
+     * 固定时长不随数量和班产变化，调用方仅在业务对象及可消费量明确后使用。
+     * @param context 排程上下文
+     * @param sku 首检所属SKU
+     * @param shifts 完整班次
+     * @param inspectionStartTime 固定首检开始
+     * @param durationSeconds 固定秒数
+     * @param shiftCapacity 运行态班产
+     * @param remainingQty 可消费数量
+     * @param scheduleType 排程类型
+     * @param machineCode 运行态机台
+     * @param availableCapacityMap 首检可用容量
+     * @return 首检分摊计划
+     */
+    public static FirstInspectionAllocationPlan buildFixedDurationPlan(
+            LhScheduleContext context, SkuScheduleDTO sku, List<LhShiftConfigVO> shifts,
+            Date inspectionStartTime, long durationSeconds, int shiftCapacity, int remainingQty,
+            String scheduleType, String machineCode, Map<Integer, Integer> availableCapacityMap) {
+        if (durationSeconds <= 0L) {
+            return FirstInspectionAllocationPlan.invalid("固定首检时长必须为正数", null, inspectionStartTime);
+        }
+        return buildPlan(context, sku, shifts, inspectionStartTime, inspectionStartTime,
+                shiftCapacity, remainingQty, scheduleType, machineCode, availableCapacityMap,
+                FirstInspectionTimingMode.START_AT_PRODUCTION_READY, durationSeconds);
+    }
+
+    /**
+     * SKU尚未确定时仅冻结固定首检时间，不生成首检条数或占用首检计数。
+     * @param shifts 当前班次，可用于确定区间归属
+     * @param inspectionStartTime 维护返回的结束时间
+     * @param durationSeconds 固定首检秒数
+     * @return 保留完整首检区间及恢复边界的公共时间计划
+     */
+    public static FirstInspectionTimelinePlan buildFixedDurationTimelinePlan(
+            List<LhShiftConfigVO> shifts, Date inspectionStartTime, long durationSeconds) {
+        if (Objects.isNull(inspectionStartTime) || durationSeconds <= 0L) {
+            throw new IllegalArgumentException("固定首检缺少有效开始时间或时长");
+        }
+        Date startTime = new Date(inspectionStartTime.getTime());
+        Date endTime = new Date(startTime.getTime() + durationSeconds * MILLIS_PER_SECOND);
+        FirstInspectionAllocationPlan allocation = FirstInspectionAllocationPlan.valid(
+                0, 0, BigDecimal.ZERO, durationSeconds, startTime, endTime, null,
+                new ArrayList<FirstInspectionShiftAllocation>(0));
+        return FirstInspectionTimelinePlan.of(allocation, FirstInspectionTimingMode.START_AT_PRODUCTION_READY,
+                "设备计划固定首检，待明确SKU后分配数量与计数", startTime, startTime, startTime,
+                endTime, FirstInspectionQtyUtil.resolveAttributionShift(shifts, endTime),
+                FirstInspectionQtyUtil.resolveAttributionShift(shifts, startTime));
+    }
+
+    /** 固定时长与数量折算时长共用分摊内核；fixedDurationSeconds为0时保持既有行为。 */
+    private static FirstInspectionAllocationPlan buildPlan(
+            LhScheduleContext context, SkuScheduleDTO sku, List<LhShiftConfigVO> shifts,
+            Date changeoverEndTime, Date inspectionNotBeforeTime, int shiftCapacity, int remainingQty,
+            String scheduleType, String machineCode, Map<Integer, Integer> availableCapacityMap,
+            FirstInspectionTimingMode timingMode, long fixedDurationSeconds) {
         if (CollectionUtils.isEmpty(shifts) || Objects.isNull(changeoverEndTime)) {
             return FirstInspectionAllocationPlan.invalid(
                     "首检缺少完整班次或切换结束时间", null, changeoverEndTime);
@@ -195,8 +255,10 @@ public final class FirstInspectionAllocationUtil {
         } else if (productionReadyForward && inspectionNotBeforeTime.after(changeoverEndTime)) {
             inspectionReferenceTime = inspectionNotBeforeTime;
         }
-        LhShiftConfigVO countingShift = FirstInspectionQtyUtil.resolveFirstInspectionAttributionShift(
-                context, sku, orderedShifts, inspectionReferenceTime, scheduleType);
+        LhShiftConfigVO countingShift = fixedDurationSeconds > 0L
+                ? FirstInspectionQtyUtil.resolveAttributionShift(orderedShifts, inspectionReferenceTime)
+                : FirstInspectionQtyUtil.resolveFirstInspectionAttributionShift(
+                        context, sku, orderedShifts, inspectionReferenceTime, scheduleType);
         // 倒推首检的结束是区间右边界。恰好在窗口末端结束时，计数归属末班而非不存在的下一班。
         if (!forwardInspection && Objects.isNull(countingShift) && !orderedShifts.isEmpty()) {
             LhShiftConfigVO lastShift = orderedShifts.get(orderedShifts.size() - 1);
@@ -213,7 +275,8 @@ public final class FirstInspectionAllocationUtil {
         if (FirstInspectionQtyUtil.isTrialTimeBasedFirstInspection(sku, countingShift, scheduleType)) {
             // 试制继续沿用项目既有固定2小时/中班75%规则，不生成首检条数。
             return FirstInspectionAllocationPlan.valid(
-                    sequence, 0, BigDecimal.ZERO, 0L, inspectionReferenceTime, inspectionReferenceTime,
+                    sequence, 0, BigDecimal.ZERO, fixedDurationSeconds, inspectionReferenceTime,
+                    new Date(inspectionReferenceTime.getTime() + fixedDurationSeconds * MILLIS_PER_SECOND),
                     countingShift, new ArrayList<FirstInspectionShiftAllocation>(0));
         }
         int configuredQty = FirstInspectionQtyUtil.resolveAdjustedFirstInspectionQty(
@@ -221,7 +284,8 @@ public final class FirstInspectionAllocationUtil {
         int inspectionQty = Math.min(Math.max(0, configuredQty), Math.max(0, remainingQty));
         if (inspectionQty <= 0) {
             return FirstInspectionAllocationPlan.valid(
-                    sequence, 0, BigDecimal.ZERO, 0L, inspectionReferenceTime, inspectionReferenceTime,
+                    sequence, 0, BigDecimal.ZERO, fixedDurationSeconds, inspectionReferenceTime,
+                    new Date(inspectionReferenceTime.getTime() + fixedDurationSeconds * MILLIS_PER_SECOND),
                     countingShift, new ArrayList<FirstInspectionShiftAllocation>(0));
         }
 
@@ -241,7 +305,8 @@ public final class FirstInspectionAllocationUtil {
          * 禁止先把小时产量截断为整数，否则班产14条/8小时会从1.75条/小时被降为1条/小时，
          * 将本应落在后续班次的首检区间错误拉长到前一班次。
          */
-        long durationSeconds = resolveInspectionDurationSeconds(inspectionQty, effectiveSeconds, shiftCapacity);
+        long durationSeconds = fixedDurationSeconds > 0L ? fixedDurationSeconds
+                : resolveInspectionDurationSeconds(inspectionQty, effectiveSeconds, shiftCapacity);
         long durationMillis = durationSeconds * MILLIS_PER_SECOND;
         Date inspectionStartTime = forwardInspection
                 ? inspectionReferenceTime

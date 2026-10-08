@@ -90,7 +90,8 @@ public final class MachineAssignmentEngine<C extends MachineAssignmentContext<T>
                 }
                 policy.fillCurrentShiftIdleCapacity(shiftOrder, shiftTaskMap, context);
                 if (inventoryClosedLoopEnabled) {
-                    this.closeShiftInventory(context, shiftOrder, shiftTaskList, runtimeStockMap, policy);
+                    // 通过领域策略生命周期钩子关账，确保 TM/TC 在公共库存结算后执行各自的实际收尾确认。
+                    policy.closeShiftInventory(context, shiftOrder, shiftTaskList, runtimeStockMap);
                 }
             }
             policy.settleShiftToolLedger(context, shiftOrder, availableToolQtyBeforeShift,
@@ -150,17 +151,22 @@ public final class MachineAssignmentEngine<C extends MachineAssignmentContext<T>
         // 原实现只对流排序，不改变班次任务原列表；保留原列表顺序，避免影响后续补量和关账遍历。
         List<T> sortedTaskList = new ArrayList<>(shiftTaskList);
         policy.sortRecalculationTasks(sortedTaskList);
+        policy.beforeRecalculateShiftPlans(context, sortedTaskList, runtimeStockMap);
         sortedTaskList.stream()
                 .filter(Objects::nonNull)
                 .forEach(task -> {
                     String productCode = policy.getProductCode(task);
-                    if (this.isBlank(productCode) || this.isNotBlank(task.getUnplannedReasonCode())) {
+                    if (this.isBlank(productCode)) {
                         return;
                     }
                     BigDecimal openingStock = planningStockMap.getOrDefault(productCode,
                             this.nvl(task.getRollingStockQty()));
                     runtimeStockMap.putIfAbsent(productCode, openingStock);
                     task.setRollingStockQty(openingStock);
+                    policy.beforeRecalculateTaskPlanQty(context, task, openingStock);
+                    if (this.isNotBlank(task.getUnplannedReasonCode())) {
+                        return;
+                    }
                     if (policy.isPresetPlanTask(task)) {
                         planningStockMap.put(productCode, openingStock.add(this.nvl(task.getPlanQty()))
                                 .subtract(this.nvl(task.getCurrentShiftDemandQty())).max(BigDecimal.ZERO));

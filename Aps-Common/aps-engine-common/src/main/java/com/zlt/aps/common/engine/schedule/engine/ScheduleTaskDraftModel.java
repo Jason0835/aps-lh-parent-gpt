@@ -182,6 +182,30 @@ public class ScheduleTaskDraftModel implements ScheduleSortableTask, ScheduleQua
      */
     protected ScheduleProductTailDecisionModel productTailDecision;
     /**
+     * 收尾后起排班次参数快照。
+     */
+    protected SchedulePostTailShiftParameter postTailShiftParameter;
+    /**
+     * 收尾后目标班次判定结果。
+     */
+    protected SchedulePostTailDecision postTailDecision;
+    /**
+     * 当前产品最近一次实际收尾状态快照。
+     */
+    protected SchedulePostTailCloseOutState postTailCloseOutState;
+    /**
+     * 当前任务是否处于收尾间隔禁排状态。
+     */
+    protected Boolean postTailShiftBlocked;
+    /**
+     * 收尾间隔内待承接缺口，单位米。
+     */
+    protected BigDecimal postTailBlockedQty;
+    /**
+     * 当前判定涉及的跳过班次。
+     */
+    protected List<Integer> postTailSkippedShiftOrders = new ArrayList<>();
+    /**
      * 是否为未来停产需求补充任务，避免把复制的数量窗口当成普通收尾覆盖窗口。
      */
     protected Boolean futureShutdownSupplementTask;
@@ -349,6 +373,16 @@ public class ScheduleTaskDraftModel implements ScheduleSortableTask, ScheduleQua
     public void setFormingTailSourceList(List<ScheduleFormingTailSourceModel> formingTailSourceList) {
         this.formingTailSourceList = formingTailSourceList == null
                 ? new ArrayList<>() : new ArrayList<>(formingTailSourceList);
+    }
+
+    /**
+     * 设置收尾后判定跳过班次并复制容器。
+     *
+     * @param postTailSkippedShiftOrders 跳过班次
+     */
+    public void setPostTailSkippedShiftOrders(List<Integer> postTailSkippedShiftOrders) {
+        this.postTailSkippedShiftOrders = postTailSkippedShiftOrders == null
+                ? new ArrayList<>() : new ArrayList<>(postTailSkippedShiftOrders);
     }
 
     /**

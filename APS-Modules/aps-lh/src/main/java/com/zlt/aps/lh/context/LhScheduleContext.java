@@ -433,6 +433,12 @@ public class LhScheduleContext {
      * daysToDue、计划日期、物理机台编码升序排列；原 maintenancePlanMap 继续供历史调用点查询。</p>
      */
     private List<LhPrecisionPlan> orderedMaintenancePlanList = new ArrayList<>();
+
+    /** 本批设备计划判定、候选时间约束、待复评及最终安排，与预演快照同步回滚。 */
+    private EquipmentPlanRuntimeState equipmentPlanRuntimeState = new EquipmentPlanRuntimeState();
+
+    /** 每条续作实际消费记录，仅用于精度晚阶段受控撤销与重算，按结果身份关联。 */
+    private Map<LhScheduleResult, ContinuousProductionConsumption> continuousProductionConsumptionMap = new IdentityHashMap<>();
     /**
      * 是否由本批精度中心统一决策。
      * <p>续作前登记，阻止逐SKU挂窗；续作最终收口后统一按优先级分配日期和每日额度。</p>

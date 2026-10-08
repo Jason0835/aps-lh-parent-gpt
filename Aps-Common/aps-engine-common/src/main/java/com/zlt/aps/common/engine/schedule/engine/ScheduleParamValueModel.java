@@ -4,6 +4,7 @@ import lombok.Data;
 @Data
 public class ScheduleParamValueModel {
     protected String paramCode;
+    protected String paramName;
     protected String paramValue;
     protected String defaultValue;
     protected String source;

@@ -417,6 +417,20 @@ public final class ShiftFieldUtil {
     }
 
     /**
+     * 获取首个有计划量的班次，供设备约束区分原生产与维护后的新生产。
+     * @param result 排程结果
+     * @return 班次索引，未找到返回-1
+     */
+    public static int resolveFirstPlannedShiftIndex(LhScheduleResult result) {
+        if (Objects.isNull(result)) {
+            return -1;
+        }
+        return java.util.stream.IntStream.rangeClosed(1, LhScheduleConstant.MAX_SHIFT_SLOT_COUNT)
+                .filter(index -> Objects.nonNull(getShiftPlanQty(result, index)) && getShiftPlanQty(result, index) > 0)
+                .findFirst().orElse(-1);
+    }
+
+    /**
      * 格式化1-8班收尾标记，便于日志核对。
      *
      * @param result 排程结果

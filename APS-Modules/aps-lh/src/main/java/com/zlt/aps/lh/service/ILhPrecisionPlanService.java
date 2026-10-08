@@ -143,6 +143,14 @@ public interface ILhPrecisionPlanService extends IDocService<LhPrecisionPlan> {
     int batchFillScheduleDate(List<java.util.Map<String, Object>> fillList);
 
     /**
+     * 在当前排程事务内按最终有效安排主键回填日期，任一更新失败使整批回滚。
+     * @param factoryCode 当前工厂
+     * @param scheduleDates 主键去重后的实际保养开始自然日
+     * @return 更新数量
+     */
+    int fillArrangedScheduleDates(String factoryCode, java.util.Map<Long, java.util.Date> scheduleDates);
+
+    /**
      * MES回填实际精度执行日期
      * 匹配最接近的计划排程精度日期且实际执行时间为空的硫化精度计划
      * 回填后立马推算生成下一次硫化精度计划

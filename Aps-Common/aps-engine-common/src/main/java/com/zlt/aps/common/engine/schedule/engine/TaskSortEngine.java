@@ -1,5 +1,6 @@
 package com.zlt.aps.common.engine.schedule.engine;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
@@ -28,7 +29,9 @@ public final class TaskSortEngine<C, T extends ScheduleSortableTask> {
         }
 
         String strategyCode = policy.resolveStrategyCode(context);
+        boolean prependSupplyHoursPriority = policy.prependSupplyHoursPriority(context, strategyCode);
         String beforeOrder = tracePort.summarizeTaskOrder(context);
+        List<T> beforeTaskList = new ArrayList<>(taskList);
         boolean planCalcOrderReady = taskList.stream()
                 .allMatch(task -> task != null && task.getPlanCalcOrderIndex() != null);
         String sortSource = planCalcOrderReady ? "PLAN_CALC_ORDER" : "LEGACY_TASK_SORT";
@@ -41,7 +44,7 @@ public final class TaskSortEngine<C, T extends ScheduleSortableTask> {
         else {
             Comparator<T> originalComparator = policy.buildStrategyComparator(context, strategyCode);
             taskList.sort(this.buildStartupAwareComparator(originalComparator,
-                    policy.prependSupplyHoursPriority(context, strategyCode)));
+                    prependSupplyHoursPriority));
         }
 
         String afterOrder = tracePort.summarizeTaskOrder(context);
@@ -55,6 +58,9 @@ public final class TaskSortEngine<C, T extends ScheduleSortableTask> {
                     policy.isStartupShift(context, task));
             tracePort.logTaskSortDetail(context, task, strategyCode, sortSource, sortIndex);
         }
+        tracePort.recordTaskSortSnapshot(context, strategyCode, sortSource,
+                prependSupplyHoursPriority, beforeTaskList,
+                new ArrayList<>(taskList));
     }
 
     /**

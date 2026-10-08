@@ -12,6 +12,7 @@ import com.zlt.aps.lh.component.StructureEndingAlignmentService;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.component.UnscheduledResultCollector;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.service.impl.LhEquipmentPlanScheduleService;
 import com.zlt.aps.lh.engine.factory.ScheduleStrategyFactory;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
 import com.zlt.aps.lh.engine.strategy.IFirstInspectionBalanceStrategy;
@@ -58,6 +59,9 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
 
     @Resource
     private ScheduleStrategyFactory strategyFactory;
+    /** 后置裁量后的真实收尾进入公共设备计划复评。 */
+    @Resource
+    private LhEquipmentPlanScheduleService equipmentPlanScheduleService;
     @Resource
     private StructureEndingAlignmentService structureEndingAlignmentService;
     @Resource
@@ -170,6 +174,7 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
                     context.getUnscheduledResultList().size());
             strategy.allocateShiftPlanQty(context);
             strategy.adjustEmbryoStock(context);
+            equipmentPlanScheduleService.reviewConfirmedEndings(context);
             log.info("新增规格胎胚库存调整完成, 排程结果数: {}, 剩余新增SKU: {}, 未排产数: {}",
                     context.getScheduleResultList().size(), context.getNewSpecSkuList().size(),
                     context.getUnscheduledResultList().size());

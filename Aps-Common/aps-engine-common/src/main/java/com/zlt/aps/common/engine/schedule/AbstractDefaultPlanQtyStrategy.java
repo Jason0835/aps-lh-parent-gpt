@@ -1,5 +1,7 @@
 package com.zlt.aps.common.engine.schedule;
 
+import com.zlt.aps.common.engine.schedule.engine.SchedulePlanQtyResultModel;
+import com.zlt.aps.common.engine.schedule.engine.SchedulePostTailPlanQtyCalculator;
 import com.zlt.aps.common.engine.schedule.engine.ScheduleTaskDraftModel;
 
 import java.math.BigDecimal;
@@ -15,7 +17,8 @@ import java.math.RoundingMode;
  * @param <T> 待排任务类型
  * @param <R> 计划量结果类型
  */
-public abstract class AbstractDefaultPlanQtyStrategy<C, T extends ScheduleTaskDraftModel, R> {
+public abstract class AbstractDefaultPlanQtyStrategy<C, T extends ScheduleTaskDraftModel,
+        R extends SchedulePlanQtyResultModel> {
 
     /**
      * 执行公共默认计划量计算。
@@ -58,6 +61,10 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T extends ScheduleTaskDr
             task.setStockCoverageCovered(null);
             task.setStockCoverageStockGapQty(null);
             this.setTwoShiftStockCovered(task, null);
+        }
+
+        if (Boolean.TRUE.equals(task.getPostTailShiftBlocked())) {
+            return SchedulePostTailPlanQtyCalculator.calculate(task, this.newResult());
         }
 
         BigDecimal grossDemand = currentDemand.add(guardDemand);

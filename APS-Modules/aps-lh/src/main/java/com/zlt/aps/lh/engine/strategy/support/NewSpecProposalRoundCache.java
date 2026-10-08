@@ -38,6 +38,8 @@ public final class NewSpecProposalRoundCache {
     private int timelineRejectedCount;
     /** 当前业务日阶段单轮最多保留的机台最佳提案数量 */
     private int maxRetainedBestProposalCount;
+    /** 本轮缓存对应的设备约束版本，回滚或重新安排后必须重新比较候选。 */
+    private long equipmentPlanConstraintVersion = -1L;
 
     /**
      * 创建业务日阶段缓存。
@@ -62,6 +64,16 @@ public final class NewSpecProposalRoundCache {
         expectedEndingTraceMap.clear();
         structureMachineStatisticsMap.clear();
         lastQueueTraceFingerprint = null;
+    }
+
+    /** @param version 当前设备约束版本 @return 是否已失效旧提案缓存 */
+    public boolean invalidateEquipmentPlanVersion(long version) {
+        if (equipmentPlanConstraintVersion == version) {
+            return false;
+        }
+        equipmentPlanConstraintVersion = version;
+        this.clearAfterStateChanged();
+        return true;
     }
 
     /**

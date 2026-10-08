@@ -32,6 +32,8 @@ public class NewSpecCandidateCache {
     private final Map<String, Integer> candidateWindowCapacityMap;
     /** 反向匹配推荐机台编码，由单控机台反向匹配链路设置，优先于排序选择 */
     private String preferredMachineCode;
+    /** 本SKU临时容量缓存对应的设备约束版本。 */
+    private long equipmentPlanConstraintVersion = -1L;
 
     private NewSpecCandidateCache(List<MachineScheduleDTO> singleControlCandidates,
                                   List<MachineScheduleDTO> normalCandidates,
@@ -89,6 +91,16 @@ public class NewSpecCandidateCache {
      */
     public void clearCapacityCache() {
         candidateWindowCapacityMap.clear();
+    }
+
+    /** @param version 当前设备约束版本 @return 是否需要同步清空候选时间计划 */
+    public boolean invalidateEquipmentPlanVersion(long version) {
+        if (equipmentPlanConstraintVersion == version) {
+            return false;
+        }
+        equipmentPlanConstraintVersion = version;
+        this.clearCapacityCache();
+        return true;
     }
 
     /**

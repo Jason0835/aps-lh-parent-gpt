@@ -53,7 +53,31 @@ public interface PlanCalculationPolicy<C, T extends ScheduleTaskDraftModel,
                                      Map<String, BigDecimal> remainingStockMap, D demandStrategy,
                                      String demandAlgorithmCode);
 
+    /**
+     * 在当前班次需求准备完成后写入领域计划量入口的运行态判定。
+     *
+     * @param context       排程上下文
+     * @param shiftTaskList 当前班次任务
+     */
+    default void beforeCalculatePlanQty(C context, List<T> shiftTaskList) {
+        // 默认无额外计划量入口判定。
+    }
+
     void sortPlanCalcShiftTasks(C context, List<T> shiftTaskList);
+
+    /**
+     * 记录逐班计划计算排序轮次；默认空实现兼容未接入解释表的领域策略。
+     *
+     * @param context        排程上下文
+     * @param beforeOrder    排序前任务集合
+     * @param afterOrder     排序后任务集合
+     * @param sortStartIndex 本轮首个计划计算序号
+     * @param sortEndIndex   本轮最后计划计算序号
+     */
+    default void recordPlanCalcSortSnapshot(C context, List<T> beforeOrder, List<T> afterOrder,
+                                            int sortStartIndex, int sortEndIndex) {
+        // 默认不记录排序快照。
+    }
 
     BigDecimal calculatePlanQtyForTask(C context, T task, Map<String, F> stockForecastMap,
                                        Map<String, BigDecimal> remainingStockMap, BigDecimal remainingToolQty,

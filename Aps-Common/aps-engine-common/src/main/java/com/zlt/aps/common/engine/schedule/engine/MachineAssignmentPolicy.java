@@ -20,6 +20,29 @@ public interface MachineAssignmentPolicy<C, T extends ScheduleTaskDraftModel, P>
     void recalculateShiftPlans(C context, List<T> shiftTaskList, Map<String, BigDecimal> runtimeStockMap);
 
     /**
+     * 在兼容的公共逐班重算路径中写入收尾后起排班次判定。
+     *
+     * @param context         排程上下文
+     * @param shiftTaskList   当前班次任务
+     * @param runtimeStockMap 上一班实际关账库存
+     */
+    default void beforeRecalculateShiftPlans(C context, List<T> shiftTaskList,
+                                             Map<String, BigDecimal> runtimeStockMap) {
+        // 默认不增加逐班重算前置判定。
+    }
+
+    /**
+     * 在兼容逐任务重算路径写入班初库存后补充计划量入口判定。
+     *
+     * @param context      排程上下文
+     * @param task         当前任务
+     * @param openingStock 当前任务实际班初库存
+     */
+    default void beforeRecalculateTaskPlanQty(C context, T task, BigDecimal openingStock) {
+        // 默认不增加逐任务重算前置判定。
+    }
+
+    /**
      * 在机台分配开始前建立班次级成型需求快照，供各班次计划量计算前的工装释放使用。
      *
      * @param context 排程上下文

@@ -65,6 +65,10 @@ import com.zlt.aps.lh.service.impl.NewSpecScheduleCommitService;
 import com.zlt.aps.lh.service.impl.NewSpecScheduleCommitResult;
 import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
 import com.zlt.aps.lh.service.impl.LhMaintenanceScheduleService;
+import com.zlt.aps.lh.service.impl.LhEquipmentPlanScheduleService;
+import com.zlt.aps.lh.service.impl.LhEquipmentPlanTimelineResolver;
+import com.zlt.aps.lh.engine.strategy.support.EquipmentPlanOverlapResult;
+import com.zlt.aps.lh.engine.strategy.support.EquipmentPlanTimeline;
 import com.zlt.aps.lh.util.CleaningScheduleRuleUtil;
 import com.zlt.aps.lh.util.FirstInspectionQtyUtil;
 import com.zlt.aps.lh.util.FirstInspectionAllocationUtil;
@@ -171,6 +175,9 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
     private EarlyProductionRuntimePlanService earlyProductionRuntimePlanService;
     @Resource
     private LhMaintenanceScheduleService maintenanceScheduleService;
+    /** 真实收尾变化统一交给设备计划编排复评。 */
+    @Resource
+    private LhEquipmentPlanScheduleService equipmentPlanScheduleService = new LhEquipmentPlanScheduleService();
     @Resource
     private IMouldChangeBalanceStrategy mouldChangeBalanceStrategy;
     @Resource
@@ -288,6 +295,10 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         Map<String, Boolean> completedMachineMap = new HashMap<>(Math.max(16, candidateMachines.size() * 2));
         int typeBlockScheduledCount = 0;
         while (!CollectionUtils.isEmpty(context.getNewSpecSkuList())) {
+            // 上一轮真实收尾可能使待定精度有效；重建候选排序，禁止沿用旧时间和容量画像。
+            if (this.equipmentPlanScheduleService.reviewConfirmedEndings(context)) {
+                completedMachineMap.clear();
+            }
             List<MachineScheduleDTO> activeMachines = buildActiveMachineList(
                     context, candidateMachines, machineTriggerSourceMap, completedMachineMap);
             if (CollectionUtils.isEmpty(activeMachines)) {
@@ -395,6 +406,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                 break;
             }
         }
+        this.equipmentPlanScheduleService.reviewConfirmedEndings(context);
         log.info("换活字块排产结束, 新增结果数: {}, 剩余新增SKU: {}, 当前排程结果数: {}",
                 typeBlockScheduledCount, context.getNewSpecSkuList().size(),
                 context.getScheduleResultList().size());
@@ -417,10 +429,6 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                                            SkuScheduleDTO sku, List<LhShiftConfigVO> shifts,
                                            List<MachineScheduleDTO> activeMachines, List<SkuScheduleDTO> candidateSkus,
                                            String matchedLayer, String triggerSource) {
-        if (endingJudgmentStrategy.isCurrentWindowEnding(context, sku)) {
-            getMaintenanceScheduleService().tryAttachMaintenanceAfterFirstEnding(
-                    context, machine, machine.getEstimatedEndTime());
-        }
         Date typeBlockSwitchStartTime = allocateTypeBlockSwitchStartTime(
                 context, machine, sku, machine.getEstimatedEndTime());
         Date typeBlockStartTime = resolveTypeBlockProductionStartTime(
@@ -1593,6 +1601,15 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         } else {
             productionStartTime = switchCompleteTime;
         }
+        if (Objects.nonNull(machine) && machine.getMaintenanceWindowList().stream()
+                .anyMatch(window -> Objects.nonNull(window) && window.isEquipmentPlanManaged())) {
+            // 准备仍从真实释放时间开始，公共精度与含首检切换总时长取较晚完成点。
+            Date precisionReadyTime = this.getMaintenanceScheduleService().resolveParallelMouldChangeReadyTime(
+                    context, machine, switchStartTime, switchCompleteTime);
+            if (precisionReadyTime.after(productionStartTime)) {
+                productionStartTime = precisionReadyTime;
+            }
+        }
         return resolveCleaningOverlapProductionStartTime(machine, switchStartTime, productionStartTime);
     }
 
@@ -1990,12 +2007,17 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                  */
                 this.rollbackTypeBlockFirstInspectionSequence(
                         context, machine, sku, switchStartTime, startTime,
-                        shifts, earliestEmbryoAvailableTime);
+                        shifts, earliestEmbryoAvailableTime, context.getFirstInspectionResultPlanMap().get(result));
             }
             sku.setTargetScheduleQty(originalTargetScheduleQty);
             sku.setRemainingScheduleQty(originalRemainingScheduleQty);
             sku.setStrictTargetQty(originalStrictTargetQty);
             return false;
+        }
+        FirstInspectionAllocationPlan preparedInspection = context.getFirstInspectionResultPlanMap().get(result);
+        if (Objects.nonNull(preparedInspection) && Objects.nonNull(preparedInspection.getEquipmentPlanId())
+                && preparedInspection.getInspectionEndTime().after(startTime)) {
+            startTime = preparedInspection.getInspectionEndTime();
         }
         result.setScheduleType(ScheduleTypeEnum.TYPE_BLOCK.getCode());
         result.setIsChangeMould(YES_FLAG);
@@ -2014,7 +2036,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     LhScheduleTimeUtil.formatDateTime(startTime), result.getDailyPlanQty());
             rollbackTypeBlockFirstInspectionSequence(
                     context, machine, sku, switchStartTime, startTime,
-                    shifts, earliestEmbryoAvailableTime);
+                    shifts, earliestEmbryoAvailableTime, context.getFirstInspectionResultPlanMap().get(result));
             return false;
         }
         result.setSpecEndTime(actualCompletionTime);
@@ -2043,12 +2065,13 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         String precisionRejectReason = getMaintenanceScheduleService()
                 .resolvePrecisionCandidateRejectReason(
                         context, machine, sku, precisionPendingQty, precisionPlannedQty,
-                        switchStartTime, startTime, precisionCompletionTime);
+                        switchStartTime, startTime, precisionCompletionTime,
+                        this.resolveTypeBlockSwitchCompleteTime(context, machine, switchStartTime, startTime), preparedInspection);
         if (StringUtils.isNotEmpty(precisionRejectReason)) {
             recordTypeBlockAppendFailure(failureReason, precisionRejectReason);
             rollbackTypeBlockFirstInspectionSequence(
                     context, machine, sku, switchStartTime, startTime,
-                    shifts, earliestEmbryoAvailableTime);
+                    shifts, earliestEmbryoAvailableTime, context.getFirstInspectionResultPlanMap().get(result));
             sku.setTargetScheduleQty(originalTargetScheduleQty);
             sku.setRemainingScheduleQty(originalRemainingScheduleQty);
             sku.setStrictTargetQty(originalStrictTargetQty);
@@ -2077,7 +2100,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             precisionQuotaBaseline.restore(context, sku);
             rollbackTypeBlockFirstInspectionSequence(
                     context, machine, sku, switchStartTime, startTime,
-                    shifts, earliestEmbryoAvailableTime);
+                    shifts, earliestEmbryoAvailableTime, context.getFirstInspectionResultPlanMap().get(result));
             sku.setTargetScheduleQty(originalTargetScheduleQty);
             sku.setRemainingScheduleQty(originalRemainingScheduleQty);
             sku.setStrictTargetQty(originalStrictTargetQty);
@@ -2095,7 +2118,8 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         String finalPrecisionRejectReason = getMaintenanceScheduleService()
                 .resolvePrecisionCandidateRejectReason(
                         context, machine, sku, precisionPendingQty, finalPrecisionPlannedQty,
-                        switchStartTime, startTime, finalPrecisionCompletionTime);
+                        switchStartTime, startTime, finalPrecisionCompletionTime,
+                        this.resolveTypeBlockSwitchCompleteTime(context, machine, switchStartTime, startTime), preparedInspection);
         if (StringUtils.isNotEmpty(finalPrecisionRejectReason)) {
             // dayN回裁可能把原本完整的候选缩成部分数量，必须按扣账前快照恢复，
             // 禁止以“少排一点”的方式占用精度前空闲时间。
@@ -2103,7 +2127,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             recordTypeBlockAppendFailure(failureReason, finalPrecisionRejectReason);
             rollbackTypeBlockFirstInspectionSequence(
                     context, machine, sku, switchStartTime, startTime,
-                    shifts, earliestEmbryoAvailableTime);
+                    shifts, earliestEmbryoAvailableTime, context.getFirstInspectionResultPlanMap().get(result));
             sku.setTargetScheduleQty(originalTargetScheduleQty);
             sku.setRemainingScheduleQty(originalRemainingScheduleQty);
             sku.setStrictTargetQty(originalStrictTargetQty);
@@ -2177,6 +2201,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     LhScheduleTimeUtil.formatDateTime(switchStartTime),
                     LhScheduleTimeUtil.formatDateTime(startTime), quotaTrimmedQty);
         }
+        this.equipmentPlanScheduleService.commitPrecisionInspection(context, result);
         if (Objects.nonNull(committedFirstInspectionAllocationPlan)) {
             /*
              * 到此主副结果、日计划账本和机台运行态均已成功提交，才允许记录最终首检分摊。
@@ -2569,6 +2594,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
      * @param fallbackStartTime 开产时间兜底值
      * @param shifts 班次
      * @param earliestEmbryoAvailableTime 结构切换提前命中的最早胎胚可供时间；其他换活字块为 null
+     * @param inspection 已实际写入的首检计划；无精度归属时沿用原计数规则
      */
     private void rollbackTypeBlockFirstInspectionSequence(LhScheduleContext context,
                                                           MachineScheduleDTO machine,
@@ -2576,7 +2602,13 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                                                           Date switchStartTime,
                                                           Date fallbackStartTime,
                                                           List<LhShiftConfigVO> shifts,
-                                                          Date earliestEmbryoAvailableTime) {
+                                                          Date earliestEmbryoAvailableTime,
+                                                          FirstInspectionAllocationPlan inspection) {
+        // 精度并行共用首检的计数班次可能早于切换结束班，失败时必须回退冻结班次。
+        if (Objects.nonNull(inspection) && Objects.nonNull(inspection.getEquipmentPlanId())) {
+            FirstInspectionQtyUtil.rollbackFirstInspectionSequence(context, inspection.getCountingShift());
+            return;
+        }
         Date switchCompleteTime = resolveTypeBlockSwitchCompleteTime(
                 context, machine, switchStartTime, fallbackStartTime);
         FirstInspectionQtyUtil.rollbackFirstInspectionSequence(
@@ -4399,6 +4431,21 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                 ScheduleTypeEnum.TYPE_BLOCK.getCode());
         Date switchCompleteTime = resolveTypeBlockSwitchCompleteTime(
                 context, machine, switchStartTime, startTime);
+        EquipmentPlanOverlapResult precisionOverlap = this.getMaintenanceScheduleService().resolvePrecisionChangeoverOverlap(
+                context, machine, sku, switchStartTime, switchCompleteTime, ScheduleTypeEnum.TYPE_BLOCK.getCode());
+        if (precisionOverlap.isUnsupported()) {
+            PriorityTraceLogHelper.appendProcessLog(context, "设备计划未覆盖组合",
+                    "物料=" + sku.getMaterialCode() + "，机台=" + machine.getMachineCode() + "，原因=" + precisionOverlap.getReason());
+            return null;
+        }
+        EquipmentPlanTimeline parallelTimeline = precisionOverlap.getTimeline();
+        if (precisionOverlap.isSupported() && Objects.nonNull(earliestEmbryoAvailableTime)
+                && earliestEmbryoAvailableTime.after(parallelTimeline.getInspectionStartTime())) {
+            PriorityTraceLogHelper.appendProcessLog(context, "设备计划未覆盖组合",
+                    "物料=" + sku.getMaterialCode() + "，机台=" + machine.getMachineCode()
+                            + "，原因=供胚门禁晚于并行公共首检开始，当前组合不提交");
+            return null;
+        }
         /*
          * 清洗只有在与真实换活字块区间重叠时才可按现有并行规则剔除。胎胚、维修或
          * 其他生产门禁可能把正式开产继续后移，不能据此扩大“清洗与切换重叠”区间。
@@ -4412,8 +4459,12 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
          * 首检与普通生产区间，不能先用旧首检区间的容量失败阻断后续合法时间轴。
          */
         boolean largeTimelineRequired = StructureSwitchSchedulingPolicy.requiresLargeTimeline(context, sku, startTime);
-        FirstInspectionAllocationPlan firstInspectionAllocationPlan =
-                FirstInspectionAllocationUtil.buildPlan(
+        FirstInspectionAllocationPlan firstInspectionAllocationPlan = precisionOverlap.isSupported()
+                ? FirstInspectionAllocationUtil.buildFixedDurationPlan(context, sku, context.getScheduleWindowShifts(),
+                        parallelTimeline.getInspectionStartTime(), LhEquipmentPlanTimelineResolver.PRECISION_INSPECTION_SECONDS,
+                        runtimeShiftCapacity, refinedTargetQty, ScheduleTypeEnum.TYPE_BLOCK.getCode(), machine.getMachineCode(), null)
+                        .withEquipmentPlanId(parallelTimeline.getPrecisionPlanId())
+                : FirstInspectionAllocationUtil.buildPlan(
                         context, sku, shifts, switchCompleteTime, startTime,
                         runtimeShiftCapacity, refinedTargetQty,
                         ScheduleTypeEnum.TYPE_BLOCK.getCode(),
@@ -4425,7 +4476,12 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                             context, result, sku, firstInspectionAllocationPlan,
                             runtimeShiftCapacity, mouldQty, cleaningWindowList,
                             maintenanceWindowList);
-            firstInspectionAllocationPlan = FirstInspectionAllocationUtil.buildPlan(
+            firstInspectionAllocationPlan = precisionOverlap.isSupported()
+                    ? FirstInspectionAllocationUtil.buildFixedDurationPlan(context, sku, context.getScheduleWindowShifts(),
+                            parallelTimeline.getInspectionStartTime(), LhEquipmentPlanTimelineResolver.PRECISION_INSPECTION_SECONDS,
+                            runtimeShiftCapacity, refinedTargetQty, ScheduleTypeEnum.TYPE_BLOCK.getCode(), machine.getMachineCode(),
+                            firstInspectionCapacityMap).withEquipmentPlanId(parallelTimeline.getPrecisionPlanId())
+                    : FirstInspectionAllocationUtil.buildPlan(
                     context, sku, shifts, switchCompleteTime, startTime,
                     runtimeShiftCapacity, refinedTargetQty,
                     ScheduleTypeEnum.TYPE_BLOCK.getCode(),
@@ -4643,6 +4699,13 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             Date effectiveStart = StructureSwitchSchedulingPolicy.effectiveStart(context,
                     switchPlan, shift, control.getEffectiveStartTime());
             Date effectiveEnd = control.getEffectiveEndTime();
+            if (Objects.nonNull(firstInspectionAllocationPlan) && Objects.nonNull(firstInspectionAllocationPlan.getEquipmentPlanId())) {
+                effectiveStart = NewSpecEmbryoAvailableTimeResolver.resolveEffectiveProductionWindowStart(
+                        effectiveStart, effectiveEnd, firstInspectionAllocationPlan.getInspectionEndTime());
+                if (Objects.isNull(effectiveStart)) {
+                    continue;
+                }
+            }
             int actualShiftPlanQty = ShiftCapacityResolverUtil.resolveActualShiftPlanQty(
                     shiftCapacity, shift, configPlusShiftType, ScheduleTypeEnum.TYPE_BLOCK.getCode());
             boolean oddShiftAdjustEnabled = ShiftCapacityResolverUtil.isOddShiftCapacityAdjustEnabled(
@@ -4682,6 +4745,9 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     maintenanceWindowList, shiftMaxQty, ScheduleTypeEnum.TYPE_BLOCK.getCode());
             int physicalShiftMaxQty = shiftMaxQty;
             shiftMaxQty = dailyStandardShiftCapacityMap.getOrDefault(shift.getShiftIndex(), shiftMaxQty);
+            if (Objects.nonNull(firstInspectionAllocationPlan) && Objects.nonNull(firstInspectionAllocationPlan.getEquipmentPlanId())) {
+                shiftMaxQty = Math.min(shiftMaxQty, physicalShiftMaxQty);
+            }
             int capacityAfterSwitch;
             if (crossShiftInspection) {
                 int currentShiftInspectionQty = Math.max(
@@ -4819,6 +4885,12 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                 || CollectionUtils.isEmpty(plan.getShiftAllocations())
                 || shiftCapacity <= 0 || mouldQty <= 0) {
             return capacityMap;
+        }
+        if (Objects.nonNull(plan.getEquipmentPlanId())) {
+            // 仅首检容量副本释放本计划的首检区间，真实保养及其他设备约束继续扣减。
+            MachineScheduleDTO machine = context.getMachineScheduleMap().get(result.getLhMachineCode());
+            maintenanceWindowList = ShiftCapacityResolverUtil.resolvePrecisionInspectionCapacityWindows(
+                    context, result.getLhMachineCode(), machine.getMaintenanceWindowList(), plan.getEquipmentPlanId());
         }
         int dryIceLossQty = context.getParamIntValue(
                 LhScheduleParamConstant.DRY_ICE_LOSS_QTY,

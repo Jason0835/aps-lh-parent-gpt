@@ -9,7 +9,7 @@ import com.zlt.aps.lh.engine.factory.ScheduleStrategyFactory;
 import com.zlt.aps.lh.engine.strategy.IProductionStrategy;
 import com.zlt.aps.lh.engine.strategy.ISkuPriorityStrategy;
 import com.zlt.aps.lh.engine.strategy.ITypeBlockProductionStrategy;
-import com.zlt.aps.lh.service.impl.LhMaintenanceScheduleService;
+import com.zlt.aps.lh.service.impl.LhEquipmentPlanScheduleService;
 import com.zlt.aps.lh.service.impl.PreviousAlternatePlanReuseService;
 import com.zlt.aps.lh.service.impl.TimedMachineOffShiftService;
 import com.zlt.aps.lh.service.impl.TimedMachineOffLoadPreviewService;
@@ -46,7 +46,7 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
     @Resource
     private ITypeBlockProductionStrategy typeBlockProductionStrategy;
     @Resource
-    private LhMaintenanceScheduleService maintenanceScheduleService;
+    private LhEquipmentPlanScheduleService equipmentPlanScheduleService;
     /** 续作真实释放时间确定后，先消费可复用交替关系的一份机台需求。 */
     @Resource
     private PreviousAlternatePlanReuseService previousAlternatePlanReuseService;
@@ -81,12 +81,6 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
         log.debug("续作排产优先级排序完成, 续作SKU: {}, 新增SKU: {}",
                 context.getContinuousSkuList().size(), context.getNewSpecSkuList().size());
 
-        /*
-         * S4.4开始前只登记中心决策，禁止逐SKU回调提前挂载精度窗口。
-         * 精度统一等待续作最终收口，不能将初始化首班起点误当成物料已收尾。
-         */
-        maintenanceScheduleService.prepareMaintenancePlanWindows(context);
-
         IProductionStrategy strategy = strategyFactory.getProductionStrategy(
                 ScheduleTypeEnum.CONTINUOUS.getCode());
 
@@ -113,8 +107,8 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
         // 数量稳定后只消费一次账本，同时发布机台、模具和待排余量。
         strategy.finalizeContinuousProduction(context);
 
-        // 续作最终数量、真实收尾和物理交接时间已经稳定，按精度优先级统一分配每日一台额度。
-        maintenanceScheduleService.finalizeMaintenancePlanWindows(context);
+        // 普通精度只在真实收尾稳定后集中判断；若复评产生新强制约束，先按消费记录恢复并重算受影响续作。
+        equipmentPlanScheduleService.reviewConfirmedEndings(context);
 
         // 独立复用阶段覆盖全部剩余产能机台，完成后换活字块只处理实时剩余资源与需求。
         previousAlternatePlanReuseService.reuse(context);

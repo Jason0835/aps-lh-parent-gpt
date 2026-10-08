@@ -2,6 +2,7 @@ package com.zlt.aps.lh.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -1820,6 +1821,43 @@ public class LhPrecisionPlanServiceImpl extends AbstractDocService<LhPrecisionPl
                     LhScheduleTimeUtil.formatDate(scheduleDate), affectedRows);
         }
         return filledCount;
+    }
+
+    /**
+     * 精度安排与排程结果共同提交，保留原对外回填入口的独立事务语义。
+     * @param factoryCode 当前工厂
+     * @param scheduleDates 仅由最终有效安排形成的主键及实际开始日
+     * @return 本事务更新行数
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class, propagation = Propagation.MANDATORY)
+    public int fillArrangedScheduleDates(String factoryCode, Map<Long, Date> scheduleDates) {
+        int updated = 0;
+        for (Map.Entry<Long, Date> entry : scheduleDates.entrySet()) {
+            if (Objects.isNull(entry.getKey()) || Objects.isNull(entry.getValue())) {
+                throw new IllegalStateException(I18nUtil.getMessage("ui.data.excut.error"));
+            }
+            // 只设置SCHEDULE_DATE；逻辑删除由框架处理，不写ACTUAL_DATE及COMPLETION_STATUS。
+            int affected = lhPrecisionPlanMapper.update(null,
+                    new LambdaUpdateWrapper<LhPrecisionPlan>()
+                            .eq(LhPrecisionPlan::getId, entry.getKey())
+                            .eq(LhPrecisionPlan::getFactoryCode, factoryCode)
+                            .set(LhPrecisionPlan::getScheduleDate, LhScheduleTimeUtil.clearTime(entry.getValue())));
+            if (affected == 0 && lhPrecisionPlanMapper.selectCount(new LambdaQueryWrapper<LhPrecisionPlan>()
+                    .eq(LhPrecisionPlan::getId, entry.getKey())
+                    .eq(LhPrecisionPlan::getFactoryCode, factoryCode)
+                    .eq(LhPrecisionPlan::getScheduleDate, LhScheduleTimeUtil.clearTime(entry.getValue()))) == 1L) {
+                // 兼容只返回实际变更行数的驱动：日期已一致属于幂等成功，不是回填失败。
+                continue;
+            }
+            if (affected != 1) {
+                log.error("精度安排日期回填失败，排程事务回滚，工厂={}，计划主键={}，影响行数={}",
+                        factoryCode, entry.getKey(), affected);
+                throw new IllegalStateException(I18nUtil.getMessage("ui.data.excut.error"));
+            }
+            updated += affected;
+        }
+        return updated;
     }
 
     @Override

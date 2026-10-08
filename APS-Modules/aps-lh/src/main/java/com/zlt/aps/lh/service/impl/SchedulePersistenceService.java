@@ -24,6 +24,7 @@ import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.mapper.LhUnscheduledResultMapper;
 import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
+import com.zlt.aps.lh.service.ILhPrecisionPlanService;
 import com.zlt.aps.lh.util.LhMouldCodeUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
@@ -101,6 +102,12 @@ public class SchedulePersistenceService {
     @Resource
     private LhDeviceStopPlanScheduleService deviceStopPlanScheduleService;
 
+    /** 精度最终安排收口及同事务日期回填。 */
+    @Resource
+    private LhEquipmentPlanScheduleService equipmentPlanScheduleService = new LhEquipmentPlanScheduleService();
+    @Resource
+    private ILhPrecisionPlanService precisionPlanService;
+
     /**
      * 以事务方式原子替换目标日排程结果。
      *
@@ -119,6 +126,8 @@ public class SchedulePersistenceService {
     public void replaceScheduleAtomically(LhScheduleContext context) {
         Date targetDate = LhScheduleTimeUtil.clearTime(context.getScheduleTargetDate());
         String factoryCode = context.getFactoryCode();
+        // 全部后置裁量已结束；不从候选窗口、已撤销安排或机台摘要推断回填对象。
+        Map<Long, Date> precisionScheduleDates = equipmentPlanScheduleService.finalizeArrangements(context);
 
         int releasedCount = scheduleResultService.countReleasedByDate(targetDate, factoryCode);
         if (releasedCount > 0) {
@@ -210,6 +219,9 @@ public class SchedulePersistenceService {
         deviceStopPlanScheduleService.batchFillCleaningScheduleDate(context.getCleaningScheduleDateFillList());
         // 05/06使用实际执行日期回填，与结果落库同事务，不提前写入未来计划。
         deviceStopPlanScheduleService.batchFillStopScheduleDates(context);
+        if (!precisionScheduleDates.isEmpty()) {
+            precisionPlanService.fillArrangedScheduleDates(factoryCode, precisionScheduleDates);
+        }
 
         log.info("目标日排程原子替换完成, 工厂: {}, 日期: {}, 删除结果: {}, 删除未排: {}, 删除换模: {}, 删除日志: {}, 新结果: {}, 新未排: {}, 新换模: {}, 新日志: {}",
                 factoryCode, LhScheduleTimeUtil.formatDate(targetDate),

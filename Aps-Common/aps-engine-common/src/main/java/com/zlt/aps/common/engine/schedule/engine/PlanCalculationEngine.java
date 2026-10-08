@@ -50,10 +50,17 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
         for (List<T> shiftTaskList : taskGroupByShift.values()) {
             policy.prepareShiftDemandAndSupply(context, shiftTaskList, stockForecastMap, remainingStockMap,
                     demandStrategy, demandAlgorithmCode);
+            policy.beforeCalculatePlanQty(context, shiftTaskList);
+            List<T> beforeSortTaskList = new ArrayList<>(shiftTaskList);
+            int sortStartIndex = orderIndex + 1;
             policy.sortPlanCalcShiftTasks(context, shiftTaskList);
             for (T task : shiftTaskList) {
                 task.setPlanCalcOrderIndex(++orderIndex);
                 orderedTaskList.add(task);
+            }
+            policy.recordPlanCalcSortSnapshot(context, beforeSortTaskList, new ArrayList<>(shiftTaskList),
+                    sortStartIndex, orderIndex);
+            for (T task : shiftTaskList) {
                 remainingToolQty = policy.calculatePlanQtyForTask(context, task, stockForecastMap,
                         remainingStockMap, remainingToolQty, planStrategy, planStrategyCode, demandAlgorithmCode);
             }
@@ -121,8 +128,11 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
         try {
             policy.prepareShiftDemandAndSupply(context, shiftTaskList, stockForecastMap, planningStockMap,
                     demandStrategy, demandAlgorithmCode);
+            policy.beforeCalculatePlanQty(context, shiftTaskList);
+            List<T> beforeSortTaskList = new ArrayList<>(shiftTaskList);
             policy.sortPlanCalcShiftTasks(context, shiftTaskList);
             int orderIndex = this.resolveNextPlanCalcOrderIndex(context);
+            int sortStartIndex = orderIndex + 1;
             BigDecimal remainingToolQty = context.getCurrentAvailableToolQty();
             for (T task : shiftTaskList) {
                 task.setPlanCalcOrderIndex(++orderIndex);
@@ -130,6 +140,10 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
                 if (!this.isPresetPlanTask(task)) {
                     task.setPlanQty(null);
                 }
+            }
+            policy.recordPlanCalcSortSnapshot(context, beforeSortTaskList, new ArrayList<>(shiftTaskList),
+                    sortStartIndex, orderIndex);
+            for (T task : shiftTaskList) {
                 String productCode = task.getProcessCode();
                 if (productCode == null || productCode.trim().isEmpty()) {
                     continue;
@@ -373,8 +387,12 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
                 aggregateTask.getPlanQty(), sourceWeightMap, calculationScale);
         Map<String, BigDecimal> planStockAllocationMap = this.allocateByWeight(
                 aggregateTask.getPlanStockQty(), sourceWeightMap, calculationScale);
+        Map<String, BigDecimal> postTailBlockedAllocationMap = this.allocateByWeight(
+                aggregateTask.getPostTailBlockedQty(), sourceWeightMap, calculationScale);
         for (T sourceTask : taskGroup.getSourceTaskList()) {
             String sourceBusinessKey = sourceTask.getBusinessKey();
+            boolean sourceHasPostTailBlockedReason = SchedulePostTailTaskRuleApplier
+                    .POST_TAIL_BLOCKED_REASON_CODE.equals(sourceTask.getUnplannedReasonCode());
             sourceTask.setSourceRequiredQty(sourceWeightMap.get(sourceBusinessKey));
             sourceTask.setStockDeductQty(stockDeductAllocationMap.get(sourceBusinessKey));
             sourceTask.setBaseDemandQty(baseDemandAllocationMap.get(sourceBusinessKey));
@@ -387,6 +405,25 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
             sourceTask.setTwoShiftStockCovered(aggregateTask.getTwoShiftStockCovered());
             sourceTask.setStockCoverageStockGapQty(aggregateTask.getStockCoverageStockGapQty());
             sourceTask.setStockCoverageCovered(aggregateTask.getStockCoverageCovered());
+            sourceTask.setPostTailShiftParameter(aggregateTask.getPostTailShiftParameter());
+            sourceTask.setPostTailDecision(aggregateTask.getPostTailDecision());
+            sourceTask.setPostTailCloseOutState(aggregateTask.getPostTailCloseOutState());
+            sourceTask.setPostTailShiftBlocked(aggregateTask.getPostTailShiftBlocked());
+            sourceTask.setPostTailBlockedQty(postTailBlockedAllocationMap.get(sourceBusinessKey));
+            sourceTask.setPostTailSkippedShiftOrders(aggregateTask.getPostTailSkippedShiftOrders());
+            if (aggregateTask.getUnplannedReasonCode() != null
+                    && !aggregateTask.getUnplannedReasonCode().trim().isEmpty()) {
+                sourceTask.setMachineCode(null);
+                sourceTask.setUnplannedReasonCode(aggregateTask.getUnplannedReasonCode());
+                sourceTask.setUnplannedReasonDesc(aggregateTask.getUnplannedReasonDesc());
+            } else if (sourceHasPostTailBlockedReason
+                    && (twoShiftStockCovered || this.nvl(aggregateTask.getPostTailBlockedQty())
+                    .compareTo(BigDecimal.ZERO) <= 0)) {
+                // 聚合任务因库存覆盖或零缺口清除了禁排原因时，同步清除来源任务的旧禁排标记。
+                sourceTask.setMachineCode(null);
+                sourceTask.setUnplannedReasonCode(null);
+                sourceTask.setUnplannedReasonDesc(null);
+            }
             if (twoShiftStockCovered) {
                 sourceTask.setLossAddQty(BigDecimal.ZERO);
                 sourceTask.setToolLimitAdjustQty(BigDecimal.ZERO);

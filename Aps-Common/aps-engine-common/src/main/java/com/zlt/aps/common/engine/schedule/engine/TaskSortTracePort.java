@@ -1,5 +1,7 @@
 package com.zlt.aps.common.engine.schedule.engine;
 
+import java.util.List;
+
 /**
  * 自动排程任务排序轨迹端口。
  *
@@ -52,5 +54,20 @@ public interface TaskSortTracePort<C, T extends ScheduleSortableTask> {
      * @param sortIndex 排序序号
      */
     void logTaskSortDetail(C context, T task, String strategyCode, String sortSource, int sortIndex);
-}
 
+    /**
+     * 记录本轮完整排序重放快照；旧实现无需改写即可保持空实现兼容。
+     *
+     * @param context                    排程上下文
+     * @param strategyCode               排序策略
+     * @param sortSource                 排序来源
+     * @param prependSupplyHoursPriority 是否追加供应时长
+     * @param beforeOrder                排序前完整任务集合
+     * @param afterOrder                 排序后完整任务集合
+     */
+    default void recordTaskSortSnapshot(C context, String strategyCode, String sortSource,
+                                        boolean prependSupplyHoursPriority,
+                                        List<T> beforeOrder, List<T> afterOrder) {
+        // 默认不记录领域排序快照，兼容未接入解释表的公共调用方。
+    }
+}

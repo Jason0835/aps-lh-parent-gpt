@@ -1553,7 +1553,9 @@ public final class ShiftCapacityResolverUtil {
         List<MachineMaintenanceWindowDTO> capacityWindowList = new ArrayList<>(
                 sourceSize + capsuleReplacementWindowList.size() + 2);
         if (!CollectionUtils.isEmpty(maintenanceWindowList)) {
-            capacityWindowList.addAll(maintenanceWindowList);
+            // 容量预演使用独立窗口，禁止临时裁剪回写实际安排（尤其首检恢复边界）。
+            maintenanceWindowList.stream().filter(Objects::nonNull)
+                    .map(MachineMaintenanceWindowDTO::copy).forEach(capacityWindowList::add);
         }
         capacityWindowList.addAll(resolvePlannedRepairCapacityWindowList(
                 context, devicePlanShutList, machineCode));
@@ -1562,6 +1564,28 @@ public final class ShiftCapacityResolverUtil {
         // 06仅适配为计算区间，不写入机台精度列表、不抬高换模或清洗的就绪时间。
         capacityWindowList.addAll(LhTemporaryFaultService.resolveCapacityWindows(context, machineCode));
         return capacityWindowList;
+    }
+
+    /**
+     * 校验明确归属的精度首检产能时，只在临时副本中扣除原始维护区间。
+     * 首检本身由首检分摊计划占用；实际窗口与普通生产容量仍保留完整维护加首检区间。
+     * @param context 上下文
+     * @param machineCode 机台
+     * @param maintenanceWindows 实际维护窗口
+     * @param precisionPlanId 已归属本次首检的有效计划主键
+     * @return 仅本次首检容量校验使用的独立窗口
+     */
+    public static List<MachineMaintenanceWindowDTO> resolvePrecisionInspectionCapacityWindows(
+            LhScheduleContext context, String machineCode,
+            List<MachineMaintenanceWindowDTO> maintenanceWindows, Long precisionPlanId) {
+        List<MachineMaintenanceWindowDTO> windows = resolveCapacityMaintenanceWindowList(
+                context, context.getDevicePlanShutList(), machineCode, maintenanceWindows);
+        if (Objects.nonNull(precisionPlanId)) {
+            windows.stream().filter(MachineMaintenanceWindowDTO::isEquipmentPlanManaged)
+                    .filter(window -> Objects.equals(precisionPlanId, window.getPrecisionPlanId()))
+                    .forEach(window -> window.setProductionResumeTime(window.getMaintenanceEndTime()));
+        }
+        return windows;
     }
 
     /**

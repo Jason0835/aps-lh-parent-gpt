@@ -581,4 +581,13 @@ public class EngineConstants {
 
     /** 规格级班产上限口径模式：速度口径（MES机台×规格生产速度优先，未命中回退SYS1101029） */
     public static final int SPEC_CLASS_LIMIT_MODE_SPEED = 2;
+
+    /** SYS1101037：胎圈保鲜期折算班数（S5.95保鲜校验FIFO模拟：产出班次到消耗完班次的班次差超过此值告警；期初库存视为新鲜免检；0=不校验；一期仅告警人工干预），默认9班（72h/8h班） */
+    public static String TQ_SHELF_LIFE_SHIFT_COUNT = "SYS1101037";
+
+    /** SYS1101038：胎圈工艺停放折算班数（班粒度声明口径：折算班数<1班=同班产出班末即可供成型使用，不产生班次约束；仅日志声明+三期严格化预留），默认0.5班（4h/8h班） */
+    public static String TQ_PARKING_SHIFT_COUNT = "SYS1101038";
+
+    /** SYS1101039：胎圈工厂总库容上限（S5.95库容校验：逐班次库存轨迹总量超过此值告警；0=不校验，数值待业务提供；一期仅告警），默认0 */
+    public static String TQ_WAREHOUSE_CAPACITY_LIMIT = "SYS1101039";
 }
