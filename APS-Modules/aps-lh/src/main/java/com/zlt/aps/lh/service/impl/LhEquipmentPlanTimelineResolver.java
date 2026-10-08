@@ -12,11 +12,11 @@ import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.EquipmentPlanArrangement;
 import com.zlt.aps.lh.engine.strategy.support.EquipmentPlanOverlapResult;
 import com.zlt.aps.lh.engine.strategy.support.EquipmentPlanTimeline;
-import com.zlt.aps.lh.engine.strategy.support.FirstInspectionTimelinePlan;
+import com.zlt.aps.lh.engine.strategy.support.FirstInspectionAllocationPlan;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchSchedulingPolicy;
-import com.zlt.aps.lh.util.FirstInspectionAllocationUtil;
 import com.zlt.aps.lh.util.FirstInspectionQtyUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
+import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
 import org.apache.commons.lang3.StringUtils;
@@ -27,19 +27,16 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-/** 设备计划时间适配；不重新判断精度日期、时长、预热或生产优先级。 */
+/** 设备计划时间适配；保留原始精度区间，按既有参数衔接上胶囊、预热及公共首检。 */
 @Component
 public class LhEquipmentPlanTimelineResolver {
-
-    /** 精度保养后的公共首检固定2小时，与SKU产速无关。 */
-    public static final long PRECISION_INSPECTION_SECONDS = 2L * 3600L;
 
     /** @param context 排程上下文 @param decision 有效判定 @param inputVersion 输入指纹 @return 候选时间约束 */
     public EquipmentPlanTimeline resolvePrecision(LhScheduleContext context,
                                                   PrecisionMaintenanceJudgeDTO decision, String inputVersion) {
-        FirstInspectionTimelinePlan inspection = FirstInspectionAllocationUtil.buildFixedDurationTimelinePlan(
-                context.getScheduleWindowShifts(), decision.getPrecisionEndTime(), PRECISION_INSPECTION_SECONDS);
-        return new EquipmentPlanTimeline(decision, inspection, inputVersion);
+        Date maintenanceReadyTime = LhScheduleTimeUtil.addMinutes(decision.getPrecisionEndTime(),
+                LhScheduleTimeUtil.getCapsulePreheatMinutes(context));
+        return new EquipmentPlanTimeline(decision, maintenanceReadyTime, inputVersion);
     }
 
     /**
@@ -81,7 +78,7 @@ public class LhEquipmentPlanTimelineResolver {
     }
 
     /**
-     * 两项完整耗时并行取最大完成点，共用最后2小时首检，不再向切换总时长重复追加首检。
+     * 保养后上胶囊及预热完成与切换结束取最大边界，再正向执行一次公共首检。
      * 原始保养开始/结束始终保留；不同开始时刻比较绝对完成点，不向前移动已合法的切换窗口。
      */
     private EquipmentPlanOverlapResult resolvePrecisionChangeover(LhScheduleContext context, MachineScheduleDTO machine,
@@ -118,12 +115,44 @@ public class LhEquipmentPlanTimelineResolver {
         if (inspectionAllocated) {
             return EquipmentPlanOverlapResult.unsupported("精度公共首检已被有效结果承接，不得再次分配或移动");
         }
-        long inspectionMillis = PRECISION_INSPECTION_SECONDS * 1000L;
-        Date resume = new Date(Math.max(original.getMaintenanceEndTime().getTime() + inspectionMillis, end.getTime()));
-        EquipmentPlanTimeline parallel = original.withInspection(new Date(resume.getTime() - inspectionMillis), resume);
+        Date inspectionStart = this.resolvePrecisionInspectionStartTime(original.getMaintenanceReadyTime(), end);
+        // 此时尚未选定首检参数及条数，仅返回准备边界；实际首检区间由原数量分摊工具生成。
+        EquipmentPlanTimeline parallel = original.withInspection(inspectionStart, inspectionStart);
         String conflict = this.resolveAdditionalOverlapReason(context, parallel, start);
         return StringUtils.isNotBlank(conflict)
                 ? EquipmentPlanOverlapResult.unsupported(conflict) : EquipmentPlanOverlapResult.supported(parallel);
+    }
+
+    /**
+     * 准备预演、正式组合及提交校验共用首检起点；首检不得占用上胶囊及预热时间。
+     * @param maintenanceReadyTime 已冻结的精度上胶囊及预热完成时间
+     * @param changeoverEndTime 切换结束；独立精度传空
+     * @return 两项准备均结束、可以开始计件首检的时刻
+     */
+    public Date resolvePrecisionInspectionStartTime(Date maintenanceReadyTime, Date changeoverEndTime) {
+        Date inspectionStart = Objects.nonNull(changeoverEndTime) && changeoverEndTime.after(maintenanceReadyTime)
+                ? changeoverEndTime : maintenanceReadyTime;
+        return new Date(inspectionStart.getTime());
+    }
+
+    /**
+     * 首检数量确定后复核真实首检结束前的组合占用，不能只检查尚未分配数量时的准备边界。
+     * @param context 上下文 @param inspection 参数计件首检 @param changeStart 切换开始，无切换时为空
+     * @return 尚未覆盖组合原因，无冲突为空
+     */
+    public String resolveInspectionOverlapReason(LhScheduleContext context, FirstInspectionAllocationPlan inspection,
+            Date changeStart) {
+        if (!inspection.isValid() || Objects.isNull(inspection.getEquipmentPlanId())) {
+            return inspection.getInvalidReason();
+        }
+        EquipmentPlanArrangement arrangement = context.getEquipmentPlanRuntimeState().getArrangementMap().get(inspection.getEquipmentPlanId());
+        if (Objects.isNull(arrangement) || !arrangement.isEffective()) {
+            return "精度计件首检缺少有效设备安排";
+        }
+        EquipmentPlanTimeline actual = arrangement.getTimeline().withInspection(
+                inspection.getInspectionStartTime(), inspection.getInspectionEndTime());
+        return this.resolveAdditionalOverlapReason(context, actual,
+                Objects.nonNull(changeStart) ? changeStart : actual.getMaintenanceStartTime());
     }
 
     /**

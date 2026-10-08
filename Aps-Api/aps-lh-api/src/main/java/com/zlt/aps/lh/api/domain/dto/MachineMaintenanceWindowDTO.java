@@ -32,8 +32,10 @@ public class MachineMaintenanceWindowDTO {
     private Date maintenanceStartTime;
     /** 保养结束时间 */
     private Date maintenanceEndTime;
-    /** 是否由设备计划公共编排发布；此类窗口不得再套用旧精度并行、预热和06:00规则。 */
+    /** 是否由设备计划公共编排发布；预热已统一适配，不得重复追加预热或套用旧06:00规则。 */
     private boolean equipmentPlanManaged;
+    /** 精度保养后上胶囊及预热完成时间，不包含公共首检。 */
+    private Date maintenanceReadyTime;
     /** 公共首检开始时间，与原始保养结束时间分别保存。 */
     private Date firstInspectionStartTime;
     /** 公共首检结束时间。 */
@@ -69,6 +71,7 @@ public class MachineMaintenanceWindowDTO {
         target.setMaintenanceStartTime(this.copyDate(maintenanceStartTime));
         target.setMaintenanceEndTime(this.copyDate(maintenanceEndTime));
         target.setEquipmentPlanManaged(equipmentPlanManaged);
+        target.setMaintenanceReadyTime(this.copyDate(maintenanceReadyTime));
         target.setFirstInspectionStartTime(this.copyDate(firstInspectionStartTime));
         target.setFirstInspectionEndTime(this.copyDate(firstInspectionEndTime));
         target.setProductionResumeTime(this.copyDate(productionResumeTime));

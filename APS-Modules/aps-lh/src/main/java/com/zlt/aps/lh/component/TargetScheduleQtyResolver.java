@@ -2004,16 +2004,19 @@ public class TargetScheduleQtyResolver {
                 ? shifts : context.getScheduleWindowShifts();
         EquipmentPlanTimeline parallelTimeline = precisionOverlap.getTimeline();
         FirstInspectionAllocationPlan firstInspectionAllocationPlan = precisionOverlap.isSupported()
-                ? FirstInspectionAllocationUtil.buildFixedDurationPlan(context, sku, inspectionShifts,
-                        parallelTimeline.getInspectionStartTime(), LhEquipmentPlanTimelineResolver.PRECISION_INSPECTION_SECONDS,
-                        shiftCapacity, Math.max(sku.resolveTargetScheduleQty(), shiftCapacity), scheduleType, machine.getMachineCode(), null)
-                        .withEquipmentPlanId(parallelTimeline.getPrecisionPlanId())
+                ? FirstInspectionAllocationUtil.buildPrecisionQuantityPlan(context, sku, inspectionShifts,
+                        parallelTimeline.getInspectionStartTime(),
+                        shiftCapacity, Math.max(sku.resolveTargetScheduleQty(), shiftCapacity), scheduleType, machine.getMachineCode(), null, parallelTimeline.getPrecisionPlanId())
                 : FirstInspectionAllocationUtil.buildPlan(
                         context, sku, inspectionShifts, mouldChangeCompleteTime,
                         productionStartTime,
                         shiftCapacity, Math.max(sku.resolveTargetScheduleQty(), shiftCapacity),
                         scheduleType, machine.getMachineCode(), null);
         if (precisionOverlap.isSupported() && !firstInspectionAllocationPlan.isValid()) {
+            return 0;
+        }
+        if (precisionOverlap.isSupported() && StringUtils.isNotBlank(equipmentPlanTimelineResolver.resolveInspectionOverlapReason(
+                context, firstInspectionAllocationPlan, switchStartTime))) {
             return 0;
         }
         Map<Integer, Integer> firstInspectionQtyMap =

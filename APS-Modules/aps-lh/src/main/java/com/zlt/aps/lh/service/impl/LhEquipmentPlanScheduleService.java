@@ -98,7 +98,7 @@ public class LhEquipmentPlanScheduleService {
      * @param context 排程上下文
      * @param machine 当前机台
      * @param readyTime 原模恢复的就绪时刻
-     * @return 待分配数量的固定时间计划，无待分配首检时为空
+     * @return 待按参数分配数量和时长的准备计划，无待分配首检时为空
      */
     public EquipmentPlanTimeline resolveUnallocatedPrecisionInspection(LhScheduleContext context,
             MachineScheduleDTO machine, Date readyTime) {
@@ -133,14 +133,13 @@ public class LhEquipmentPlanScheduleService {
                 .get(inspection.getEquipmentPlanId());
         if (Objects.isNull(arrangement) || !arrangement.isEffective() || !inspection.isValid()
                 || !context.getScheduleResultList().contains(result) || ShiftFieldUtil.resolveScheduledQty(result) <= 0
-                || inspection.getInspectionDurationSeconds() != LhEquipmentPlanTimelineResolver.PRECISION_INSPECTION_SECONDS
                 || !StringUtils.equals(arrangement.getTimeline().getPhysicalMachineCode(),
                         LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode()))) {
-            throw new IllegalStateException("精度公共首检缺少同一物理机台的有效安排或固定时间计划");
+            throw new IllegalStateException("精度计件首检缺少同一物理机台的有效安排或数量时间计划");
         }
         EquipmentPlanTimeline combined = arrangement.getTimeline().withInspection(
                 inspection.getInspectionStartTime(), inspection.getInspectionEndTime());
-        this.replaceInspectionTimeline(context, arrangement, combined, "切换与精度并行，共用固定2小时首检");
+        this.replaceInspectionTimeline(context, arrangement, combined, "切换与精度并行，首检按当班参数条数占用实际生产时间");
         if ("1".equals(result.getIsChangeMould()) || "1".equals(result.getIsTypeBlock())) {
             Date changeEnd = LhScheduleTimeUtil.addHours(result.getMouldChangeStartTime(), "1".equals(result.getIsTypeBlock())
                     ? LhScheduleTimeUtil.getTypeBlockChangeTotalHours(context) : LhScheduleTimeUtil.getMouldChangeTotalHours(context));
@@ -153,6 +152,7 @@ public class LhEquipmentPlanScheduleService {
                             + "，切换结束=" + LhScheduleTimeUtil.formatDateTime(changeEnd)
                             + "，保养开始=" + LhScheduleTimeUtil.formatDateTime(combined.getMaintenanceStartTime())
                             + "，保养结束=" + LhScheduleTimeUtil.formatDateTime(combined.getMaintenanceEndTime())
+                            + "，上胶囊及预热完成=" + LhScheduleTimeUtil.formatDateTime(combined.getMaintenanceReadyTime())
                             + "，公共首检开始=" + LhScheduleTimeUtil.formatDateTime(combined.getInspectionStartTime())
                             + "，公共首检量=" + inspection.getInspectionQty()
                             + "，恢复生产=" + LhScheduleTimeUtil.formatDateTime(combined.getProductionResumeTime()));
@@ -187,7 +187,7 @@ public class LhEquipmentPlanScheduleService {
         for (EquipmentPlanArrangement arrangement : new ArrayList<>(
                 context.getEquipmentPlanRuntimeState().getArrangementMap().values())) {
             EquipmentPlanTimeline timeline = arrangement.getTimeline();
-            if (!arrangement.isEffective() || Objects.equals(timeline.getInspectionStartTime(), timeline.getMaintenanceEndTime())) {
+            if (!arrangement.isEffective() || Objects.equals(timeline.getProductionResumeTime(), timeline.getMaintenanceReadyTime())) {
                 continue;
             }
             boolean bound = context.getScheduleResultList().stream()
@@ -195,15 +195,13 @@ public class LhEquipmentPlanScheduleService {
                     .map(result -> context.getFirstInspectionResultPlanMap().get(result)).filter(Objects::nonNull)
                     .anyMatch(plan -> Objects.equals(timeline.getPrecisionPlanId(), plan.getEquipmentPlanId()));
             if (!bound) {
-                Date inspectionStart = timeline.getMaintenanceEndTime();
-                Date inspectionEnd = new Date(inspectionStart.getTime()
-                        + LhEquipmentPlanTimelineResolver.PRECISION_INSPECTION_SECONDS * 1000L);
-                this.replaceInspectionTimeline(context, arrangement, timeline.withInspection(inspectionStart, inspectionEnd),
-                        "切换承接结果已撤销，恢复独立精度公共首检");
+                Date inspectionStart = timeline.getMaintenanceReadyTime();
+                this.replaceInspectionTimeline(context, arrangement, timeline.withInspection(inspectionStart, inspectionStart),
+                        "切换承接结果已撤销，恢复精度准备边界，首检待明确SKU后按参数分配");
                 PriorityTraceLogHelper.appendProcessLog(context, "精度并行安排恢复",
                         "批次=" + context.getBatchNo() + "，物理机台=" + timeline.getPhysicalMachineCode()
                                 + "，计划主键=" + timeline.getPrecisionPlanId() + "，原因=有效承接结果已撤销"
-                                + "，恢复生产=" + LhScheduleTimeUtil.formatDateTime(inspectionEnd));
+                                + "，首检准备完成=" + LhScheduleTimeUtil.formatDateTime(inspectionStart));
             }
         }
         return version != context.getEquipmentPlanRuntimeState().getConstraintVersion();
@@ -484,7 +482,8 @@ public class LhEquipmentPlanScheduleService {
                         + "，物理机台=" + timeline.getPhysicalMachineCode() + "，计划主键=" + timeline.getPrecisionPlanId()
                         + "，保养开始=" + LhScheduleTimeUtil.formatDateTime(timeline.getMaintenanceStartTime())
                         + "，保养结束=" + LhScheduleTimeUtil.formatDateTime(timeline.getMaintenanceEndTime())
-                        + "，固定首检结束=" + LhScheduleTimeUtil.formatDateTime(timeline.getProductionResumeTime())
+                        + "，上胶囊及预热完成=" + LhScheduleTimeUtil.formatDateTime(timeline.getMaintenanceReadyTime())
+                        + "，首检=待明确SKU后按当班参数分配"
                         + "，强制下机=" + timeline.isForceDown());
     }
 
@@ -544,6 +543,7 @@ public class LhEquipmentPlanScheduleService {
                             && Objects.equals(window.getPrecisionPlanId(), timeline.getPrecisionPlanId())
                             && Objects.equals(window.getMaintenanceStartTime(), timeline.getMaintenanceStartTime())
                             && Objects.equals(window.getMaintenanceEndTime(), timeline.getMaintenanceEndTime())
+                            && Objects.equals(window.getMaintenanceReadyTime(), timeline.getMaintenanceReadyTime())
                             && Objects.equals(window.getFirstInspectionStartTime(), timeline.getInspectionStartTime())
                             && Objects.equals(window.getFirstInspectionEndTime(), timeline.getProductionResumeTime())
                             && Objects.equals(window.getProductionResumeTime(), timeline.getProductionResumeTime())));

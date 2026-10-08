@@ -1567,7 +1567,7 @@ public final class ShiftCapacityResolverUtil {
     }
 
     /**
-     * 校验明确归属的精度首检产能时，只在临时副本中扣除原始维护区间。
+     * 校验明确归属的精度首检产能时，临时副本仍保留保养、上胶囊预热及首检前等待。
      * 首检本身由首检分摊计划占用；实际窗口与普通生产容量仍保留完整维护加首检区间。
      * @param context 上下文
      * @param machineCode 机台
@@ -1583,7 +1583,7 @@ public final class ShiftCapacityResolverUtil {
         if (Objects.nonNull(precisionPlanId)) {
             windows.stream().filter(MachineMaintenanceWindowDTO::isEquipmentPlanManaged)
                     .filter(window -> Objects.equals(precisionPlanId, window.getPrecisionPlanId()))
-                    .forEach(window -> window.setProductionResumeTime(window.getMaintenanceEndTime()));
+                    .forEach(window -> window.setProductionResumeTime(window.getFirstInspectionStartTime()));
         }
         return windows;
     }

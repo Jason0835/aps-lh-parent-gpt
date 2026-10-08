@@ -227,6 +227,22 @@ public final class FirstInspectionAllocationUtil {
                 FirstInspectionQtyUtil.resolveAttributionShift(shifts, startTime));
     }
 
+    /**
+     * 精度准备完成后复用普通计件首检：按当班顺序及SYS0303002/3003取条数，再按班产折算真实时长。
+     * 首检是班次总计划量的一部分，不预留固定两小时，也不额外增加班次总产能。
+     * @param context 上下文 @param sku SKU @param shifts 班次 @param inspectionStart 首检可开始时间
+     * @param shiftCapacity 完整班产 @param remainingQty 目标量 @param scheduleType 排程类型 @param machineCode 机台
+     * @param availableCapacityMap 实际首检容量 @param precisionPlanId 精度主键
+     * @return 与普通换模共用参数及计数器的首检计划
+     */
+    public static FirstInspectionAllocationPlan buildPrecisionQuantityPlan(LhScheduleContext context, SkuScheduleDTO sku,
+            List<LhShiftConfigVO> shifts, Date inspectionStart, int shiftCapacity, int remainingQty,
+            String scheduleType, String machineCode, Map<Integer, Integer> availableCapacityMap, Long precisionPlanId) {
+        return buildPlan(context, sku, shifts, inspectionStart, inspectionStart, shiftCapacity, remainingQty,
+                scheduleType, machineCode, availableCapacityMap, FirstInspectionTimingMode.START_AT_PRODUCTION_READY)
+                .withEquipmentPlanId(precisionPlanId);
+    }
+
     /** 固定时长与数量折算时长共用分摊内核；fixedDurationSeconds为0时保持既有行为。 */
     private static FirstInspectionAllocationPlan buildPlan(
             LhScheduleContext context, SkuScheduleDTO sku, List<LhShiftConfigVO> shifts,

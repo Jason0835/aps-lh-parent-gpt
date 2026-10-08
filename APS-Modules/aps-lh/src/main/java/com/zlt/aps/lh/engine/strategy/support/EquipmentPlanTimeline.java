@@ -20,9 +20,11 @@ public final class EquipmentPlanTimeline {
     private final String sourceMachineCode;
     /** L/R共用的物理机台。 */
     private final String physicalMachineCode;
-    /** 原始判定开始、结束，固定首检结束；均为绝对时间。 */
+    /** 原始判定开始、结束；均为绝对时间。 */
     private final long maintenanceStartMillis;
     private final long maintenanceEndMillis;
+    /** 单场景保养后上胶囊及预热完成边界；组合、撤销和快照均保留该冻结值。 */
+    private final long maintenanceReadyMillis;
     /** 公共首检开始；并行切换较晚完成时可以晚于原始保养结束。 */
     private final long inspectionStartMillis;
     private final long inspectionEndMillis;
@@ -32,29 +34,28 @@ public final class EquipmentPlanTimeline {
     private final String inputVersion;
 
     /**
-     * 将有效单场景结果与公共首检时间计划组合为只读约束。
+     * SKU尚未确定时只冻结保养及预热边界，不预占固定首检时长。
      * @param judge 原始精度判定
-     * @param inspection 公共固定首检时间计划
+     * @param maintenanceReadyTime 上胶囊及预热完成时间
      * @param inputVersion 输入指纹
      */
     public EquipmentPlanTimeline(PrecisionMaintenanceJudgeDTO judge,
-                                 FirstInspectionTimelinePlan inspection, String inputVersion) {
+                                 Date maintenanceReadyTime, String inputVersion) {
         if (Objects.isNull(judge) || judge.getDurationHours() <= 0
                 || Objects.isNull(judge.getPrecisionPlanId())
                 || Objects.isNull(judge.getPrecisionStartTime()) || Objects.isNull(judge.getPrecisionEndTime())
                 || !judge.getPrecisionStartTime().before(judge.getPrecisionEndTime())
-                || Objects.isNull(inspection) || Objects.isNull(inspection.getAllocationPlan())
-                || !Objects.equals(judge.getPrecisionEndTime(),
-                        inspection.getAllocationPlan().getInspectionStartTime())) {
-            throw new IllegalArgumentException("设备计划缺少有效判定或连续首检时间区间");
+                || Objects.isNull(maintenanceReadyTime) || maintenanceReadyTime.before(judge.getPrecisionEndTime())) {
+            throw new IllegalArgumentException("设备计划缺少有效判定或上胶囊预热完成边界");
         }
         this.precisionPlanId = judge.getPrecisionPlanId();
         this.sourceMachineCode = judge.getMachineCode();
         this.physicalMachineCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(sourceMachineCode);
         this.maintenanceStartMillis = judge.getPrecisionStartTime().getTime();
         this.maintenanceEndMillis = judge.getPrecisionEndTime().getTime();
-        this.inspectionStartMillis = inspection.getAllocationPlan().getInspectionStartTime().getTime();
-        this.inspectionEndMillis = inspection.getAllocationPlan().getInspectionEndTime().getTime();
+        this.maintenanceReadyMillis = maintenanceReadyTime.getTime();
+        this.inspectionStartMillis = maintenanceReadyMillis;
+        this.inspectionEndMillis = maintenanceReadyMillis;
         this.forceDown = judge.isForceDown();
         this.inputVersion = inputVersion;
     }
@@ -62,14 +63,15 @@ public final class EquipmentPlanTimeline {
     /** 原始判定身份及保养区间保持不变，只替换已解析的公共首检区间。 */
     private EquipmentPlanTimeline(EquipmentPlanTimeline source, Date inspectionStart, Date inspectionEnd) {
         if (Objects.isNull(inspectionStart) || Objects.isNull(inspectionEnd)
-                || inspectionStart.before(source.getMaintenanceEndTime()) || !inspectionStart.before(inspectionEnd)) {
-            throw new IllegalArgumentException("公共首检必须在保养结束后执行且区间有效");
+                || inspectionStart.before(source.getMaintenanceReadyTime()) || inspectionStart.after(inspectionEnd)) {
+            throw new IllegalArgumentException("公共首检必须在上胶囊及预热完成后执行且区间有效");
         }
         this.precisionPlanId = source.precisionPlanId;
         this.sourceMachineCode = source.sourceMachineCode;
         this.physicalMachineCode = source.physicalMachineCode;
         this.maintenanceStartMillis = source.maintenanceStartMillis;
         this.maintenanceEndMillis = source.maintenanceEndMillis;
+        this.maintenanceReadyMillis = source.maintenanceReadyMillis;
         this.inspectionStartMillis = inspectionStart.getTime();
         this.inspectionEndMillis = inspectionEnd.getTime();
         this.forceDown = source.forceDown;
@@ -95,6 +97,7 @@ public final class EquipmentPlanTimeline {
         window.setPlanDate(LhScheduleTimeUtil.clearTime(this.getMaintenanceStartTime()));
         window.setMaintenanceStartTime(this.getMaintenanceStartTime());
         window.setMaintenanceEndTime(this.getMaintenanceEndTime());
+        window.setMaintenanceReadyTime(this.getMaintenanceReadyTime());
         window.setFirstInspectionStartTime(this.getInspectionStartTime());
         window.setFirstInspectionEndTime(this.getProductionResumeTime());
         window.setProductionResumeTime(this.getProductionResumeTime());
@@ -132,11 +135,15 @@ public final class EquipmentPlanTimeline {
     public Date getMaintenanceEndTime() {
         return new Date(maintenanceEndMillis);
     }
+    /** @return 精度保养后上胶囊及预热完成的独立日期 */
+    public Date getMaintenanceReadyTime() {
+        return new Date(maintenanceReadyMillis);
+    }
     /** @return 公共首检开始的独立日期 */
     public Date getInspectionStartTime() {
         return new Date(inspectionStartMillis);
     }
-    /** @return 固定首检结束的独立日期 */
+    /** @return 已分配首检的结束；尚未关联SKU时仅表示准备完成边界 */
     public Date getProductionResumeTime() {
         return new Date(inspectionEndMillis);
     }

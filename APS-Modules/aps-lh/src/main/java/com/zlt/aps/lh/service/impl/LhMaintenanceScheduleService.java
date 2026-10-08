@@ -331,20 +331,22 @@ public class LhMaintenanceScheduleService {
         if (window.isEquipmentPlanManaged()) {
             if (Objects.nonNull(inspectionPlan) && Objects.equals(window.getPrecisionPlanId(), inspectionPlan.getEquipmentPlanId())) {
                 if (!inspectionPlan.isValid() || Objects.isNull(inspectionPlan.getInspectionStartTime())
-                        || inspectionPlan.getInspectionStartTime().before(window.getMaintenanceEndTime())
-                        || inspectionPlan.getInspectionDurationSeconds() != LhEquipmentPlanTimelineResolver.PRECISION_INSPECTION_SECONDS) {
-                    return "精度并行缺少有效的固定2小时公共首检";
+                        || Objects.isNull(window.getMaintenanceReadyTime())
+                        || inspectionPlan.getInspectionStartTime().before(window.getMaintenanceReadyTime())) {
+                    return "精度并行缺少有效的计件首检计划";
                 }
-                long inspectionMillis = LhEquipmentPlanTimelineResolver.PRECISION_INSPECTION_SECONDS * 1000L;
-                long expectedEnd = window.getMaintenanceEndTime().getTime() + inspectionMillis;
+                Date changeoverEndTime = null;
                 if (Objects.nonNull(parallelMouldChangeEndTime) && Objects.nonNull(preparationStartTime)
                         && this.isWindowOverlap(window, preparationStartTime, parallelMouldChangeEndTime, window.getProductionResumeTime())) {
-                    expectedEnd = Math.max(expectedEnd, parallelMouldChangeEndTime.getTime());
+                    changeoverEndTime = parallelMouldChangeEndTime;
                 }
+                long expectedStart = equipmentPlanTimelineResolver.resolvePrecisionInspectionStartTime(
+                        window.getMaintenanceReadyTime(), changeoverEndTime).getTime();
                 if (Objects.isNull(inspectionPlan.getInspectionEndTime())
-                        || inspectionPlan.getInspectionEndTime().getTime() != expectedEnd
-                        || inspectionPlan.getInspectionStartTime().getTime() != expectedEnd - inspectionMillis) {
-                    return "精度并行首检与两项完整时间的最大完成点不一致";
+                        || inspectionPlan.getInspectionStartTime().getTime() != expectedStart
+                        || inspectionPlan.getInspectionEndTime().getTime() != expectedStart
+                                + inspectionPlan.getInspectionDurationSeconds() * 1000L) {
+                    return "精度并行首检未按准备完成点及参数条数正向执行";
                 }
                 return Objects.isNull(productionStartTime) || productionStartTime.before(inspectionPlan.getInspectionEndTime())
                         ? "精度与切换公共首检尚未结束，禁止正式生产" : StringUtils.EMPTY;
@@ -364,7 +366,7 @@ public class LhMaintenanceScheduleService {
             }
             return this.isTimeWithinMaintenanceOccupation(productionStartTime,
                     window.getMaintenanceStartTime(), window.getProductionResumeTime())
-                    ? "候选生产开始仍处于精度保养或固定首检区间" : StringUtils.EMPTY;
+                    ? "候选生产开始仍处于精度保养、预热或已安排首检区间" : StringUtils.EMPTY;
         }
         Date taskStartTime = Objects.nonNull(preparationStartTime)
                 ? preparationStartTime : productionStartTime;
@@ -452,6 +454,12 @@ public class LhMaintenanceScheduleService {
     public EquipmentPlanOverlapResult resolvePrecisionChangeoverOverlap(LhScheduleContext context, MachineScheduleDTO machine,
             SkuScheduleDTO sku, Date start, Date end, String scheduleType) {
         return equipmentPlanTimelineResolver.resolveChangeoverOverlap(context, machine, sku, start, end, scheduleType);
+    }
+
+    /** @param context 上下文 @param inspection 参数计件首检 @param changeStart 切换开始 @return 实际首检区间的未覆盖组合原因 */
+    public String resolvePrecisionInspectionOverlapReason(LhScheduleContext context, FirstInspectionAllocationPlan inspection,
+            Date changeStart) {
+        return equipmentPlanTimelineResolver.resolveInspectionOverlapReason(context, inspection, changeStart);
     }
 
     /** @param context 上下文 @param machine 机台 @param sku SKU @param start 切换开始 @param end 含首检切换结束 @param scheduleType 动作类型 @return 未支持组合原因 */
@@ -1050,8 +1058,8 @@ public class LhMaintenanceScheduleService {
 
     /**
      * 解析正规换模与精度计划并行后的最终恢复生产时间。
-     * <p>公共计划使用已发布的固定首检完成点，旧窗口保留胶囊预热完成点；
-     * 两者均与切换结束取较晚值，不能把换模总时长已包含的首检再次相加。</p>
+     * <p>公共计划只取上胶囊预热与切换结束的较晚值作为首检起点，不添加固定首检时长；
+     * 旧窗口仍保留原有预热完成点与切换结束取晚的契约。</p>
      *
      * @param context 排程上下文
      * @param machine 机台运行态
@@ -1072,6 +1080,10 @@ public class LhMaintenanceScheduleService {
         for (MachineMaintenanceWindowDTO window : machine.getMaintenanceWindowList()) {
             Date resumeTime = resolveWindowResumeTime(context, window);
             if (isWindowOverlap(window, mouldChangeStartTime, mouldChangeEndTime, resumeTime)) {
+                if (window.isEquipmentPlanManaged()) {
+                    resumeTime = equipmentPlanTimelineResolver.resolvePrecisionInspectionStartTime(
+                            window.getMaintenanceReadyTime(), mouldChangeEndTime);
+                }
                 readyTime = later(readyTime, resumeTime);
             }
         }

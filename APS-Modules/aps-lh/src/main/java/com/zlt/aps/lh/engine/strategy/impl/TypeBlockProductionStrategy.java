@@ -66,7 +66,6 @@ import com.zlt.aps.lh.service.impl.NewSpecScheduleCommitResult;
 import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
 import com.zlt.aps.lh.service.impl.LhMaintenanceScheduleService;
 import com.zlt.aps.lh.service.impl.LhEquipmentPlanScheduleService;
-import com.zlt.aps.lh.service.impl.LhEquipmentPlanTimelineResolver;
 import com.zlt.aps.lh.engine.strategy.support.EquipmentPlanOverlapResult;
 import com.zlt.aps.lh.engine.strategy.support.EquipmentPlanTimeline;
 import com.zlt.aps.lh.util.CleaningScheduleRuleUtil;
@@ -4460,10 +4459,9 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
          */
         boolean largeTimelineRequired = StructureSwitchSchedulingPolicy.requiresLargeTimeline(context, sku, startTime);
         FirstInspectionAllocationPlan firstInspectionAllocationPlan = precisionOverlap.isSupported()
-                ? FirstInspectionAllocationUtil.buildFixedDurationPlan(context, sku, context.getScheduleWindowShifts(),
-                        parallelTimeline.getInspectionStartTime(), LhEquipmentPlanTimelineResolver.PRECISION_INSPECTION_SECONDS,
-                        runtimeShiftCapacity, refinedTargetQty, ScheduleTypeEnum.TYPE_BLOCK.getCode(), machine.getMachineCode(), null)
-                        .withEquipmentPlanId(parallelTimeline.getPrecisionPlanId())
+                ? FirstInspectionAllocationUtil.buildPrecisionQuantityPlan(context, sku, context.getScheduleWindowShifts(),
+                        parallelTimeline.getInspectionStartTime(),
+                        runtimeShiftCapacity, refinedTargetQty, ScheduleTypeEnum.TYPE_BLOCK.getCode(), machine.getMachineCode(), null, parallelTimeline.getPrecisionPlanId())
                 : FirstInspectionAllocationUtil.buildPlan(
                         context, sku, shifts, switchCompleteTime, startTime,
                         runtimeShiftCapacity, refinedTargetQty,
@@ -4471,16 +4469,23 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                         machine.getMachineCode(), null);
         if (!largeTimelineRequired && firstInspectionAllocationPlan.isValid()
                 && firstInspectionAllocationPlan.getInspectionQty() > 0) {
+            String conflict = precisionOverlap.isSupported()
+                    ? this.getMaintenanceScheduleService().resolvePrecisionInspectionOverlapReason(
+                            context, firstInspectionAllocationPlan, switchStartTime) : null;
+            if (StringUtils.isNotBlank(conflict)) {
+                PriorityTraceLogHelper.appendProcessLog(context, "设备计划未覆盖组合", conflict);
+                return null;
+            }
             Map<Integer, Integer> firstInspectionCapacityMap =
                     this.calculateTypeBlockFirstInspectionAvailableCapacityMap(
                             context, result, sku, firstInspectionAllocationPlan,
                             runtimeShiftCapacity, mouldQty, cleaningWindowList,
                             maintenanceWindowList);
             firstInspectionAllocationPlan = precisionOverlap.isSupported()
-                    ? FirstInspectionAllocationUtil.buildFixedDurationPlan(context, sku, context.getScheduleWindowShifts(),
-                            parallelTimeline.getInspectionStartTime(), LhEquipmentPlanTimelineResolver.PRECISION_INSPECTION_SECONDS,
+                    ? FirstInspectionAllocationUtil.buildPrecisionQuantityPlan(context, sku, context.getScheduleWindowShifts(),
+                            parallelTimeline.getInspectionStartTime(),
                             runtimeShiftCapacity, refinedTargetQty, ScheduleTypeEnum.TYPE_BLOCK.getCode(), machine.getMachineCode(),
-                            firstInspectionCapacityMap).withEquipmentPlanId(parallelTimeline.getPrecisionPlanId())
+                            firstInspectionCapacityMap, parallelTimeline.getPrecisionPlanId())
                     : FirstInspectionAllocationUtil.buildPlan(
                     context, sku, shifts, switchCompleteTime, startTime,
                     runtimeShiftCapacity, refinedTargetQty,
