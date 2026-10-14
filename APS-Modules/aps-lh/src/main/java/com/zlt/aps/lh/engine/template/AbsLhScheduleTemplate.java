@@ -88,6 +88,12 @@ public abstract class AbsLhScheduleTemplate {
                 return buildInterruptResponse(context);
             }
 
+            // 无有效候选时由实现直接跳过，不执行资源初始化或排产动作。
+            doStructureSwitchProduction(context);
+            if (context.isInterrupted()) {
+                return buildInterruptResponse(context);
+            }
+
             // S4.5 新增规格排产：只处理仍在新增待排列表中的 SKU，执行选机、换模、首检和班次分配。
             context.setCurrentStep(ScheduleStepEnum.S4_5_NEW_PRODUCTION.getCode());
             log.info(">>> 步骤 S4.5: {}", ScheduleStepEnum.S4_5_NEW_PRODUCTION.getDescription());
@@ -185,6 +191,15 @@ public abstract class AbsLhScheduleTemplate {
 
     /** S4.4 续作规格排产 */
     protected abstract void doContinuousProduction(LhScheduleContext context);
+
+    /**
+     * 提供结构切换步骤扩展入口，由正式模板绑定独立处理器。
+     *
+     * @param context 续作和换活字块完成后的实时上下文
+     */
+    protected void doStructureSwitchProduction(LhScheduleContext context) {
+        // 默认空实现兼容只覆盖原模板步骤的测试替身，正式模板绑定独立Handler。
+    }
 
     /** S4.5 新增规格排产 */
     protected abstract void doNewSpecProduction(LhScheduleContext context);

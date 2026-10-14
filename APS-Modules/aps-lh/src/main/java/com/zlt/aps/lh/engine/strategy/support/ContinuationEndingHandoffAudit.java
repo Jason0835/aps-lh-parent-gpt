@@ -1,6 +1,7 @@
 package com.zlt.aps.lh.engine.strategy.support;
 
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
+import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.context.LhScheduleContext;
@@ -25,14 +26,22 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** 最终交替衔接只读复核。只写诊断日志，不修改结果、库存、计划量、资源或消费账本。 */
+/**
+ * 最终交替衔接只读复核，只写诊断日志，不修改结果、库存、计划量、资源或消费账本。
+ */
 @Slf4j
 public final class ContinuationEndingHandoffAudit {
+    /**
+     * 跨日两机公式角色的中班收尾节点。
+     */
+    private static final int NIGHT_FINISH_RELEASE_HOUR = 19;
+
     private ContinuationEndingHandoffAudit() {
     }
 
     /**
      * 所有后料、首检和后置裁量完成后，对照续作提交快照。
+     *
      * @param context 最终排程上下文
      * @return 存在差异的结果行数与生产收尾异常组数，供聚焦回归复核
      */
@@ -60,6 +69,13 @@ public final class ContinuationEndingHandoffAudit {
         int differences = 0;
         for (LhScheduleResult original : originals) {
             ContinuationEndingAllocationSnapshot snapshot = context.getContinuationSurplusEndingSnapshotMap().get(original);
+            // 零量06点释放也有业务约束，必须在跳过无生产结果前核对。
+            boolean tDayValid = auditTDayConstraint(context, original, snapshot, finalResults);
+            boolean nightValid = auditNightConstraint(context, original, snapshot, finalResults);
+            if (!tDayValid || !nightValid) {
+                differences++;
+                invalidProductionGroups.add(snapshot.getGroupKey());
+            }
             if (Arrays.stream(snapshot.getShiftQuantities()).sum() <= 0) {
                 continue;
             }
@@ -144,6 +160,137 @@ public final class ContinuationEndingHandoffAudit {
         });
         differences += auditProductionEndingGroups(context, expectedGroups, productionGroups, invalidProductionGroups);
         return differences;
+    }
+
+    /**
+     * 独立核对跨日两机的物理角色、公式分量、前缀和夜班优先，不以输出一致冒充业务通过。
+     * 单控两侧按同源物理机合计；零量角色也必须经过本校验。
+     *
+     * @param context 最终排程上下文
+     * @param original 原续作结果
+     * @param snapshot 已提交的单侧快照及整机约束
+     * @param finalResults 最终保留结果的对象身份集合
+     * @return 不适用本规则或最终结果满足分配前约束时返回真
+     */
+    private static boolean auditNightConstraint(LhScheduleContext context, LhScheduleResult original,
+            ContinuationEndingAllocationSnapshot snapshot, Set<LhScheduleResult> finalResults) {
+        ContinuationNightFinishConstraint constraint = snapshot.getNightFinishConstraint();
+        if (Objects.isNull(constraint)) {
+            // 规则名称来自正式分配结果，不能把遗失的约束解释为本机无需复核。
+            if (StringUtils.equals(ContinuationNightFinishConstraint.RULE_NAME, snapshot.getFinishRule())) {
+                log.warn("跨日两机收尾缺少分配前约束, 批次={}, 物料={}, 机台={}",
+                        context.getBatchNo(), original.getMaterialCode(), original.getLhMachineCode());
+                return false;
+            }
+            return true;
+        }
+        String physicalMachine = LhSingleControlMachineUtil.resolvePhysicalMachineCode(original.getLhMachineCode());
+        List<LhScheduleResult> sides = context.getContinuationSurplusEndingSnapshotMap().entrySet().stream()
+                .filter(entry -> StringUtils.equals(snapshot.getGroupKey(), entry.getValue().getGroupKey()))
+                .map(Map.Entry::getKey)
+                .filter(result -> StringUtils.equals(physicalMachine,
+                        LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode())))
+                .filter(finalResults::contains).collect(Collectors.toList());
+        int actualQty = sides.stream().mapToInt(ShiftFieldUtil::resolveScheduledQty).sum();
+        int actualNight = sides.stream().mapToInt(result ->
+                ShiftFieldUtil.getShiftPlanQty(result, constraint.getNightShiftIndex())).sum();
+        int actualPrefix = sides.stream().mapToInt(result -> context.getScheduleWindowShifts().stream()
+                .filter(shift -> shift.getShiftIndex() < constraint.getNightShiftIndex())
+                .mapToInt(shift -> ShiftFieldUtil.getShiftPlanQty(result, shift.getShiftIndex())).sum()).sum();
+        Date completed = sides.stream().map(ContinuationEndingHandoffAudit::lastEnd)
+                .filter(Objects::nonNull).max(Date::compareTo).orElse(null);
+        Date node = LhScheduleTimeUtil.buildTime(LhScheduleTimeUtil.clearTime(constraint.getWorkDate()),
+                NIGHT_FINISH_RELEASE_HOUR, 0, 0);
+        boolean nodeValid = !constraint.isFormulaRole() || Objects.equals(node, snapshot.getFinishDeadline())
+                && actualQty <= constraint.getNodeCapacityQty()
+                && (actualQty == 0 || Objects.nonNull(completed) && !completed.after(node));
+        boolean valid = finalResults.contains(original) && StringUtils.equals(physicalMachine, constraint.getMachineCode())
+                && actualQty == constraint.getRequiredQty() && actualPrefix == constraint.getPrefixQty()
+                && actualNight == constraint.getRequiredNightQty() && nodeValid;
+        String detail = String.format("工厂=%s, 批次=%s, 物料=%s, 状态=%s, 物理机台=%s, 收尾日=%s, "
+                        + "总目标=%s, 当日余量=%s, 标准班产=%s, 公式角色=%s, 应排量=%s, 最终量=%s, "
+                        + "应排前缀=%s, 实际前缀=%s, 夜班序号=%s, 应排夜班=%s, 实际夜班=%s, "
+                        + "节点容量=%s, 最终结束=%s, 业务规则满足=%s",
+                context.getFactoryCode(), context.getBatchNo(), original.getMaterialCode(), original.getProductStatus(),
+                physicalMachine, LhScheduleTimeUtil.formatDateTime(constraint.getWorkDate()), constraint.getTargetQty(),
+                constraint.getDayRemainingQty(), constraint.getShiftQty(), constraint.isFormulaRole(),
+                constraint.getRequiredQty(), actualQty, constraint.getPrefixQty(), actualPrefix,
+                constraint.getNightShiftIndex(), constraint.getRequiredNightQty(), actualNight,
+                constraint.getNodeCapacityQty(), LhScheduleTimeUtil.formatDateTime(completed), valid);
+        PriorityTraceLogHelper.appendProcessLog(context, "续作跨日两机3.2规则复核", detail);
+        if (valid) {
+            if (log.isInfoEnabled()) {
+                log.info("续作跨日两机3.2规则复核, {}", detail);
+            }
+        } else {
+            log.warn("续作跨日两机3.2规则复核, {}", detail);
+        }
+        return valid;
+    }
+
+    /**
+     * 从分配前的目标、班产和真实容量独立推导节点，防止错误输出截止时间自我验证。
+     * 同单位场景还核对节点角色应承接的最大合法量，异质单位保留守恒内核的组合选择。
+     *
+     * @param context 最终排程上下文
+     * @param original 固定身份的续作结果
+     * @param snapshot 已提交快照
+     * @param finalResults 按对象身份冻结的最终结果集合
+     * @return 原始业务约束全部满足，或本机不属于T日节点角色时返回true
+     */
+    private static boolean auditTDayConstraint(LhScheduleContext context, LhScheduleResult original,
+            ContinuationEndingAllocationSnapshot snapshot, Set<LhScheduleResult> finalResults) {
+        ContinuationTDayFinishConstraint constraint = snapshot.getTDayFinishConstraint();
+        if (Objects.isNull(constraint)) {
+            // 历史T日角色必须携带业务输入；缺失快照不能被解释成无需校验节点。
+            LhMouldChangePlan historicalPlan = context.getPreviousAlternateMachineOrder()
+                    .uniquePlan(original.getLhMachineCode(), original.getMaterialCode());
+            if (Objects.nonNull(snapshot.getHistoricalFinishPlanId()) && Objects.nonNull(historicalPlan)
+                    && Objects.equals(snapshot.getHistoricalFinishPlanId(), historicalPlan.getId())
+                    && Objects.equals(LhScheduleTimeUtil.clearTime(historicalPlan.getPlanDate()),
+                            LhScheduleTimeUtil.clearTime(context.getScheduleDate()))) {
+                String detail = String.format("工厂=%s, 批次=%s, 物料=%s, 状态=%s, 机台=%s, 历史计划=%s, "
+                                + "业务规则满足=false, 原因=历史T日释放角色缺少分配前节点约束",
+                        context.getFactoryCode(), context.getBatchNo(), original.getMaterialCode(),
+                        original.getProductStatus(), original.getLhMachineCode(), snapshot.getHistoricalFinishPlanId());
+                PriorityTraceLogHelper.appendProcessLog(context, "续作T日收尾业务规则复核", detail);
+                log.warn("续作T日收尾业务规则复核, {}", detail);
+                return false;
+            }
+            return true;
+        }
+        Date node = ContinuationTDayFinishConstraint.resolveNode(constraint.getWorkDate(),
+                constraint.getTargetQty(), constraint.getShiftQty());
+        // L/R快照共享整机约束，按最终物理机台的同源侧结果合计，不把单侧量冒充整机量。
+        String physicalMachine = LhSingleControlMachineUtil.resolvePhysicalMachineCode(original.getLhMachineCode());
+        List<LhScheduleResult> sides = context.getContinuationSurplusEndingSnapshotMap().entrySet().stream()
+                .filter(entry -> StringUtils.equals(snapshot.getGroupKey(), entry.getValue().getGroupKey()))
+                .map(Map.Entry::getKey)
+                .filter(result -> StringUtils.equals(physicalMachine,
+                        LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode())))
+                .filter(finalResults::contains).collect(Collectors.toList());
+        int actualQty = sides.stream().mapToInt(result -> Arrays.stream(
+                readQuantities(result, context.getScheduleWindowShifts())).sum()).sum();
+        Date completed = sides.stream().map(ContinuationEndingHandoffAudit::lastEnd)
+                .filter(Objects::nonNull).max(Date::compareTo).orElse(null);
+        boolean valid = Objects.equals(node, snapshot.getFinishDeadline())
+                && actualQty <= constraint.getNodeCapacityQty()
+                && (Objects.isNull(constraint.getRequiredQty()) || actualQty == constraint.getRequiredQty())
+                && (actualQty == 0 || Objects.nonNull(completed) && !completed.after(node));
+        String detail = String.format("工厂=%s, 批次=%s, 物料=%s, 状态=%s, 物理机台=%s, 原始目标=%s, "
+                        + "标准班产=%s, 业务节点=%s, 输出截止=%s, 节点容量=%s, 应承接量=%s, 最终量=%s, "
+                        + "最终结束=%s, 业务规则满足=%s",
+                context.getFactoryCode(), context.getBatchNo(), original.getMaterialCode(), original.getProductStatus(),
+                physicalMachine, constraint.getTargetQty(), constraint.getShiftQty(), LhScheduleTimeUtil.formatDateTime(node),
+                LhScheduleTimeUtil.formatDateTime(snapshot.getFinishDeadline()), constraint.getNodeCapacityQty(),
+                constraint.getRequiredQty(), actualQty, LhScheduleTimeUtil.formatDateTime(completed), valid);
+        PriorityTraceLogHelper.appendProcessLog(context, "续作T日收尾业务规则复核", detail);
+        if (valid) {
+            log.info("续作T日收尾业务规则复核, {}", detail);
+        } else {
+            log.warn("续作T日收尾业务规则复核, {}", detail);
+        }
+        return valid;
     }
 
     /**

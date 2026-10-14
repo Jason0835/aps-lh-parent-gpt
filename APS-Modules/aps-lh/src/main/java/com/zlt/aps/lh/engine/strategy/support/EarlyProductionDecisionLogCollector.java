@@ -175,6 +175,25 @@ public class EarlyProductionDecisionLogCollector {
     }
 
     /**
+     * 冻结采集明细顺序和原对象身份，供排程预演快照恢复已有日志关联。
+     *
+     * @return 明细原对象组成的独立列表
+     */
+    public List<EarlyProductionDecisionLogEntry> snapshotEntries() {
+        return new ArrayList<>(entryList);
+    }
+
+    /**
+     * 恢复预演前的明细顺序，撤回预演追加的成功或失败日志。
+     *
+     * @param entries 已冻结的原日志对象列表
+     */
+    public void restoreEntries(List<EarlyProductionDecisionLogEntry> entries) {
+        entryList.clear();
+        entryList.addAll(entries);
+    }
+
+    /**
      * 获取采集明细数量。
      *
      * @return 明细数量

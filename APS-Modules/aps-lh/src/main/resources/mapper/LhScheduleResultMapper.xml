@@ -50,8 +50,12 @@
             DAILY_LH_MACHINE_COUNT_RANGE,
             PRODUCTION_TYPE,
             IS_EMBRYO_ENDING,
+            IS_EMBRYO_CONFIRM_ENDING,
             IS_STRUCTURE_MIN_MACHINE_RETAINED,
             MONTH_PLAN_SUM_TOTAL,
+            OVERDUE_SURPLUS_FLAG,
+            IS_STRUCTURE_SWITCH,
+            STRUCTURE_SWITCH_DESC,
             CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, REMARK, IS_DELETE
         ) VALUES
         <foreach collection="list" item="item" separator=",">
@@ -100,8 +104,12 @@
                 #{item.dailyLhMachineCountRange},
                 #{item.productionType},
                 #{item.isEmbryoEnding},
+                #{item.isEmbryoConfirmEnding},
                 #{item.isStructureMinMachineRetained},
                 #{item.monthPlanSumTotal},
+                #{item.overdueSurplusFlag},
+                #{item.isStructureSwitch},
+                #{item.structureSwitchDesc},
                 #{item.createBy}, #{item.createTime}, #{item.updateBy}, #{item.updateTime}, #{item.remark}, #{item.isDelete}
             )
         </foreach>

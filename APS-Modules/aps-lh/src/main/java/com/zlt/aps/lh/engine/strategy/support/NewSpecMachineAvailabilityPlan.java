@@ -120,7 +120,10 @@ public class NewSpecMachineAvailabilityPlan {
      */
     private final boolean firstInspectionDeferredByClassTotalLimit;
 
-    /** 不含胎胚等待的首检开始时间，仅供当前机台选SKU，不参与实际落班。 */
+    /**
+     * 完成必要切换准备后的最早首检时间，供普通选料和结构切换等待筛选共用。
+     * 不包含供胚或结构名额等待，不参与实际落班；提案复制与正式复核保留同一基准。
+     */
     private final Date skuSelectionStartTime;
 
     public NewSpecMachineAvailabilityPlan(
@@ -639,7 +642,11 @@ public class NewSpecMachineAvailabilityPlan {
                 currentDayResourceShift, selectionStartTime);
     }
 
-    /** @return 不含胎胚等待的首检开始时间；未配置胎胚时间或无合法预演起点时为空 */
+    /**
+     * 获取提案冻结的准备后最早首检比较时间。
+     *
+     * @return 不含供胚等待的首检起点；未配置或没有合法起点时为空
+     */
     public Date getSkuSelectionStartTime() {
         return skuSelectionStartTime;
     }

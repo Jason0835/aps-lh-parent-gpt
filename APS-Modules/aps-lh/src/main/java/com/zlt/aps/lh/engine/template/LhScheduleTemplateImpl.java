@@ -2,6 +2,7 @@ package com.zlt.aps.lh.engine.template;
 
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.handler.ContinuousProductionHandler;
+import com.zlt.aps.lh.handler.StructureSwitchProductionHandler;
 import com.zlt.aps.lh.handler.DataInitHandler;
 import com.zlt.aps.lh.handler.DayPlanAdjustProductionHandler;
 import com.zlt.aps.lh.handler.NewProductionHandler;
@@ -52,6 +53,12 @@ public class LhScheduleTemplateImpl extends AbsLhScheduleTemplate {
     @Resource
     private NewProductionHandler newProductionHandler;
 
+    /**
+     * 续作和换活字块之后的独立结构切换步骤。
+     */
+    @Resource
+    private StructureSwitchProductionHandler structureSwitchProductionHandler;
+
     @Resource
     private DayPlanAdjustProductionHandler dayPlanAdjustProductionHandler;
 
@@ -87,6 +94,16 @@ public class LhScheduleTemplateImpl extends AbsLhScheduleTemplate {
     @Override
     protected void doNewSpecProduction(LhScheduleContext context) {
         newProductionHandler.handle(context);
+    }
+
+    /**
+     * 在普通新增之前调用结构切换处理器，无有效候选时直接跳过。
+     *
+     * @param context 续作和换活字块完成后的实时排程上下文
+     */
+    @Override
+    protected void doStructureSwitchProduction(LhScheduleContext context) {
+        structureSwitchProductionHandler.handleIfApplicable(context);
     }
 
     @Override

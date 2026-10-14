@@ -23,6 +23,8 @@ import com.zlt.aps.lh.engine.strategy.support.EarlyProductionRuntimePlan;
 import com.zlt.aps.lh.engine.strategy.support.ActiveMachineBinding;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionDecision;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionDecisionLogEntry;
+import com.zlt.aps.lh.engine.strategy.support.EarlyProductionDecisionLogCollector;
+import com.zlt.aps.lh.engine.strategy.support.HistoricalStructureHandoffState;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceContext;
 import com.zlt.aps.lh.engine.strategy.support.ScheduleSubstitutionDirective;
 import com.zlt.aps.lh.engine.strategy.support.DayTypeBlockReverseSelectionDirective;
@@ -208,6 +210,22 @@ final class ScheduleSubstitutionAttemptSnapshot {
     private Map<LhScheduleResult, Integer> precisionPreInsertInspectionShiftIndexMap;
     /** 置换前提前生产运行视图，预演结束后不能无条件丢弃调用前状态。 */
     private Map<SkuScheduleDTO, EarlyProductionRuntimePlan> earlyProductionRuntimePlanMap;
+    /**
+     * 历史承接诊断随候选回滚，负荷预演不能提前解除正式机台的保留。
+     */
+    private Map<LhMouldChangePlan, HistoricalStructureHandoffState> historicalStructureHandoffStateMap;
+    /**
+     * 预演前日志采集器身份，保留运行视图对原明细对象的引用。
+     */
+    private Map<LocalDate, EarlyProductionDecisionLogCollector> earlyProductionDecisionLogCollectorMap;
+    /**
+     * 每个原采集器的明细顺序，恢复时删除预演新增日志。
+     */
+    private Map<EarlyProductionDecisionLogCollector, List<EarlyProductionDecisionLogEntry>> earlyProductionLogEntries;
+    /**
+     * 原明细对象的字段快照，撤回预演对已有日志的成功标记和数量更新。
+     */
+    private Map<EarlyProductionDecisionLogEntry, EarlyProductionDecisionLogEntry> earlyProductionLogStates;
     /** 置换前当前排程日期 */
     private Date currentScheduleDate;
     /** 置换前临时指定机台与共用模具联动指令，内部候选失败恢复时必须保持调用方原指令。 */
@@ -444,6 +462,16 @@ final class ScheduleSubstitutionAttemptSnapshot {
         snapshot.earlyProductionRuntimePlanMap =
                 copyEarlyProductionRuntimePlanMap(
                         context.getEarlyProductionRuntimePlanMap());
+        snapshot.historicalStructureHandoffStateMap = new IdentityHashMap<>(context.getHistoricalStructureHandoffStateMap());
+        snapshot.earlyProductionDecisionLogCollectorMap = new LinkedHashMap<>(context.getEarlyProductionDecisionLogCollectorMap());
+        snapshot.earlyProductionLogEntries = new IdentityHashMap<>();
+        snapshot.earlyProductionLogStates = new IdentityHashMap<>();
+        snapshot.earlyProductionDecisionLogCollectorMap.values().forEach(collector -> {
+            List<EarlyProductionDecisionLogEntry> entries = collector.snapshotEntries();
+            snapshot.earlyProductionLogEntries.put(collector, entries);
+            entries.forEach(entry -> snapshot.earlyProductionLogStates.put(entry,
+                    copyBean(entry, EarlyProductionDecisionLogEntry.class)));
+        });
         snapshot.currentScheduleDate = context.getCurrentScheduleDate();
         snapshot.specialMaterialSpecifiedMachineCode =
                 context.getSpecialMaterialSpecifiedMachineCode();
@@ -464,6 +492,9 @@ final class ScheduleSubstitutionAttemptSnapshot {
         List<SkuScheduleDTO> capturedSkus = new ArrayList<>(context.getDayPlanAdjustSkuList());
         // 无日计划的指定试验原对象与派生候选共享额度，失败仍需一并恢复。
         capturedSkus.addAll(context.getPreviousAlternateTrialDemandList());
+        // 前置结构切换绑定可能已移出待排列表，逐班续排失败仍须恢复其共享数量与日计划账本。
+        context.getPreScheduledMachineBindingList().stream().map(ActiveMachineBinding::getSku)
+                .forEach(capturedSkus::add);
         if (Objects.nonNull(skuCollection)) {
             capturedSkus.addAll(skuCollection);
         }
@@ -666,6 +697,10 @@ final class ScheduleSubstitutionAttemptSnapshot {
         context.setPrecisionPreInsertInspectionShiftIndexMap(
                 new IdentityHashMap<LhScheduleResult, Integer>(
                         precisionPreInsertInspectionShiftIndexMap));
+        context.setHistoricalStructureHandoffStateMap(new IdentityHashMap<>(historicalStructureHandoffStateMap));
+        earlyProductionLogStates.forEach((entry, state) -> BeanUtil.copyProperties(state, entry));
+        earlyProductionLogEntries.forEach(EarlyProductionDecisionLogCollector::restoreEntries);
+        context.setEarlyProductionDecisionLogCollectorMap(new LinkedHashMap<>(earlyProductionDecisionLogCollectorMap));
         context.setEarlyProductionRuntimePlanMap(
                 copyEarlyProductionRuntimePlanMap(earlyProductionRuntimePlanMap));
         context.setCurrentScheduleDate(currentScheduleDate);
@@ -980,9 +1015,8 @@ final class ScheduleSubstitutionAttemptSnapshot {
                 copiedPlan.setDecision(copiedDecision);
             }
             if (entry.getValue().getDecisionLogEntry() != null) {
-                copiedPlan.setDecisionLogEntry(copyBean(
-                        entry.getValue().getDecisionLogEntry(),
-                        EarlyProductionDecisionLogEntry.class));
+                // 日志字段由身份快照单独恢复；运行视图必须继续指向采集器中的同一明细。
+                copiedPlan.setDecisionLogEntry(entry.getValue().getDecisionLogEntry());
             }
             targetMap.put(entry.getKey(), copiedPlan);
         }

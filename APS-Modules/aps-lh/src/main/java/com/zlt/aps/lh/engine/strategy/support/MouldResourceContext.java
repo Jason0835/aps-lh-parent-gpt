@@ -415,11 +415,11 @@ public class MouldResourceContext {
             if (!CollectionUtils.isEmpty(plannedMoulds)) {
                 return this.resolveExactAllocation(materialCode, machineCode, plannedMoulds, resourceReferenceTime);
             }
-            if (MouldChangeTypeEnum.TYPE_BLOCK.getCode()
-                    .equals(event.getPlan().getChangeMouldType())) {
-                // 换活字块仍使用原整组模具，但必须通过真实时刻与占用校验。
+            PreviousAlternateActionPlan action = PreviousAlternateActionPlan.resolve(scheduleContext, event);
+            if (MouldChangeTypeEnum.TYPE_BLOCK.getCode().equals(action.getChangeMouldType())) {
+                // 实际换活字块使用冻结的原完整模具组，关系判定不豁免真实时刻与占用校验。
                 return this.resolveExactAllocation(materialCode, machineCode,
-                        new ArrayList<String>(event.getOriginalMouldCodes()), resourceReferenceTime);
+                        new ArrayList<String>(action.getOriginalMouldCodes()), resourceReferenceTime);
             }
             if (StringUtils.equals(event.getMaterialCode(), materialCode)) {
                 // 同料L/R仅替换一副；LR仍执行整组优先级，两者均校验完整装机模具。

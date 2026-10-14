@@ -1,8 +1,10 @@
 package com.zlt.aps.lh.service;
 
+import com.zlt.aps.lh.api.domain.dto.LhEmbryoMachineMappingQueryDTO;
 import com.zlt.aps.lh.api.domain.dto.LhInsertOrderValidateResultDTO;
 import com.zlt.aps.lh.api.domain.dto.LhOrderInsertDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
+import com.zlt.aps.lh.api.domain.vo.LhEmbryoMachineMappingVO;
 
 import java.util.Date;
 import java.util.List;
@@ -22,6 +24,15 @@ public interface ILhScheduleResultService {
      * @return 排程结果列表
      */
     List<LhScheduleResult> selectByDateAndFactory(Date scheduleDate, String factoryCode);
+
+    /**
+     * 按工厂、排程日期和胎胚编号批量查询有效硫化机映射。
+     *
+     * @param query 查询条件
+     * @return 胎胚与硫化机编码映射列表
+     * @throws RuntimeException 查询硫化排程结果失败时抛出
+     */
+    List<LhEmbryoMachineMappingVO> queryEmbryoMachineMappings(LhEmbryoMachineMappingQueryDTO query);
 
     /**
      * 查询前日排程结果

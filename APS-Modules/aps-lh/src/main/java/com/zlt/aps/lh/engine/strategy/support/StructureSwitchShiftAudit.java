@@ -241,7 +241,7 @@ public final class StructureSwitchShiftAudit {
     }
 
     /**
-     * 对每次真正提交过的结构按最终正量定位首班，并保留未产生正量的审计结论。
+     * 对有效正量结构按统一判定报告规则首班，实际首产量只用于占用和证据统计。
      * @param context 原上下文
      * @param reportShifts 本次输出班次
      * @param phase 明确区分阶段快照和最终结果
@@ -253,10 +253,10 @@ public final class StructureSwitchShiftAudit {
                     .filter(result -> Objects.nonNull(context.getStructureSwitchResultPlanMap().get(result)))
                     .filter(result -> Objects.equals(source.getId(), context.getStructureSwitchResultPlanMap()
                             .get(result).getSource().getId())).collect(Collectors.toList());
-            LhShiftConfigVO first = window.stream().filter(shift -> switchResults.stream()
+            LhShiftConfigVO actualFirst = window.stream().filter(shift -> switchResults.stream()
                     .anyMatch(result -> StructureSwitchSchedulingPolicy.quantity(result, shift.getShiftIndex()) > 0))
                     .findFirst().orElse(null);
-            if (Objects.isNull(first)) {
+            if (Objects.isNull(actualFirst)) {
                 if (context.getStructureSwitchShiftAuditMap().values().stream()
                         .anyMatch(entry -> Objects.equals(entry.getSourceId(), source.getId()))) {
                     String detail = new StringBuilder(128).append("batchNo=").append(context.getBatchNo())
@@ -268,14 +268,24 @@ public final class StructureSwitchShiftAudit {
                 }
                 continue;
             }
-            LhShiftConfigVO second = window.stream().filter(shift -> shift.getShiftStartDateTime()
-                    .after(first.getShiftStartDateTime())).findFirst().orElse(null);
             LhScheduleResult firstResult = switchResults.stream()
-                    .filter(result -> StructureSwitchSchedulingPolicy.quantity(result, first.getShiftIndex()) > 0)
-                    .min(Comparator.comparing(result -> actualStart(result, first))).get();
+                    .filter(result -> StructureSwitchSchedulingPolicy.quantity(result, actualFirst.getShiftIndex()) > 0)
+                    .min(Comparator.comparing(result -> actualStart(result, actualFirst))).get();
+            StructureSwitchPlan firstPlan = context.getStructureSwitchResultPlanMap().get(firstResult);
+            StructureSwitchRuntimeState state = context.getStructureSwitchRuntimeMap()
+                    .get(source.getNextStructureName());
+            boolean capacityFirst = Objects.nonNull(firstPlan.getFirstShiftDecision())
+                    || (Objects.nonNull(state) && Objects.equals(state.getSourceId(), source.getId())
+                    && Objects.nonNull(state.getFirstShiftDecision()));
+            LhShiftConfigVO first = capacityFirst
+                    ? StructureSwitchSchedulingPolicy.resolveFirstShift(context, firstPlan) : actualFirst;
+            if (Objects.isNull(first)) {
+                continue;
+            }
+            LhShiftConfigVO second = StructureSwitchSchedulingPolicy.nextShift(context, first.getShiftStartDateTime());
             for (LhShiftConfigVO shift : reportShifts) {
                 if (!shift.getShiftStartDateTime().before(first.getShiftStartDateTime())) {
-                    appendShift(context, source, firstResult, first, second, shift, phase);
+                    appendShift(context, source, firstResult, first, second, actualFirst, shift, phase);
                 }
             }
         }
@@ -288,11 +298,13 @@ public final class StructureSwitchShiftAudit {
      * @param firstResult 最终首台SKU
      * @param first 动态S0
      * @param second 紧邻S1
+     * @param actualFirst 当前实际首产班
      * @param shift 被审计班次
      * @param phase 审计时点
      */
     private static void appendShift(LhScheduleContext context, CxEmbryoLhTime source, LhScheduleResult firstResult,
-            LhShiftConfigVO first, LhShiftConfigVO second, LhShiftConfigVO shift, String phase) {
+            LhShiftConfigVO first, LhShiftConfigVO second, LhShiftConfigVO actualFirst,
+            LhShiftConfigVO shift, String phase) {
         boolean isFirst = Objects.equals(first.getShiftStartDateTime(), shift.getShiftStartDateTime());
         boolean isSecond = Objects.nonNull(second)
                 && Objects.equals(second.getShiftStartDateTime(), shift.getShiftStartDateTime());
@@ -333,6 +345,7 @@ public final class StructureSwitchShiftAudit {
         String detail = new StringBuilder(768).append("batchNo=").append(context.getBatchNo())
                 .append("，factoryCode=").append(context.getFactoryCode()).append("，时点=").append(phase)
                 .append("，sourceId=").append(source.getId()).append("，结构=").append(source.getNextStructureName())
+                .append("，实际首产班=").append(actualFirst.getShiftName())
                 .append("，S0=").append(LhScheduleTimeUtil.formatDateTime(first.getShiftStartDateTime()))
                 .append("，S1=").append(Objects.isNull(second) ? "窗口外" : LhScheduleTimeUtil.formatDateTime(second.getShiftStartDateTime()))
                 .append("，当前班=class").append(shift.getShiftIndex()).append("，阶段=")

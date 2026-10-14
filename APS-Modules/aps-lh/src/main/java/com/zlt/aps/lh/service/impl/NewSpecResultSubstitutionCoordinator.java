@@ -20,6 +20,7 @@ import com.zlt.aps.lh.engine.strategy.ISkuPriorityStrategy;
 import com.zlt.aps.lh.engine.strategy.support.ActiveMachineBinding;
 import com.zlt.aps.lh.engine.strategy.support.DailyNewSpecCandidate;
 import com.zlt.aps.lh.engine.strategy.support.DailySchedulePhase;
+import com.zlt.aps.lh.engine.strategy.support.DailyUnscheduledSkuSubstitutionPolicy;
 import com.zlt.aps.lh.engine.strategy.support.DayDrivenScheduleState;
 import com.zlt.aps.lh.engine.strategy.support.DayScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.DeferredScheduleTask;
@@ -51,9 +52,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
- * 特殊 SKU 对当前业务日新增排产结果执行原子置换。
+ * 当日未上机 SKU 对当前业务日新增排产结果执行原子置换。
  *
  * <p>置换单位是新增排产形成的 {@link ActiveMachineBinding}，不是整台机台时间轴。机台在
  * 新增结果之前已经形成的续作结果只用于确定释放边界，续作班次数量、收尾标识和结束时间均不修改。</p>
@@ -68,9 +70,11 @@ import java.util.Set;
 @Service
 public class NewSpecResultSubstitutionCoordinator {
 
-    /** 被普通新增占用机台改由特殊 SKU 接管后的延期原因。 */
+    /**
+     * 普通新增机台被当日未上机 SKU 接管后的延期原因。
+     */
     private static final String REPLACED_NEW_SPEC_DEFER_REASON =
-            "新增排产机台被更高优先级特殊SKU置换，恢复待排并顺延后续业务日";
+            "新增排产机台被当日未上机SKU置换，恢复待排并顺延后续业务日";
 
     @Resource
     private ScheduleStrategyFactory strategyFactory;
@@ -86,25 +90,32 @@ public class NewSpecResultSubstitutionCoordinator {
     private ISkuPriorityStrategy skuPriorityStrategy;
 
     /**
-     * 按特殊 SKU 既有顺序执行新增结果置换。
+     * 按当前日正常候选既有顺序执行新增结果置换。
      *
      * @param context 排程上下文
      * @param dayContext 当前业务日上下文
      * @param state 三天窗口日驱动状态
-     * @param specialCandidates 正常竞争后仍剩余的特殊候选
+     * @param pendingCandidates 正常竞争后仍剩余的正常候选
      */
     public void substitute(LhScheduleContext context,
                            DayScheduleContext dayContext,
                            DayDrivenScheduleState state,
-                           List<DailyNewSpecCandidate> specialCandidates) {
+                           List<DailyNewSpecCandidate> pendingCandidates) {
         if (Objects.isNull(context) || Objects.isNull(dayContext) || Objects.isNull(state)
-                || CollectionUtils.isEmpty(specialCandidates)) {
+                || CollectionUtils.isEmpty(pendingCandidates)) {
             return;
         }
+        // 一次冻结当日零正量候选，后续被撤销的 SKU 不加入本轮，防止同日循环互换。
+        List<DailyNewSpecCandidate> eligibleCandidates = DailyUnscheduledSkuSubstitutionPolicy
+                .collectCandidates(context, dayContext, pendingCandidates);
+        if (eligibleCandidates.isEmpty()) {
+            return;
+        }
+        this.appendCandidateLog(context, dayContext, eligibleCandidates);
         List<ActiveMachineBinding> candidateBindings = this.collectCurrentDayNewSpecBindings(
                 context, dayContext, state);
         if (CollectionUtils.isEmpty(candidateBindings)) {
-            this.appendStageSummary(context, dayContext, specialCandidates.size(), 0, 0,
+            this.appendStageSummary(context, dayContext, eligibleCandidates.size(), 0, 0,
                     "当前业务日没有可置换的新增排产占用机台");
             return;
         }
@@ -115,16 +126,13 @@ public class NewSpecResultSubstitutionCoordinator {
         int attemptedMachineCount = 0;
         int successMachineCount = 0;
         IMachineMatchStrategy machineMatchStrategy = strategyFactory.getMachineMatchStrategy();
-        for (DailyNewSpecCandidate specialCandidate : specialCandidates) {
-            if (Objects.isNull(specialCandidate) || Objects.isNull(specialCandidate.getSku())) {
-                continue;
-            }
-            SkuScheduleDTO specialSku = specialCandidate.getSku();
-            while (specialCandidate.getRemainingMachineCount() > 0
+        for (DailyNewSpecCandidate pendingCandidate : eligibleCandidates) {
+            SkuScheduleDTO targetSku = pendingCandidate.getSku();
+            while (pendingCandidate.getRemainingMachineCount() > 0
                     && targetScheduleQtyResolver.resolveProductionRemainingQty(
-                    context, specialSku) > 0) {
+                    context, targetSku) > 0) {
                 ActiveMachineBinding selectedBinding = this.selectBestBinding(
-                        context, dayContext, specialSku, candidateBindings,
+                        context, dayContext, state, targetSku, candidateBindings,
                         protectedSpecialSkuSet, consumedPhysicalMachineCodeSet,
                         machineMatchStrategy);
                 if (Objects.isNull(selectedBinding)) {
@@ -135,15 +143,15 @@ public class NewSpecResultSubstitutionCoordinator {
                         selectedBinding.getMachineCode());
                 consumedPhysicalMachineCodeSet.add(physicalMachineCode);
                 if (!this.trySubstituteOneBinding(
-                        context, dayContext, state, specialCandidate, selectedBinding)) {
+                        context, dayContext, state, pendingCandidate, selectedBinding)) {
                     continue;
                 }
                 successMachineCount++;
-                specialCandidate.consumeMachineOpportunity();
+                pendingCandidate.consumeMachineOpportunity();
             }
         }
-        this.appendStageSummary(context, dayContext, specialCandidates.size(),
-                attemptedMachineCount, successMachineCount, "特殊SKU新增结果置换阶段完成");
+        this.appendStageSummary(context, dayContext, eligibleCandidates.size(),
+                attemptedMachineCount, successMachineCount, "当日未上机SKU新增结果置换阶段完成");
     }
 
     /**
@@ -164,6 +172,12 @@ public class NewSpecResultSubstitutionCoordinator {
         List<ActiveMachineBinding> resultList = new ArrayList<ActiveMachineBinding>(16);
         for (ActiveMachineBinding binding : state.getActiveBindings()) {
             if (!this.isCurrentDayNewSpecBinding(context, dayContext, binding)) {
+                continue;
+            }
+            String protectionReason = DailyUnscheduledSkuSubstitutionPolicy
+                    .resolveProtectionReason(context, state, binding);
+            if (StringUtils.isNotEmpty(protectionReason)) {
+                this.appendProtectedMachineLog(context, dayContext, binding, protectionReason);
                 continue;
             }
             resultList.add(binding);
@@ -208,15 +222,26 @@ public class NewSpecResultSubstitutionCoordinator {
     }
 
     /**
-     * 在不构造候选矩阵的前提下选择当前特殊 SKU 的最佳新增占用绑定。
+     * 在不构造候选矩阵的前提下选择当前未上机 SKU 的最佳新增占用绑定。
      *
      * <p>先复用机台反向硬匹配和六层匹配结果，再在相同匹配层级下优先置换排序名次靠后的
      * 普通新增 SKU，最后按机台编码稳定收口。已排成功的其他特殊 SKU 不作为被置换对象。</p>
+     *
+     * @param context 机台资源及已提交结果
+     * @param dayContext 当前业务日
+     * @param state 日驱动绑定状态
+     * @param targetSku 当日未上机 SKU
+     * @param candidateBindings 本轮冻结的当日新增绑定
+     * @param protectedSpecialSkuSet 已上机特殊 SKU 保护集合
+     * @param consumedPhysicalMachineCodeSet 本轮已尝试物理机台
+     * @param machineMatchStrategy 原有机台硬匹配策略
+     * @return 最佳可置换绑定；无候选返回 null
      */
     private ActiveMachineBinding selectBestBinding(
             LhScheduleContext context,
             DayScheduleContext dayContext,
-            SkuScheduleDTO specialSku,
+            DayDrivenScheduleState state,
+            SkuScheduleDTO targetSku,
             List<ActiveMachineBinding> candidateBindings,
             Set<SkuScheduleDTO> protectedSpecialSkuSet,
             Set<String> consumedPhysicalMachineCodeSet,
@@ -225,14 +250,16 @@ public class NewSpecResultSubstitutionCoordinator {
         int bestMatchPriority = Integer.MAX_VALUE;
         int bestVictimRank = Integer.MIN_VALUE;
         for (ActiveMachineBinding binding : candidateBindings) {
-            if (Objects.isNull(binding) || binding.getSku() == specialSku
+            if (Objects.isNull(binding) || binding.getSku() == targetSku
                     || protectedSpecialSkuSet.contains(binding.getSku())) {
                 continue;
             }
             String physicalMachineCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(
                     binding.getMachineCode());
             if (consumedPhysicalMachineCodeSet.contains(physicalMachineCode)
-                    || !this.isCurrentDayNewSpecBinding(context, dayContext, binding)) {
+                    || !this.isCurrentDayNewSpecBinding(context, dayContext, binding)
+                    || StringUtils.isNotEmpty(DailyUnscheduledSkuSubstitutionPolicy
+                    .resolveProtectionReason(context, state, binding))) {
                 continue;
             }
             MachineScheduleDTO machine = context.getMachineScheduleMap().get(binding.getMachineCode());
@@ -240,7 +267,7 @@ public class NewSpecResultSubstitutionCoordinator {
                 continue;
             }
             MachineSkuMatchResult matchResult = machineMatchStrategy.matchSkuOnMachine(
-                    context, machine, specialSku);
+                    context, machine, targetSku);
             if (Objects.isNull(matchResult) || !matchResult.isMatched()
                     || Objects.isNull(matchResult.getMatchLevel())) {
                 continue;
@@ -268,19 +295,33 @@ public class NewSpecResultSubstitutionCoordinator {
     }
 
     /**
-     * 对单个新增绑定执行“撤销普通新增结果 -> 特殊 SKU 指定机台重排 -> 更新外层绑定”。
+     * 对单个新增绑定执行“撤销普通新增结果 -> 当日未上机 SKU 指定机台重排 -> 更新外层绑定”。
+     *
+     * @param context 排程上下文
+     * @param dayContext 当前业务日
+     * @param state 日驱动绑定及候选状态
+     * @param pendingCandidate 当日未上机候选
+     * @param victimBinding 拟撤销的当日普通新增绑定
+     * @return 当日正量结果与外层绑定提交成功时返回 true，失败恢复后返回 false
      */
     private boolean trySubstituteOneBinding(
             LhScheduleContext context,
             DayScheduleContext dayContext,
             DayDrivenScheduleState state,
-            DailyNewSpecCandidate specialCandidate,
+            DailyNewSpecCandidate pendingCandidate,
             ActiveMachineBinding victimBinding) {
-        SkuScheduleDTO specialSku = specialCandidate.getSku();
+        // 在实际撤销前重新读保护事实，避免候选快照过期后删除历史指定或结构切换结果。
+        String protectionReason = DailyUnscheduledSkuSubstitutionPolicy
+                .resolveProtectionReason(context, state, victimBinding);
+        if (StringUtils.isNotEmpty(protectionReason)) {
+            this.appendProtectedMachineLog(context, dayContext, victimBinding, protectionReason);
+            return false;
+        }
+        SkuScheduleDTO targetSku = pendingCandidate.getSku();
         SkuScheduleDTO victimSku = victimBinding.getSku();
         ScheduleSubstitutionAttemptSnapshot snapshot =
                 ScheduleSubstitutionAttemptSnapshot.capture(
-                        context, Arrays.asList(specialSku, victimSku));
+                        context, Arrays.asList(targetSku, victimSku));
         try {
             Date switchReadyTime = this.removeVictimBindingResult(
                     context, dayContext, victimBinding);
@@ -289,17 +330,17 @@ public class NewSpecResultSubstitutionCoordinator {
                 return false;
             }
             this.restoreMachineStateBeforeVictim(
-                    context, victimBinding, specialSku, switchReadyTime);
+                    context, victimBinding, targetSku, switchReadyTime);
             structureEndingAlignmentService.prepareStructureEndingAlignmentIndex(context);
             capsuleReplacementRuleService.rebuildRuntimeState(context, null);
             context.setMouldResourceContext(MouldResourceContext.from(context));
 
             ScheduleSubstitutionDirective directive = this.buildSpecifiedMachineDirective(
-                    specialSku, victimBinding.getMachineCode(), switchReadyTime);
-            List<LhScheduleResult> newResultList = specifiedNewSpecSchedulingService.schedule(
-                    context, specialSku, directive);
+                    targetSku, victimBinding.getMachineCode(), switchReadyTime);
+            List<LhScheduleResult> newResultList = specifiedNewSpecSchedulingService.scheduleCurrentDay(
+                    context, dayContext, pendingCandidate, directive);
             ActiveMachineBinding targetBinding = this.buildTargetBinding(
-                    context, dayContext, specialSku, victimBinding, newResultList);
+                    context, dayContext, targetSku, victimBinding, newResultList);
             if (Objects.isNull(targetBinding)) {
                 snapshot.restore(context);
                 structureEndingAlignmentService.prepareStructureEndingAlignmentIndex(context);
@@ -311,7 +352,7 @@ public class NewSpecResultSubstitutionCoordinator {
              * 最后一次性替换绑定并恢复被置换 SKU 的待排生命周期，避免额外复制整个状态对象。
              */
             state.registerBinding(targetBinding);
-            state.markScheduledAndCarryOver(specialSku);
+            state.markScheduledAndCarryOver(targetSku);
             if (state.hasActiveBinding(victimSku)) {
                 state.markScheduledAndCarryOver(victimSku);
             } else {
@@ -319,20 +360,20 @@ public class NewSpecResultSubstitutionCoordinator {
                 state.defer(new DeferredScheduleTask(
                         victimSku, dayContext.getScheduleDate(),
                         dayContext.getScheduleDate().plusDays(1),
-                        DailySchedulePhase.SPECIAL_SKU,
+                        DailySchedulePhase.UNSCHEDULED_SKU_SUBSTITUTION,
                         REPLACED_NEW_SPEC_DEFER_REASON));
             }
             this.appendSuccessLog(
-                    context, dayContext, specialSku, victimSku,
+                    context, dayContext, targetSku, victimSku,
                     victimBinding, targetBinding, switchReadyTime);
             return true;
         } catch (RuntimeException exception) {
             snapshot.restore(context);
             structureEndingAlignmentService.prepareStructureEndingAlignmentIndex(context);
-            log.error("特殊SKU新增结果置换异常，候选状态已完整恢复, batchNo: {}, businessDate: {}, "
-                            + "specialMaterialCode: {}, victimMaterialCode: {}, machineCode: {}",
+            log.error("当日未上机SKU新增结果置换异常，候选状态已完整恢复, batchNo: {}, businessDate: {}, "
+                            + "targetMaterialCode: {}, victimMaterialCode: {}, machineCode: {}",
                     context.getBatchNo(), dayContext.getScheduleDate(),
-                    specialSku.getMaterialCode(), victimSku.getMaterialCode(),
+                    targetSku.getMaterialCode(), victimSku.getMaterialCode(),
                     victimBinding.getMachineCode(), exception);
             return false;
         }
@@ -393,7 +434,7 @@ public class NewSpecResultSubstitutionCoordinator {
         }
         targetScheduleQtyResolver.restoreProductionRemainingQty(
                 context, victimSku, removedTotalQty,
-                "特殊SKU置换撤销普通新增结果", binding.getMachineCode());
+                "当日未上机SKU置换撤销普通新增结果", binding.getMachineCode());
         this.restoreRemovedDailyQuota(
                 context, victimSku, removedQtyByDate);
         return switchReadyTime;
@@ -722,6 +763,11 @@ public class NewSpecResultSubstitutionCoordinator {
 
     /**
      * 将机台运行态恢复到被置换新增结果接管之前，续作结果本身保持只读。
+     *
+     * @param context 排程上下文
+     * @param victimBinding 被撤销新增绑定
+     * @param targetSku 当日未上机目标 SKU
+     * @param switchReadyTime 本次允许切换的开始时间
      */
     private void restoreMachineStateBeforeVictim(
             LhScheduleContext context,
@@ -843,23 +889,38 @@ public class NewSpecResultSubstitutionCoordinator {
                 StringUtils.equals("1", primaryResult.getIsEnd()));
     }
 
+    /**
+     * 记录本次成功置换的当前日正量、接管物料及被撤销绑定，供批次验收核对。
+     *
+     * @param context 排程上下文
+     * @param dayContext 当前业务日
+     * @param targetSku 当日未上机 SKU
+     * @param victimSku 被置换的普通新增 SKU
+     * @param victimBinding 被撤销绑定
+     * @param targetBinding 已提交接管绑定
+     * @param switchReadyTime 允许重新切换的开始时间
+     */
     private void appendSuccessLog(
             LhScheduleContext context,
             DayScheduleContext dayContext,
-            SkuScheduleDTO specialSku,
+            SkuScheduleDTO targetSku,
             SkuScheduleDTO victimSku,
             ActiveMachineBinding victimBinding,
             ActiveMachineBinding targetBinding,
             Date switchReadyTime) {
         String detail = new StringBuilder(320)
-                .append("batchNo=").append(context.getBatchNo())
+                .append("factoryCode=").append(context.getFactoryCode())
+                .append(", batchNo=").append(context.getBatchNo())
                 .append(", businessDate=").append(dayContext.getScheduleDate())
                 .append(", machineCode=").append(victimBinding.getMachineCode())
                 .append(", pairMachineCode=").append(victimBinding.getPairMachineCode())
                 .append(", victimMaterialCode=").append(victimSku.getMaterialCode())
                 .append(", victimProductStatus=").append(victimSku.getProductStatus())
-                .append(", specialMaterialCode=").append(specialSku.getMaterialCode())
-                .append(", specialProductStatus=").append(specialSku.getProductStatus())
+                .append(", targetMaterialCode=").append(targetSku.getMaterialCode())
+                .append(", targetProductStatus=").append(targetSku.getProductStatus())
+                .append(", targetSpecialSku=").append(skuPriorityStrategy.resolveSpecialNewSpecSkus(
+                        context, Collections.singletonList(targetSku)).contains(targetSku))
+                .append(", targetDayPlanQty=").append(this.resolveCurrentDayPlanQty(dayContext, targetBinding))
                 .append(", switchReadyTime=")
                 .append(LhScheduleTimeUtil.formatDateTime(switchReadyTime))
                 .append(", targetEndTime=")
@@ -867,29 +928,76 @@ public class NewSpecResultSubstitutionCoordinator {
                         targetBinding.getScheduleResult().getSpecEndTime()))
                 .append(", continuationResultEffect=保留不变")
                 .toString();
-        log.info("特殊SKU新增结果置换成功, {}", detail);
+        log.info("当日未上机SKU新增结果置换成功, {}", detail);
         PriorityTraceLogHelper.appendProcessLog(
-                context, "特殊SKU新增结果置换", detail);
+                context, "当日未上机SKU新增结果置换", detail);
     }
 
+    /**
+     * 记录当日零正量候选快照，不修改候选排序和资源账本。
+     *
+     * @param context 排程上下文
+     * @param dayContext 当前业务日
+     * @param candidates 当日未上机候选快照
+     */
+    private void appendCandidateLog(LhScheduleContext context, DayScheduleContext dayContext,
+                                    List<DailyNewSpecCandidate> candidates) {
+        List<String> skuKeys = candidates.stream().map(DailyNewSpecCandidate::getSkuKey)
+                .collect(Collectors.toList());
+        String detail = "factoryCode=" + context.getFactoryCode() + ", batchNo=" + context.getBatchNo()
+                + ", businessDate=" + dayContext.getScheduleDate() + ", dayPlanQty=0, skuKeys=" + skuKeys;
+        log.info("当日未上机SKU置换候选, {}", detail);
+        PriorityTraceLogHelper.appendProcessLog(context, "当日未上机SKU置换候选", detail);
+    }
+
+    /**
+     * 记录整台物理机台被排除的业务来源。
+     *
+     * @param context 排程上下文
+     * @param dayContext 当前业务日
+     * @param binding 被保护绑定
+     * @param reason 保护原因
+     */
+    private void appendProtectedMachineLog(LhScheduleContext context, DayScheduleContext dayContext,
+                                           ActiveMachineBinding binding, String reason) {
+        String detail = "factoryCode=" + context.getFactoryCode() + ", batchNo=" + context.getBatchNo()
+                + ", businessDate=" + dayContext.getScheduleDate() + ", physicalMachineCode="
+                + LhSingleControlMachineUtil.resolvePhysicalMachineCode(binding.getMachineCode())
+                + ", materialCode=" + binding.getSku().getMaterialCode()
+                + ", productStatus=" + binding.getSku().getProductStatus() + ", reason=" + reason;
+        log.info("当日未上机SKU置换机台保护, {}", detail);
+        PriorityTraceLogHelper.appendProcessLog(context, "当日未上机SKU置换机台保护", detail);
+    }
+
+    /**
+     * 汇总当前日置换候选、尝试和成功机台数。
+     *
+     * @param context 排程上下文
+     * @param dayContext 当前业务日
+     * @param pendingSkuCount 当日未上机候选数
+     * @param attemptedMachineCount 尝试物理机台数
+     * @param successMachineCount 成功物理机台数
+     * @param reason 本阶段收口原因
+     */
     private void appendStageSummary(
             LhScheduleContext context,
             DayScheduleContext dayContext,
-            int specialSkuCount,
+            int pendingSkuCount,
             int attemptedMachineCount,
             int successMachineCount,
             String reason) {
         String detail = new StringBuilder(192)
-                .append("batchNo=").append(context.getBatchNo())
+                .append("factoryCode=").append(context.getFactoryCode())
+                .append(", batchNo=").append(context.getBatchNo())
                 .append(", businessDate=").append(dayContext.getScheduleDate())
-                .append(", specialSkuCount=").append(specialSkuCount)
+                .append(", pendingSkuCount=").append(pendingSkuCount)
                 .append(", attemptedMachineCount=").append(attemptedMachineCount)
                 .append(", successMachineCount=").append(successMachineCount)
                 .append(", reason=").append(reason)
                 .toString();
-        log.info("特殊SKU新增结果置换阶段完成, {}", detail);
+        log.info("当日未上机SKU新增结果置换阶段完成, {}", detail);
         PriorityTraceLogHelper.appendProcessLog(
-                context, "特殊SKU新增结果置换汇总", detail);
+                context, "当日未上机SKU新增结果置换汇总", detail);
     }
 
     private LocalDate toLocalDate(Date date) {

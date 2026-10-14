@@ -9,10 +9,12 @@ import com.zlt.aps.lh.engine.factory.ScheduleStrategyFactory;
 import com.zlt.aps.lh.engine.strategy.IProductionStrategy;
 import com.zlt.aps.lh.engine.strategy.ISkuPriorityStrategy;
 import com.zlt.aps.lh.engine.strategy.ITypeBlockProductionStrategy;
+import com.zlt.aps.lh.engine.strategy.support.StructureSwitchCandidateScope;
 import com.zlt.aps.lh.service.impl.LhEquipmentPlanScheduleService;
 import com.zlt.aps.lh.service.impl.PreviousAlternatePlanReuseService;
 import com.zlt.aps.lh.service.impl.TimedMachineOffShiftService;
 import com.zlt.aps.lh.service.impl.TimedMachineOffLoadPreviewService;
+import com.zlt.aps.lh.service.impl.PreviousAlternateMachineOrderService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -50,6 +52,11 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
     /** 续作真实释放时间确定后，先消费可复用交替关系的一份机台需求。 */
     @Resource
     private PreviousAlternatePlanReuseService previousAlternatePlanReuseService;
+    /**
+     * 在所有续作释放决策前初始化本批历史机台优先级。
+     */
+    @Resource
+    private PreviousAlternateMachineOrderService previousAlternateMachineOrderService;
     /** 余量收尾之后独立确定按时间下机边界，必须早于正式扣账和后料提交。 */
     @Resource
     private TimedMachineOffShiftService timedMachineOffShiftService;
@@ -71,6 +78,7 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
         dayPlanAdjustRequireAssembler.prepare(context);
         // 冻结历史交替时刻，续作识别保持原样，排量及所有后置调整共同遵守下机边界。
         previousAlternatePlanReuseService.prepareReleaseEvents(context);
+        previousAlternateMachineOrderService.initializePreviousAlternateMachineOrder(context);
         ISkuPriorityStrategy priorityStrategy = strategyFactory.getSkuPriorityStrategy();
         /*
          * S4.4排序调用：排序策略从S4.2独立的结构排序日期快照读取最大END_DAY，按结构只计算一次
@@ -109,6 +117,9 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
 
         // 普通精度只在真实收尾稳定后集中判断；若复评产生新强制约束，先按消费记录恢复并重算受影响续作。
         equipmentPlanScheduleService.reviewConfirmedEndings(context);
+
+        // 只冻结结构切换身份；正式切换统一在换活字块结束后的独立步骤执行。
+        StructureSwitchCandidateScope.freeze(context);
 
         // 独立复用阶段覆盖全部剩余产能机台，完成后换活字块只处理实时剩余资源与需求。
         previousAlternatePlanReuseService.reuse(context);

@@ -283,6 +283,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         context.setMonthPlanVersion(StringUtils.isNotEmpty(request.getMonthPlanVersion())
                 ? request.getMonthPlanVersion().trim() : request.getMonthPlanVersion());
         context.setOperator(StringUtils.isNotEmpty(request.getOperator()) ? request.getOperator().trim() : request.getOperator());
+        // 是否更新结构切换时间：未传（如定时任务、内部调用）按"不更新"处理，与前端默认不勾选一致
+        context.setUpdateStructureLhTime(StringUtils.isNotEmpty(request.getUpdateStructureLhTime())
+                ? request.getUpdateStructureLhTime().trim() : "0");
         // 工厂名称来源于工厂枚举：116=越南，117=泰国
         context.setFactoryName(FactoryCodeEnum.getFactoryNameByCode(factoryCode));
         // 请求日期为排程目标日

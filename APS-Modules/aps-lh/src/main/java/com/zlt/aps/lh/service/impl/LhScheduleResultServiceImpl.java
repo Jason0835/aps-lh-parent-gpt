@@ -12,9 +12,12 @@ import com.zlt.aps.common.engine.utils.MonthPlanSurplusCalculator;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
+import com.zlt.aps.lh.api.domain.dto.LhEmbryoMachineMappingQueryDTO;
 import com.zlt.aps.lh.api.domain.dto.LhInsertOrderValidateResultDTO;
+import com.zlt.aps.lh.api.domain.dto.LhEmbryoMachineMappingQueryDTO;
 import com.zlt.aps.lh.api.domain.dto.LhOrderInsertDTO;
 import com.zlt.aps.lh.api.domain.entity.*;
+import com.zlt.aps.lh.api.domain.vo.LhEmbryoMachineMappingVO;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.lh.api.enums.ReleaseStatusEnum;
 import com.zlt.aps.lh.component.LhBatchNoRedisGenerator;
@@ -42,6 +45,7 @@ import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -113,6 +117,44 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
     @Override
     public List<LhScheduleResult> selectByDateAndFactory(Date scheduleDate, String factoryCode) {
         return mapper.selectList(new LambdaQueryWrapper<LhScheduleResult>().eq(StringUtils.isNotEmpty(factoryCode), LhScheduleResult::getFactoryCode, factoryCode).eq(LhScheduleResult::getScheduleDate, scheduleDate).eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
+    }
+
+    /**
+     * 按请求的工厂、排程日期和胎胚编号返回去重后的有效硫化机映射。
+     *
+     * @param query 工厂、排程日期和胎胚编号查询条件
+     * @return 按胎胚编号、硫化机编码升序排列的映射列表
+     * @throws RuntimeException 查询硫化排程结果失败时抛出
+     */
+    @Override
+    public List<LhEmbryoMachineMappingVO> queryEmbryoMachineMappings(LhEmbryoMachineMappingQueryDTO query) {
+        if (query == null || query.getScheduleDate() == null || StringUtils.isBlank(query.getFactoryCode())
+                || CollectionUtils.isEmpty(query.getEmbryoCodes())) {
+            return Collections.emptyList();
+        }
+        Set<String> embryoCodeSet = query.getEmbryoCodes().stream()
+                .filter(StringUtils::isNotBlank)
+                .map(String::trim)
+                .collect(Collectors.toSet());
+        if (embryoCodeSet.isEmpty()) {
+            return Collections.emptyList();
+        }
+        Date scheduleDate = Date.from(query.getScheduleDate().atStartOfDay(ZoneId.systemDefault()).toInstant());
+        return this.selectByDateAndFactory(scheduleDate, query.getFactoryCode()).stream()
+                .filter(Objects::nonNull)
+                .filter(result -> StringUtils.isNotBlank(result.getEmbryoCode()))
+                .filter(result -> embryoCodeSet.contains(result.getEmbryoCode().trim()))
+                .filter(result -> StringUtils.isNotBlank(result.getLhMachineCode()))
+                .map(result -> {
+                    LhEmbryoMachineMappingVO mapping = new LhEmbryoMachineMappingVO();
+                    mapping.setEmbryoCode(result.getEmbryoCode().trim());
+                    mapping.setLhMachineCode(result.getLhMachineCode().trim());
+                    return mapping;
+                })
+                .distinct()
+                .sorted(Comparator.comparing(LhEmbryoMachineMappingVO::getEmbryoCode)
+                        .thenComparing(LhEmbryoMachineMappingVO::getLhMachineCode))
+                .collect(Collectors.toList());
     }
 
     @Override

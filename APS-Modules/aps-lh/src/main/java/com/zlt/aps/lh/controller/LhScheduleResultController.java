@@ -21,12 +21,14 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.autoLogin.feign.FeignTokenHelper;
+import com.zlt.aps.autoLogin.loginUtils.annotation.AutoLoginLog;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.lh.api.domain.dto.*;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
+import com.zlt.aps.lh.api.domain.vo.LhEmbryoMachineMappingVO;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleResultTemplateImportVO;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
 import com.zlt.aps.lh.api.domain.vo.ScheduleSummaryReportVO;
@@ -138,6 +140,39 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
             return new ArrayList<>();
         }
         return lhScheduleService.listScheduleShiftDates(query.getScheduleDate());
+    }
+
+    /**
+     * 查询指定工厂、排程日期及胎胚编号对应的硫化机编码。
+     *
+     * @param query 批量查询条件
+     * @return 胎胚与硫化机编码映射列表
+     * @throws RuntimeException 硫化服务查询失败时抛出
+     */
+    @PostMapping("/queryEmbryoMachineMappings")
+    @ApiOperation("批量查询胎胚硫化机映射")
+    @AutoLoginLog
+    public List<LhEmbryoMachineMappingVO> queryEmbryoMachineMappings(
+            @RequestBody LhEmbryoMachineMappingQueryDTO query) {
+        int embryoCount = query == null || query.getEmbryoCodes() == null ? 0 : query.getEmbryoCodes().size();
+        String factoryCode = query == null ? null : query.getFactoryCode();
+        LocalDate scheduleDate = query == null ? null : query.getScheduleDate();
+        log.info("[LH_EMBRYO_MACHINE_MAPPING] phase=REQUEST_RECEIVED, factoryCode={}, scheduleDate={}, embryoCount={}",
+                factoryCode, scheduleDate, embryoCount);
+        try {
+            List<LhEmbryoMachineMappingVO> mappings = this.lhScheduleResultService.queryEmbryoMachineMappings(query);
+            log.info("[LH_EMBRYO_MACHINE_MAPPING] phase=RESPONSE_BUILT, factoryCode={}, scheduleDate={}, "
+                            + "responseType={}, mappingCount={}",
+                    factoryCode, scheduleDate,
+                    mappings == null ? "null" : mappings.getClass().getName(),
+                    mappings == null ? null : mappings.size());
+            return mappings;
+        } catch (RuntimeException exception) {
+            log.error("[LH_EMBRYO_MACHINE_MAPPING] phase=FAILED, factoryCode={}, scheduleDate={}, embryoCount={}, "
+                            + "exceptionType={}",
+                    factoryCode, scheduleDate, embryoCount, exception.getClass().getName(), exception);
+            throw exception;
+        }
     }
 
 

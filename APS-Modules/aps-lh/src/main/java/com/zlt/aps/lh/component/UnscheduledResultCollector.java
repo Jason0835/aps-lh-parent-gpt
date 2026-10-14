@@ -563,8 +563,10 @@ public class UnscheduledResultCollector {
         String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
                 result.getMaterialCode(), result.getProductStatus());
         Integer embryoTargetQty = this.resolveNonSharedEmbryoEndingDemandTarget(context, snapshot, skuKey);
+        boolean continuationZeroPlan = snapshot.isContinuationZeroPlanObserved()
+                || StringUtils.equals(CONTINUATION_ZERO_PLAN_REASON, result.getUnscheduledReason());
         if (Objects.isNull(embryoTargetQty)
-                && (!StringUtils.equals(CONTINUATION_ZERO_PLAN_REASON, result.getUnscheduledReason())
+                && (!continuationZeroPlan
                 || Objects.isNull(snapshot.getInitialSurplusQty()) || snapshot.getInitialSurplusQty() <= 0)) {
             return false;
         }
@@ -725,18 +727,26 @@ public class UnscheduledResultCollector {
                 StringUtils.trimToEmpty(sku.getProductStatus()));
     }
 
+    /**
+     * 关联原始需求并保留续作零结果诊断身份，避免后续原因升级使保存前数量核对失效。
+     *
+     * @param context 排程上下文
+     * @param sku 来源SKU，阶段归并时可为空
+     * @param result 待关联未排记录
+     */
     private void attachDemand(LhScheduleContext context,
                               SkuScheduleDTO sku,
                               LhUnscheduledResult result) {
-        if (StringUtils.isNotEmpty(result.getRuntimeDemandKey())) {
-            return;
-        }
-        UnscheduledDemandSnapshot snapshot = this.findSnapshot(context, sku);
+        UnscheduledDemandSnapshot snapshot = StringUtils.isNotEmpty(result.getRuntimeDemandKey())
+                ? this.findSnapshot(context, result) : this.findSnapshot(context, sku);
         if (Objects.isNull(snapshot)) {
             snapshot = this.findSnapshot(context, result);
         }
         if (Objects.nonNull(snapshot)) {
             result.setRuntimeDemandKey(snapshot.getDemandKey());
+            if (StringUtils.equals(CONTINUATION_ZERO_PLAN_REASON, result.getUnscheduledReason())) {
+                snapshot.setContinuationZeroPlanObserved(true);
+            }
         }
     }
 

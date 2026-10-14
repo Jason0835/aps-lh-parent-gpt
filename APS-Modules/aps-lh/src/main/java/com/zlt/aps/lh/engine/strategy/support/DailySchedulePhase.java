@@ -18,8 +18,10 @@ public enum DailySchedulePhase {
     NORMAL_RESOURCE_COMPETITION,
     /** 已下线：无未来计划的历史欠产或既有收尾遗留任务，暂留待后续关联代码清理 */
     LEGACY_SHORTAGE_OR_ENDING,
-    /** 正常竞争后特殊 SKU 独立置换阶段，只允许接管当前日新增排产占用机台 */
-    SPECIAL_SKU,
+    /**
+     * 正常竞争后当日零正量 SKU 的独立置换阶段，仅允许接管未受保护的当日普通新增绑定。
+     */
+    UNSCHEDULED_SKU_SUBSTITUTION,
     /** 使用正常阶段完成后的剩余资源执行提前生产 */
     EARLY_PRODUCTION,
     /** 当日状态收口以及窗口末日最终未排处理 */

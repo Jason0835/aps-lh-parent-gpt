@@ -29,6 +29,14 @@ public class ContinuationEndingAllocationSnapshot implements Serializable {
     private String finishRoleMachineCode;
     /** 本次历史释放节点规则。 */
     private String finishRule;
+    /**
+     * T日节点原始目标和真实容量，不以输出截止字段代替业务规则。
+     */
+    private ContinuationTDayFinishConstraint tDayFinishConstraint;
+    /**
+     * 跨日两机大余量分配前的公式、物理角色及夜班优先约束。
+     */
+    private ContinuationNightFinishConstraint nightFinishConstraint;
     /** 组级模拟次数快照下的预测换模时间，null表示当时无合法预测。 */
     private Date predictedChangeTime;
     /** 预测使用的动作类型，后料尚未选定时为通用交替。 */

@@ -119,6 +119,7 @@ public final class ResultShiftTimeUtil {
 
     /**
      * 汇总最终班次完成时间，停产保机仍保持窗口占用语义。
+     *
      * @param context 排程上下文
      * @param result 已完成数量及班次时间回写的结果
      */
@@ -136,7 +137,7 @@ public final class ResultShiftTimeUtil {
                 endTime = shiftEnd;
             }
         }
-        // 时间下机是物理占用边界，末班实际正量结束可能更早，不能据此提前释放。
+        // 时间下机使用已核实的物理释放事实；统一扣账再次裁量后由发布入口重新核实。
         if (context.getTimedMachineOffDecisionMap().containsKey(result)) {
             endTime = context.getTimedMachineOffDecisionMap().get(result).getOccupancyEndTime();
         }

@@ -2,6 +2,7 @@ package com.zlt.aps.lh.engine.strategy.support;
 
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
+import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import org.apache.commons.lang3.StringUtils;
 
@@ -40,6 +41,10 @@ public final class NewSpecMachineAssignmentPlan {
     private final boolean actualAvailableTimeMode;
     /** 组合已由调用方明确，仅执行资源分配，不再次进行机台选型。 */
     private boolean fixedMachineExecution;
+    /**
+     * 独立结构切换本轮竞争班次；不授予历史指定组合的选型豁免。
+     */
+    private LhShiftConfigVO structureSwitchShift;
     /** 对象身份映射，避免同物料补偿 DTO 互相覆盖 */
     private final Map<SkuScheduleDTO, String> assignedMachineCodeMap =
             new IdentityHashMap<SkuScheduleDTO, String>(1);
@@ -101,6 +106,35 @@ public final class NewSpecMachineAssignmentPlan {
         return fixedMachineExecution;
     }
 
+    /**
+     * 为唯一组合登记实际竞争班次，不授予历史指定组合豁免。
+     *
+     * @param shift 本轮真实竞争班次
+     * @return 携带前置步骤归属的原提案
+     */
+    public NewSpecMachineAssignmentPlan forStructureSwitch(LhShiftConfigVO shift) {
+        this.structureSwitchShift = Objects.requireNonNull(shift, "结构切换竞争班次不能为空");
+        return this;
+    }
+
+    /**
+     * 获取独立结构切换的实际竞争班次。
+     *
+     * @return 独立结构切换竞争班次，其他入口为空
+     */
+    public LhShiftConfigVO getStructureSwitchShift() {
+        return structureSwitchShift;
+    }
+
+    /**
+     * 判断是否需要登记供后续新增读取的前置在机绑定。
+     *
+     * @return 是否需要登记供后续新增读取的前置在机绑定
+     */
+    public boolean isPreScheduledExecution() {
+        return fixedMachineExecution || Objects.nonNull(structureSwitchShift);
+    }
+
     public boolean isAssigned(SkuScheduleDTO sku) {
         return Objects.nonNull(sku) && assignedMachineCodeMap.containsKey(sku);
     }
@@ -145,7 +179,8 @@ public final class NewSpecMachineAssignmentPlan {
 
     public String getAssignmentKey() {
         return buildAssignmentKey(
-                matchResult, candidate.getSku(), targetShiftIndex);
+                matchResult, candidate.getSku(), Objects.nonNull(structureSwitchShift)
+                        ? structureSwitchShift.getShiftIndex() : targetShiftIndex);
     }
 
     /**
@@ -218,7 +253,15 @@ public final class NewSpecMachineAssignmentPlan {
         return buildAssignmentKey(physicalMachineCode, sku, targetShiftIndex);
     }
 
-    private static String buildAssignmentKey(String machineResourceCode,
+    /**
+     * 按资源、SKU和竞争班次生成稳定的失败键。
+     *
+     * @param machineResourceCode 已按整机或单侧归一的资源编码
+     * @param sku SKU
+     * @param targetShiftIndex 竞争班次
+     * @return 稳定失败键
+     */
+    public static String buildAssignmentKey(String machineResourceCode,
                                              SkuScheduleDTO sku,
                                              Integer targetShiftIndex) {
         String materialCode = Objects.isNull(sku) ? "" : StringUtils.defaultString(sku.getMaterialCode());

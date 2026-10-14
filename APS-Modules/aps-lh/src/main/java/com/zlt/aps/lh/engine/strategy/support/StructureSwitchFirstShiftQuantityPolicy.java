@@ -10,11 +10,13 @@ import com.zlt.aps.lh.api.enums.SingleControlMachineModeEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
+import com.zlt.aps.lh.util.ShiftFieldUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 
 import java.text.MessageFormat;
 import java.util.Collections;
+import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -52,6 +54,22 @@ public final class StructureSwitchFirstShiftQuantityPolicy {
         }
         return context.getStructureTreadCountMap()
                 .getOrDefault(source.getNextStructureName(), Collections.emptyMap()).get(embryoCode);
+    }
+
+    /**
+     * 判断供胚所在首班，数量时间上限不依赖整车胎面限额是否配置。
+     *
+     * @param context 本批开关
+     * @param source 有效切换来源
+     * @param shift 当前班次
+     * @return 是否属于结构切换供胚首班
+     */
+    public static boolean isSupplyFirstShift(LhScheduleContext context, CxEmbryoLhTime source,
+            LhShiftConfigVO shift) {
+        return StructureSwitchSchedulingPolicy.isEnabled(context) && Objects.nonNull(source)
+                && Objects.nonNull(source.getEarliestLhTime()) && Objects.nonNull(shift)
+                && !source.getEarliestLhTime().before(shift.getShiftStartDateTime())
+                && source.getEarliestLhTime().before(shift.getShiftEndDateTime());
     }
 
     /**
@@ -169,14 +187,17 @@ public final class StructureSwitchFirstShiftQuantityPolicy {
     }
 
     /**
-     * 判断当前结果是否受到供胚首班限量，供日计划回裁与数量归整共用。
+     * 判断当前结果是否受到供胚首班时间上限，供日计划回裁与数量归整共用。
+     *
      * @param context 当前批次
      * @param result 当前结果
      * @param shift 当前班次
-     * @return 是否存在生效的首班额度
+     * @return 是否需要执行首班时间上限及含首检归整
      */
     public static boolean isLimited(LhScheduleContext context, LhScheduleResult result, LhShiftConfigVO shift) {
-        return Objects.nonNull(resolveLimit(context, resolveSource(context, result), result.getEmbryoCode(), shift));
+        CxEmbryoLhTime source = resolveSource(context, result);
+        return Objects.nonNull(resolveLimit(context, source, result.getEmbryoCode(), shift))
+                || (isSupplyFirstShift(context, source, shift) && !StructureSwitchSchedulingPolicy.isLargeInch(source));
     }
 
     /**
@@ -193,7 +214,8 @@ public final class StructureSwitchFirstShiftQuantityPolicy {
     }
 
     /**
-     * 先叠加其他机台共享额度，再按最终含首检量向下归整，保留原数量单位例外。
+     * 先叠加共享额度及本机实际时间上限，再按含首检总量向下归整，保留原数量单位例外。
+     *
      * @param context 当前上下文
      * @param source 冻结来源
      * @param result 当前结果
@@ -205,14 +227,36 @@ public final class StructureSwitchFirstShiftQuantityPolicy {
     private static int capTotal(LhScheduleContext context, CxEmbryoLhTime source, LhScheduleResult result,
             LhShiftConfigVO shift, int proposedTotal, int sides) {
         Integer limit = resolveLimit(context, source, result.getEmbryoCode(), shift);
-        if (Objects.isNull(limit)) {
+        if (!isSupplyFirstShift(context, source, shift)) {
             return proposedTotal;
         }
         long used = usedQuantity(context, result.getStructureName(), result.getEmbryoCode(), shift, result);
-        int available = (int) Math.max(0L, limit - used) / sides;
-        int multiple = QUANTITY_POLICY.resolveAllocationMultiple(context, result,
-                ShiftCapacityResolverUtil.resolveMachineMouldQty(result.getMouldQty()));
+        int available = Objects.isNull(limit) ? Integer.MAX_VALUE : (int) Math.max(0L, limit - used) / sides;
+        int mouldQty = ShiftCapacityResolverUtil.resolveMachineMouldQty(
+                Objects.isNull(result.getMouldQty()) ? 0 : result.getMouldQty());
+        int multiple = QUANTITY_POLICY.resolveAllocationMultiple(context, result, mouldQty);
         int total = Math.min(Math.max(0, proposedTotal), available);
+        // 含首检量必须受真实时间上限约束，不能对已经向上补成偶数的数量再次取偶了事。
+        Date start = StructureSwitchSchedulingPolicy.later(source.getEarliestLhTime(),
+                ShiftFieldUtil.getShiftStartTime(result, shift.getShiftIndex()));
+        StructureSwitchPlan plan = context.getStructureSwitchResultPlanMap().get(result);
+        if (Objects.nonNull(plan) && Objects.nonNull(plan.getInspectionPlan())) {
+            for (FirstInspectionShiftAllocation allocation : plan.getInspectionPlan().getShiftAllocations()) {
+                if (Objects.equals(allocation.getShift().getShiftIndex(), shift.getShiftIndex())) {
+                    Date inspectionStart = StructureSwitchSchedulingPolicy.later(
+                            source.getEarliestLhTime(), allocation.getOverlapStartTime());
+                    if (inspectionStart.before(start)) {
+                        start = inspectionStart;
+                    }
+                }
+            }
+        }
+        int capacity = Objects.isNull(result.getSingleMouldShiftQty()) ? 0 : result.getSingleMouldShiftQty();
+        if (capacity > 0) {
+            long seconds = Math.max(0L, (shift.getShiftEndDateTime().getTime() - start.getTime()) / 1000L);
+            total = Math.min(total, ShiftCapacityResolverUtil.resolveShiftCapacity(capacity, 0,
+                    mouldQty, ShiftCapacityResolverUtil.resolveShiftDurationSeconds(shift), seconds, true));
+        }
         total -= total % multiple;
         if (total != proposedTotal) {
             log.info("结构胎胚首班限量, factoryCode={}, batchNo={}, sourceId={}, structure={}, embryo={}, "
@@ -225,25 +269,23 @@ public final class StructureSwitchFirstShiftQuantityPolicy {
     }
 
     /**
-     * 提交及保存前按实际结果复核共享总量和普通双模总量；候选提交负责原子回滚，保存前仅告警。
+     * 提交及保存前复核共享额度、真实产能和数量单位；候选提交负责原子回滚，保存前仅告警。
+     *
      * @param context 当前上下文
      * @return 失败原因，通过为空
      */
     public static String validateResults(LhScheduleContext context) {
-        if (context.getStructureTreadCountMap().isEmpty()) {
-            return null;
-        }
         for (LhScheduleResult result : context.getScheduleResultList()) {
             CxEmbryoLhTime source = resolveSource(context, result);
             for (LhShiftConfigVO shift : context.getScheduleWindowShifts()) {
                 Integer limit = resolveLimit(context, source, result.getEmbryoCode(), shift);
-                if (Objects.isNull(limit)) {
+                if (!isSupplyFirstShift(context, source, shift)) {
                     continue;
                 }
                 long total = usedQuantity(context, result.getStructureName(), result.getEmbryoCode(), shift, null);
-                int multiple = QUANTITY_POLICY.resolveAllocationMultiple(context, result,
-                        ShiftCapacityResolverUtil.resolveMachineMouldQty(result.getMouldQty()));
-                if (total > limit || StructureSwitchSchedulingPolicy.quantity(result, shift.getShiftIndex()) % multiple != 0) {
+                int plannedQty = StructureSwitchSchedulingPolicy.quantity(result, shift.getShiftIndex());
+                if ((Objects.nonNull(limit) && total > limit)
+                        || capRetainedTotal(context, result, shift, plannedQty) != plannedQty) {
                     return MessageFormat.format("结构{0}胎胚{1}班次{2}的含首检数量不合法，上限{3}，累计{4}",
                             result.getStructureName(), result.getEmbryoCode(), shift.getShiftIndex(), limit, total);
                 }

@@ -21,7 +21,8 @@ import java.util.Objects;
 /**
  * 新增待排SKU前置未排规则。
  *
- * <p>统一处理新增SKU日计划准入、纯遗留SKU静默出队、收尾小余量和仅历史欠产规则，
+ * <p>统一处理新增SKU日计划准入、窗口无计划且无欠产余量未排、纯遗留SKU静默出队、
+ * 收尾小余量和仅历史欠产规则，
  * 以及硫化参数SYS0311004=0时新增排产链路试制量试SKU的参数拦截。
  * 换活字块和新增排产必须复用本规则，避免SKU在S4.4被提前消费后绕过S4.5判断。</p>
  *
@@ -33,6 +34,10 @@ public final class PendingSkuUnscheduledRule {
     /** 非续作SKU在排程及提前生产范围内无日计划的统一未排原因 */
     public static final String DAILY_PLAN_ADMISSION_UNSCHEDULED_REASON =
             "排程窗口及提前生产范围内无日计划量";
+
+    /** 排程窗口内无月计划量且无欠产余量标识的统一未排原因 */
+    public static final String NO_OVERDUE_SURPLUS_UNSCHEDULED_REASON =
+            "排程窗口内无月计划量且无欠产余量，不参与排产";
 
     /** 续作试制、量试SKU完整判断范围无日计划量的统一未排原因 */
     public static final String CONTINUOUS_TRIAL_DAILY_PLAN_ADMISSION_UNSCHEDULED_REASON =
@@ -156,10 +161,74 @@ public final class PendingSkuUnscheduledRule {
     }
 
     /**
+     * 评估排程窗口内无月计划日计划量且无欠产余量标识的SKU是否直接进入未排。
+     * <p>判断范围严格限制为排程窗口首日～窗口末日的原始DAY_N汇总（originalWindowPlanQty），
+     * 窗口内无计划量且欠产余量标识为false时，通常列入未排；正规新增候选在固定提前
+     * 生产截止日内存在未来原始计划时保留候选资格，后续只能经提前生产中心和资源门禁排产。
+     * 不得单凭硫化余量、调整量或账面结转放行，也不得为试制量试扩大观察窗口。</p>
+     * <p>调用方负责豁免MES精确在机续作候选、停产收尾模式等特殊链路；本方法只负责判断和
+     * 构造未排结果，不修改SKU目标量、排产集合、胎胚库存或日计划账本。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 待评估SKU
+     * @return 命中规则时返回未排结果；未命中返回null
+     */
+    public static LhUnscheduledResult evaluateNoOverdueSurplusAdmission(LhScheduleContext context,
+                                                                        SkuScheduleDTO sku) {
+        if (Objects.isNull(context) || Objects.isNull(sku)
+                || sku.getOriginalWindowPlanQty() > 0
+                || sku.isOverdueSurplusFlag()
+                || hasEligibleFutureOriginalPlan(context, sku)) {
+            return null;
+        }
+        LocalDate windowStartDate = toLocalDate(context.getScheduleDate());
+        LocalDate windowEndDate = toLocalDate(context.getWindowEndDate());
+        int surplusQty = Math.max(0, sku.getSurplusQty());
+        String detail = String.format("工厂: %s, 批次: %s, 物料: %s, 产品状态: %s, 施工阶段: %s, "
+                        + "排程窗口: %s～%s, 窗口原始计划量: %d, 硫化余量: %d, 欠产余量标识: %s, "
+                        + "原因: %s",
+                context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(), sku.getProductStatus(),
+                sku.getConstructionStage(), windowStartDate, windowEndDate, sku.getOriginalWindowPlanQty(),
+                surplusQty, sku.isOverdueSurplusFlag(), NO_OVERDUE_SURPLUS_UNSCHEDULED_REASON);
+        log.info("窗口无计划且无欠产余量SKU未排准入拦截, factoryCode: {}, batchNo: {}, materialCode: {}, "
+                        + "productStatus: {}, constructionStage: {}, windowStartDate: {}, windowEndDate: {}, "
+                        + "originalWindowPlanQty: {}, surplusQty: {}, reason: {}",
+                context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(), sku.getProductStatus(),
+                sku.getConstructionStage(), windowStartDate, windowEndDate, sku.getOriginalWindowPlanQty(),
+                surplusQty, NO_OVERDUE_SURPLUS_UNSCHEDULED_REASON);
+        PriorityTraceLogHelper.appendProcessLog(context, "窗口无计划且无欠产余量不排产", detail);
+        LhUnscheduledResult unscheduledResult = buildUnscheduledResult(
+                context, sku, 0, NO_OVERDUE_SURPLUS_UNSCHEDULED_REASON,
+                UnscheduledReasonEnum.NO_OVERDUE_SURPLUS_NO_PLAN, detail);
+        // 月计划版本和生产版本属于本次准入未排结果的对账字段，与日计划准入拦截口径保持一致。
+        unscheduledResult.setMonthPlanVersion(sku.getMonthPlanVersion());
+        unscheduledResult.setProductionVersion(sku.getProductionVersion());
+        return unscheduledResult;
+    }
+
+    /**
+     * 判断窗口外正规新增计划是否处于本次允许的提前生产范围。
+     *
+     * @param context 排程上下文
+     * @param sku 待评估SKU
+     * @return 存在允许范围内的未来原始计划时返回true，仅保留候选，不授予资源
+     */
+    private static boolean hasEligibleFutureOriginalPlan(LhScheduleContext context, SkuScheduleDTO sku) {
+        if (!EarlyProductionChecker.isEligibleNewProductionSku(sku)
+                || Objects.isNull(context.getWindowEndDate())) {
+            return false;
+        }
+        return Objects.nonNull(EarlyProductionChecker.resolveFirstFuturePlanDate(
+                context, sku, toLocalDate(context.getWindowEndDate())));
+    }
+
+    /**
      * 评估续作试制、量试SKU是否因排程窗口内无日计划量且无硫化余量而直接进入未排。
      * <p>本规则仅按施工阶段识别试制和量试，判断范围严格限制为排程窗口首日~窗口末日，
-     * 不叠加提前生产天数阈值。已识别为续作且仍有硫化余量的SKU优先保留续作身份，
-     * 由续作收尾目标量和实际消费账本控制实际排产量；前日T+1交替计划仍不得放行无余量的全窗口为零SKU。</p>
+     * 不叠加提前生产天数阈值。已识别为续作且欠产余量标识为true（余量由上月欠产构成）的SKU
+     * 优先保留续作身份，由续作收尾目标量和实际消费账本控制实际排产量；窗口内无计划但余量
+     * 来自窗口外未来计划等非欠产来源（欠产余量标识为false）时不放行，直接进入未排；
+     * 前日T+1交替计划仍不得放行无余量的全窗口为零SKU。</p>
      * <p>本方法只负责判断和构造未排结果，不修改续作列表、机台或日计划账本。</p>
      *
      * @param context 排程上下文，提供排程窗口和跨月月计划数据
@@ -181,15 +250,15 @@ public final class PendingSkuUnscheduledRule {
             return null;
         }
         int surplusQty = Math.max(0, sku.getSurplusQty());
-        if (surplusQty > 0) {
+        if (surplusQty > 0 && sku.isOverdueSurplusFlag()) {
             String retainDetail = String.format("工厂: %s, 批次: %s, 物料: %s, 产品状态: %s, 施工阶段: %s, "
                             + "续作机台: %s, 排程窗口: %s～%s, 窗口原始计划量: %d, 硫化余量: %d, "
-                            + "决策: 保留续作并按余量严格排产",
+                            + "欠产余量标识: %s, 决策: 保留续作并按欠产余量严格排产",
                     context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(), sku.getProductStatus(),
                     sku.getConstructionStage(), sku.getContinuousMachineCode(), windowStartDate, windowEndDate,
-                    sku.getOriginalWindowPlanQty(), surplusQty);
-            log.info("续作试制量试SKU余量优先放行, {}", retainDetail);
-            PriorityTraceLogHelper.appendProcessLog(context, "续作试制量试余量优先放行", retainDetail);
+                    sku.getOriginalWindowPlanQty(), surplusQty, sku.isOverdueSurplusFlag());
+            log.info("续作试制量试SKU欠产余量优先放行, {}", retainDetail);
+            PriorityTraceLogHelper.appendProcessLog(context, "续作试制量试欠产余量优先放行", retainDetail);
             return null;
         }
 

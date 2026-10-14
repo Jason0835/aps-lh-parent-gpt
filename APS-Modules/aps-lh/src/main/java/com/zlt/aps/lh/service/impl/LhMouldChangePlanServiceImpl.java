@@ -3,6 +3,7 @@ package com.zlt.aps.lh.service.impl;
 import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -28,6 +29,7 @@ import com.zlt.aps.lh.mapper.LhSharedMouldPatEntityMapper;
 import com.zlt.aps.lh.service.ILhMouldChangePlanService;
 import com.zlt.aps.lh.service.ILhParamsService;
 import com.zlt.aps.lh.util.LhMouldCodeUtil;
+import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.maindata.mapper.LhMachineInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
@@ -417,7 +419,8 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
     /**
      * 解析模具交替计划最终使用的模具号。
      *
-     * <p>换活字块计划继续取当前物理机台左右侧的在机模具号，并按原值优先的顺序合并；
+     * <p>换活字块计划取在机模具号后按原值优先的顺序合并：单控机台（编码以 L/R 结尾）只取
+     * 本侧在机模具号，双模机台按物理机台整机口径取，并按原值优先的顺序合并；
      * 正规换模计划从后物料对应的共享模具配置中排除在机模具号后，稳定随机选择最多两副
      * 模具并直接覆盖原模具号；喷砂清洗和干冰清洗计划不填写模具号，其他类型继续沿用共享
      * 模具配置和原有合并逻辑。</p>
@@ -456,7 +459,8 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
                     String changeMouldType = plan.getChangeMouldType();
                     if (MouldChangeTypeEnum.containsCode(changeMouldType,
                             MouldChangeTypeEnum.TYPE_BLOCK.getCode())) {
-                        String matchedMouldCode = this.resolveOnlineMouldCode(plan, onlineInfoMap);
+                        // 换活字块沿用在机模具号，单控机台只取本侧，不与配对侧拼接。
+                        String matchedMouldCode = this.resolveSingleSideOnlineMouldCode(plan, onlineInfoMap);
                         plan.setMouldCode(this.mergeMouldCode(plan.getMouldCode(), matchedMouldCode,
                                 changeMouldType));
                     } else if (MouldChangeTypeEnum.containsCode(changeMouldType,
@@ -872,15 +876,20 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
     /**
      * 合并计划原模具号和匹配模具号。
      *
+     * <p>两侧拆分口径刻意不同：原模具号来自 correctMouldChangePlanMouldCode 的
+     * formatMouldCodeSets，是「每两副组成一套、套内以斜杠分隔」的组套书写形态，必须按斜杠
+     * 拆开才能与匹配模具号逐副去重，否则会出现「斜杠串 + 逗号串」并存，导致同一副模具
+     * 以两种书写形态重复登记；匹配模具号中的斜杠是「模具号/花纹块」业务语义，只按逗号拆分。</p>
+     *
      * <p>原模具号在前、匹配模具号在后，去除空值和重复值；共享模具计划保留原有换行展示格式。</p>
      *
-     * @param originalMouldCode 原模具号
-     * @param matchedMouldCode  匹配模具号
+     * @param originalMouldCode 原模具号，组套格式按斜杠和逗号拆分
+     * @param matchedMouldCode  匹配模具号，只按逗号拆分
      * @param changeMouldType   换模类型
      * @return 合并后的模具号
      */
     private String mergeMouldCode(String originalMouldCode, String matchedMouldCode, String changeMouldType) {
-        LinkedHashSet<String> mouldCodeSet = LhMouldCodeUtil.splitMouldCode(originalMouldCode);
+        LinkedHashSet<String> mouldCodeSet = LhMouldCodeUtil.splitMouldCodeBySetSeparator(originalMouldCode);
         mouldCodeSet.addAll(LhMouldCodeUtil.splitMouldCode(matchedMouldCode));
         if (CollectionUtils.isEmpty(mouldCodeSet)) {
             return "";
@@ -994,6 +1003,53 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
         Map<String, LhMachineOnlineInfo> latestByMachine = new LinkedHashMap<>();
         matchedInfoList.forEach(onlineInfo -> latestByMachine.putIfAbsent(onlineInfo.getLhCode(), onlineInfo));
         return latestByMachine.values().stream()
+                .map(LhMachineOnlineInfo::getInMachineMouldCode)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .collect(Collectors.joining(","));
+    }
+
+    /**
+     * 解析换活字块计划对应的在机模具号。
+     *
+     * <p>单控机台（机台编码以 L/R 结尾）的左右两侧是独立运行单元，各自只应登记本侧在机的
+     * 模具号。若沿用 {@link #resolveOnlineMouldCode} 的物理机台口径，K1501L、K1501R 会被
+     * 归并到同一物理机台 K1501，取到左右两侧模具号的拼接值，导致两条计划的模具号完全相同。
+     * 因此单控机台必须按运行态机台编码精确匹配；非单控机台沿用物理机台整机口径。</p>
+     *
+     * <p>精确匹配未命中时回退整机口径，避免该侧在机记录缺失导致模具号被清空。宁可与现状
+     * 保持一致，不可丢失模具号。</p>
+     *
+     * @param plan          模具交替计划
+     * @param onlineInfoMap 机台前缀到在机信息的映射
+     * @return 在机模具号，多个模具号以英文逗号分隔；单控机台只返回本侧模具号
+     */
+    private String resolveSingleSideOnlineMouldCode(LhMouldChangePlan plan,
+                                                    Map<String, List<LhMachineOnlineInfo>> onlineInfoMap) {
+        if (!LhSingleControlMachineUtil.isSingleMouldMachine(plan.getLhMachineCode())) {
+            // 双模机台按整机口径返回，直接复用既有逻辑。
+            return this.resolveOnlineMouldCode(plan, onlineInfoMap);
+        }
+        String planMachineCode = StringUtils.trim(plan.getLhMachineCode());
+        List<LhMachineOnlineInfo> matchedInfoList =
+                onlineInfoMap.get(this.stripLeftRightSuffix(planMachineCode));
+        if (CollectionUtils.isEmpty(matchedInfoList)) {
+            return "";
+        }
+        /*
+         * buildOnlineInfoMap 已按 LH_CODE、ONLINE_DATE、UPDATE_TIME、ID 依次倒序排列，
+         * putIfAbsent 保留的即为该侧最新一条在机记录。
+         */
+        Map<String, LhMachineOnlineInfo> latestBySide = new LinkedHashMap<>();
+        matchedInfoList.stream()
+                .filter(onlineInfo -> StringUtils.equalsIgnoreCase(
+                        StringUtils.trim(onlineInfo.getLhCode()), planMachineCode))
+                .forEach(onlineInfo -> latestBySide.putIfAbsent(onlineInfo.getLhCode(), onlineInfo));
+        if (latestBySide.isEmpty()) {
+            // 该侧无在机记录时回退整机口径，避免模具号被清空。
+            return this.resolveOnlineMouldCode(plan, onlineInfoMap);
+        }
+        return latestBySide.values().stream()
                 .map(LhMachineOnlineInfo::getInMachineMouldCode)
                 .filter(StringUtils::isNotBlank)
                 .distinct()
@@ -1265,7 +1321,7 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
                 docEntity.setOrderNo(exist.getOrderNo());
                 docEntity.setIsRelease(exist.getIsRelease());
                 docEntity.setMouldStatus(exist.getMouldStatus());
-                lhMouldChangePlanMapper.updateById(docEntity);
+                this.updateImportedMouldChangePlan(docEntity);
                 updateNum++;
             } else {
                 failureNum++;
@@ -1296,17 +1352,18 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
     }
 
     /**
-     * 校验并转换模具交替计划导入文本中的班次和示方类型。
+     * 校验并转换模具交替计划导入文本中的清洗类型、班次和示方类型。
      *
      * @param plan            模具交替计划导入行
      * @param importLogId     导入日志编号
      * @param errorRow        Excel行号
      * @param importErrorLogs 当前行错误日志集合
-     * @return 任一字段为空或无法匹配枚举时返回true
+     * @return 字段值无法识别或必填类型缺失时返回true
      */
     private boolean normalizeMouldChangePlanImportTypes(LhMouldChangePlan plan, Long importLogId,
                                                         int errorRow, List<ImportErrorLog> importErrorLogs) {
-        boolean invalid = false;
+        boolean invalid = this.normalizeMouldChangePlanImportCleaning(plan, importLogId,
+                errorRow, importErrorLogs);
         String classIndexText = plan.getClassIndex();
         ShiftEnum shiftEnum = ShiftEnum.getByMouldChangePlanExcelText(classIndexText);
         if (shiftEnum == null) {
@@ -1331,6 +1388,115 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
             plan.setProductStatus(statusEnum.getCode());
         }
         return invalid;
+    }
+
+    /**
+     * 校验模板清洗选项并转换为清洗类型和交替类型字典值。
+     *
+     * @param plan            模具交替计划导入行
+     * @param importLogId     导入日志编号
+     * @param errorRow        Excel行号
+     * @param importErrorLogs 当前行错误日志集合
+     * @return 清洗选项无效或同时选择两种清洗时返回true
+     */
+    private boolean normalizeMouldChangePlanImportCleaning(LhMouldChangePlan plan, Long importLogId,
+                                                           int errorRow, List<ImportErrorLog> importErrorLogs) {
+        boolean invalid = false;
+        String cleanTypeText = plan.getCleanType();
+        if (StringUtil.isNotBlank(cleanTypeText)
+                && !MouldChangeTypeEnum.SAND_BLAST.getCode().equals(cleanTypeText.trim())
+                && !MouldChangeTypeEnum.DRY_ICE.getCode().equals(cleanTypeText.trim())) {
+            String message = I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.cleanTypeInvalid");
+            ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorRow,
+                    MessageFormat.format(message, errorRow, cleanTypeText), importErrorLogs);
+            invalid = true;
+        }
+
+        Boolean sandBlasting = this.parseCleaningImportOption(plan.getIsSandblastingClean());
+        Boolean dryIce = this.parseCleaningImportOption(plan.getIsDryIceClean());
+        if (sandBlasting == null) {
+            this.addInvalidCleaningOptionError(importLogId, errorRow,
+                    plan.getIsSandblastingClean(), importErrorLogs);
+            invalid = true;
+        }
+        if (dryIce == null) {
+            this.addInvalidCleaningOptionError(importLogId, errorRow,
+                    plan.getIsDryIceClean(), importErrorLogs);
+            invalid = true;
+        }
+        boolean sandBlastingSelected = Boolean.TRUE.equals(sandBlasting);
+        boolean dryIceSelected = Boolean.TRUE.equals(dryIce);
+        if (sandBlastingSelected && dryIceSelected) {
+            String message = I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.cleanTypeConflict");
+            ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorRow,
+                    MessageFormat.format(message, errorRow), importErrorLogs);
+            invalid = true;
+        }
+
+        if (sandBlastingSelected && !dryIceSelected) {
+            plan.setCleanType(MouldChangeTypeEnum.SAND_BLAST.getCode());
+        } else if (dryIceSelected && !sandBlastingSelected) {
+            plan.setCleanType(MouldChangeTypeEnum.DRY_ICE.getCode());
+        } else {
+            plan.setCleanType(null);
+        }
+        plan.setChangeMouldType(Boolean.TRUE.equals(this.parseCleaningImportOption(plan.getIsReplaceBlock()))
+                ? MouldChangeTypeEnum.TYPE_BLOCK.getCode() : MouldChangeTypeEnum.REGULAR.getCode());
+        return invalid;
+    }
+
+    /**
+     * 将导入模板的是/否文本转换为布尔值。
+     *
+     * @param optionText Excel中的选项文本
+     * @return 是返回true，否或空返回false，无法识别时返回null
+     */
+    private Boolean parseCleaningImportOption(String optionText) {
+        if (StringUtil.isBlank(optionText)) {
+            return Boolean.FALSE;
+        }
+        String normalizedText = optionText.trim();
+        if (YesOrNoEnum.YES.getCode().equals(normalizedText)
+                || "是".equals(normalizedText) || "是Có".equals(normalizedText)
+                || "是 Có".equals(normalizedText)) {
+            return Boolean.TRUE;
+        }
+        if (YesOrNoEnum.NO.getCode().equals(normalizedText)
+                || "否".equals(normalizedText) || "Không".equals(normalizedText)) {
+            return Boolean.FALSE;
+        }
+        return null;
+    }
+
+    /**
+     * 记录清洗选项文本无效的导入错误。
+     *
+     * @param importLogId     导入日志编号
+     * @param errorRow        Excel行号
+     * @param optionText      无法识别的选项文本
+     * @param importErrorLogs 当前行错误日志集合
+     */
+    private void addInvalidCleaningOptionError(Long importLogId, int errorRow, String optionText,
+                                               List<ImportErrorLog> importErrorLogs) {
+        String message = I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.cleanOptionInvalid");
+        ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorRow,
+                MessageFormat.format(message, errorRow, StringUtils.defaultString(optionText, "")),
+                importErrorLogs);
+    }
+
+    /**
+     * 更新导入的模具交替计划，并在清洗类型为空时显式清空数据库字段。
+     *
+     * @param plan 待更新的模具交替计划
+     */
+    private void updateImportedMouldChangePlan(LhMouldChangePlan plan) {
+        lhMouldChangePlanMapper.updateById(plan);
+        if (plan.getCleanType() == null) {
+            LambdaUpdateWrapper<LhMouldChangePlan> updateWrapper = new LambdaUpdateWrapper<>();
+            updateWrapper.eq(LhMouldChangePlan::getId, plan.getId())
+                    .set(LhMouldChangePlan::getCleanType, null);
+            lhMouldChangePlanMapper.update(null, updateWrapper);
+        }
     }
 
     /**

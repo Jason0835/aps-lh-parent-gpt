@@ -96,6 +96,24 @@ public final class LhMouldCodeUtil {
     }
 
     /**
+     * 按英文逗号或斜杠拆分模具号文本。
+     *
+     * <p>与 {@link #splitMouldCode(String)} 的区别：本方法同时按斜杠拆分，用于识别
+     * 「同一套内两副模具」的组套书写形态（例如 {@code formatMouldCodeSets} 产出的
+     * {@code HM20230903857/HM20230903858}）。只有按斜杠拆开，才能与逗号形态的同一副模具
+     * 去重，避免出现「斜杠串 + 逗号串」并存导致同一副模具重复登记。</p>
+     *
+     * <p>使用边界：该方法仅适用于模具号自身的归一化。斜杠承载「模具号/花纹块」业务语义的
+     * 展示值禁止使用本方法拆分，否则会把花纹块误当作模具号。</p>
+     *
+     * @param mouldCodeText 模具号文本，套内以斜杠分隔、套间以英文逗号分隔
+     * @return 去空格、去空值、去重后的模具号集合，保持原文本顺序
+     */
+    public static LinkedHashSet<String> splitMouldCodeBySetSeparator(String mouldCodeText) {
+        return splitMouldCodeSetText(mouldCodeText);
+    }
+
+    /**
      * 拼接模具号集合。
      *
      * @param mouldCodeCollection 模具号集合

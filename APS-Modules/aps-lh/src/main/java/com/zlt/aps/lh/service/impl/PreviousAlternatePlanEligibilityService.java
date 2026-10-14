@@ -249,7 +249,7 @@ public class PreviousAlternatePlanEligibilityService {
      * @param businessDate 实际业务日
      * @param candidate 当前新增候选
      */
-    void fillMachineDemand(LhScheduleContext context,
+    public void fillMachineDemand(LhScheduleContext context,
                            LocalDate businessDate,
                            DailyNewSpecCandidate candidate) {
         SkuScheduleDTO sku = candidate.getSku();

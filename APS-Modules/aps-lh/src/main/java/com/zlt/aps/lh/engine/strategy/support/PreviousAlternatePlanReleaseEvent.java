@@ -19,6 +19,10 @@ public class PreviousAlternatePlanReleaseEvent implements Serializable {
     public static final int SINGLE_REPLACEMENT_MOULD_QTY = 1;
     /** 原始交替计划，保留计划编号、前后物料及动作类型。 */
     private LhMouldChangePlan plan;
+    /**
+     * 本次实际动作只读快照，独立于历史计划类型及其排序，候选回滚不改变原装机事实。
+     */
+    private PreviousAlternateActionPlan actualActionPlan;
     /** 当前运行态机台编码，左右侧保持独立。 */
     private String machineCode;
     /** 下机前实际在机物料，不能用历史后料替代。 */

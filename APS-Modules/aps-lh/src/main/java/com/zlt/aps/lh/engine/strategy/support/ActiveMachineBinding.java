@@ -43,6 +43,28 @@ public class ActiveMachineBinding {
     private Date estimatedEndTime;
     /** 已由前置执行完成的最后业务日；后续编排不得再次消费这些日期的产能和需求。 */
     private LocalDate preparedThroughDate;
+    /**
+     * 独立结构切换前置绑定，后续班次只能续排该绑定，不重复换模或首检。
+     */
+    private boolean structureSwitchBinding;
+
+    /**
+     * 判断当前绑定是否由独立结构切换步骤提交。
+     *
+     * @return 是否由结构切换步骤提交
+     */
+    public boolean isStructureSwitchBinding() {
+        return structureSwitchBinding;
+    }
+
+    /**
+     * 登记当前绑定的结构切换来源身份。
+     *
+     * @param value 是否由结构切换步骤提交
+     */
+    public void setStructureSwitchBinding(boolean value) {
+        this.structureSwitchBinding = value;
+    }
 
     /**
      * 读取前置绑定已承接需求的起始业务日。

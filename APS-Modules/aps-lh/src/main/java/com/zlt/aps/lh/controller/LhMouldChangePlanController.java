@@ -329,7 +329,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
     }
 
     /**
-     * 将导入模板数据转换为模具交替计划实体，保留班次和示方类型原始文本供服务层枚举校验。
+     * 将导入模板数据转换为模具交替计划实体，保留班次、示方类型和清洗选项原文供服务层校验转换。
      *
      * @param list         模具交替计划导入行
      * @param scheduleDate 排程日期
@@ -350,15 +350,6 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             // 保留模板示方类型原文，由导入服务统一校验并转换为字典值。
             lhMouldChangePlan.setProductStatus(lhMouldChangePlanVo.getAfterMaterialType());
 
-            if (YesOrNoEnum.YES.getCode().equals(lhMouldChangePlanVo.getIsReplaceBlock())) {
-                lhMouldChangePlan.setChangeMouldType(MouldChangeTypeEnum.TYPE_BLOCK.getCode());
-            } else if (YesOrNoEnum.YES.getCode().equals(lhMouldChangePlanVo.getIsSandblastingClean())) {
-                lhMouldChangePlan.setChangeMouldType(MouldChangeTypeEnum.SAND_BLAST.getCode());
-            } else if (YesOrNoEnum.YES.getCode().equals(lhMouldChangePlanVo.getIsDryIceClean())) {
-                lhMouldChangePlan.setChangeMouldType(MouldChangeTypeEnum.DRY_ICE.getCode());
-            } else {
-                lhMouldChangePlan.setChangeMouldType(MouldChangeTypeEnum.REGULAR.getCode());
-            }
             String endType = lhMouldChangePlanVo.getEndType();
             if ("是Có".equals(endType)) {
                 lhMouldChangePlan.setEndType(YesOrNoEnum.NO.getCode());
@@ -582,11 +573,12 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         if (item == null) {
             return 2;
         }
-        String changeMouldType = item.getChangeMouldType();
-        if (MouldChangeTypeEnum.containsAnyCode(changeMouldType,
+        String cleanType = item.getCleanType();
+        if (MouldChangeTypeEnum.containsAnyCode(cleanType,
                 MouldChangeTypeEnum.SAND_BLAST.getCode(), MouldChangeTypeEnum.DRY_ICE.getCode())) {
             return 0;
         }
+        String changeMouldType = item.getChangeMouldType();
         return MouldChangeTypeEnum.containsAnyCode(changeMouldType,
                 MouldChangeTypeEnum.REGULAR.getCode(), MouldChangeTypeEnum.TYPE_BLOCK.getCode()) ? 1 : 2;
     }
@@ -894,20 +886,24 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
 
             lhMouldChangePlanVo.setSeq(seq++);
 
-            // 如果换模类型是喷砂清洗或干冰清洗，前规格不导出
+            // 清洗类型仅从新增字段读取；旧交替类型中的清洗编码由迁移脚本补入。
             String changeMouldType = lhMouldChangePlan.getChangeMouldType();
             if (MouldChangeTypeEnum.containsCode(changeMouldType, MouldChangeTypeEnum.TYPE_BLOCK.getCode())) {
                 lhMouldChangePlanVo.setIsReplaceBlock(YesOrNoEnum.YES.getCode());
             }
-            if (MouldChangeTypeEnum.containsCode(changeMouldType, MouldChangeTypeEnum.SAND_BLAST.getCode())) {
+            if (MouldChangeTypeEnum.SAND_BLAST.getCode().equals(lhMouldChangePlan.getCleanType())) {
                 lhMouldChangePlanVo.setIsSandblastingClean(YesOrNoEnum.YES.getCode());
-                lhMouldChangePlanVo.setBeforeMaterialCode("");
-                lhMouldChangePlanVo.setBeforeMaterialDesc("");
+                if (StringUtils.isBlank(changeMouldType)) {
+                    lhMouldChangePlanVo.setBeforeMaterialCode("");
+                    lhMouldChangePlanVo.setBeforeMaterialDesc("");
+                }
             }
-            if (MouldChangeTypeEnum.containsCode(changeMouldType, MouldChangeTypeEnum.DRY_ICE.getCode())) {
+            if (MouldChangeTypeEnum.DRY_ICE.getCode().equals(lhMouldChangePlan.getCleanType())) {
                 lhMouldChangePlanVo.setIsDryIceClean(YesOrNoEnum.YES.getCode());
-                lhMouldChangePlanVo.setBeforeMaterialCode("");
-                lhMouldChangePlanVo.setBeforeMaterialDesc("");
+                if (StringUtils.isBlank(changeMouldType)) {
+                    lhMouldChangePlanVo.setBeforeMaterialCode("");
+                    lhMouldChangePlanVo.setBeforeMaterialDesc("");
+                }
             }
             resultList.add(lhMouldChangePlanVo);
         }

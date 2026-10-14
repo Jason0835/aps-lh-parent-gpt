@@ -43,6 +43,10 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 public final class StructureSwitchSchedulingPolicy {
+    /**
+     * 已通过机台匹配但被结构切换班次名额拒绝的公共原因前缀。
+     */
+    public static final String SHIFT_LIMIT_REJECTION_PREFIX = "结构切换分班机台上限拒绝";
     /** 明确标识为1才启用；历史空值按0处理。 */
     private static final int YES = 1;
     /** 首个上机班上限。 */
@@ -72,9 +76,34 @@ public final class StructureSwitchSchedulingPolicy {
      * @return 同一有效来源记录；非适用场景返回null
      */
     public static CxEmbryoLhTime resolveSource(LhScheduleContext context, SkuScheduleDTO sku) {
+        if (Objects.isNull(context)) {
+            return null;
+        }
+        Date businessDate = Objects.nonNull(context.getCurrentScheduleDate())
+                ? context.getCurrentScheduleDate() : context.getScheduleDate();
+        return resolveSource(context, sku, Objects.isNull(businessDate) ? null
+                : businessDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate());
+    }
+
+    /**
+     * 显式业务日的只读识别，供独立步骤冻结窗口资格，禁止为识别候选改写当前业务日。
+     *
+     * @param context 排程上下文
+     * @param sku 候选SKU
+     * @param currentDate 需要核对的业务日
+     * @return 原规则认可的同一供胚来源
+     */
+    public static CxEmbryoLhTime resolveSource(LhScheduleContext context, SkuScheduleDTO sku, LocalDate currentDate) {
         if (!isEnabled(context) || context.isStructureSwitchSelectionProbe()
                 || Objects.isNull(sku) || StringUtils.isEmpty(sku.getStructureName())) {
             return null;
+        }
+        if (!context.isIsolatedNextShiftPlan()) {
+            CxEmbryoLhTime frozen = context.getStructureSwitchCandidateSourceMap()
+                    .get(StructureSwitchCandidateScope.skuKey(sku));
+            if (Objects.nonNull(frozen)) {
+                return frozen;
+            }
         }
         CxEmbryoLhTime source = context.getStructureSwitchSourceMap().get(sku.getStructureName());
         if (Objects.isNull(source) || Objects.isNull(source.getEarliestLhTime())) {
@@ -87,12 +116,9 @@ public final class StructureSwitchSchedulingPolicy {
         if (NewSpecEmbryoAvailableTimeResolver.isStructureScheduledInCurrentContinuation(context, sku)) {
             return null;
         }
-        Date businessDate = Objects.nonNull(context.getCurrentScheduleDate())
-                ? context.getCurrentScheduleDate() : context.getScheduleDate();
-        if (Objects.isNull(businessDate)) {
+        if (Objects.isNull(currentDate)) {
             return null;
         }
-        LocalDate currentDate = businessDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
         LocalDate futureDate = EarlyProductionChecker.resolveFirstFuturePlanDate(context, sku, currentDate);
         if (EarlyProductionChecker.isStructureSwitchEarlyProduction(context, sku, currentDate, futureDate)) {
             return source;
@@ -179,7 +205,8 @@ public final class StructureSwitchSchedulingPolicy {
     }
 
     /**
-     * 在完整窗口内解析结构分班名额允许的最早首检或生产时间，准备动作不随名额后移。
+     * 在完整窗口内解析规则首班及分班名额允许的最早首检或生产时间，准备动作不随名额后移。
+     *
      * @param context 排程上下文
      * @param sku 候选SKU
      * @param machineCode 候选物理机台或运行侧
@@ -192,12 +219,20 @@ public final class StructureSwitchSchedulingPolicy {
         if (Objects.isNull(source) || Objects.isNull(requestedStart)) {
             return requestedStart;
         }
+        StructureSwitchFirstShiftDecision firstDecision =
+                StructureSwitchFirstShiftPolicy.resolve(context, source, sku, machineCode);
+        if (Objects.nonNull(firstDecision) && Objects.isNull(firstDecision.getFirstShift())) {
+            return null;
+        }
+        Date notBefore = Objects.isNull(firstDecision) ? requestedStart
+                : later(requestedStart, firstDecision.getFirstShift().getShiftStartDateTime());
         for (LhShiftConfigVO shift : orderedShifts(context)) {
-            if (!requestedStart.before(shift.getShiftEndDateTime())) {
+            if (!notBefore.before(shift.getShiftEndDateTime())) {
                 continue;
             }
-            Date allowedStart = later(requestedStart, shift.getShiftStartDateTime());
-            StructureSwitchPlan candidate = createPlan(context, source, null, shift, requestedStart, allowedStart);
+            Date allowedStart = later(notBefore, shift.getShiftStartDateTime());
+            StructureSwitchPlan candidate = createPlan(context, source, null, shift, requestedStart, allowedStart)
+                    .withFirstShiftDecision(firstDecision);
             // 复用预演和提交的同一计数规则，首班一台、等结果第二班两台；单控按物理机台去重。
             if (Objects.isNull(evaluate(context, candidate, sku, machineCode, null))) {
                 return allowedStart;
@@ -231,12 +266,51 @@ public final class StructureSwitchSchedulingPolicy {
         if (Objects.isNull(source) || Objects.isNull(first)) {
             return null;
         }
-        // S0/S1按首个正量维护；跨班首检不能被批量取偶裁掉，P0按本候选正式生产班次定位。
+        // 实际首产班保护跨班首检；规则S0/S1由独立判定附加，P0仍按本候选正式生产定位。
         LhShiftConfigVO bulk = null;
         if (isLargeInch(source)) {
             bulk = Objects.nonNull(formalShift) ? formalShift : first;
         }
         return new StructureSwitchPlan(source, first, bulk, baseStart, productionStart, inspection, false);
+    }
+
+    /**
+     * 在原首检生产计划上附加规则首班，实际首产班和P0保持各自含义。
+     *
+     * @param context 本批上下文
+     * @param source 供胚来源
+     * @param inspection 首检分摊
+     * @param formalShift 正式生产班
+     * @param baseStart 原始基准起点
+     * @param productionStart 正式生产起点
+     * @param sku 当前候选SKU
+     * @param machineCode 运行态机台编码
+     * @param runtimeCapacity 正式内核使用的运行态班产
+     * @return 含首班判定的计划，无实际量落点时为空
+     */
+    public static StructureSwitchPlan createPlan(LhScheduleContext context, CxEmbryoLhTime source,
+            FirstInspectionAllocationPlan inspection, LhShiftConfigVO formalShift, Date baseStart,
+            Date productionStart, SkuScheduleDTO sku, String machineCode, int runtimeCapacity) {
+        StructureSwitchPlan plan = createPlan(context, source, inspection, formalShift, baseStart, productionStart);
+        return Objects.isNull(plan) ? null : plan.withFirstShiftDecision(
+                StructureSwitchFirstShiftPolicy.resolve(context, source, sku, machineCode, runtimeCapacity));
+    }
+
+    /**
+     * 读取已提交的共享规则首班，未提交时使用候选判定，适用范围外沿用实际首产班。
+     *
+     * @param context 本批运行态
+     * @param plan 候选冻结提案
+     * @return 规则首班，无法合法认定时为空
+     */
+    public static LhShiftConfigVO resolveFirstShift(LhScheduleContext context, StructureSwitchPlan plan) {
+        StructureSwitchRuntimeState state = context.getStructureSwitchRuntimeMap()
+                .get(plan.getSource().getNextStructureName());
+        StructureSwitchFirstShiftDecision decision = Objects.nonNull(state)
+                && Objects.equals(state.getSourceId(), plan.getSource().getId())
+                && Objects.nonNull(state.getFirstShiftDecision())
+                ? state.getFirstShiftDecision() : plan.getFirstShiftDecision();
+        return Objects.isNull(decision) ? plan.getFirstQuantityShift() : decision.getFirstShift();
     }
 
     /**
@@ -316,10 +390,11 @@ public final class StructureSwitchSchedulingPolicy {
         Date formalStart = later(changeEnd, inspection.getInspectionEndTime());
         LhShiftConfigVO formalShift = FirstInspectionQtyUtil.resolveAttributionShift(shifts, formalStart);
         LhShiftConfigVO occupationShift = FirstInspectionQtyUtil.resolveAttributionShift(shifts, inspectionStart);
-        StructureSwitchPlan preliminary = createPlan(context, source, inspection, formalShift, baseStart, formalStart);
+        StructureSwitchPlan preliminary = createPlan(context, source, inspection, formalShift, baseStart, formalStart,
+                sku, machineCode, capacity);
         LhShiftConfigVO firstShift = preliminary.getFirstQuantityShift();
         StructureSwitchPlan plan = new StructureSwitchPlan(source, firstShift, preliminary.getFirstBatchShift(),
-                baseStart, formalStart, inspection, true);
+                baseStart, formalStart, inspection, true, preliminary.getFirstShiftDecision());
         log.info("结构切换含首检时间轴, sourceId={}, structure={}, sku={}, machine={}, changeStart={}, changeEnd={}, "
                         + "machineStart={}, embryoTime={}, formulaStart={}, inspectionStart={}, formalStart={}, firstShift={}",
                 source.getId(), source.getNextStructureName(), sku.getMaterialCode(), machineCode, changeStart, changeEnd,
@@ -429,6 +504,11 @@ public final class StructureSwitchSchedulingPolicy {
         StructureSwitchPlan plan = createPlan(context, source, availability.getFirstInspectionPlan(),
                 availability.getFormalTargetShift(), availability.getMachineReadyTime(),
                 availability.getFormalAvailableProductionTime());
+        if (Objects.isNull(plan)) {
+            return availability;
+        }
+        plan = plan.withFirstShiftDecision(StructureSwitchFirstShiftPolicy.resolve(context, source, sku,
+                availability.getMachine().getMachineCode()));
         FirstInspectionTimelinePlan timeline = availability.getFirstInspectionTimelinePlan();
         if (Objects.isNull(timeline)) {
             timeline = FirstInspectionTimelinePlan.of(availability.getFirstInspectionPlan(),
@@ -454,7 +534,8 @@ public final class StructureSwitchSchedulingPolicy {
     }
 
     /**
-     * 校验完整计划会涉及的受限班次，包含历史回看导致S0前移的已有结果。
+     * 按共享规则首班校验完整计划覆盖的受限班次，适用范围外沿用历史实际首产规则。
+     *
      * @param context 排程上下文
      * @param plan 冻结切换计划
      * @param machineCode 候选机台
@@ -485,15 +566,27 @@ public final class StructureSwitchSchedulingPolicy {
             return null;
         }
         String structure = plan.getSource().getNextStructureName();
-        Date anchor = plan.getFirstQuantityShift().getShiftStartDateTime();
+        LhShiftConfigVO ruleFirst = resolveFirstShift(context, plan);
+        if (Objects.isNull(ruleFirst)) {
+            return rejectedFirstShift(context, plan, sku, machineCode, plan.getFirstShiftDecision().getReason());
+        }
+        Date anchor = ruleFirst.getShiftStartDateTime();
         StructureSwitchRuntimeState state = context.getStructureSwitchRuntimeMap().get(structure);
-        if (Objects.nonNull(state) && (Objects.nonNull(actualQuantities) || state.getFirstShiftStart().before(anchor))) {
+        if (Objects.nonNull(state) && Objects.equals(state.getSourceId(), plan.getSource().getId())
+                && Objects.isNull(plan.getFirstShiftDecision())
+                && (Objects.nonNull(actualQuantities) || state.getFirstShiftStart().before(anchor))) {
             anchor = state.getFirstShiftStart();
         }
         LhShiftConfigVO secondShift = Objects.nonNull(state) && Objects.equals(anchor, state.getFirstShiftStart())
                 ? state.getSecondShift() : nextShift(context, anchor);
         String physical = LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode);
         for (LhShiftConfigVO shift : orderedShifts(context)) {
+            boolean occupies = Objects.nonNull(actualQuantities)
+                    ? actualQuantities.getOrDefault(shift.getShiftIndex(), 0) > 0 : occupies(plan, shift);
+            if (Objects.nonNull(plan.getFirstShiftDecision()) && occupies
+                    && shift.getShiftStartDateTime().before(anchor)) {
+                return rejectedFirstShift(context, plan, sku, machineCode, "首检或生产早于规则首班");
+            }
             int offset = SECOND_SHIFT_LIMIT;
             if (Objects.equals(shift.getShiftStartDateTime(), anchor)) {
                 offset = 0;
@@ -516,9 +609,6 @@ public final class StructureSwitchSchedulingPolicy {
                     .map(result -> LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode()))
                     .forEach(machines::add);
             int scheduledCount = machines.size();
-            boolean occupies = Objects.nonNull(actualQuantities)
-                    ? actualQuantities.getOrDefault(shift.getShiftIndex(), 0) > 0
-                    : occupies(plan, shift);
             if (occupies) {
                 machines.add(physical);
             }
@@ -531,7 +621,7 @@ public final class StructureSwitchSchedulingPolicy {
                     Objects.isNull(plan.getFirstBatchShift()) ? null : plan.getFirstBatchShift().getShiftStartDateTime(),
                     shift.getShiftIndex(), scheduledCount, limit, allowed);
             if (!allowed) {
-                String reason = new StringBuilder("结构切换分班机台上限拒绝，结构=").append(structure)
+                String reason = new StringBuilder(SHIFT_LIMIT_REJECTION_PREFIX).append("，结构=").append(structure)
                         .append("，班次=").append(shift.getShiftIndex()).append("，已排=").append(scheduledCount)
                         .append("，合计=").append(machines.size()).append("，上限=").append(limit).toString();
                 return new StructureMachineLimitDecision(true, false, DailySchedulePhase.EARLY_PRODUCTION,
@@ -542,6 +632,28 @@ public final class StructureSwitchSchedulingPolicy {
             }
         }
         return null;
+    }
+
+    /**
+     * 生成首班无合法落点或提案提前的拒绝，沿用当前组合失败及完整回滚流程。
+     *
+     * @param context 本批上下文
+     * @param plan 冻结提案
+     * @param sku 当前候选，提交校验时可为空
+     * @param machineCode 运行态机台
+     * @param reason 拒绝依据
+     * @return 当前组合的拒绝决策
+     */
+    private static StructureMachineLimitDecision rejectedFirstShift(LhScheduleContext context,
+            StructureSwitchPlan plan, SkuScheduleDTO sku, String machineCode, String reason) {
+        LhShiftConfigVO shift = plan.getFirstQuantityShift();
+        Set<String> machines = java.util.Collections.emptySet();
+        return new StructureMachineLimitDecision(true, false, DailySchedulePhase.EARLY_PRODUCTION,
+                shift.getWorkDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate(),
+                shift.getShiftIndex(), shift.getShiftStartDateTime(), shift.getShiftEndDateTime(), machineCode,
+                LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode),
+                Objects.isNull(sku) ? null : sku.getMaterialCode(), plan.getSource().getNextStructureName(),
+                null, machines, machines, 0, 0, "结构切换首班判定拒绝，" + reason);
     }
 
     /**
@@ -561,38 +673,71 @@ public final class StructureSwitchSchedulingPolicy {
     }
 
     /**
-     * 提交完成后重建首班状态，结果被回裁或回滚后不会保留虚假S0。
-     * @param context 排程上下文
+     * 从当前有效结果重建实际首产状态，规则首班保留首个成功组合的冻结判定。
+     * 全部正量被移除时清理本窗状态；失败提交由既有快照恢复原状态。
+     *
+     * @param context 本批上下文
      */
     public static void rebuildCommittedState(LhScheduleContext context) {
         if (!isEnabled(context)) {
             return;
         }
         Map<String, StructureSwitchRuntimeState> states = new LinkedHashMap<>(context.getStructureSwitchBaselineRuntimeMap());
+        Map<LhScheduleResult, StructureSwitchPlan> resultPlans = context.getStructureSwitchResultPlanMap();
         List<LhScheduleResult> results = context.getScheduleResultList().stream()
-                .filter(result -> context.getStructureSwitchResultPlanMap().containsKey(result))
-                .sorted(Comparator.comparing(result -> firstActualTime(context, result)))
+                .filter(result -> resultPlans.containsKey(result))
                 .collect(Collectors.toList());
+        // 规则首班按成功提交顺序冻结；扩机参照SKU继续使用原最早真实开产时间排序。
+        Map<String, StructureSwitchFirstShiftDecision> firstDecisions = new LinkedHashMap<>(16);
         for (LhScheduleResult result : results) {
-            StructureSwitchPlan plan = context.getStructureSwitchResultPlanMap().get(result);
+            StructureSwitchPlan plan = resultPlans.get(result);
+            if (Objects.isNull(plan) || orderedShifts(context).stream()
+                    .noneMatch(shift -> quantity(result, shift.getShiftIndex()) > 0)) {
+                continue;
+            }
+            String structure = plan.getSource().getNextStructureName();
+            StructureSwitchRuntimeState previous = context.getStructureSwitchRuntimeMap().get(structure);
+            StructureSwitchFirstShiftDecision decision = Objects.nonNull(previous)
+                    && Objects.equals(previous.getSourceId(), plan.getSource().getId())
+                    && Objects.nonNull(previous.getFirstShiftDecision())
+                    ? previous.getFirstShiftDecision() : plan.getFirstShiftDecision();
+            if (Objects.nonNull(decision)) {
+                firstDecisions.putIfAbsent(structure, decision);
+            }
+        }
+        results.sort(Comparator.comparing(result -> firstActualTime(context, result)));
+        for (LhScheduleResult result : results) {
+            StructureSwitchPlan plan = resultPlans.get(result);
             if (Objects.isNull(plan)) {
                 continue;
             }
-            for (LhShiftConfigVO shift : orderedShifts(context)) {
-                if (quantity(result, shift.getShiftIndex()) <= 0) {
-                    continue;
-                }
-                String structure = plan.getSource().getNextStructureName();
-                StructureSwitchRuntimeState existing = states.get(structure);
-                if (Objects.isNull(existing) || shift.getShiftStartDateTime().before(existing.getFirstShiftStart())) {
-                    StructureSwitchRuntimeState previous = context.getStructureSwitchRuntimeMap().get(structure);
-                    LhShiftConfigVO second = Objects.nonNull(previous)
-                            && Objects.equals(previous.getFirstShiftStart(), shift.getShiftStartDateTime())
-                            ? previous.getSecondShift() : nextShift(context, shift.getShiftStartDateTime());
-                    states.put(structure, new StructureSwitchRuntimeState(plan.getSource().getId(),
-                            shift.getShiftStartDateTime(), second, result.getMaterialCode(), result.getProductStatus(), result.getEmbryoCode()));
-                }
-                break;
+            LhShiftConfigVO actualFirst = orderedShifts(context).stream()
+                    .filter(shift -> quantity(result, shift.getShiftIndex()) > 0).findFirst().orElse(null);
+            if (Objects.isNull(actualFirst)) {
+                continue;
+            }
+            String structure = plan.getSource().getNextStructureName();
+            StructureSwitchRuntimeState existing = states.get(structure);
+            StructureSwitchRuntimeState previous = context.getStructureSwitchRuntimeMap().get(structure);
+            StructureSwitchFirstShiftDecision decision = firstDecisions.get(structure);
+            if (Objects.nonNull(decision) && Objects.isNull(decision.getFirstShift())) {
+                continue;
+            }
+            Date actualStart = actualFirst.getShiftStartDateTime();
+            boolean earlier = Objects.isNull(existing) || actualStart.before(existing.getActualFirstShiftStart());
+            if (Objects.isNull(existing) || (earlier && Objects.isNull(decision))) {
+                Date anchor = Objects.isNull(decision) ? actualStart : decision.getFirstShift().getShiftStartDateTime();
+                LhShiftConfigVO second = Objects.nonNull(previous)
+                        && Objects.equals(anchor, previous.getFirstShiftStart())
+                        ? previous.getSecondShift() : nextShift(context, anchor);
+                states.put(structure, new StructureSwitchRuntimeState(plan.getSource().getId(), anchor, second,
+                        result.getMaterialCode(), result.getProductStatus(), result.getEmbryoCode(),
+                        decision, actualStart));
+            } else if (earlier) {
+                states.put(structure, new StructureSwitchRuntimeState(existing.getSourceId(),
+                        existing.getFirstShiftStart(),
+                        existing.getSecondShift(), existing.getMaterialCode(), existing.getProductStatus(),
+                        existing.getEmbryoCode(), existing.getFirstShiftDecision(), actualStart));
             }
         }
         context.setStructureSwitchRuntimeMap(states);
@@ -612,7 +757,8 @@ public final class StructureSwitchSchedulingPolicy {
             return state;
         }
         return new StructureSwitchRuntimeState(state.getSourceId(), state.getFirstShiftStart(), adjacentShift,
-                state.getMaterialCode(), state.getProductStatus(), state.getEmbryoCode());
+                state.getMaterialCode(), state.getProductStatus(), state.getEmbryoCode(),
+                state.getFirstShiftDecision(), state.getActualFirstShiftStart());
     }
 
     /**
@@ -651,9 +797,11 @@ public final class StructureSwitchSchedulingPolicy {
         indices.add(plan.getFirstQuantityShift().getShiftIndex());
         indices.add(plan.getFirstBatchShift().getShiftIndex());
         StructureSwitchRuntimeState state = context.getStructureSwitchRuntimeMap().get(plan.getSource().getNextStructureName());
-        if (Objects.isNull(state) || Objects.equals(state.getFirstShiftStart(), plan.getFirstQuantityShift().getShiftStartDateTime())) {
-            // 首台同时提交紧邻第二班的连续生产，保证下一业务日扩机时先计入首台占用，不虚增第三台。
-            LhShiftConfigVO second = nextShift(context, plan.getFirstQuantityShift().getShiftStartDateTime());
+        LhShiftConfigVO ruleFirst = resolveFirstShift(context, plan);
+        if (Objects.nonNull(ruleFirst) && (Objects.isNull(state)
+                || Objects.equals(state.getFirstShiftStart(), ruleFirst.getShiftStartDateTime()))) {
+            // 首台同时提交规则第二班的连续生产，扩机时计入首台的真实占用。
+            LhShiftConfigVO second = nextShift(context, ruleFirst.getShiftStartDateTime());
             if (Objects.nonNull(second)) {
                 indices.add(second.getShiftIndex());
             }
@@ -664,6 +812,27 @@ public final class StructureSwitchSchedulingPolicy {
             indices.add(availability.getFormalTargetShift().getShiftIndex());
         }
         return orderedShifts(context).stream().filter(shift -> indices.contains(shift.getShiftIndex()))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 独立步骤每轮只提交竞争班次及完整首检、大换英寸P0/S1必需的切片，不扩成整日整窗。
+     *
+     * @param context 完整窗口
+     * @param availability 冻结时间轴
+     * @param shift 本轮竞争班次
+     * @return 原数量内核允许写入的班次
+     */
+    public static List<LhShiftConfigVO> resolveSingleRoundCommitShifts(LhScheduleContext context,
+            NewSpecMachineAvailabilityPlan availability, LhShiftConfigVO shift) {
+        Set<Integer> indices = resolveCommitShifts(context, availability, java.util.Collections.singletonList(shift))
+                .stream().map(LhShiftConfigVO::getShiftIndex).collect(Collectors.toSet());
+        if (Objects.nonNull(availability.getFirstInspectionPlan())) {
+            availability.getFirstInspectionPlan().getShiftAllocations().stream()
+                    .filter(allocation -> allocation.getQuantity() > 0)
+                    .map(allocation -> allocation.getShift().getShiftIndex()).forEach(indices::add);
+        }
+        return orderedShifts(context).stream().filter(item -> indices.contains(item.getShiftIndex()))
                 .collect(Collectors.toList());
     }
 
@@ -704,7 +873,7 @@ public final class StructureSwitchSchedulingPolicy {
         if (Objects.nonNull(plan)) {
             context.getStructureSwitchResultPlanMap().put(result, plan);
         }
-        return plan;
+        return Objects.nonNull(plan) ? plan : context.getStructureSwitchResultPlanMap().get(result);
     }
 
     /**
@@ -732,7 +901,7 @@ public final class StructureSwitchSchedulingPolicy {
     }
 
     /**
-     * P0沿用全部停机与实际模数计算，仅关闭向上补模并按完整班长折算。
+     * 兼容原调用入口，供胚首班及P0沿用停机约束，关闭向上补模并按完整班长折算。
      * @param context 排程上下文
      * @param plan 冻结提案
      * @param shift 当前班次
@@ -745,16 +914,50 @@ public final class StructureSwitchSchedulingPolicy {
      * @param maintenance 保养窗口
      * @param original 原算法上限
      * @param scheduleType 排程类型
-     * @return P0未向上补齐的数量上限，普通班次保持原值
+     * @return 供胚首班及P0未向上补齐的上限，其他班次保持原值
      */
     public static int capCapacity(LhScheduleContext context, StructureSwitchPlan plan, LhShiftConfigVO shift,
             ShiftProductionControlDTO control, String machineCode, int capacity, int cycleSeconds, int mouldQty,
             List<MachineCleaningWindowDTO> cleaning, List<MachineMaintenanceWindowDTO> maintenance,
             int original, String scheduleType) {
-        if (!isFirstBatch(context, plan, shift)) {
+        return capCapacity(context, null, Objects.isNull(control) ? null : control.getEffectiveStartTime(),
+                plan, shift, control,
+                machineCode, capacity, cycleSeconds, mouldQty, cleaning, maintenance, original, scheduleType);
+    }
+
+    /**
+     * 供胚首班及大换英寸P0使用未向上补模的净产能，预演和落班共用实际起点。
+     *
+     * @param context 排程上下文
+     * @param sku 当前物料
+     * @param productionStart 本次实际计量起点
+     * @param plan 已冻结切换计划
+     * @param shift 当前班次
+     * @param control 班次管控
+     * @param machineCode 机台编码
+     * @param capacity 完整班产
+     * @param cycleSeconds 硫化周期秒数
+     * @param mouldQty 模数
+     * @param cleaning 清洗窗口
+     * @param maintenance 维护窗口
+     * @param original 原计算上限
+     * @param scheduleType 排程类型
+     * @return 受真实时长约束的数量上限
+     */
+    public static int capCapacity(LhScheduleContext context, SkuScheduleDTO sku, Date productionStart,
+            StructureSwitchPlan plan, LhShiftConfigVO shift,
+            ShiftProductionControlDTO control, String machineCode, int capacity, int cycleSeconds, int mouldQty,
+            List<MachineCleaningWindowDTO> cleaning, List<MachineMaintenanceWindowDTO> maintenance,
+            int original, String scheduleType) {
+        CxEmbryoLhTime source = Objects.nonNull(plan) ? plan.getSource() : resolveSource(context, sku);
+        boolean supplyFirstShift = StructureSwitchFirstShiftQuantityPolicy.isSupplyFirstShift(context, source, shift);
+        if (!isFirstBatch(context, plan, shift) && !supplyFirstShift) {
             return original;
         }
-        Date start = effectiveStart(context, plan, shift, control.getEffectiveStartTime());
+        Date start = effectiveStart(context, plan, shift, later(control.getEffectiveStartTime(), productionStart));
+        if (supplyFirstShift) {
+            start = later(start, source.getEarliestLhTime());
+        }
         int actualCapacity = ShiftCapacityResolverUtil.resolveActualShiftPlanQty(capacity, shift,
                 ShiftCapacityResolverUtil.resolveOddShiftCapacityPlusShiftType(context), scheduleType);
         int rawCapacity = ShiftCapacityResolverUtil.resolveShiftCapacityWithDowntime(context.getDevicePlanShutList(),
@@ -802,7 +1005,11 @@ public final class StructureSwitchSchedulingPolicy {
         // 首检已按真实时间独立分摊，只有本次普通生产量按物理整机取偶，不能混入首检尾数。
         int finalQty = floorEven(BigDecimalUtils.valueOf((long) quantity * sides)) / sides;
         StructureSwitchRuntimeState state = context.getStructureSwitchRuntimeMap().get(result.getStructureName());
-        Date firstShiftStart = Objects.isNull(state) ? plan.getFirstQuantityShift().getShiftStartDateTime() : state.getFirstShiftStart();
+        LhShiftConfigVO ruleFirst = resolveFirstShift(context, plan);
+        Date firstShiftStart = Objects.isNull(ruleFirst) ? null : ruleFirst.getShiftStartDateTime();
+        if (Objects.nonNull(state)) {
+            firstShiftStart = state.getFirstShiftStart();
+        }
         log.info("大换英寸P0分量, structure={}, sku={}, machine={}, waitNotify={}, largeInch=1, S0={}, P0={}, "
                         + "targetShift={}, baseStart={}, productionStart={}, capacity={}, remaining={}, finalQty={}",
                 result.getStructureName(), result.getMaterialCode(), result.getLhMachineCode(),
@@ -839,7 +1046,7 @@ public final class StructureSwitchSchedulingPolicy {
                     context.getBatchNo(), quantityFailure);
             return quantityFailure;
         }
-        // 日计划回裁可能移除原首班，先依据实际正量重新定位，再检查新的S0/S1。
+        // 回裁更新实际首产状态；规则S0/S1继续使用首个成功组合的时间产能判定。
         rebuildCommittedState(context);
         Set<String> validatedStructures = new LinkedHashSet<>(16);
         int resultIndex = 0;
@@ -863,7 +1070,9 @@ public final class StructureSwitchSchedulingPolicy {
                         result.getMaterialCode(), result.getLhMachineCode(), timelineFailure);
                 return timelineFailure;
             }
-            String failure = validatedStructures.add(plan.getSource().getNextStructureName())
+            boolean firstStructureResult = validatedStructures.add(plan.getSource().getNextStructureName());
+            // 每行独立核对规则首班下限，不能因同结构已校验过另一行而漏掉回裁后的提前量。
+            String failure = Objects.nonNull(plan.getFirstShiftDecision()) || firstStructureResult
                     ? validate(context, plan, result.getLhMachineCode(), quantities) : null;
             if (StringUtils.isNotEmpty(failure)) {
                 return failure;
@@ -872,6 +1081,13 @@ public final class StructureSwitchSchedulingPolicy {
                 continue;
             }
             StructureSwitchRuntimeState state = context.getStructureSwitchRuntimeMap().get(result.getStructureName());
+            if (Objects.nonNull(state) && Objects.nonNull(state.getFirstShiftDecision())) {
+                log.info("结构切换规则首班提交, factoryCode={}, batchNo={}, structure={}, sku={}, machine={}, "
+                                + "decision={}, actualFirstShiftStart={}",
+                        context.getFactoryCode(), context.getBatchNo(),
+                        result.getStructureName(), result.getMaterialCode(), result.getLhMachineCode(),
+                        state.getFirstShiftDecision(), state.getActualFirstShiftStart());
+            }
             log.info("结构切换实际提交, structure={}, sku={}, machine={}, waitNotify={}, largeInch={}, "
                             + "S0={}, P0={}, baseStart={}, productionStart={}, finalShiftQuantities={}",
                     result.getStructureName(), result.getMaterialCode(), result.getLhMachineCode(),
@@ -924,7 +1140,21 @@ public final class StructureSwitchSchedulingPolicy {
      * @return 同SKU为0、同胎胚为1、同结构为2；不适用为-1
      */
     public static int expansionRank(LhScheduleContext context, SkuScheduleDTO sku, StructureSwitchPlan plan) {
-        if (!isEnabled(context) || Objects.isNull(plan) || !Objects.equals(YES, plan.getSource().getIsWaitNotify())) {
+        return Objects.isNull(plan) ? -1 : expansionRank(context, sku, plan.getFirstQuantityShift(), plan.getSource());
+    }
+
+    /**
+     * 在扫描机台前按当前真实班次排序S1候选，避免为排序先构造完整SKU×机台提案矩阵。
+     *
+     * @param context 已提交首班状态
+     * @param sku 当前候选
+     * @param shift 本轮竞争班次
+     * @param source 已冻结来源
+     * @return 同SKU、同胎胚、同结构分别为0、1、2，非S1为-1
+     */
+    public static int expansionRank(LhScheduleContext context, SkuScheduleDTO sku,
+            LhShiftConfigVO shift, CxEmbryoLhTime source) {
+        if (!isEnabled(context) || Objects.isNull(source) || !Objects.equals(YES, source.getIsWaitNotify())) {
             return -1;
         }
         StructureSwitchRuntimeState state = context.getStructureSwitchRuntimeMap().get(sku.getStructureName());
@@ -932,7 +1162,7 @@ public final class StructureSwitchSchedulingPolicy {
             return -1;
         }
         LhShiftConfigVO second = state.getSecondShift();
-        if (Objects.isNull(second) || !Objects.equals(second.getShiftStartDateTime(), plan.getFirstQuantityShift().getShiftStartDateTime())) {
+        if (Objects.isNull(second) || !Objects.equals(second.getShiftStartDateTime(), shift.getShiftStartDateTime())) {
             return -1;
         }
         if (StringUtils.equals(state.getMaterialCode(), sku.getMaterialCode())

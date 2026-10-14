@@ -197,6 +197,8 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
         // 已提交的时间下机边界统一约束预演和正式入口，不受旧均衡开关或跨日准备例外影响。
         Date timedBoundary = context.getTimedMachineOffBoundary(machineCode);
         boolean timedOff = Objects.nonNull(timedBoundary);
+        // 独立结构切换始终执行每日与班次硬上限，不借均衡关闭绕过合并次数。
+        boolean strictLimits = balanced || timedOff || context.isStructureSwitchScheduling();
         Date cursor = timedOff && timedBoundary.after(readyTime) ? timedBoundary : readyTime;
         Date timedWindowEnd = timedOff ? context.getScheduleWindowShifts().stream()
                 .map(shift -> shift.getShiftEndDateTime()).max(Date::compareTo).orElse(null) : null;
@@ -225,7 +227,7 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
             // 停机、禁换模或跨日顺延后，限额与已用次数均按最新落点日期读取。
             String dateKey = this.formatDateKey(cursor);
             int[] counts = countMap.getOrDefault(dateKey, new int[]{0, 0});
-            if ((balanced || timedOff) && this.getTotalUsed(counts) >= this.getDailyLimit(context, dateKey)) {
+            if (strictLimits && this.getTotalUsed(counts) >= this.getDailyLimit(context, dateKey)) {
                 if (this.isOnOrAfterScheduleTargetDate(context, cursor)) {
                     return null;
                 }
@@ -237,7 +239,7 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
                 if (counts[IDX_MORNING] < this.getMorningLimit(context, dateKey)) {
                     return cursor;
                 }
-                if (!balanced && !timedOff) {
+                if (!strictLimits) {
                     // 关闭态保持原正式行为：早班满后从中班起点继续避让，不附加新日终限制。
                     cursor = LhScheduleTimeUtil.getAfternoonShiftStart(context, cursor);
                     continue;
@@ -253,7 +255,7 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
                     && counts[IDX_AFTERNOON] < this.getAfternoonLimit(context, dateKey)) {
                 return cursor;
             }
-            if ((balanced || timedOff) && this.isOnOrAfterScheduleTargetDate(context, cursor)) {
+            if (strictLimits && this.isOnOrAfterScheduleTargetDate(context, cursor)) {
                 return null;
             }
             cursor = this.getNextCalendarDayMorningStart(context, cursor);

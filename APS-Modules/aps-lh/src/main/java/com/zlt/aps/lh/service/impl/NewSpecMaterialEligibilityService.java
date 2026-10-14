@@ -20,6 +20,7 @@ import com.zlt.aps.lh.engine.strategy.support.DailyNewSpecCandidate;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionChecker;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionRuntimePlan;
 import com.zlt.aps.lh.engine.strategy.support.PendingSkuUnscheduledRule;
+import com.zlt.aps.lh.engine.strategy.support.StructureSwitchCandidateScope;
 import com.zlt.aps.lh.util.PriorityTraceLogHelper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -167,6 +168,10 @@ public class NewSpecMaterialEligibilityService {
             SkuScheduleDTO sku, LocalDate date, boolean specifiedTrial) {
         DailyNewSpecCandidate candidate = new DailyNewSpecCandidate(
                 MonthPlanDateResolver.buildMaterialStatusKey(sku.getMaterialCode(), sku.getProductStatus()), sku);
+        if (StructureSwitchCandidateScope.shouldDefer(context, sku)) {
+            candidate.setLastFailure("结构切换候选由独立结构切换步骤统一排产");
+            return candidate;
+        }
         if (!specifiedTrial && StringUtils.equals(
                 SkuScheduleSourceTypeEnum.PREVIOUS_ALTERNATE_TRIAL.getCode(), sku.getSourceType())) {
             candidate.setLastFailure("历史指定试制量试余量只允许原指定组合承接");
@@ -188,7 +193,13 @@ public class NewSpecMaterialEligibilityService {
                 context, sku, date);
         boolean continuationDue = !continuation || Objects.isNull(sku.getFirstAddMachineProductionDate())
                 || !sku.getFirstAddMachineProductionDate().isAfter(date);
-        boolean normalDemand = continuation ? continuationDue : originalQty > 0 && remainingQty > 0;
+        // 独立切换首台已消费日额度后，真实补机缺口仍由统一目标台数中心判断，不能重建日额度。
+        boolean switchExpansion = context.isStructureSwitchScheduling()
+                && StructureSwitchCandidateScope.owns(context, sku)
+                && DailyMachineExpansionPlanner.countCommittedMachineDemand(context, sku, date) > 0
+                && targetScheduleQtyResolver.previewProductionRemainingQty(context, sku) > 0;
+        boolean normalDemand = continuation ? continuationDue : originalQty > 0 && (remainingQty > 0
+            || switchExpansion);
         if (!context.isFutureOnlyEarlyProductionCandidate(sku, date) && normalDemand && !continuationEarly) {
             candidate.addReason(continuation ? DailyCandidateReason.ADD_MACHINE_REQUIREMENT
                     : DailyCandidateReason.TODAY_PLAN);

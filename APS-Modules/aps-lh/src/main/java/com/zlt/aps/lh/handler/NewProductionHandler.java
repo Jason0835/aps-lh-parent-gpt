@@ -21,6 +21,7 @@ import com.zlt.aps.lh.engine.strategy.IMouldChangeBalanceStrategy;
 import com.zlt.aps.lh.engine.strategy.IProductionStrategy;
 import com.zlt.aps.lh.engine.strategy.ISkuPriorityStrategy;
 import com.zlt.aps.lh.engine.strategy.support.PendingSkuUnscheduledRule;
+import com.zlt.aps.lh.engine.strategy.support.StructureSwitchCandidateScope;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -78,38 +79,8 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
                 context.getNewSpecSkuList().size(), context.getScheduleResultList().size(),
                 context.getUnscheduledResultList().size());
 
-        /*
-         * 班次9后置计划必须以全部前置阶段最终余量重新判断，但正常新增执行期间会把完成、
-         * 未排或参数拦截SKU移出待排列表。因此在任何新增消费前只冻结候选身份，数量仍由
-         * 后置服务读取最终生产剩余账本，避免改变原班次1～8的准入和排序。
-         */
-        context.getNewSpecSkuList().stream()
-                .filter(Objects::nonNull)
-                .forEach(context::registerNextShiftNewPlanCandidate);
-
-        /*
-         * SYS0311004 只控制试制/量试是否进入真实机台新增排产。参数未配置或为0时，
-         * 未命中前日指定交替的 SKU 仍属于虚拟机台最终兜底范围，因此必须在参数拦截前冻结候选；
-         * 正常新增选机结束后会把终局未排 SKU 移出待排列表，S4.5.3 只能读取该快照
-         * 核对实际机台已排量，且不得把虚拟机台写回真实机台资源池。
-         */
-        this.captureTrialVirtualMachineCandidates(context);
-
-        /*
-         * SYS0311004=0 时试制、量试不参与真实机台新增排产（续作排产不受该参数影响）。
-         * 必须在排序和普通新增选机之前统一拦截：同物料多状态续作切换在S4.4
-         * 已按续作口径消费可承接的X/T候选，此处只拦截仍残留在新增待排列表中的试制、量试SKU，
-         * 写未排记录并清理真实机台运行态；前面冻结的对象身份快照继续留给S4.5.3虚拟机台兜底。
-         */
+        this.prepareCandidateSnapshots(context);
         this.excludeTrialMassTrialNewSpecSkus(context);
-
-        /*
-         * S4.5 开始前冻结“排程开始时已在机且仍由原物料续作”的结果身份。
-         * 共用模具联动置换和特殊材料置换都发生在 S4.5 完成后。若届时仅按机台或 scheduleType
-         * 反推，会把本阶段刚生成的新增结果误当成续作候选；因此必须在新增链路写入任何结果之前
-         * 先保留这份只读快照。
-         */
-        captureSubstitutionContinuationSnapshot(context);
 
         try {
             // 获取 S4.5 新增排产策略；特殊材料置换由本 Handler 完成后的独立 S4.5.1 步骤执行。
@@ -194,6 +165,22 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
     }
 
     /**
+     * 新增侧首次消费前冻结后置候选；结构切换与普通新增共用，避免后者覆盖前者消费前的身份。
+     *
+     * @param context 前置阶段最终上下文
+     */
+    public void prepareCandidateSnapshots(LhScheduleContext context) {
+        if (context.isNewProductionSnapshotsPrepared()) {
+            return;
+        }
+        context.getNewSpecSkuList().stream().filter(Objects::nonNull)
+                .forEach(context::registerNextShiftNewPlanCandidate);
+        this.captureTrialVirtualMachineCandidates(context);
+        this.captureSubstitutionContinuationSnapshot(context);
+        context.setNewProductionSnapshotsPrepared(true);
+    }
+
+    /**
      * SYS0311004=0时拦截新增排产链路中的试制、量试SKU。
      *
      * <p>硫化参数SYS0311004只控制新增排产：参数=0时施工阶段为试制（01）、量试（02）的SKU
@@ -219,6 +206,10 @@ public class NewProductionHandler extends AbsScheduleStepHandler {
         List<LhUnscheduledResult> blockedResultList =
                 new ArrayList<>(context.getNewSpecSkuList().size());
         for (SkuScheduleDTO sku : context.getNewSpecSkuList()) {
+            if (StructureSwitchCandidateScope.owns(context, sku)) {
+                // 已在独立步骤按普通/指定组合分别核验，不能在此清零真实余量或覆盖原失败原因。
+                continue;
+            }
             LhUnscheduledResult unscheduledResult =
                     PendingSkuUnscheduledRule.evaluateNewSpecTrialExclusion(context, sku);
             if (Objects.isNull(unscheduledResult)) {

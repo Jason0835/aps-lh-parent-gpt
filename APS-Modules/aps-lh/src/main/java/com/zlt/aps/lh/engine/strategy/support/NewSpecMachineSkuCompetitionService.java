@@ -200,6 +200,14 @@ public class NewSpecMachineSkuCompetitionService {
         Set<String> normalizedFailureSet = Objects.isNull(failedAssignmentKeySet)
                 ? Collections.<String>emptySet() : failedAssignmentKeySet;
         Map<String, NewSpecScheduleProposal> switchExpansionProposals = new LinkedHashMap<>(4);
+        // 独立切换已留下S0运行态，并不代表普通新增候选池仍有切换候选。
+        // 只按当前池检查，避免历史运行态关闭普通双桶收敛，导致无关SKU重复扫描后续日期池。
+        boolean hasSwitchCandidates = StructureSwitchSchedulingPolicy.isEnabled(context)
+                && !context.getStructureSwitchRuntimeMap().isEmpty()
+                && candidatePoolMap.values().stream().filter(Objects::nonNull).flatMap(List::stream)
+                .filter(Objects::nonNull).map(DailyNewSpecCandidate::getSku).filter(Objects::nonNull)
+                .anyMatch(sku -> context.getStructureSwitchRuntimeMap().containsKey(sku.getStructureName())
+                        && Objects.nonNull(StructureSwitchSchedulingPolicy.resolveSource(context, sku)));
         NewSpecScheduleProposal bestOrdinaryProposal = null;
         NewSpecScheduleProposal bestCrossDayProposal = null;
         for (LocalDate poolDate : orderedPoolDates) {
@@ -351,7 +359,7 @@ public class NewSpecMachineSkuCompetitionService {
                 bestCrossDayProposal = crossDayProposalOfDate;
             }
             if (switchExpansionProposals.isEmpty()
-                    && (!StructureSwitchSchedulingPolicy.isEnabled(context) || context.getStructureSwitchRuntimeMap().isEmpty())
+                    && !hasSwitchCandidates
                     && Objects.nonNull(bestOrdinaryProposal)
                     && Objects.nonNull(bestCrossDayProposal)) {
                 break;

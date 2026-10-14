@@ -305,6 +305,32 @@ public class TargetScheduleQtyResolver {
     }
 
     /**
+     * 抬高续作窗口目标下限，同时保留非严格场景独立的真实消费预算。
+     * 窗口产能只决定本轮目标，不得把更大的硫化余量账本压低；重复调用保留已经消费的数量。
+     * 严格目标、试制和严格欠产仍使用既有业务目标口径。
+     *
+     * @param context 本批真实消费账本
+     * @param sku 当前续作物料及状态
+     * @param floorTargetQty 已计算的窗口目标下限
+     * @param reason 同步原因
+     * @return 保留已消费量后的真实剩余量
+     */
+    public int applyContinuationTargetFloor(LhScheduleContext context, SkuScheduleDTO sku,
+            int floorTargetQty, String reason) {
+        if (Objects.isNull(context) || Objects.isNull(sku) || StringUtils.isEmpty(sku.getMaterialCode())
+                || this.shouldUseTargetQtyAsProductionLedger(sku)) {
+            return this.applyProductionTargetState(context, sku, floorTargetQty, reason);
+        }
+        this.initializeProductionRemainingQty(context, sku, sku.resolveTargetScheduleQty(), reason);
+        int ledgerTargetQty = Math.max(context.getSkuProductionTargetQtyMap().get(this.buildSkuKey(sku)),
+                this.resolveInitialProductionRemainingQty(sku, floorTargetQty));
+        sku.setTargetScheduleQty(Math.max(0, floorTargetQty));
+        int remainingQty = this.syncProductionRemainingQtyToTarget(context, sku, ledgerTargetQty, reason);
+        sku.setRemainingScheduleQty(remainingQty);
+        return remainingQty;
+    }
+
+    /**
      * 将 SKU 实际消费账本收敛到指定剩余量。
      * <p>该方法用于前置补满规则曾放大目标、但真实物理收尾块必须回到严格硫化余量的场景。
      * 参数是“尚可排数量”而不是“总目标量”，因此需要用已消费量反推新的账本总目标；禁止复用

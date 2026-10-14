@@ -250,8 +250,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     /**
      * 从月度计划获取T日SKU数据，按产品结构归集，计算硫化余量
      * <p>
-     * 硫化余量 = Max(月度计划总量 - 已完成量 + 有效上月超欠产量, 0)
-     * 其中有效上月超欠产量可正可负：正值=欠产（增加余量），负值=超产（扣减余量）
+     * 硫化余量 = Max(月度计划总量 - 已完成量 - 有效上月超欠产量, 0)
+     * 其中有效上月超欠产量可正可负（写侧口径=完成量-计划量）：正值=超产（扣减余量），负值=欠产（增加余量）
      * </p>
      *
      * @param context 排程上下文
@@ -342,6 +342,23 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                     && !context.isFutureOnlyEarlyProductionCandidate(dto)) {
                 addNoPlanUnscheduledResult(context, dto);
                 continue;
+            }
+
+            /*
+             * 窗口内无计划且无欠产余量时统一评估准入；固定提前范围内存在未来原始计划的
+             * 正规新增SKU保留待排身份，只能由后续提前生产阶段竞争剩余资源。
+             * MES精确在机续作候选与停产收尾模式除外，仍由各自链路继续判定。
+             */
+            if (!exactOnlineContinuation
+                    && !context.isStopProductionMode()
+                    && dto.getOriginalWindowPlanQty() <= 0
+                    && !dto.isOverdueSurplusFlag()) {
+                LhUnscheduledResult noOverdueSurplusResult =
+                        PendingSkuUnscheduledRule.evaluateNoOverdueSurplusAdmission(context, dto);
+                if (Objects.nonNull(noOverdueSurplusResult)) {
+                    unscheduledResultCollector.add(context, dto, noOverdueSurplusResult);
+                    continue;
+                }
             }
 
             // 排程窗口没有计划量但存在余量/正向结转目标量时，允许继续排产，并给出明确告警。
@@ -1072,9 +1089,10 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     /**
      * 计算SKU的硫化余量
      * <p>
-     * 硫化余量 = Max(月度计划总量 - 已完成量 + 有效上月超欠产量, 0)。
+     * 硫化余量 = Max(月度计划总量 - 已完成量 - 有效上月超欠产量, 0)。
      * 不再将逐日超产量加回剩余需求，避免月累计完成量已超月计划时余量被虚增。
-     * 有效上月超欠产量可正可负：正值表示欠产（增加余量），负值表示超产（扣减余量）。
+     * 有效上月超欠产量可正可负（写侧口径=完成量-计划量）：正值表示超产（扣减余量），
+     * 负值表示欠产（增加余量）。
      * </p>
      *
      * @param context 排程上下文
@@ -1146,7 +1164,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
 
     /**
      * 解析有效上月超欠产数量。
-     * <p>正值表示欠产（需补排），负值表示超产（需扣减余量），仅在有效标识为1时生效。</p>
+     * <p>有效上月超欠产量取自月计划原值（写侧口径=完成量-计划量）：
+     * 正值表示超产（扣减余量），负值表示欠产（增加余量），仅在有效标识为1时生效。</p>
      *
      * @param plan 月生产计划记录
      * @return 有效上月超欠产数量（正=欠产，负=超产）
@@ -1352,6 +1371,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         dto.setWindowRemainingPlanQty(windowRemainingPlanQty);
 
         dto.setSurplusQty(surplus.getSurplusQty());
+        // 欠产余量标识：窗口内无计划量且余量来自上月欠产时为true，供未排准入规则消费
+        dto.setOverdueSurplusFlag(surplus.isOverdueSurplusFlag());
         // 历史前料即使随后因零余量退出待排池，前日交替仍须读取本次初始化的原始余量。
         context.getInitialMaterialSurplusQtyMap().merge(dto.getMaterialCode(), dto.getSurplusQty(), Integer::sum);
         //20260713+ 含上月超欠产 surplus.getMonthPlanSumTotal()
@@ -3198,6 +3219,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         copy.setMonthPlanSumTotal(source.getMonthPlanSumTotal());
         copy.setFinishedQty(source.getFinishedQty());
         copy.setSurplusQty(source.getSurplusQty());
+        // 续作副本沿用源SKU的欠产余量标识，确保续作试制准入按同一口径判定。
+        copy.setOverdueSurplusFlag(source.isOverdueSurplusFlag());
         copy.setWindowPlanQty(source.getWindowPlanQty());
         // 续作副本沿用S4.3固化的原始窗口DAY_N，确保试制、量试续作准入不受收尾目标量抬高影响。
         copy.setOriginalWindowPlanQty(source.getOriginalWindowPlanQty());

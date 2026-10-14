@@ -22,7 +22,17 @@ public class ContinuationMachineFinishPlan {
     private String finishRoleMachineCode;
     /** 本次释放节点采用的业务规则。 */
     private String finishRule;
-    /** 历史交替终末余量的完成或退出事实；其他节点场景不设置。 */
+    /**
+     * T日节点角色分配前的业务输入，供保存前独立核对。
+     */
+    private ContinuationTDayFinishConstraint tDayFinishConstraint;
+    /**
+     * 跨日两机大余量分配前的公式、物理角色及夜班优先约束。
+     */
+    private ContinuationNightFinishConstraint nightFinishConstraint;
+    /**
+     * 普通及历史交替续作余量统一的完成或退出事实，窗口未完成时不得提前释放机台。
+     */
     private FinishState finishState;
 
     /** 区分物料已完成、机台强制退出和窗口内仍未完成，禁止把生产停止直接当作余量收尾。 */

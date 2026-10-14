@@ -125,6 +125,12 @@ public class LhScheduleContext {
      */
     private LhScheduleConfig scheduleConfig;
     /**
+     * 是否更新结构切换时间（1=重算 T_CX_EMBRYO_LH_TIME 的结构可收尾时间，0=跳过保留成型排程快照）。
+     * <p>由排程请求 {@code LhScheduleRequestDTO.updateStructureLhTime} 写入；缺省 0（与前端默认不勾选一致），
+     * 仅在基础数据加载（{@link com.zlt.aps.lh.service.impl.LhBaseDataServiceImpl#loadAllBaseData}）阶段消费。
+     */
+    private String updateStructureLhTime = "0";
+    /**
      * 硫化开模时间
      */
     private Date curingOpenMoldTime;
@@ -321,6 +327,35 @@ public class LhScheduleContext {
     /** 后结构对应的有效供胚来源记录；时间与两个标识必须来自同一行。 */
     private Map<String, CxEmbryoLhTime> structureSwitchSourceMap =
             new LinkedHashMap<>(16);
+
+    /**
+     * 续作稳定后冻结的结构切换候选身份；仅主窗口使用，不复制数量账本。
+     */
+    private Map<String, SkuScheduleDTO> structureSwitchCandidateSkuMap = new LinkedHashMap<>(16);
+
+    /**
+     * 物料和产品状态对应的切换来源，跨班次及正常需求日保持同一来源身份。
+     */
+    private Map<String, CxEmbryoLhTime> structureSwitchCandidateSourceMap = new LinkedHashMap<>(16);
+
+    /**
+     * 仅独立结构切换步骤执行期间生效，不授予指定交替或资源豁免。
+     */
+    private boolean structureSwitchScheduling;
+
+    /**
+     * 仅历史指定承接编排期间允许消费已冻结的结构切换后料，不改变资源或数量校验。
+     */
+    private boolean previousAlternateScheduling;
+    /**
+     * 后置班次、试制及置换候选身份只在新增侧首次消费前冻结一次。
+     */
+    private boolean newProductionSnapshotsPrepared;
+
+    /**
+     * 独立步骤记录的最终候选失败原因，交由窗口统一未排收口消费。
+     */
+    private Map<String, String> structureSwitchFailureReasonMap = new LinkedHashMap<>(16);
 
     /** 同一次结构切换的已提交首班状态，键为后结构，生命周期限定本次配置快照。 */
     private Map<String, StructureSwitchRuntimeState> structureSwitchRuntimeMap = new LinkedHashMap<>(16);
@@ -733,6 +768,11 @@ public class LhScheduleContext {
             structureEarlyProductionAdmissionMap =
             new LinkedHashMap<LocalDate, Map<String, StructureEarlyProductionAdmission>>(4);
     /**
+     * 有效历史关系的本窗口承接状态，预演回滚必须恢复；关系对象沿用本批原始身份。
+     */
+    private Map<LhMouldChangePlan, HistoricalStructureHandoffState>
+            historicalStructureHandoffStateMap = new IdentityHashMap<>(16);
+    /**
      * 业务日期 -> 提前生产判断日志采集器。
      * <p>采集器只保存日志标量快照，S4.4 换活字块和 S4.5 新增排产共用同一份内存态日志上下文，
      * 最终仍通过既有过程日志批量落库，不参与任何排程决策。</p>
@@ -799,6 +839,11 @@ public class LhScheduleContext {
     private List<SkuScheduleDTO> trialVirtualMachineCandidateList = new ArrayList<>();
     /** 本批最新有效历史关系，只提供指定组合资格，不授予普通新增开关豁免。 */
     private List<LhMouldChangePlan> eligiblePreviousAlternatePlans = new ArrayList<>(16);
+
+    /**
+     * 续作决策前冻结的前日交替物理机台顺序，预演和正式计算共同只读消费。
+     */
+    private PreviousAlternateMachineOrder previousAlternateMachineOrder = PreviousAlternateMachineOrder.EMPTY;
     /** 命中指定交替的试制量试原始候选，失败恢复不删除，最终按真实结果核对未排。 */
     private Map<String, SkuScheduleDTO> previousAlternateTrialSkuMap = new LinkedHashMap<>(16);
     /** 指定交替实际失败证据，资源恢复后仍保留，不能被普通开关拦截覆盖。 */
@@ -1120,6 +1165,11 @@ public class LhScheduleContext {
     private List<TimedMachineOffRequest> timedMachineOffRequests = new ArrayList<>(8);
     /** 本批一次性时间下机负荷预演标记，仅限制预演扫描，不改变正式排程。 */
     private boolean timedMachineOffLoadPreview;
+    /**
+     * 仅主时间下机预演生效的同源动作输入捕获器，主预演及定向重评均须恢复原引用。
+     */
+    private TimedMachineOffActionPreviewCapture timedMachineOffActionPreviewCapture;
+
     /** 已提交时间边界以结果身份索引，零量生产行移除后仍保留资源释放事实。 */
     private Map<LhScheduleResult, OffMachineDecision> timedMachineOffDecisionMap = new IdentityHashMap<>(8);
 

@@ -24,7 +24,8 @@ import java.util.Set;
  * 新增结构物理机台上限统一准入计算器。
  *
  * <p>普通新增、续作加机台和普通结构提前生产统一按生产占用班次所属业务日读取结构机台上限，
- * 并复用结构收尾服务的班次边界判断计算有效在机数。结构切换在提前生产和后续正常资源
+ * 并复用结构收尾服务的班次边界判断计算有效在机数。试制、量试豁免普通结构上限，
+ * 仍按真实占用计入在机统计；豁免不改变资源、首检及结构切换专用名额。结构切换在提前生产和后续正常资源
  * 竞争阶段统一使用S0/S1专用逐班名额；结构收尾提前生产沿用专用准入，两者都不重复套用
  * 普通结构班次门禁。计算过程只读，不修改结构索引、排程结果、候选运行态或资源账本。</p>
  *
@@ -32,6 +33,7 @@ import java.util.Set;
  * 正式提交使用无缓存复核，兼顾候选扫描性能和提交时点业务正确性。</p>
  *
  * @author APS
+ * @date 2026/10/14
  */
 @Slf4j
 @Component
@@ -71,6 +73,7 @@ public class StructureMachineLimitAdmissionService {
 
     /**
      * 按首检或正式生产实际占用时刻计算结构机台上限准入结果。
+     * 试制、量试仅豁免普通结构数量上限，必要班次和机台信息仍须完整。
      *
      * @param context 排程上下文
      * @param phase 当前排程阶段
@@ -118,6 +121,27 @@ public class StructureMachineLimitAdmissionService {
                 .atZone(ZoneId.systemDefault()).toLocalDate();
         int structureMachineLimit = context.getStructurePlanMachineCount(
                 businessDate, sku.getStructureName());
+        if (PendingSkuUnscheduledRule.isTrialOrMassTrialSku(sku)) {
+            // 与原机台续作一致，试制量试不等待普通结构名额，但提交后仍登记真实在机占用。
+            if (log.isInfoEnabled()) {
+                log.info("试制量试结构机台上限豁免, factoryCode: {}, batchNo: {}, businessDate: {}, "
+                                + "materialCode: {}, productStatus: {}, constructionStage: {}, structureName: {}, "
+                                + "machineCode: {}, physicalMachineCode: {}, shiftIndex: {}, "
+                                + "structureMachineLimit: {}, actualMachineCount: {}",
+                        context.getFactoryCode(), context.getBatchNo(), businessDate,
+                        sku.getMaterialCode(), sku.getProductStatus(), sku.getConstructionStage(),
+                        sku.getStructureName(), machineCode,
+                        LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode),
+                        formalTargetShift.getShiftIndex(), structureMachineLimit,
+                        Objects.isNull(context.getStructureShiftInMachineIndex()) ? null
+                                : context.getStructureShiftInMachineIndex().resolveInMachineCount(
+                                        sku.getStructureName(), formalTargetShift.getShiftIndex()));
+            }
+            return this.buildDecision(
+                    false, true, phase, businessDate, formalTargetShift, machineCode,
+                    sku, originalPoolDate, null, structureMachineLimit,
+                    "试制量试豁免普通结构硫化机台数上限，仍计入实际在机统计");
+        }
         if (structureMachineLimit <= 0) {
             return this.buildDecision(
                     true, false, phase, businessDate, formalTargetShift, machineCode,
@@ -172,6 +196,7 @@ public class StructureMachineLimitAdmissionService {
 
     /**
      * 从完整排程窗口中的真实占用班次开始解析最早满足结构机台上限的开产时刻。
+     * 试制、量试不因普通结构名额后移首检或生产，结构切换专用名额仍继续生效。
      *
      * <p>首检计入在线硫化机。结构机台数按整个班次统计，当前班次已满时不得因班内某台
      * 收尾而提前释放名额；历史首检班次有名额时保留原时刻，只有真实超限才继续扫描
@@ -203,9 +228,10 @@ public class StructureMachineLimitAdmissionService {
                 || CollectionUtils.isEmpty(scheduleShifts)) {
             return null;
         }
-        if (StructureSwitchSchedulingPolicy.shouldSkipNormalStructureShiftLimit(
+        if (PendingSkuUnscheduledRule.isTrialOrMassTrialSku(sku)
+                || StructureSwitchSchedulingPolicy.shouldSkipNormalStructureShiftLimit(
                 context, sku, phase, earlyProductionDecision)) {
-            // 结构切换跳过普通日机台数门禁，但仍须按S0/S1名额顺延实际首检和生产。
+            // 试制量试和结构切换均跳过普通结构名额，实际首检和生产仍须满足S0/S1约束。
             return StructureSwitchSchedulingPolicy.resolveEarliestOccupationTime(
                     context, sku, machineCode, requestedStartTime);
         }

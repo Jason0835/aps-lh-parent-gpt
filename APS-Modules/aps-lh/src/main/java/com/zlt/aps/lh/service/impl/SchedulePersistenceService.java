@@ -8,6 +8,7 @@ import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleProcessLog;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
+import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
@@ -16,6 +17,10 @@ import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationEndingAllocationSnapshot;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationMachineFinishPlan;
+import com.zlt.aps.lh.engine.strategy.support.StructureSwitchPlan;
+import com.zlt.aps.lh.engine.strategy.support.StructureSwitchSchedulingPolicy;
+import com.zlt.aps.lh.engine.strategy.support.StructureSwitchFirstShiftPolicy;
+import com.zlt.aps.lh.engine.strategy.support.StructureSwitchRuntimeState;
 import com.zlt.aps.lh.exception.ScheduleErrorCode;
 import com.zlt.aps.lh.exception.ScheduleException;
 import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
@@ -191,6 +196,8 @@ public class SchedulePersistenceService {
             fillProductionType(context, context.getScheduleResultList());
             // 为新增排产SKU结果行追加月计划定稿"模具号"开头备注
             fillNewSpecMonthPlanRemark(context, context.getScheduleResultList());
+            // 回填前段欠产余量标识、结构切换标识及结构切换实际首班描述，只读上下文运行态，不改变排程结果
+            fillStructureSwitchInfo(context, context.getScheduleResultList());
             scheduleResultMapper.insertBatch(context.getScheduleResultList());
         }
         if (!context.getUnscheduledResultList().isEmpty()) {
@@ -678,6 +685,75 @@ public class SchedulePersistenceService {
                 result.setSkuSortDesc(sourceSku.getSortDesc());
             }
         }
+    }
+
+    /**
+     * 保存前统一回填前段欠产余量标识、结构切换标识及结构切换实际首班描述。
+     *
+     * <p>只读排程上下文既有运行态，不重新计算、不影响排程流程：</p>
+     * <ul>
+     *   <li>前段欠产余量：取来源 SKU 待排初始化时的 {@code SkuScheduleDTO#overdueSurplusFlag}
+     *       （排程窗口内无月计划量且硫化余量仅由上月欠产构成为 1）；</li>
+     *   <li>结构切换：结果行在排程运行期绑定了结构切换冻结计划
+     *       （{@code structureSwitchResultPlanMap}）时为 1，含单控 L/R 两侧与滚动继承结果；</li>
+     *   <li>结构切换描述：本次结构切换规则首班班次名称（含日期，如：T日早班、T+1日夜班），
+     *       优先取同结构已提交的规则首班，取不到时回退冻结提案判定。</li>
+     * </ul>
+     *
+     * @param context 排程上下文
+     * @param scheduleResults 排程结果列表
+     */
+    private void fillStructureSwitchInfo(LhScheduleContext context, List<LhScheduleResult> scheduleResults) {
+        if (Objects.isNull(context) || CollectionUtils.isEmpty(scheduleResults)) {
+            return;
+        }
+        Map<LhScheduleResult, SkuScheduleDTO> sourceSkuMap = context.getScheduleResultSourceSkuMap();
+        Map<LhScheduleResult, StructureSwitchPlan> resultPlanMap = context.getStructureSwitchResultPlanMap();
+        for (LhScheduleResult result : scheduleResults) {
+            if (Objects.isNull(result)) {
+                continue;
+            }
+            // 前段欠产余量：来源于待排 SKU 初始化时计算的欠产余量标识；无来源 SKU 的结果行保持默认 0
+            SkuScheduleDTO sourceSku = sourceSkuMap.get(result);
+            if (Objects.nonNull(sourceSku)) {
+                result.setOverdueSurplusFlag(sourceSku.isOverdueSurplusFlag() ? YES_FLAG : NO_FLAG);
+            }
+            // 结构切换：结果行绑定了冻结切换计划即为结构切换结果
+            StructureSwitchPlan switchPlan = resultPlanMap.get(result);
+            if (Objects.isNull(switchPlan)) {
+                continue;
+            }
+            result.setIsStructureSwitch(YES_FLAG);
+            result.setStructureSwitchDesc(this.resolveStructureSwitchFirstShiftName(context, result, switchPlan));
+        }
+    }
+
+    /**
+     * 解析规则首班的班次描述，包含窗口前T日晚班，并与分班门禁使用同一判定。
+     * 实际首产班和P0独立维护，日计划回裁不得将规则首班描述改为实际首产班。
+     *
+     * @param context 排程上下文
+     * @param result 排程结果
+     * @param switchPlan 冻结切换计划
+     * @return 班次描述；无法解析返回 null
+     */
+    private String resolveStructureSwitchFirstShiftName(LhScheduleContext context, LhScheduleResult result,
+                                                        StructureSwitchPlan switchPlan) {
+        StructureSwitchRuntimeState state = context.getStructureSwitchRuntimeMap().get(result.getStructureName());
+        if (Objects.nonNull(state) && Objects.nonNull(state.getFirstShiftStart())) {
+            String shiftName = StructureSwitchFirstShiftPolicy.decisionShifts(context).stream()
+                    .filter(shift -> Objects.equals(shift.getShiftStartDateTime(), state.getFirstShiftStart()))
+                    .map(LhShiftConfigVO::getShiftName)
+                    .filter(StringUtils::isNotEmpty)
+                    .findFirst()
+                    .orElse(null);
+            if (StringUtils.isNotEmpty(shiftName)) {
+                return shiftName;
+            }
+        }
+        // 未登记共享状态时读取冻结判定，供胚额度班和实际首产班不参与描述替换。
+        LhShiftConfigVO first = StructureSwitchSchedulingPolicy.resolveFirstShift(context, switchPlan);
+        return Objects.nonNull(first) ? first.getShiftName() : null;
     }
 
     /**

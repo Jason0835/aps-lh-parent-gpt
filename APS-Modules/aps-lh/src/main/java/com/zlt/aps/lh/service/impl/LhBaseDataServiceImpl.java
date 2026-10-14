@@ -16,6 +16,7 @@ import com.zlt.aps.lh.api.enums.*;
 import com.zlt.aps.lh.component.LhMachineSupplyStructureRule;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.SkuDecrementChecker;
+import com.zlt.aps.lh.component.StructureEndingRecalcService;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.exception.ScheduleDomainExceptionHelper;
 import com.zlt.aps.lh.exception.ScheduleErrorCode;
@@ -72,6 +73,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     @Resource
     private HistoricalMouldChangeQuotaService historicalMouldChangeQuotaService;
 
+    @Resource
+    private StructureEndingRecalcService structureEndingRecalcService;
+
     /**
      * 排产版本已定稿（与 MpFactoryProductionVersion.isFinal 一致）
      */
@@ -96,6 +100,12 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
      * 非主销合并胎胚的收尾余量阈值：胎胚余量 <= 该值视为收尾
      */
     private static final int NON_MAIN_PRODUCT_ENDING_THRESHOLD = 2;
+
+    /**
+     * 「更新结构切换时间」开关的开启值：前端勾选后传 1，执行 T_CX_EMBRYO_LH_TIME 结构可收尾时间重算。
+     * <p>默认不勾选（缺省 0），未勾选时整步跳过、保留成型排程写入的原始快照。
+     */
+    private static final String UPDATE_STRUCTURE_LH_TIME_ENABLED = "1";
 
     /**
      * 主销合并胎胚的收尾余量阈值：胎胚余量 <= 该值视为收尾
@@ -484,6 +494,17 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         // 4. 胎胚收尾标识：依赖月计划、胎胚库存、月累计完成量、T日班次完成量、前日排程结果等均已就绪，
         //    故在屏障同步之后计算；以胎胚维度合并硫化余量并按主销参与情况判定收尾。
         this.loadEmbryoEndingFlagMap(context);
+
+        // 4.1 结构可收尾时间重算：依赖月计划（成型余量）、胎胚库存、物料信息、工作日历、班次窗口、
+        //     日硫化产能、结构排产配置，须晚于上述数据、早于硫化排程读取结构胎胚可供时间，
+        //     使「胎胚最早可供硫化时间」按最新成型余量而非成型排程快照生效。
+        //     由前端「更新结构切换时间」勾选控制：未勾选时整步跳过，保留成型排程写入的原始快照。
+        if (UPDATE_STRUCTURE_LH_TIME_ENABLED.equals(context.getUpdateStructureLhTime())) {
+            this.structureEndingRecalcService.recalc(context, scheduleDate);
+        } else {
+            log.info("结构可收尾时间重算跳过, 原因: 未勾选「更新结构切换时间」, factoryCode: {}, T日: {}",
+                    factoryCode, LhScheduleTimeUtil.formatDate(scheduleDate));
+        }
 
         // 5. 目标机台数统一Map预计算：依赖工作日历和月计划均已就绪，覆盖停产保机前N日、
         //    实际排程窗口、T+3增机及特殊材料窗口后两日判断；以物料+产品状态+自然日为完整维度，

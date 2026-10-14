@@ -3,6 +3,8 @@
  */
 package com.zlt.aps.lh.engine.strategy.impl;
 
+import com.ruoyi.common.i18n.utils.I18nUtil;
+
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
@@ -20,6 +22,7 @@ import com.zlt.aps.lh.api.enums.TrialStatusEnum;
 import com.zlt.aps.lh.component.LhMachineSupplyStructureRule;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
+import com.zlt.aps.lh.engine.strategy.support.StructureSwitchCandidateScope;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IMachineMatchStrategy;
 import com.zlt.aps.lh.engine.strategy.support.MachinePriorityMetricSnapshot;
@@ -229,6 +232,12 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         MachineFilterTrace trace = new MachineFilterTrace(context.getMachineScheduleMap().size());
 
         for (MachineScheduleDTO machine : context.getMachineScheduleMap().values()) {
+            if (Objects.nonNull(machine) && StructureSwitchCandidateScope.isHistoricalMachineReservedForOtherSku(
+                    context, sku, machine.getMachineCode())) {
+                trace.recordFilteredMachine(machine, I18nUtil.getMessage(
+                        "ui.lh.schedule.previousAlternate.structureSwitchMachineReserved"));
+                continue;
+            }
             if (isNotAllowedMachine(notAllowedMachineCodes, machine)) {
                 trace.notAllowedMachineFilteredCount++;
                 trace.recordFilteredMachine(machine, "定点机台不可作业");
@@ -316,6 +325,12 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         if (Objects.isNull(context) || Objects.isNull(machine) || Objects.isNull(sku)
                 || StringUtils.isEmpty(machine.getMachineCode())) {
             return MachineSkuMatchResult.failed(machine, sku, "排程上下文、机台或SKU为空");
+        }
+        // 指定后料尚未承接时保护其原机台，其他 SKU 不能借普通竞争覆盖该关系。
+        if (StructureSwitchCandidateScope.isHistoricalMachineReservedForOtherSku(
+                context, sku, machine.getMachineCode())) {
+            return MachineSkuMatchResult.failed(machine, sku, I18nUtil.getMessage(
+                    "ui.lh.schedule.previousAlternate.structureSwitchMachineReserved"));
         }
         // 先校验结构去向与专供机允许结构，拒绝发生在任何资源扣减前。
         MachineSkuMatchResult supplyStructureMatch = this.matchSupplyStructureConstraint(

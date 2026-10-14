@@ -266,6 +266,16 @@ public final class FirstInspectionTimelinePlan {
             appendValue(source, structureSwitchPlan.getFirstBatchShift());
             appendValue(source, structureSwitchPlan.getBaseStart());
             appendValue(source, structureSwitchPlan.getProductionStart());
+            StructureSwitchFirstShiftDecision firstDecision = structureSwitchPlan.getFirstShiftDecision();
+            if (Objects.nonNull(firstDecision)) {
+                // 正式重放必须保留同一首班及其产能依据，不能只验证实际生产时间。
+                appendValue(source, firstDecision.getSupplyShift());
+                appendValue(source, firstDecision.getFirstShift());
+                appendValue(source, firstDecision.getMachineCode());
+                appendValue(source, firstDecision.getRuntimeCapacity());
+                appendValue(source, firstDecision.getMinimumQuantity());
+                appendValue(source, firstDecision.getAvailableQuantity());
+            }
         }
         if (hasInspection()) {
             if (Objects.nonNull(allocationPlan.getEquipmentPlanId())) {

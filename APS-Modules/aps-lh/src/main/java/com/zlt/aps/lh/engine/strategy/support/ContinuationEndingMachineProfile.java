@@ -1,6 +1,8 @@
 package com.zlt.aps.lh.engine.strategy.support;
 
 import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
+import com.zlt.aps.lh.api.constant.LhScheduleConstant;
+import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.dto.CapsuleReplacementTimeWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineMaintenanceWindowDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
@@ -20,7 +22,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Collections;
 import java.util.Date;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -102,6 +103,19 @@ public final class ContinuationEndingMachineProfile {
     /** @return 已冻结的物理交接硬截止；无后续强制动作时为空 */
     public Date getReleaseDeadline() {
         return releaseDeadline;
+    }
+
+    /**
+     * 复制计算中会收紧的容量数组，供释放角色预览使用。
+     * 原结果、停机与资源窗口只读共享，预览不能收紧正式计算画像。
+     *
+     * @return 独立容量及硬截止的同机台画像
+     */
+    public ContinuationEndingMachineProfile copyForCalculation() {
+        ContinuationEndingMachineProfile copy = new ContinuationEndingMachineProfile(context, shifts,
+                originals, rawProfiles, cleaningWindows, maintenanceWindows, capacities.clone(), multiple);
+        copy.releaseDeadline = releaseDeadline;
+        return copy;
     }
 
     /**
@@ -317,6 +331,156 @@ public final class ContinuationEndingMachineProfile {
     }
 
     /**
+     * 从精确释放时刻正向计算单侧剩余班产，避免累计数量相减把跨释放点的半个节拍计为整条。
+     * 这里只刷新资源缓存，后料按自己的节拍、换模和首检再次计算正式产能。
+     *
+     * @param side 单侧原结果位置
+     * @param position 窗口班次位置
+     * @param releaseTime 实际物理释放时刻
+     * @return 原画像有效窗口内从释放后重新起算的单侧容量
+     */
+    public int remainingCapacityAfter(int side, int position, Date releaseTime) {
+        LhScheduleResult raw = rawProfiles.get(side);
+        LhShiftConfigVO shift = shifts.get(position);
+        Date start = ShiftFieldUtil.getShiftStartTime(raw, shift.getShiftIndex());
+        Date end = ShiftFieldUtil.getShiftEndTime(raw, shift.getShiftIndex());
+        if (Objects.isNull(start) || Objects.isNull(end) || !releaseTime.before(end)) {
+            return 0;
+        }
+        Date available = releaseTime.after(start) ? releaseTime : start;
+        int capacity = ShiftCapacityResolverUtil.resolveShiftCapacityWithDowntime(deviceStops,
+                cleaningWindows.get(side), maintenanceWindows.get(side), raw.getLhMachineCode(), available, end,
+                Objects.nonNull(raw.getSingleMouldShiftQty()) ? raw.getSingleMouldShiftQty() : 0,
+                Objects.nonNull(raw.getLhTime()) ? raw.getLhTime() : 0,
+                Objects.nonNull(raw.getMouldQty()) ? raw.getMouldQty() : 0,
+                ShiftCapacityResolverUtil.resolveShiftDurationSeconds(shift),
+                context.getParamIntValue(LhScheduleParamConstant.DRY_ICE_LOSS_QTY, LhScheduleConstant.DRY_ICE_LOSS_QTY),
+                context.getParamIntValue(LhScheduleParamConstant.DRY_ICE_DURATION_HOURS,
+                        LhScheduleConstant.DRY_ICE_DURATION_HOURS), shift,
+                ShiftCapacityResolverUtil.resolveOddShiftCapacityPlusShiftType(context), raw.getScheduleType(),
+                context.getParamIntValue(LhScheduleParamConstant.PLANNED_REPAIR_FIXED_QTY,
+                        LhScheduleConstant.PLANNED_REPAIR_FIXED_QTY));
+        return Math.max(0, Math.min(capacity, capacities[position] / originals.size()));
+    }
+
+    /**
+     * 从已落定的生产结束时刻检查真实物理占用，不叠加换模额度或禁换模时段。
+     * 零量调用方必须传入已知的需求日可用起点，不能以画像窗口起点推断提前释放。
+     *
+     * @param completedOrAvailable 已有生产完成时刻或零量请求的已知可用起点
+     * @return 清洗、维护、停机和胶囊占用均结束后的交接时刻
+     * @throws IllegalArgumentException 未提供生产完成或零量可用起点时抛出
+     */
+    public Date physicalReadyTime(Date completedOrAvailable) {
+        if (Objects.isNull(completedOrAvailable)) {
+            throw new IllegalArgumentException("时间下机缺少真实完成或零量可用起点");
+        }
+        Date available = completedOrAvailable;
+        if (originals.stream().anyMatch(result -> context.isContinuousStopHoldMachine(result.getLhMachineCode()))) {
+            return shifts.get(shifts.size() - 1).getShiftEndDateTime();
+        }
+        Date previous;
+        do {
+            previous = available;
+            for (int side = 0; side < originals.size(); side++) {
+                MachineScheduleDTO machine = context.getMachineScheduleMap()
+                        .get(originals.get(side).getLhMachineCode());
+                available = MachineCleaningOverlapUtil.resolveEarliestAvailableTime(available,
+                        cleaningWindows.get(side),
+                        Objects.nonNull(machine) ? machine.getPlanStopStartTime() : null,
+                        Objects.nonNull(machine) ? machine.getPlanStopEndTime() : null);
+                if (Objects.nonNull(machine)) {
+                    available = MachineCleaningOverlapUtil.resolveEarliestAvailableTime(available,
+                            machine.getCleaningWindowList(), machine.getPlanStopStartTime(),
+                            machine.getPlanStopEndTime());
+                }
+                for (MachineMaintenanceWindowDTO window : maintenanceWindows.get(side)) {
+                    available = this.afterOccupiedWindow(available,
+                            window.getMaintenanceStartTime(), window.getMaintenanceEndTime());
+                }
+            }
+            for (MdmDevicePlanShut stop : deviceStops) {
+                available = this.afterOccupiedWindow(available, stop.getBeginDate(), stop.getEndDate());
+            }
+            for (CapsuleReplacementTimeWindowDTO window : capsuleWindows) {
+                available = this.afterOccupiedWindow(available,
+                        window.getReplacementStartTime(), window.getReplacementEndTime());
+            }
+        } while (available.after(previous));
+        return available;
+    }
+
+    /**
+     * 读取既定总量在本机真实时间轴上形成的逐班量，供收尾计划对调校验。
+     *
+     * @param quantity 已通过合法性校验的物理机台总量
+     * @return 与窗口班次顺序一致的数量数组
+     */
+    public int[] shiftQuantities(int quantity) {
+        int[] allocated = new int[capacities.length];
+        int remaining = quantity;
+        for (int position = 0; position < capacities.length; position++) {
+            allocated[position] = Math.min(remaining, capacities[position]);
+            remaining -= allocated[position];
+        }
+        return allocated;
+    }
+
+    /**
+     * 解析收尾后最早可发起交替的物理时间，不预占后料、首检或换模名额。
+     * 夜间顺延后重新检查设备窗口，防止跳到早班时又落入维护或清洗占用。
+     *
+     * @param quantity 本机拟承接的合法总量
+     * @return 物理占用与禁换模窗口均已结束的时间；无法计算时为空
+     */
+    public Date earliestChangeoverTime(int quantity) {
+        Date available = this.switchReadyTime(quantity);
+        if (Objects.isNull(available)) {
+            return null;
+        }
+        Date previous;
+        do {
+            previous = available;
+            if (LhScheduleTimeUtil.isNoMouldChangeTime(context, available)) {
+                available = LhScheduleTimeUtil.resolveNextMorningAfterNoMouldChangeWindow(context, available);
+            }
+            for (int side = 0; side < originals.size(); side++) {
+                MachineScheduleDTO machine = context.getMachineScheduleMap()
+                        .get(originals.get(side).getLhMachineCode());
+                available = MachineCleaningOverlapUtil.resolveEarliestAvailableTime(
+                        available, cleaningWindows.get(side),
+                        Objects.nonNull(machine) ? machine.getPlanStopStartTime() : null,
+                        Objects.nonNull(machine) ? machine.getPlanStopEndTime() : null);
+                for (MachineMaintenanceWindowDTO window : maintenanceWindows.get(side)) {
+                    available = this.afterOccupiedWindow(available,
+                            window.getMaintenanceStartTime(), window.getMaintenanceEndTime());
+                }
+            }
+            for (MdmDevicePlanShut stop : deviceStops) {
+                available = this.afterOccupiedWindow(available, stop.getBeginDate(), stop.getEndDate());
+            }
+            for (CapsuleReplacementTimeWindowDTO window : capsuleWindows) {
+                available = this.afterOccupiedWindow(available,
+                        window.getReplacementStartTime(), window.getReplacementEndTime());
+            }
+        } while (available.after(previous));
+        return available;
+    }
+
+    /**
+     * 将落入半开占用区间的时刻推至区间结束，端点相接允许立即交接。
+     *
+     * @param time 待判断时刻
+     * @param start 占用开始
+     * @param end 占用结束
+     * @return 原时刻或占用结束时刻
+     */
+    private Date afterOccupiedWindow(Date time, Date start, Date end) {
+        return Objects.nonNull(start) && Objects.nonNull(end) && !start.after(time) && end.after(time)
+                ? end : time;
+    }
+
+    /**
      * 将已经通过整组校验的数量写入传入的结果副本；原结果由调用方统一提交。
      * @param proposed 各侧结果副本
      * @param quantity 物理机台合计排量
@@ -334,81 +498,6 @@ public final class ContinuationEndingMachineProfile {
             }
             remaining -= allocated;
         }
-    }
-
-    /**
-     * 只读核对目标物理机台能否承接既定槽位，不重新反算数量、完成时间或下机时间。
-     * 不同停机时间轴无法仅靠编码替换证明等价，发生窗口占用时保留原绑定。
-     * @param source 原槽位机台画像
-     * @param proposed 已完成计算的结果副本，键为原结果对象
-     * @param finish 已冻结的逐机收尾事实
-     * @return 既有班产、时间基数、左右侧和资源边界均兼容时为true
-     */
-    public boolean canAcceptFinishSlot(ContinuationEndingMachineProfile source,
-            Map<LhScheduleResult, LhScheduleResult> proposed, ContinuationMachineFinishPlan finish) {
-        if (originals.size() != source.originals.size() || multiple != source.multiple
-                || Objects.isNull(finish.getOfflineTime())
-                || (Objects.nonNull(releaseDeadline) && finish.getOfflineTime().after(releaseDeadline))) {
-            return false;
-        }
-        Date start = source.originals.stream().map(proposed::get)
-                .flatMap(result -> shifts.stream().filter(shift -> ShiftFieldUtil.getShiftPlanQty(result,
-                        shift.getShiftIndex()) > 0).map(shift -> ShiftFieldUtil.getShiftStartTime(result, shift.getShiftIndex())))
-                .filter(Objects::nonNull).min(Date::compareTo).orElse(shifts.get(0).getShiftStartDateTime());
-        if (this.hasFinishSlotOccupation(start, finish.getOfflineTime())
-                || source.hasFinishSlotOccupation(start, finish.getOfflineTime())) {
-            return false;
-        }
-        for (LhScheduleResult original : source.originals) {
-            String side = LhSingleControlMachineUtil.resolveSplitSide(original.getLhMachineCode());
-            LhScheduleResult target = rawProfiles.stream()
-                    .filter(raw -> Objects.equals(side, LhSingleControlMachineUtil.resolveSplitSide(raw.getLhMachineCode())))
-                    .findFirst().orElse(null);
-            LhScheduleResult sourceRaw = source.rawProfiles.get(source.originals.indexOf(original));
-            if (Objects.isNull(target) || !Objects.equals(sourceRaw.getMouldQty(), target.getMouldQty())
-                    || !Objects.equals(sourceRaw.getLhTime(), target.getLhTime())
-                    || !Objects.equals(sourceRaw.getStandardCapacity(), target.getStandardCapacity())
-                    || !Objects.equals(sourceRaw.getSingleMouldShiftQty(), target.getSingleMouldShiftQty())) {
-                return false;
-            }
-            for (int position = 0; position < shifts.size(); position++) {
-                int shiftIndex = shifts.get(position).getShiftIndex();
-                int quantity = ShiftFieldUtil.getShiftPlanQty(proposed.get(original), shiftIndex);
-                if (quantity > 0 && ((long) quantity * originals.size() > capacities[position]
-                        || !Objects.equals(ShiftFieldUtil.getShiftPlanQty(sourceRaw, shiftIndex),
-                        ShiftFieldUtil.getShiftPlanQty(target, shiftIndex))
-                        || !Objects.equals(ShiftFieldUtil.getShiftStartTime(sourceRaw, shiftIndex),
-                        ShiftFieldUtil.getShiftStartTime(target, shiftIndex))
-                        || !Objects.equals(ShiftFieldUtil.getShiftEndTime(sourceRaw, shiftIndex),
-                        ShiftFieldUtil.getShiftEndTime(target, shiftIndex)))) {
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
-
-    /**
-     * 检查槽位内已登记的物理占用，包含释放时刻正在开始的胶囊等动作。
-     * @param start 槽位生产起点，零量时为窗口起点
-     * @param end 已计算的物理释放时间
-     * @return 存在无法直接互换的占用或强制生产截止时为true
-     */
-    private boolean hasFinishSlotOccupation(Date start, Date end) {
-        return deviceStops.stream().anyMatch(stop -> this.overlapsFinishSlot(start, end, stop.getBeginDate(), stop.getEndDate()))
-                || capsuleWindows.stream().anyMatch(window -> this.overlapsFinishSlot(start, end,
-                window.getReplacementStartTime(), window.getReplacementEndTime()))
-                || cleaningWindows.stream().flatMap(List::stream).anyMatch(window -> this.overlapsFinishSlot(start, end,
-                window.getCleanStartTime(), window.getReadyTime()))
-                || maintenanceWindows.stream().flatMap(List::stream).anyMatch(window ->
-                (Objects.nonNull(window.getProductionCutoffTime()) && end.after(window.getProductionCutoffTime()))
-                || this.overlapsFinishSlot(start, end, window.getMaintenanceStartTime(), window.getProductionResumeTime()));
-    }
-
-    /** @param start 槽位起点 @param end 槽位释放 @param occupiedStart 占用起点 @param occupiedEnd 占用终点 @return 时间缺失或相交时不能证明可互换 */
-    private boolean overlapsFinishSlot(Date start, Date end, Date occupiedStart, Date occupiedEnd) {
-        return Objects.isNull(occupiedStart) || Objects.isNull(occupiedEnd)
-                || (!occupiedStart.after(end) && occupiedEnd.after(start));
     }
 
     /**

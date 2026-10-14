@@ -31,6 +31,10 @@ public class UnscheduledDemandSnapshot {
     private int originalDemandQty;
     /** 初始化硫化余量，仅用于续作零结果诊断的最终数量核对；日调整需求不设置。 */
     private Integer initialSurplusQty;
+    /**
+     * 同源需求曾出现续作零结果诊断，后续原因升级仍须按最终有效产量核对未排数量。
+     */
+    private boolean continuationZeroPlanObserved;
     /** 月计划年份。 */
     private Integer monthPlanYear;
     /** 月计划月份。 */
@@ -41,7 +45,7 @@ public class UnscheduledDemandSnapshot {
     private String productionVersion;
 
     /**
-     * 复制快照，供候选试算回滚保存独立状态。
+     * 复制需求及续作零结果诊断标记，供候选试算回滚保存独立状态。
      *
      * @return 快照副本
      */
@@ -55,6 +59,7 @@ public class UnscheduledDemandSnapshot {
         target.setEffectiveDemand(effectiveDemand);
         target.setOriginalDemandQty(originalDemandQty);
         target.setInitialSurplusQty(initialSurplusQty);
+        target.setContinuationZeroPlanObserved(continuationZeroPlanObserved);
         target.setMonthPlanYear(monthPlanYear);
         target.setMonthPlanMonth(monthPlanMonth);
         target.setMonthPlanVersion(monthPlanVersion);

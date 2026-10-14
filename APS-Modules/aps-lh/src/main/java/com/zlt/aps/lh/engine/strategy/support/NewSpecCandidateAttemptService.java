@@ -6,12 +6,14 @@ import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
 import com.zlt.aps.lh.component.StructureEndingAlignmentDecision;
 import com.zlt.aps.lh.component.StructureEndingAlignmentService;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
 import java.time.LocalDate;
 import java.util.Date;
+import java.util.Collections;
 import java.util.Objects;
 
 /**
@@ -203,7 +205,7 @@ public class NewSpecCandidateAttemptService {
     }
 
     /**
-     * 按首检实际覆盖班次和首个正式生产班次统一校验结构机台数上限。
+     * 统一校验结构切换候选等待，以及首检和正式生产班次的结构机台上限。
      *
      * @param context 排程上下文
      * @param dayContext 当前业务日
@@ -231,6 +233,18 @@ public class NewSpecCandidateAttemptService {
                 || Objects.isNull(productionOccupationShift)
                 || Objects.isNull(productionOccupationShift.getShiftIndex())) {
             return null;
+        }
+        // 历史指定、独立结构竞争及普通提案复核共用冻结的准备后最早首检时间。
+        String selectionFailure = StructureSwitchSelectionTimePolicy.validate(
+                context, candidate.getSku(), availabilityPlan);
+        if (StringUtils.isNotEmpty(selectionFailure)) {
+            return new StructureMachineLimitDecision(true, false, dayContext.getCurrentPhase(),
+                    dayContext.getScheduleDate(), productionOccupationShift.getShiftIndex(),
+                    productionOccupationShift.getShiftStartDateTime(), productionOccupationShift.getShiftEndDateTime(),
+                    matchResult.getMachine().getMachineCode(),
+                    LhSingleControlMachineUtil.resolvePhysicalMachineCode(matchResult.getMachine().getMachineCode()),
+                    candidate.getSku().getMaterialCode(), candidate.getSku().getStructureName(), poolDate,
+                    Collections.emptySet(), Collections.emptySet(), 0, 0, selectionFailure);
         }
         // 新增分班限制叠加原准入，实际顺延后以冻结时间轴重新校验。
         StructureMachineLimitDecision switchDecision = StructureSwitchSchedulingPolicy.evaluate(context,
