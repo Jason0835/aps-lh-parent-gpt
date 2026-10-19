@@ -1,0 +1,86 @@
+package com.zlt.aps.lh.api.enums;
+
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
+/**
+ * 产品状态枚举
+ *
+ * @author zlt
+ */
+@Getter
+@AllArgsConstructor
+public enum TrialStatusEnum {
+
+    TRIAL("X", "试验", "试验 Thử nghiệm", "试验Thử nghiệm"),
+    MASS_TRIAL("T", "量试", "量试 Thử nghiệm số lượng", "量试Thử nghiệm số lượng"),
+    FORMAL("S", "正规", "正规 Chính quy", "正规Chính quy");
+
+    /** 状态编码 */
+    private final String code;
+
+    /** 状态描述 */
+    private final String description;
+
+    /**
+     * 模具交替计划导出使用的中越双语示方类型
+     */
+    private final String mouldChangePlanExcelText;
+
+    /**
+     * 模具交替计划导出使用的中越双语示方类型
+     */
+    private final String mouldChangePlanExcelTextNoSpace;
+
+    /**
+     * 根据编码获取枚举
+     *
+     * @param code 状态编码
+     * @return 产品状态枚举，未找到返回null
+     */
+    public static TrialStatusEnum getByCode(String code) {
+        if (code == null) {
+            return null;
+        }
+        for (TrialStatusEnum e : values()) {
+            if (e.getCode().equals(code)) {
+                return e;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 判断产品状态是否为试制或量试。
+     * <p>试制(X)与量试(T)的计划日常落在排程窗口之外，但仍会被试制量试虚拟机台兜底排产，
+     * 因此基础数据校验不得按“窗口无计划量”跳过，必须保证其示方书关系完整。</p>
+     *
+     * @param code 产品状态编码（S-正规、T-量试、X-试制）
+     * @return true-试制或量试，false-正规或未知状态
+     */
+    public static boolean isTrialStatus(String code) {
+        TrialStatusEnum status = getByCode(code);
+        return status == TRIAL || status == MASS_TRIAL;
+    }
+
+    /**
+     * 根据模具交替计划模板文本获取示方类型枚举，支持中文短标签和中越双语文本。
+     *
+     * @param text 模板中的示方类型文本
+     * @return 匹配的示方类型枚举，空值或不支持的文本返回null
+     */
+    public static TrialStatusEnum getByMouldChangePlanExcelText(String text) {
+        if (text == null || text.trim().isEmpty()) {
+            return null;
+        }
+        String normalizedText = text.trim();
+        for (TrialStatusEnum statusEnum : values()) {
+            if (statusEnum.description.equals(normalizedText)
+                    || statusEnum.mouldChangePlanExcelText.equals(normalizedText)
+                    || statusEnum.mouldChangePlanExcelTextNoSpace.equals(normalizedText)) {
+                return statusEnum;
+            }
+        }
+        return null;
+    }
+}

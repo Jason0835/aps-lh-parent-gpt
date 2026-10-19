@@ -3,6 +3,7 @@ package com.zlt.aps.lh.engine.strategy.support;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.component.StructureEarlyProductionAdmission;
+import com.zlt.aps.lh.component.EmbryoEndingStructureMachineExemptionPolicy;
 import com.zlt.aps.lh.component.StructureMinMachineRetentionService;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
@@ -73,7 +74,7 @@ public class StructureMachineLimitAdmissionService {
 
     /**
      * 按首检或正式生产实际占用时刻计算结构机台上限准入结果。
-     * 试制、量试仅豁免普通结构数量上限，必要班次和机台信息仍须完整。
+     * 试制、量试和成型收尾后的匹配SKU按各自规则豁免数量上限，必要班次和机台信息仍须完整。
      *
      * @param context 排程上下文
      * @param phase 当前排程阶段
@@ -134,13 +135,31 @@ public class StructureMachineLimitAdmissionService {
                         LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode),
                         formalTargetShift.getShiftIndex(), structureMachineLimit,
                         Objects.isNull(context.getStructureShiftInMachineIndex()) ? null
-                                : context.getStructureShiftInMachineIndex().resolveInMachineCount(
-                                        sku.getStructureName(), formalTargetShift.getShiftIndex()));
+                                : context.getStructureShiftInMachineIndex().resolveRawInMachinePhysicalCodes(
+                                        sku.getStructureName(), formalTargetShift.getShiftIndex()).size());
             }
             return this.buildDecision(
                     false, true, phase, businessDate, formalTargetShift, machineCode,
                     sku, originalPoolDate, null, structureMachineLimit,
                     "试制量试豁免普通结构硫化机台数上限，仍计入实际在机统计");
+        }
+        if (EmbryoEndingStructureMachineExemptionPolicy.isExempt(context, sku.getStructureName(),
+                sku.getEmbryoCode(), sku.getStructureName(), formalTargetShift)) {
+            StructureEarlyProductionAdmission exemptStatistics = structureMinMachineRetentionService
+                    .resolveEffectiveStructureMachineStatistics(context, sku.getStructureName(), formalTargetShift);
+            if (log.isInfoEnabled()) {
+                log.info("成型收尾SKU结构配额准入豁免, factoryCode: {}, batchNo: {}, businessDate: {}, shiftIndex: {}, "
+                                + "structureName: {}, productStatus: {}, embryoCode: {}, materialCode: {}, "
+                                + "machineCode: {}, endingShifts: {}",
+                        context.getFactoryCode(), context.getBatchNo(), businessDate, formalTargetShift.getShiftIndex(),
+                        sku.getStructureName(), sku.getProductStatus(),
+                        sku.getEmbryoCode(), sku.getMaterialCode(), machineCode,
+                        EmbryoEndingStructureMachineExemptionPolicy.resolveEndingShifts(
+                                context, sku.getEmbryoCode()));
+            }
+            // 只豁免数量门禁，既有结构资格、实际资源、首检和生产时间轴仍由原链路校验。
+            return this.buildDecision(true, true, phase, businessDate, formalTargetShift, machineCode,
+                    sku, originalPoolDate, exemptStatistics, structureMachineLimit, "成型胎胚收尾后同胎胚同结构不占机台配额");
         }
         if (structureMachineLimit <= 0) {
             return this.buildDecision(

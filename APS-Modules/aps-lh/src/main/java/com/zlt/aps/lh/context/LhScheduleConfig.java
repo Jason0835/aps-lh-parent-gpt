@@ -25,6 +25,11 @@ public class LhScheduleConfig {
     /** 已解析的参数快照（值均为字符串，按需转换） */
     private final Map<String, String> resolvedParamMap;
 
+    /**
+     * 本批次换模或换活字块首班计划量上限，-1表示关闭新限制。
+     */
+    private final int firstShiftPlanQtyLimit;
+
     /** 按日标准量排产结构集合；构造配置快照时一次解析，排产过程中只做精确匹配 */
     private final Set<String> dailyStandardCapacityStructureSet;
 
@@ -38,6 +43,7 @@ public class LhScheduleConfig {
      */
     public LhScheduleConfig(Map<String, String> resolvedParamMap) {
         this.resolvedParamMap = new HashMap<>(resolvedParamMap);
+        this.firstShiftPlanQtyLimit = this.parseFirstShiftPlanQtyLimit();
         this.dailyStandardCapacityStructureSet = parseDailyStandardCapacityStructureSet(
                 this.resolvedParamMap.get(LhScheduleParamConstant.DAILY_STANDARD_CAPACITY_STRUCTURE_LIST));
         Set<String> configuredPrefixSet = parseCommaSeparatedValueSet(
@@ -85,6 +91,42 @@ public class LhScheduleConfig {
         } catch (NumberFormatException e) {
             return defaultValue;
         }
+    }
+
+    /**
+     * 读取换模或换活字块首班计划量上限，明确空值及-1关闭限制，缺失参数记录使用默认10条。
+     *
+     * @return 非负数量上限；关闭限制时返回-1
+     */
+    public int getFirstShiftPlanQtyLimit() {
+        return this.firstShiftPlanQtyLimit;
+    }
+
+    /**
+     * 构建配置快照时解析一次首班上限，非法配置记录原因并关闭新限制。
+     *
+     * @return 非负数量上限，空值、-1或非法值返回-1
+     */
+    private int parseFirstShiftPlanQtyLimit() {
+        String paramCode = LhScheduleParamConstant.FIRST_SHIFT_PLAN_QTY_LIMIT;
+        if (!this.resolvedParamMap.containsKey(paramCode)) {
+            return LhScheduleConstant.FIRST_SHIFT_PLAN_QTY_LIMIT;
+        }
+        String value = this.resolvedParamMap.get(paramCode);
+        if (StringUtils.isBlank(value)) {
+            return -1;
+        }
+        try {
+            int limit = Integer.parseInt(value.trim());
+            if (limit >= -1) {
+                return limit;
+            }
+        } catch (NumberFormatException exception) {
+            log.warn("首班计划量上限不是有效整数，关闭新限制, paramCode={}, value={}", paramCode, value);
+            return -1;
+        }
+        log.warn("首班计划量上限小于-1，关闭新限制, paramCode={}, value={}", paramCode, value);
+        return -1;
     }
 
     /**
@@ -771,6 +813,17 @@ public class LhScheduleConfig {
     public BigDecimal getMachineSkuEmbryoMaxWaitHours() {
         return this.getParamBigDecimalValue(LhScheduleParamConstant.MACHINE_SKU_EMBRYO_MAX_WAIT_HOURS,
                 LhScheduleConstant.MACHINE_SKU_EMBRYO_MAX_WAIT_HOURS);
+    }
+
+    /**
+     * 判断本批次是否执行清洗计划与实际在机模具的一致性校验。
+     *
+     * @return 仅合法值1开启校验，缺省、空白或非法值均关闭
+     */
+    public boolean isCleaningOnlineMouldCheckEnabled() {
+        String value = this.getParamValue(LhScheduleParamConstant.CLEANING_ONLINE_MOULD_CHECK_ENABLED,
+                String.valueOf(LhScheduleConstant.CLEANING_ONLINE_MOULD_CHECK_ENABLED));
+        return StringUtils.equals("1", StringUtils.trim(value));
     }
 
     /**

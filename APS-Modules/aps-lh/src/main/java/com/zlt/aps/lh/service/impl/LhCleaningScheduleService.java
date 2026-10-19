@@ -10,6 +10,7 @@ import com.zlt.aps.lh.api.domain.entity.LhMouldCleanPlan;
 import com.zlt.aps.lh.api.enums.CleaningTypeEnum;
 import com.zlt.aps.lh.api.enums.TrialStatusEnum;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
+import com.zlt.aps.lh.context.LhScheduleConfig;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.util.LeftRightMouldUtil;
 import com.zlt.aps.lh.util.LhMouldCodeUtil;
@@ -152,6 +153,13 @@ public class LhCleaningScheduleService {
         MachineCleaningWindowDTO pairedWindow = new MachineCleaningWindowDTO();
         // 配对窗口继承来源计划主键，最终阶段按同一主键去重回填，不产生第二条停机计划更新。
         pairedWindow.setSourcePlanId(cleaningWindow.getSourcePlanId());
+        pairedWindow.setSourceMaterialCode(cleaningWindow.getSourceMaterialCode());
+        pairedWindow.setSourceProductStatus(cleaningWindow.getSourceProductStatus());
+        LhMachineOnlineInfo pairedOnline = this.resolveMachineOnlineInfo(context, pairMachineCode);
+        if (Objects.nonNull(pairedOnline)) {
+            pairedWindow.setSourceMaterialCode(pairedOnline.getMaterialCode());
+            pairedWindow.setSourceProductStatus(this.normalizeProductStatus(pairedOnline.getProductStatus()));
+        }
         pairedWindow.setLhCode(pairMachineCode);
         pairedWindow.setCleanType(cleaningWindow.getCleanType());
         pairedWindow.setLeftRightMould(LeftRightMouldUtil.resolveCleaningLeftRightMould(pairMachineCode));
@@ -201,7 +209,7 @@ public class LhCleaningScheduleService {
         if (StringUtils.isEmpty(cleanType)) {
             return null;
         }
-        // 清洗窗口真正占用机台、影响首检和排产前，先校验设备停机计划维护的在机模具。
+        // 清洗窗口占用机台前，按本批次参数决定是否校验计划与实际在机模具。
         if (!this.isCleaningPlanMouldMatched(context, cleaningPlan, cleanType)) {
             return null;
         }
@@ -239,6 +247,9 @@ public class LhCleaningScheduleService {
         increaseDeviceStopCleaningUsage(context, dryIceDailyCountMap, dryIceMorningCountMap,
                 dryIceAfternoonCountMap, sandBlastDailyCountMap, cleanType, cleanStartTime);
         MachineCleaningWindowDTO cleaningWindow = buildCleaningWindow(context, cleaningPlan, cleanType, cleanStartTime, cleanDurationHours);
+        // 清洗始终属于计划校验时的在机模具和SKU，不能在后续换料后改挂到后料。
+        cleaningWindow.setSourceMaterialCode(machineMaterial);
+        cleaningWindow.setSourceProductStatus(this.normalizeProductStatus(productStatus));
         if (CleaningTypeEnum.SAND_BLAST.getCode().equals(cleanType)) {
             cleaningWindow.setSandBlastSequence(sandBlastDailyCountMap.get(LhScheduleTimeUtil.formatDate(cleanStartTime)));
         }
@@ -260,6 +271,7 @@ public class LhCleaningScheduleService {
     /**
      * 校验设备停机清洗计划与当前实际在机模具是否一致。
      *
+     * <p>开关默认关闭，关闭时直接继续后续清洗规则；开启时才执行以下模具比较。</p>
      * <p>实际值只使用本次排程加载的 MES 在机模具快照，不根据在机物料回查 SKU 模具关系，
      * 避免把可用模具误当成当前实际在机模具。喷砂和干冰均从统一清洗入口调用本方法。</p>
      * <p>计划未维护有效模具号时，仅免除本次一致性校验，后续清洗时间、名额、收尾及窗口逻辑保持不变。</p>
@@ -267,11 +279,19 @@ public class LhCleaningScheduleService {
      * @param context 排程上下文
      * @param cleaningPlan 设备停机清洗计划
      * @param cleanType 清洗类型
-     * @return true-计划未维护模具或模具完全一致，可继续执行原清洗逻辑；false-实际模具缺失或不一致，跳过计划
+     * @return 关闭校验、计划模具为空或集合一致时返回true；开启且实际模具缺失或不一致时返回false
      */
     private boolean isCleaningPlanMouldMatched(LhScheduleContext context,
                                                MdmDevicePlanShut cleaningPlan,
                                                String cleanType) {
+        LhScheduleConfig scheduleConfig = context.getScheduleConfig();
+        if (Objects.isNull(scheduleConfig) || !scheduleConfig.isCleaningOnlineMouldCheckEnabled()) {
+            log.info("清洗在机模具一致性校验开关关闭，跳过一致性校验，继续后续清洗规则, "
+                            + "工厂: {}, 批次: {}, 机台: {}, 清洗类型: {}, 清洗计划ID: {}, 是否纳入清洗窗口: {}",
+                    context.getFactoryCode(), context.getBatchNo(), cleaningPlan.getMachineCode(), cleanType,
+                    cleaningPlan.getId(), "待后续规则确认");
+            return true;
+        }
         String plannedMouldCode = cleaningPlan.getInMachineMouldCode();
         boolean plannedMouldMissing = CollectionUtils.isEmpty(LhMouldCodeUtil.normalizeAndSortMouldCodes(
                 Collections.singletonList(plannedMouldCode)));

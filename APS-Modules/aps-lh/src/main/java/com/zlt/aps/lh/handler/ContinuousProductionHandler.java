@@ -11,9 +11,11 @@ import com.zlt.aps.lh.engine.strategy.ISkuPriorityStrategy;
 import com.zlt.aps.lh.engine.strategy.ITypeBlockProductionStrategy;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchCandidateScope;
 import com.zlt.aps.lh.service.impl.LhEquipmentPlanScheduleService;
+import com.zlt.aps.lh.service.impl.SharedEmbryoEndingScheduleService;
 import com.zlt.aps.lh.service.impl.PreviousAlternatePlanReuseService;
 import com.zlt.aps.lh.service.impl.TimedMachineOffShiftService;
 import com.zlt.aps.lh.service.impl.TimedMachineOffLoadPreviewService;
+import com.zlt.aps.lh.service.impl.TimedMachineOffCleaningHandoffService;
 import com.zlt.aps.lh.service.impl.PreviousAlternateMachineOrderService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -32,7 +34,8 @@ import javax.annotation.Resource;
  * </ul>
  *
  * <p>该 Handler 只负责步骤编排，具体续作目标量、换活字块匹配、同 SKU 多机台降模等规则
- * 分别下沉到 {@code ContinuousProductionStrategy} 和 {@code TypeBlockProductionStrategy}。</p>
+ * 分别下沉到 {@code ContinuousProductionStrategy} 和 {@code TypeBlockProductionStrategy}，
+ * 共用胎胚收尾由 {@code SharedEmbryoEndingScheduleService} 在普通降模前独立处理。</p>
  *
  * @author APS
  */
@@ -42,6 +45,13 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
 
     @Resource
     private ScheduleStrategyFactory strategyFactory;
+
+    /**
+     * 独立胎胚收尾前置服务，完整流程不再嵌入普通降模。
+     */
+    @Resource
+    private SharedEmbryoEndingScheduleService sharedEmbryoEndingScheduleService;
+
     /** 提前提供指定后料来源，不改变独立调整的普通后置排产顺序。 */
     @Resource
     private DayPlanAdjustRequireAssembler dayPlanAdjustRequireAssembler;
@@ -62,10 +72,20 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
     private TimedMachineOffShiftService timedMachineOffShiftService;
     @Resource
     private TimedMachineOffLoadPreviewService timedMachineOffLoadPreviewService;
+    /**
+     * 历史正规换模覆盖喷砂时联合确认后料，失败恢复后沿用原时间下机规则。
+     */
+    @Resource
+    private TimedMachineOffCleaningHandoffService timedMachineOffCleaningHandoffService;
     /** S4.4 续作排产前校验 MES 实际在机模具与续作 SKU 模具关系。 */
     @Resource
     private ContinuationOnlineMouldValidator continuationOnlineMouldValidator;
 
+    /**
+     * 按原续作顺序完成数量与资源计算，喷砂重叠的精确历史换模由联合尝试确认。
+     *
+     * @param context 当前批次的续作、历史交替及资源上下文
+     */
     @Override
     protected void doHandle(LhScheduleContext context) {
         log.info("续作排产处理开始, 工厂: {}, 目标日: {}, 续作SKU: {}, 新增SKU: {}, 当前结果数: {}",
@@ -106,26 +126,23 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
         log.info("续作胎胚库存调整完成, 排程结果数: {}, 未排产数: {}",
                 context.getScheduleResultList().size(), context.getUnscheduledResultList().size());
 
+        // 胎胚收尾先独立确定同SKU各原机任务和真实时间轴，普通下机只处理其他对象。
+        sharedEmbryoEndingScheduleService.allocateSharedEmbryoEndingMachines(context);
+
         // 前置续作降模只冻结余量收尾机台及硬边界，普通非收尾处理保持原有口径。
+        // 续作降模/停产保机
         strategy.scheduleReduceMould(context);
+
         // 历史交替正式排产前计算真实收尾，禁止后料提交后再搬动前料。
+        // SKU余量收尾错班
         strategy.calculateContinuationRemainderFinish(context);
-        // 不依赖余量收尾组是否存在，独立处理已选机台的时间下机需求。
-        timedMachineOffShiftService.resolveAndApply(context, timedMachineOffLoadPreviewService.preview(context));
-        // 数量稳定后只消费一次账本，同时发布机台、模具和待排余量。
-        strategy.finalizeContinuousProduction(context);
 
-        // 普通精度只在真实收尾稳定后集中判断；若复评产生新强制约束，先按消费记录恢复并重算受影响续作。
-        equipmentPlanScheduleService.reviewConfirmedEndings(context);
-
-        // 只冻结结构切换身份；正式切换统一在换活字块结束后的独立步骤执行。
-        StructureSwitchCandidateScope.freeze(context);
-
-        // 独立复用阶段覆盖全部剩余产能机台，完成后换活字块只处理实时剩余资源与需求。
-        previousAlternatePlanReuseService.reuse(context);
+        timedMachineOffCleaningHandoffService.execute(context,
+                () -> this.finalizeAndReuseContinuousProduction(context, strategy));
 
         // S4.4.5 收尾后换活字块衔接排产：只读取均衡后的最终机台可用时间。
         typeBlockProductionStrategy.scheduleTypeBlockChange(context);
+
         // 换活字块可能移出或回写待新增SKU，需重新构建结构视图供 S4.5 新增排序使用。
         context.rebuildStructureSkuMapFromPending(context.getNewSpecSkuList());
         log.info("换活字块衔接排产完成, 排程结果数: {}, 待新增SKU: {}",
@@ -138,5 +155,33 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
     @Override
     protected String getStepName() {
         return ScheduleStepEnum.S4_4_CONTINUOUS_PRODUCTION.getDescription();
+    }
+
+    /**
+     * 按原顺序完成时间下机、数量扣账、设备复评及历史指定承接。
+     * 联合尝试失败时由调用方整体恢复本阶段，禁止留下已消费数量或提前释放的资源。
+     *
+     * @param context 本批续作上下文
+     * @param strategy 原续作排产策略
+     */
+    private void finalizeAndReuseContinuousProduction(LhScheduleContext context, IProductionStrategy strategy) {
+        // 不依赖余量收尾组是否存在，独立处理已选机台的时间下机需求。
+        // 按时间下机联合决策
+        timedMachineOffShiftService.resolveAndApply(context, timedMachineOffLoadPreviewService.preview(context));
+
+        // 数量稳定后只消费一次账本，同时发布机台、模具和待排余量。
+        // 统一扣账及发布释放机台
+        strategy.finalizeContinuousProduction(context);
+
+        // 普通精度只在真实收尾稳定后集中判断；若复评产生新强制约束，先按消费记录恢复并重算受影响续作。
+        equipmentPlanScheduleService.reviewConfirmedEndings(context);
+
+        // 只冻结结构切换身份；正式切换统一在换活字块结束后的独立步骤执行。
+        // 确定结构切换候选及来源
+        StructureSwitchCandidateScope.freeze(context);
+
+        // 独立复用阶段覆盖全部剩余产能机台，完成后换活字块只处理实时剩余资源与需求。
+        // 复用历史交替计划指定后物料
+        previousAlternatePlanReuseService.reuse(context);
     }
 }

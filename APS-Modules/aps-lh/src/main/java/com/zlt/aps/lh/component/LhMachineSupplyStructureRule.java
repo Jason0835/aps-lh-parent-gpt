@@ -219,7 +219,8 @@ public class LhMachineSupplyStructureRule {
 
     /**
      * 同时校验结构去向和专供机允许承接的结构，在资源预占前执行。
-     * 弱专供结构仍可使用普通机，但不能进入只服务其他结构的专供机。
+     * 弱专供结构仍可使用普通机，共用胎胚新增进入K21还须通过原在机范围限制。
+     *
      * @param context 上下文
      * @param machineCode 候选机台
      * @param sku 待排SKU
@@ -236,8 +237,36 @@ public class LhMachineSupplyStructureRule {
         }
         Set<String> allowedStructures = this.getAllowedStructuresForMachine(context, machineCode, sku);
         // 无本年月版本转产关系时保持既有行为，不从固定结构或其他月份推断限制。
-        return allowedStructures.isEmpty()
-                || (Objects.nonNull(sku) && allowedStructures.contains(StringUtils.trim(sku.getStructureName())));
+        if (!allowedStructures.isEmpty()
+                && (Objects.isNull(sku) || !allowedStructures.contains(StringUtils.trim(sku.getStructureName())))) {
+            return false;
+        }
+        String sharedEmbryoRejection = this.getSharedEmbryoSupplyRejectionReason(context, machineCode, sku);
+        if (StringUtils.isNotEmpty(sharedEmbryoRejection) && !context.isPriorityTraceMuted() && log.isInfoEnabled()) {
+            log.info("[共用胎胚专供准入] 拒绝候选, factoryCode: {}, batchNo: {}, scheduleDate: {}, "
+                            + "materialCode: {}, productStatus: {}, machineCode: {}, reason: {}",
+                    context.getFactoryCode(), context.getBatchNo(), context.getScheduleDate(),
+                    sku.getMaterialCode(), sku.getProductStatus(), machineCode, sharedEmbryoRejection);
+        }
+        return StringUtils.isEmpty(sharedEmbryoRejection);
+    }
+
+    /**
+     * 解析共用胎胚原在机范围拒绝详情，供公共准入和候选失败原因使用。
+     * <p>仅沿用公共准入已有的精确有效历史动作豁免，避免后续资源失败被误报为胎胚范围失败。</p>
+     *
+     * @param context 本批排程上下文
+     * @param machineCode 候选机台编码
+     * @param sku 当前待排SKU
+     * @return 共用胎胚K21拒绝详情；未命中时为空字符串
+     */
+    public String getSharedEmbryoSupplyRejectionReason(
+            LhScheduleContext context, String machineCode, SkuScheduleDTO sku) {
+        if (this.isEligibleHistoricalAction(context, machineCode, sku)) {
+            return StringUtils.EMPTY;
+        }
+        return SharedEmbryoSupplyAdmissionPolicy.resolveRejectionReason(
+                context, machineCode, sku, this.getPreferredLhMachines(context, sku));
     }
 
     /**

@@ -8,6 +8,7 @@ import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.util.LhMouldCodeUtil;
+import com.zlt.aps.lh.util.CleaningDispositionResolver;
 import com.zlt.aps.lh.util.MouldStatusUtil;
 import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
@@ -747,6 +748,12 @@ public class MouldResourceContext {
                 .thenComparing(Comparator.naturalOrder()));
     }
 
+    /**
+     * 从当前机台及结果重建实际模具占用，正常调试仅输出计数，逐机明细按TRACE按需开启。
+     *
+     * @param context 当前真实或已恢复的排程上下文
+     * @return 运行态机台与实际绑定模具集合
+     */
     private static Map<String, LinkedHashSet<String>> buildMachineBoundMouldCodeMap(LhScheduleContext context) {
         Map<String, LinkedHashSet<String>> resultMap = new HashMap<String, LinkedHashSet<String>>(16);
         if (Objects.isNull(context)) {
@@ -759,9 +766,20 @@ public class MouldResourceContext {
                 appendMachineBoundMouldCodeFromResults(resultMap, context, resultList);
             }
         }
+        if (log.isDebugEnabled()) {
+            log.debug("模具资源在机绑定汇总, factoryCode: {}, batchNo: {}, machineCount: {}, mouldCount: {}",
+                    context.getFactoryCode(), context.getBatchNo(), resultMap.size(),
+                    resultMap.values().stream().mapToInt(Set::size).sum());
+        }
         return resultMap;
     }
 
+    /**
+     * 登记MES及当前释放事实确认的在机模具，不因减少日志改变真实占用或释放边界。
+     *
+     * @param resultMap 本次重建的机台模具集合
+     * @param context 当前排程上下文
+     */
     private static void appendMachineBoundMouldCodeFromCurrentMaterial(
             Map<String, LinkedHashSet<String>> resultMap,
             LhScheduleContext context) {
@@ -784,7 +802,9 @@ public class MouldResourceContext {
                 continue;
             }
             MachineCleaningWindowDTO replacement = context.getContinuationSandBlastWindowMap().get(machine.getMachineCode());
-            if (Objects.nonNull(replacement) && StringUtils.isNotEmpty(replacement.getReplacementMouldCode())) {
+            if (Objects.nonNull(replacement) && StringUtils.isNotEmpty(replacement.getReplacementMouldCode())
+                    && CleaningDispositionResolver.resolve(context, machine.getMachineCode(), replacement).getDisposition()
+                    == CleaningDispositionResolver.Disposition.INDEPENDENT) {
                 resultMap.put(machine.getMachineCode(), LhMouldCodeUtil.splitMouldCode(replacement.getReplacementMouldCode()));
                 continue;
             }
@@ -798,8 +818,10 @@ public class MouldResourceContext {
             if (!CollectionUtils.isEmpty(inMachineMouldCodeSet)) {
                 // 续作在机模具号是机台真实占用，必须优先进入已使用模具列表，避免后续新增重复分配。
                 resultMap.put(machine.getMachineCode(), inMachineMouldCodeSet);
-                log.debug("模具资源初始化占用在机模具号, machineCode: {}, currentMaterialCode: {}, mouldCodes: {}",
-                        machine.getMachineCode(), machine.getCurrentMaterialCode(), inMachineMouldCodeSet);
+                if (log.isTraceEnabled()) {
+                    log.trace("模具资源初始化占用在机模具号, machineCode: {}, currentMaterialCode: {}, mouldCodes: {}",
+                            machine.getMachineCode(), machine.getCurrentMaterialCode(), inMachineMouldCodeSet);
+                }
                 continue;
             }
             if (StringUtils.isEmpty(machine.getCurrentMaterialCode())) {
@@ -837,6 +859,8 @@ public class MouldResourceContext {
             MachineCleaningWindowDTO replacement = context.getContinuationSandBlastWindowMap()
                     .get(result.getLhMachineCode());
             if (Objects.nonNull(replacement) && StringUtils.isNotEmpty(replacement.getReplacementMouldCode())
+                    && CleaningDispositionResolver.resolve(context, result.getLhMachineCode(), replacement).getDisposition()
+                    == CleaningDispositionResolver.Disposition.INDEPENDENT
                     && StringUtils.equals(replacement.getContinuationMaterialCode(), result.getMaterialCode())
                     && StringUtils.equals(replacement.getContinuationProductStatus(), result.getProductStatus())
                     && StringUtils.equals(ScheduleTypeEnum.CONTINUOUS.getCode(), result.getScheduleType())

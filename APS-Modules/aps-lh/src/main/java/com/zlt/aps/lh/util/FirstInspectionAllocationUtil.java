@@ -243,7 +243,23 @@ public final class FirstInspectionAllocationUtil {
                 .withEquipmentPlanId(precisionPlanId);
     }
 
-    /** 固定时长与数量折算时长共用分摊内核；fixedDurationSeconds为0时保持既有行为。 */
+    /**
+     * 按固定时长或计件时长分摊首检，历史指定试制量试共用正规数量和时间轴。
+     *
+     * @param context 当前历史规则和首检计数
+     * @param sku 当前来源对象
+     * @param shifts 实际可用班次
+     * @param changeoverEndTime 准备完成时间
+     * @param inspectionNotBeforeTime 首检硬门禁
+     * @param shiftCapacity 运行态班产
+     * @param remainingQty 当前机台剩余目标
+     * @param scheduleType 排程类型
+     * @param machineCode 精确运行态机台
+     * @param availableCapacityMap 各班次可用于首检的产能
+     * @param timingMode 首检时间模式
+     * @param fixedDurationSeconds 指定固定秒数，为0时按数量折算
+     * @return 完整首检时间及逐班数量，无合法时间轴时返回拒绝计划
+     */
     private static FirstInspectionAllocationPlan buildPlan(
             LhScheduleContext context, SkuScheduleDTO sku, List<LhShiftConfigVO> shifts,
             Date changeoverEndTime, Date inspectionNotBeforeTime, int shiftCapacity, int remainingQty,
@@ -288,8 +304,8 @@ public final class FirstInspectionAllocationUtil {
         }
 
         int sequence = FirstInspectionQtyUtil.resolveNextFirstInspectionSequence(context, countingShift);
-        if (FirstInspectionQtyUtil.isTrialTimeBasedFirstInspection(sku, countingShift, scheduleType)) {
-            // 试制继续沿用项目既有固定2小时/中班75%规则，不生成首检条数。
+        if (FirstInspectionQtyUtil.isTrialTimeBasedFirstInspection(context, sku, countingShift, scheduleType)) {
+            // 普通试制沿用固定2小时/75%规则；有效历史指定已由统一判断转入正规计件。
             return FirstInspectionAllocationPlan.valid(
                     sequence, 0, BigDecimal.ZERO, fixedDurationSeconds, inspectionReferenceTime,
                     new Date(inspectionReferenceTime.getTime() + fixedDurationSeconds * MILLIS_PER_SECOND),

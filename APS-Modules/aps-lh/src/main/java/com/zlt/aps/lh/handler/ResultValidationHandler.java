@@ -4,53 +4,20 @@ import cn.hutool.core.date.DateUtil;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
-import com.zlt.aps.lh.api.domain.dto.CleaningScheduleDateFillItem;
-import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
-import com.zlt.aps.lh.api.domain.dto.MachineMaintenanceWindowDTO;
-import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
-import com.zlt.aps.lh.api.domain.dto.SkuDailyPlanQuotaDTO;
-import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
-import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
-import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
-import com.zlt.aps.lh.api.domain.entity.LhScheduleProcessLog;
-import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
-import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
+import com.zlt.aps.lh.api.domain.dto.*;
+import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
-import com.zlt.aps.lh.api.enums.CleaningTypeEnum;
-import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
-import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
-import com.zlt.aps.lh.api.enums.ShiftEnum;
-import com.zlt.aps.lh.api.enums.TrialStatusEnum;
-import com.zlt.aps.lh.api.enums.UnscheduledReasonEnum;
-import com.zlt.aps.lh.api.enums.UnscheduledGroupTypeEnum;
-import com.zlt.aps.lh.component.CapsuleReplacementRuleService;
-import com.zlt.aps.lh.component.IncrSerialGenerator;
-import com.zlt.aps.lh.component.MonthPlanDateResolver;
-import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
-import com.zlt.aps.lh.component.UnscheduledResultCollector;
-import com.zlt.aps.lh.engine.strategy.support.StructureSwitchShiftAudit;
-import com.zlt.aps.lh.engine.strategy.support.StructureSwitchFirstShiftQuantityPolicy;
+import com.zlt.aps.lh.api.enums.*;
+import com.zlt.aps.lh.component.*;
 import com.zlt.aps.lh.context.LhScheduleContext;
-import com.zlt.aps.lh.service.impl.ContinuationSandBlastDispositionService;
 import com.zlt.aps.lh.engine.observer.ScheduleEvent;
 import com.zlt.aps.lh.engine.observer.ScheduleEventPublisher;
 import com.zlt.aps.lh.engine.strategy.IEndingJudgmentStrategy;
-import com.zlt.aps.lh.engine.strategy.support.MouldResourceContext;
-import com.zlt.aps.lh.engine.strategy.support.PreviousAlternatePlanReleaseEvent;
-import com.zlt.aps.lh.engine.strategy.support.OffMachineDecision;
-import com.zlt.aps.lh.engine.strategy.support.TimedMachineOffReleaseResolver;
-import com.zlt.aps.lh.engine.strategy.support.TimedMachineOffRequest;
-import com.zlt.aps.lh.engine.strategy.support.ProductionQuantityPolicy;
-import com.zlt.aps.lh.engine.strategy.support.ContinuationEndingHandoffAudit;
-import com.zlt.aps.lh.engine.strategy.support.ContinuationTemporaryFaultTransferEvent;
-import com.zlt.aps.lh.engine.strategy.support.SpecialMaterialSubstitutionRecord;
+import com.zlt.aps.lh.engine.strategy.support.*;
 import com.zlt.aps.lh.exception.ScheduleErrorCode;
 import com.zlt.aps.lh.exception.ScheduleException;
 import com.zlt.aps.lh.service.ILhMouldChangePlanService;
-import com.zlt.aps.lh.service.impl.SchedulePersistenceService;
-import com.zlt.aps.lh.service.impl.LhEquipmentPlanScheduleService;
-import com.zlt.aps.lh.service.impl.LhNextShiftNewPlanService;
-import com.zlt.aps.lh.service.impl.LhTemporaryFaultService;
+import com.zlt.aps.lh.service.impl.*;
 import com.zlt.aps.lh.util.*;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
@@ -153,6 +120,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             // 保存前对齐计划性维修后的首个有量班次：只修正时间与原因，不重新扣减任何业务账本。
             alignPlannedRepairResumeTimeToFinalResults(context);
 
+            this.continuationSandBlastDispositionService.reconcileCancelledEvents(context);
+
             // 喷砂首检量已经在排产主链扣账，保存前只核验归属和绑定摘要，禁止二次补量。
             applySandBlastFirstInspectionToFinalResults(context);
 
@@ -186,6 +155,15 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             this.appendTemporaryFaultTransferPlans(context);
             // 类型拆分放在模具号及备注处理之后，保持原有清洗处置和资源计算口径。
             this.splitMouldChangePlanCleaningTypes(context);
+            // 待保存同动作的缺前料侧与非空侧归并，避免再次落为两条并重复统计整机动作。
+            List<LhMouldChangePlan> normalizedPlans =
+                    LhMouldChangePlanNormalizer.normalize(context.getMouldChangePlanList());
+            context.getMouldChangePlanList().clear();
+            context.getMouldChangePlanList().addAll(normalizedPlans);
+            // 清洗类型拆分和计划归并完成后，补齐纯清洗计划的备注并确保不带模具号。
+            lhMouldChangePlanService.resolveMouldCode(context.getMouldChangePlanList().stream()
+                    .filter(this::isCleaningMouldChangePlan)
+                    .collect(Collectors.toList()));
             this.logFinalMouldChangePlanMouldCodes(context);
             /*
              * 换模/换活字块均已全部落定，此处按最终实际生效计划复核早8/中7/日15。
@@ -235,6 +213,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                 log.warn("结构胎胚首班保存前审计未通过, factoryCode={}, batchNo={}, detail={}",
                         context.getFactoryCode(), context.getBatchNo(), treadFailure);
             }
+            ChangeoverFirstShiftQuantityPolicy.auditResults(context);
             equipmentPlanScheduleService.finalizeArrangements(context);
             bindMaintenanceWindowsToFinalResults(context);
             addSummaryLog(context);
@@ -430,8 +409,9 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                 continue;
             }
             String eventKey = window.getSourcePlanId() + "|" + machineCode + "|" + window.getReadyTime().getTime();
-            if (!processed.add(eventKey) || Objects.nonNull(resolveCleaningEndingResult(
-                    context, context.getScheduleResultList(), machineCode, window))) {
+            if (!processed.add(eventKey)
+                    || CleaningDispositionResolver.resolve(context, machineCode, window).getDisposition()
+                    != CleaningDispositionResolver.Disposition.INDEPENDENT) {
                 continue;
             }
             LhShiftConfigVO shift = LhScheduleTimeUtil.resolveShiftByTime(
@@ -1509,7 +1489,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         }
         SkuScheduleDTO sourceSku = context.getScheduleResultSourceSkuMap().get(result);
         return Objects.nonNull(sourceSku)
-                && LhSingleControlMachineUtil.isWholeMachineGranularitySku(context, sourceSku);
+                && LhSingleControlMachineUtil.isWholeMachineGranularitySku(
+                        context, sourceSku, result.getLhMachineCode());
     }
 
     /**
@@ -1762,7 +1743,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
      *     <li>硫化余量收尾：本 SKU 的硫化余量已全部排完；</li>
      *     <li>胎胚收尾：命中胎胚库存收尾且胎胚库存额度已排完。胎胚收尾的排产目标量就是胎胚库存
      *     内部额度（精确硬目标、不按模台数归整、不受硫化余量约束），排满该额度即代表本批胎胚用尽，
-     *     此时即使硫化余量仍有剩余也必须标识收尾。</li>
+     *     此时即使硫化余量仍有剩余也必须标识收尾。共用胎胚整组库存被最终结果耗尽时，
+     *     同组有实际排量的SKU同样收尾，不依赖后续候选刷新后的内部额度。</li>
      * </ol>
      *
      * @param context 排程上下文
@@ -1796,24 +1778,30 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             TargetScheduleQtyResolver targetScheduleQtyResolver = this.getTargetScheduleQtyResolver();
             int actualScheduledQty = Math.max(0, entry.getValue());
             // 口径一：硫化余量已全部排完即标识收尾。
-            boolean surplusTailFlag = endingJudgmentStrategy.isFinalEnding(
+            boolean sharedEmbryoEnding = targetScheduleQtyResolver.isSharedEmbryoStockEnding(context, sourceSku);
+            boolean surplusTailFlag = !sharedEmbryoEnding && endingJudgmentStrategy.isFinalEnding(
                     context, sourceSku, actualScheduledQty);
             /*
              * 口径二：胎胚收尾且胎胚库存额度已排完，同样标识收尾。
-             * 胎胚收尾的目标量即胎胚库存内部额度（精确硬目标），排满额度代表本批胎胚用尽，
-             * 因此不再要求硫化余量同时排完；未命中胎胚收尾的 SKU 该分支恒为 false，不影响原余量口径。
+             * 先复核整组原始库存是否被最终排量耗尽，再保留既有单SKU正额度排满口径。
+             * 两种胎胚收尾均不要求硫化余量同时排完；动态额度不能代替整组最终消费事实。
              * 仅在口径一未命中时解析，避免对已判定收尾的 SKU 产生多余目标量解析与日志开销。
              */
             int embryoStockTargetQty = 0;
             boolean embryoStockTailFlag = false;
+            boolean embryoGroupExhausted = false;
             if (!surplusTailFlag) {
-                embryoStockTargetQty = targetScheduleQtyResolver
-                        .resolveFinalEndingTargetQtyByStaticRelation(context, sourceSku);
-                embryoStockTailFlag = embryoStockTargetQty > 0
-                        && targetScheduleQtyResolver.isEmbryoStockEnding(context, sourceSku)
-                        && actualScheduledQty >= embryoStockTargetQty;
+                embryoGroupExhausted = actualScheduledQty > 0 && targetScheduleQtyResolver
+                        .isFinalEmbryoStockExhausted(context, sourceSku.getEmbryoCode());
+                if (!embryoGroupExhausted) {
+                    embryoStockTargetQty = targetScheduleQtyResolver
+                            .resolveFinalEndingTargetQtyByStaticRelation(context, sourceSku);
+                    embryoStockTailFlag = embryoStockTargetQty > 0
+                            && targetScheduleQtyResolver.isEmbryoStockEnding(context, sourceSku)
+                            && actualScheduledQty >= embryoStockTargetQty;
+                }
             }
-            boolean finalTailFlag = surplusTailFlag || embryoStockTailFlag;
+            boolean finalTailFlag = surplusTailFlag || embryoStockTailFlag || embryoGroupExhausted;
             context.getScheduleResultList().stream()
                     .filter(Objects::nonNull)
                     .filter(result -> StringUtils.equals(entry.getKey(),
@@ -1824,10 +1812,10 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                     .resolveSurplusEndingTargetQty(context, sourceSku);
             log.info("SKU排后最终收尾统一刷新完成, batchNo: {}, materialCode: {}, productStatus: {}, "
                             + "actualScheduledQty: {}, finalTargetQty: {}, surplusTailFlag: {}, "
-                            + "embryoStockTargetQty: {}, embryoStockTailFlag: {}, finalTailFlag: {}",
+                            + "embryoStockTargetQty: {}, embryoStockTailFlag: {}, embryoGroupExhausted: {}, finalTailFlag: {}",
                     context.getBatchNo(), sourceSku.getMaterialCode(), sourceSku.getProductStatus(),
                     actualScheduledQty, finalTargetQty, surplusTailFlag,
-                    embryoStockTargetQty, embryoStockTailFlag, finalTailFlag);
+                    embryoStockTargetQty, embryoStockTailFlag, embryoGroupExhausted, finalTailFlag);
         }
     }
 
@@ -2398,8 +2386,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     }
 
     /**
-     * 解析交替计划展示所用历史前料来源，覆盖释放后由普通竞争承接的同一后料。
-     * 仅首次换模且精确匹配已冻结的有效异料计划、机台、产品状态及真实释放边界时继承。
+     * 解析交替计划展示所用历史前料来源，覆盖成对提交及释放后普通竞争承接的同一后料。
+     * 首次换模优先读取提交时冻结的本侧展示来源，普通承接仍校验有效历史及真实释放边界。
      * 不登记历史正式提交身份，不改变原历史准备截止、运行态物料或后续普通换模。
      *
      * @param context 有效历史计划及实际释放快照
@@ -2412,6 +2400,13 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         LhMouldChangePlan committedSource = context.getPreviousAlternateResultPlanMap().get(result);
         if (Objects.nonNull(committedSource)) {
             return committedSource;
+        }
+        LhMouldChangePlan pairedSource = context.getPreviousAlternateBeforeMaterialSourceMap().get(result);
+        if (firstMachineChange && Objects.nonNull(pairedSource)
+                && StringUtils.equals(pairedSource.getLhMachineCode(), result.getLhMachineCode())
+                && context.matchesPreviousAlternateAfterMaterial(
+                        pairedSource, result.getMaterialCode(), result.getProductStatus())) {
+            return pairedSource;
         }
         PreviousAlternatePlanReleaseEvent event = context.getPreviousAlternateReleaseEventMap()
                 .get(result.getLhMachineCode());
@@ -2892,7 +2887,10 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         }
         MachineCleaningWindowDTO event = context.getOnlySandBlastContinuationReleaseWindowMap()
                 .get(plan.getLhMachineCode());
-        return Objects.nonNull(event) && Objects.nonNull(event.getCleanStartTime())
+        return Objects.nonNull(event)
+                && CleaningDispositionResolver.resolve(context, plan.getLhMachineCode(), event).getDisposition()
+                == CleaningDispositionResolver.Disposition.INDEPENDENT
+                && Objects.nonNull(event.getCleanStartTime())
                 && !plan.getPlanDate().before(event.getCleanStartTime())
                 && StringUtils.equals(event.getContinuationMaterialCode(), plan.getBeforeMaterialCode())
                 && !StringUtils.equals(plan.getBeforeMaterialCode(), plan.getAfterMaterialCode())
@@ -2905,7 +2903,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
      * @param context 排程上下文
      * @param plan 待判断计划
      * @param productStatus 后物料产品状态
-     * @return 对应离机喷砂事件；非接收计划返回null
+     * @return 实际模具整组匹配的离机喷砂事件；普通同物料计划返回null
      */
     private MachineCleaningWindowDTO resolveOnlySandBlastReceivingPlanEvent(
             LhScheduleContext context, LhMouldChangePlan plan, String productStatus) {
@@ -2929,6 +2927,10 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                 .filter(event -> StringUtils.equals(
                         this.normalizeProductStatus(event.getContinuationProductStatus()),
                         this.normalizeProductStatus(productStatus)))
+                // 同物料普通补机可能使用其他模具，只有实际接走该事件整组原模具才属于喷砂接收。
+                .filter(event -> StringUtils.isNotEmpty(event.getMouldCode())
+                        && LhMouldCodeUtil.splitMouldCode(event.getMouldCode())
+                        .equals(LhMouldCodeUtil.splitMouldCode(plan.getMouldCode())))
                 .min(Comparator.comparing(MachineCleaningWindowDTO::getCleanEndTime))
                 .orElse(null);
     }
@@ -3103,9 +3105,20 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         Map<String, List<String>> dailyMachineMap = new TreeMap<>();
         /*
          * 单控整机的同一次换模会按 L/R 运行态各生成一条交替计划，但现场只发生一次物理换模。
-         * 这里按“物理机台+计划时间+实际换模时间+交替类型+前后物料”一一配对 L/R 事件；
-         * 同一物理机台在同一天发生时间或前后物料不同的第二次真实换模仍必须独立计数。
+         * 先用实际整机提交关系确认唯一双侧动作，避免展示前料不同把同一次动作拆开；
+         * 无提交证据时仍按物理机台、时间、类型及前后物料配对，独立真实动作不合并。
          */
+        Map<LhMouldChangePlan, LhMouldChangePlan> committedPairPrimaries =
+                CommittedWholeSingleControlPlanPairs.resolve(context, context.getMouldChangePlanList());
+        if (!committedPairPrimaries.isEmpty()) {
+            String detail = committedPairPrimaries.entrySet().stream().map(entry ->
+                    "主侧=" + entry.getValue().getLhMachineCode() + ", 配对侧=" + entry.getKey().getLhMachineCode()
+                            + ", 时间=" + LhScheduleTimeUtil.formatDateTime(entry.getKey().getChangeTime())
+                            + ", 前料=" + entry.getValue().getBeforeMaterialCode() + "/" + entry.getKey().getBeforeMaterialCode()
+                            + ", 后料=" + entry.getKey().getAfterMaterialCode() + ", 同次整机提交合并为1次")
+                    .sorted().collect(Collectors.joining("；"));
+            PriorityTraceLogHelper.appendProcessLog(context, "整机配对换模配额复核", detail);
+        }
         Map<String, int[]> singleControlEventSideCountMap = new HashMap<>();
         for (LhMouldChangePlan plan : context.getMouldChangePlanList()) {
             // 同SKU喷砂置换虽展示为换模，仍不占普通换模资源名额。
@@ -3114,7 +3127,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                 continue;
             }
             String physicalMachineCode = this.resolvePhysicalMouldChangeMachineCode(
-                    plan, singleControlEventSideCountMap);
+                    plan, singleControlEventSideCountMap, committedPairPrimaries);
             if (StringUtils.isEmpty(physicalMachineCode)) {
                 // 当前 L/R 计划已与同一物理事件的配对侧合并，不再重复进入早/中/日复核。
                 continue;
@@ -3149,23 +3162,26 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     }
 
     /**
-     * 解析最终复核使用的物理换模机台，并对内容一致的单控 L/R 配对事件执行一次计数。
+     * 解析最终物理换模计数，已证实同次整机提交的配对侧复用主侧事件身份。
      * <p>不能只按“日期+物理机台”去重，因为同一物理机台一天内可能发生两次真实换模；
      * 也不能直接对事件键做集合去重，否则异常重复的同侧计划会被错误少计。因此按事件键分别累计
      * L、R 条数，仅将可一一配对的左右侧合并，未配对的单侧计划仍各自计数。</p>
      *
      * @param plan 当前最终模具交替计划
      * @param singleControlEventSideCountMap 单控物理事件左右侧累计数，value[0]为L侧、value[1]为R侧
+     * @param committedPairPrimaries 已由实际整机提交证实的唯一配对侧到主侧计划
      * @return 应计数的物理机台编码；当前计划已与配对侧合并时返回空字符串
      */
     private String resolvePhysicalMouldChangeMachineCode(
             LhMouldChangePlan plan,
-            Map<String, int[]> singleControlEventSideCountMap) {
+            Map<String, int[]> singleControlEventSideCountMap,
+            Map<LhMouldChangePlan, LhMouldChangePlan> committedPairPrimaries) {
         String machineCode = plan.getLhMachineCode();
         if (!LhSingleControlMachineUtil.isSingleMouldMachine(machineCode)) {
             return machineCode;
         }
-        String eventKey = this.buildPhysicalMouldChangeEventKey(plan);
+        // 仅已证实同次提交的配对侧复用主侧身份；两侧计划的前料展示保持原值。
+        String eventKey = this.buildPhysicalMouldChangeEventKey(committedPairPrimaries.getOrDefault(plan, plan));
         int[] sideCounts = singleControlEventSideCountMap.computeIfAbsent(
                 eventKey, key -> new int[]{0, 0});
         int currentSideIndex = LhSingleControlMachineUtil.isLeftSide(machineCode) ? 0 : 1;
@@ -3180,8 +3196,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     /**
      * 构建单控 L/R 物理换模事件键。
      * <p>事件键只描述实际换模业务事实，不包含左右侧编码、计划主键和顺位，确保同一整机的
-     * L/R 配对计划可以合并；计划时间、实际换模时间、交替类型或前后物料任一不同，均视为
-     * 同一物理机台发生的另一条真实换模事件。</p>
+     * L/R 配对计划可以合并；无同次提交证明时，计划时间、实际换模时间、交替类型或前后物料
+     * 任一不同，仍按同一物理机台的另一条真实换模事件处理。</p>
      *
      * @param plan 模具交替计划
      * @return 单控物理换模事件键
@@ -3265,16 +3281,10 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             MachineScheduleDTO machine = item.getKey();
             MachineCleaningWindowDTO cleaningWindow = item.getValue();
             String machineCode = resolveCleaningMachineCode(machine, cleaningWindow);
-            if (cleaningWindow.isOffMachineCleaning()
-                    && StringUtils.isEmpty(cleaningWindow.getReplacementMouldCode())) {
-                // 无替换模具时，清洗事实并入原机台实际交替计划；不得额外生成03喷砂计划。
-                this.appendOnlySandBlastRequeueProcessLog(
-                        context, plans, planProductStatusMap, machineCode, cleaningWindow);
-                continue;
-            }
-            // 最终优先级：三天内收尾跳过 > 正规换模合并 > 独立清洗。
-            LhScheduleResult endingResult = resolveCleaningEndingResult(
-                    context, changeResults, machineCode, cleaningWindow);
+            // 同一处置同时决定普通清洗和离机喷砂，取消后不再绑定清洗类型。
+            CleaningDispositionResolver.Decision decision = CleaningDispositionResolver.resolve(
+                    context, machineCode, cleaningWindow);
+            LhScheduleResult endingResult = decision.getEndingResult();
             if (Objects.nonNull(endingResult)) {
                 log.info("清洗交替计划跳过，最终结果命中三天内收尾, 机台: {}, 物料: {}, 清洗类型: {}, "
                                 + "来源停机计划ID: {}, 收尾时间: {}",
@@ -3283,13 +3293,18 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                         LhScheduleTimeUtil.formatDateTime(endingResult.getSpecEndTime()));
                 continue;
             }
-            if (!cleaningWindow.isOffMachineCleaning()
-                    && isCleaningOverlappedWithRegularMouldChange(context, changeResults, machineCode, cleaningWindow)) {
-                this.bindMergedCleaningType(context, plans, machineCode, cleaningWindow);
-                log.info("清洗交替计划跳过，最终处置与正规换模合并, 机台: {}, 清洗类型: {}, "
+            if (decision.getDisposition() == CleaningDispositionResolver.Disposition.MOULD_CHANGE_CANCELLED) {
+                log.info("清洗交替计划取消，只保留实际正规换模, 机台: {}, 清洗类型: {}, "
                                 + "来源停机计划ID: {}, 清洗开始: {}",
                         machineCode, cleaningWindow.getCleanType(), cleaningWindow.getSourcePlanId(),
                         LhScheduleTimeUtil.formatDateTime(cleaningWindow.getCleanStartTime()));
+                continue;
+            }
+            if (cleaningWindow.isOffMachineCleaning()
+                    && StringUtils.isEmpty(cleaningWindow.getReplacementMouldCode())) {
+                // 无替换模具时，清洗事实并入原机台实际交替计划；不得额外生成03喷砂计划。
+                this.appendOnlySandBlastRequeueProcessLog(
+                        context, plans, planProductStatusMap, machineCode, cleaningWindow);
                 continue;
             }
             RollingMachineState cleaningState = resolveCleaningMaterialState(context, changeResults,
@@ -3410,10 +3425,12 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                         Comparator.nullsLast(Date::compareTo)))
                 .orElse(null);
         LhMouldChangePlan receivingPlan = plans.stream()
-                .filter(plan -> Objects.nonNull(this.resolveOnlySandBlastReceivingPlanEvent(
-                        context, plan, planProductStatusMap.get(plan))))
-                .filter(plan -> StringUtils.equals(
-                        event.getContinuationMaterialCode(), plan.getAfterMaterialCode()))
+                .filter(plan -> {
+                    MachineCleaningWindowDTO receivingEvent = this.resolveOnlySandBlastReceivingPlanEvent(
+                            context, plan, planProductStatusMap.get(plan));
+                    return Objects.nonNull(receivingEvent)
+                            && StringUtils.equals(sourceMachineCode, receivingEvent.getLhCode());
+                })
                 .min(Comparator.comparing(LhMouldChangePlan::getPlanDate,
                         Comparator.nullsLast(Date::compareTo)))
                 .orElse(null);
@@ -3439,17 +3456,17 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     /**
      * 按最终排程结果重建清洗处置与设备停机计划日期回填项。
      * <p>初始化阶段只负责生成候选窗口和保留来源计划信息；最终阶段统一执行
-     * “三天内收尾跳过 > 正规换模合并 > 独立清洗”的优先级，并将回填日期统一归零到自然日。</p>
+     * “三天内收尾取消 > 正规换模取消 > 独立清洗”的优先级，并将回填日期统一归零到自然日。</p>
      *
      * @param context 排程上下文
      */
     private void finalizeCleaningDisposition(LhScheduleContext context) {
-        if (Objects.isNull(context) || CollectionUtils.isEmpty(context.getCleaningScheduleDateFillList())) {
+        if (Objects.isNull(context)) {
             return;
         }
+        this.synchronizeCancelledCleaningSummaries(context);
         List<CleaningScheduleDateFillItem> sourceFillList =
                 new ArrayList<>(context.getCleaningScheduleDateFillList());
-        List<LhScheduleResult> changeResults = resolveOrderedChangeResults(context);
         Map<Long, CleaningScheduleDateFillItem> finalFillMap = new LinkedHashMap<>(sourceFillList.size());
         for (CleaningScheduleDateFillItem sourceFill : sourceFillList) {
             if (Objects.isNull(sourceFill) || Objects.isNull(sourceFill.getPlanId())) {
@@ -3459,8 +3476,9 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             String machineCode = StringUtils.isNotEmpty(sourceFill.getMachineCode())
                     ? sourceFill.getMachineCode()
                     : Objects.nonNull(cleaningWindow) ? cleaningWindow.getLhCode() : null;
-            LhScheduleResult endingResult = resolveCleaningEndingResult(
-                    context, changeResults, machineCode, cleaningWindow);
+            CleaningDispositionResolver.Decision decision = CleaningDispositionResolver.resolve(
+                    context, machineCode, cleaningWindow);
+            LhScheduleResult endingResult = decision.getEndingResult();
             CleaningScheduleDateFillItem finalFill = copyCleaningScheduleDateFillItem(sourceFill);
             if (Objects.nonNull(endingResult)) {
                 applyCleaningEndingAnalysis(endingResult, sourceFill.getCleanType());
@@ -3472,15 +3490,17 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                         sourceFill.getCleanType(), sourceFill.getPlanId(),
                         LhScheduleTimeUtil.formatDate(finalFill.getScheduleDate()));
             } else if (Objects.nonNull(cleaningWindow)) {
-                boolean mouldChangeOverlap = !cleaningWindow.isOffMachineCleaning() && isCleaningOverlappedWithRegularMouldChange(
-                        context, changeResults, machineCode, cleaningWindow);
+                boolean mouldChangeOverlap = decision.getDisposition()
+                        == CleaningDispositionResolver.Disposition.MOULD_CHANGE_CANCELLED;
                 finalFill.setScheduleDate(LhScheduleTimeUtil.clearTime(cleaningWindow.getCleanStartTime()));
                 String disposition;
-                if (cleaningWindow.isOffMachineCleaning()) {
+                if (mouldChangeOverlap) {
+                    disposition = "正规换模取消清洗";
+                } else if (cleaningWindow.isOffMachineCleaning()) {
                     disposition = StringUtils.isNotEmpty(cleaningWindow.getReplacementMouldCode())
                             ? "模具置换" : "离机喷砂并入实际交替";
                 } else {
-                    disposition = mouldChangeOverlap ? "正规换模合并" : "独立清洗";
+                    disposition = "独立清洗";
                 }
                 finalFill.setFillReason(disposition);
                 log.info("清洗最终处置, 处置: {}, 机台: {}, 清洗类型: {}, 来源停机计划ID: {}, 回填日期: {}",
@@ -3500,101 +3520,30 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     }
 
     /**
-     * 解析清洗窗口对应的最终三天内收尾结果。
-     * <p>按机台、清洗时点滚动物料和产品状态精确匹配，禁止同物料不同状态串用。</p>
+     * 将最终来源事件处置同步到同机台全部结果，清除后料继承的无效清洗摘要。
      *
-     * @param context 排程上下文
-     * @param changeResults 已按时间排序的换模结果
-     * @param machineCode 机台编码
-     * @param cleaningWindow 清洗窗口；初始化已跳过清洗时可为空
-     * @return 命中三天内收尾的最终结果；未命中返回 null
+     * @param context 已确定最终结果的排程上下文
      */
-    private LhScheduleResult resolveCleaningEndingResult(LhScheduleContext context,
-                                                         List<LhScheduleResult> changeResults,
-                                                         String machineCode,
-                                                         MachineCleaningWindowDTO cleaningWindow) {
-        if (Objects.isNull(context) || StringUtils.isEmpty(machineCode)
-                || CollectionUtils.isEmpty(context.getScheduleResultList())) {
-            return null;
-        }
-        if (Objects.nonNull(cleaningWindow) && cleaningWindow.isOffMachineCleaning()) {
-            // 已执行的离机清洗不能因后续 SKU 收尾而被撤销。
-            return null;
-        }
-        Date cleanStartTime = Objects.isNull(cleaningWindow) ? null : cleaningWindow.getCleanStartTime();
-        RollingMachineState cleaningState = resolveCleaningMaterialState(
-                context, changeResults, machineCode, cleanStartTime);
-        if (StringUtils.isEmpty(cleaningState.getCurrentMaterialCode())) {
-            return null;
-        }
-        String stateKey = MonthPlanDateResolver.buildMaterialStatusKey(
-                cleaningState.getCurrentMaterialCode(), normalizeProductStatus(cleaningState.getCurrentProductStatus()));
-        return context.getScheduleResultList().stream()
-                .filter(Objects::nonNull)
-                .filter(result -> StringUtils.equals(machineCode, result.getLhMachineCode()))
-                .filter(result -> StringUtils.equals(stateKey, MonthPlanDateResolver.buildMaterialStatusKey(
-                        result.getMaterialCode(), normalizeProductStatus(result.getProductStatus()))))
-                .filter(result -> Objects.nonNull(result.getSpecEndTime()))
-                .filter(result -> Objects.isNull(cleanStartTime) || !result.getSpecEndTime().before(cleanStartTime))
-                .filter(CleaningScheduleRuleUtil::shouldSkipCleaningByResultEnding)
-                .min(Comparator.comparing(LhScheduleResult::getSpecEndTime))
-                .orElse(null);
-    }
-
-    /**
-     * 将已确认与正规换模合并的清洗类型绑定到实际计划，不增加计划或资源次数。
-     *
-     * @param context 当前排程上下文
-     * @param plans 已生成的实际交替计划
-     * @param machineCode 清洗机台编码
-     * @param cleaningWindow 已确认合并的清洗窗口
-     */
-    private void bindMergedCleaningType(LhScheduleContext context, List<LhMouldChangePlan> plans,
-            String machineCode, MachineCleaningWindowDTO cleaningWindow) {
-        plans.stream()
-                .filter(plan -> StringUtils.equals(machineCode, plan.getLhMachineCode()))
-                .filter(plan -> MouldChangeTypeEnum.containsCode(plan.getChangeMouldType(),
-                        MouldChangeTypeEnum.REGULAR.getCode()))
-                .filter(plan -> MachineCleaningOverlapUtil.isOverlap(cleaningWindow, plan.getPlanDate(),
-                        Objects.isNull(plan.getPlanDate()) ? null : LhScheduleTimeUtil.addHours(
-                                plan.getPlanDate(), LhScheduleTimeUtil.getMouldChangeTotalHours(context))))
-                .forEach(plan -> plan.setCleanType(this.resolvePlanCleaningTypes(
-                        StringUtils.defaultString(plan.getCleanType()) + ","
-                                + this.resolveCleaningMouldChangeType(cleaningWindow))));
-    }
-
-    /**
-     * 判断实际清洗窗口是否与正规换模 8 小时窗口严格相交。
-     *
-     * @param context 排程上下文
-     * @param changeResults 换模结果列表
-     * @param machineCode 机台编码
-     * @param cleaningWindow 清洗窗口
-     * @return true-与正规换模合并；false-独立清洗或仅与换活字块重叠
-     */
-    private boolean isCleaningOverlappedWithRegularMouldChange(LhScheduleContext context,
-                                                                List<LhScheduleResult> changeResults,
-                                                                String machineCode,
-                                                                MachineCleaningWindowDTO cleaningWindow) {
-        if (Objects.isNull(context) || CollectionUtils.isEmpty(changeResults)
-                || StringUtils.isEmpty(machineCode) || Objects.isNull(cleaningWindow)) {
-            return false;
-        }
-        for (LhScheduleResult result : changeResults) {
-            if (!StringUtils.equals(machineCode, result.getLhMachineCode())
-                    || !StringUtils.equals(MouldChangeTypeEnum.REGULAR.getCode(), determineChangeMouldType(result))) {
-                continue;
+    private void synchronizeCancelledCleaningSummaries(LhScheduleContext context) {
+        Map<String, List<MachineCleaningWindowDTO>> windowsByMachine = this.collectCleaningPlanItems(context).stream()
+                .collect(Collectors.groupingBy(item -> this.resolveCleaningMachineCode(item.getKey(), item.getValue()),
+                        Collectors.mapping(Map.Entry::getValue, Collectors.toList())));
+        windowsByMachine.forEach((machineCode, windows) -> {
+            List<MachineCleaningWindowDTO> cancelled = windows.stream()
+                    .filter(window -> CleaningDispositionResolver.resolve(context, machineCode, window).getDisposition()
+                            != CleaningDispositionResolver.Disposition.INDEPENDENT)
+                    .collect(Collectors.toList());
+            if (cancelled.isEmpty()) {
+                return;
             }
-            Date mouldChangeStartTime = resolvePlannedMouldChangeStartTime(result);
-            Date mouldChangeEndTime = Objects.isNull(mouldChangeStartTime) ? null
-                    : LhScheduleTimeUtil.addHours(mouldChangeStartTime,
-                    LhScheduleTimeUtil.getMouldChangeTotalHours(context));
-            if (MachineCleaningOverlapUtil.isOverlap(
-                    cleaningWindow, mouldChangeStartTime, mouldChangeEndTime)) {
-                return true;
-            }
-        }
-        return false;
+            List<MachineCleaningWindowDTO> effective = CleaningDispositionResolver.resolveEffectiveWindows(
+                    context, machineCode, windows).stream().filter(window -> !window.isOffMachineCleaning())
+                    .collect(Collectors.toList());
+            context.getScheduleResultList().stream().filter(Objects::nonNull)
+                    .filter(result -> CleaningDispositionResolver.coversMachineSide(machineCode, result.getLhMachineCode()))
+                    .forEach(result -> ResultDowntimeSummaryUtil.refreshCancelledCleaningSummary(
+                            result, effective, cancelled, context.getScheduleWindowShifts()));
+        });
     }
 
     /**
@@ -3662,29 +3611,6 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     }
 
     /**
-     * 获取最终生成交替计划所使用的有量换模结果，并按机台和时间稳定排序。
-     *
-     * @param context 排程上下文
-     * @return 换模结果列表
-     */
-    private List<LhScheduleResult> resolveOrderedChangeResults(LhScheduleContext context) {
-        if (Objects.isNull(context) || CollectionUtils.isEmpty(context.getScheduleResultList())) {
-            return new ArrayList<>(0);
-        }
-        return context.getScheduleResultList().stream()
-                .filter(Objects::nonNull)
-                .filter(result -> "1".equals(result.getIsChangeMould()))
-                .filter(result -> Objects.nonNull(result.getDailyPlanQty()) && result.getDailyPlanQty() > 0)
-                .sorted(Comparator.comparing(LhScheduleResult::getLhMachineCode,
-                                Comparator.nullsLast(String::compareTo))
-                        .thenComparing(this::resolvePlannedMouldChangeStartTime,
-                                Comparator.nullsLast(Date::compareTo))
-                        .thenComparing(LhScheduleResult::getSpecEndTime,
-                                Comparator.nullsLast(Date::compareTo)))
-                .collect(Collectors.toList());
-    }
-
-    /**
      * 统一产品状态口径：空状态按正规 S 处理。
      *
      * @param productStatus 原产品状态
@@ -3725,6 +3651,28 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                                                  Date changeTime) {
         SkuScheduleDTO beforeSku = resolveBeforeSkuForEndType(
                 context, machineCode, beforeMaterialCode, beforeProductStatus);
+        if (this.getTargetScheduleQtyResolver().isSharedEmbryoStockEnding(context, beforeSku)) {
+            // END_TYPE仅映射展示，不调用普通余量或时间下机；历史早期事件仍须有本机实际生产。
+            int quota = this.getTargetScheduleQtyResolver().resolveEmbryoStockSkuQuotaLimit(context, beforeSku);
+            int scheduled = context.getScheduleResultList().stream().filter(Objects::nonNull)
+                    .filter(result -> StringUtils.equals(beforeMaterialCode, result.getMaterialCode())
+                            && StringUtils.equals(beforeProductStatus, result.getProductStatus()))
+                    .mapToInt(ShiftFieldUtil::resolveScheduledQty).sum();
+            Date lastEnd = context.getScheduleResultList().stream().filter(Objects::nonNull)
+                    .filter(result -> StringUtils.equals(machineCode, result.getLhMachineCode())
+                            && StringUtils.equals(beforeMaterialCode, result.getMaterialCode())
+                            && StringUtils.equals(beforeProductStatus, result.getProductStatus())
+                            && ShiftFieldUtil.resolveScheduledQty(result) > 0)
+                    .flatMap(result -> context.getScheduleWindowShifts().stream()
+                            .filter(shift -> ShiftFieldUtil.getShiftPlanQty(result, shift.getShiftIndex()) > 0)
+                            .map(shift -> ShiftFieldUtil.getShiftEndTime(result, shift.getShiftIndex())))
+                    .filter(Objects::nonNull).max(Date::compareTo).orElse(null);
+            boolean completed = (quota > 0 && scheduled >= quota)
+                    || this.getTargetScheduleQtyResolver().isFinalEmbryoStockExhausted(
+                            context, beforeSku.getEmbryoCode());
+            return completed && Objects.nonNull(lastEnd) && Objects.nonNull(changeTime) && !changeTime.before(lastEnd)
+                    ? END_TYPE_BY_REMAINING_QTY : END_TYPE_BY_TIME;
+        }
         if (this.isOnlySandBlastTimeDown(
                 context, machineCode, beforeMaterialCode, changeTime)) {
             log.info("模具交替计划END_TYPE判断, machineCode: {}, beforeMaterialCode: {}, "
@@ -3746,13 +3694,13 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                     machineCode, beforeMaterialCode, beforeProductStatus, beforeMaterialSurplusQty, 0, 0);
             return END_TYPE_BY_REMAINING_QTY;
         }
-        // 胎胚收尾且胎胚库存额度已排满时前物料已无料可产，视同余量收尾完成，必须直接短路为按余量下机；
+        // 胎胚收尾且单SKU额度或整组库存已排满时，必须直接短路为按余量下机；
         // 不能并入下方“真实剩余量大于0”条件后继续比较班次，否则换模早于最后正量班次时会被改判回按时间下机。
         if (this.isBeforeMaterialEmbryoStockExhausted(
-                context, beforeSku, beforeMaterialCode, beforeProductStatus)) {
+                context, beforeSku, beforeMaterialCode, beforeProductStatus, machineCode, changeTime)) {
             log.info("模具交替计划END_TYPE判断, machineCode: {}, beforeMaterialCode: {}, beforeProductStatus: {}, "
                             + "beforeMaterialSurplusQty: {}, beforeMaterialRemainingQty: {}, "
-                            + "endType: 0, reason: 前物料胎胚收尾且胎胚库存额度已排满",
+                            + "endType: 0, reason: 前物料胎胚收尾且单SKU额度或整组库存已排满",
                     machineCode, beforeMaterialCode, beforeProductStatus, beforeMaterialSurplusQty,
                     beforeMaterialRemainingQty);
             return END_TYPE_BY_REMAINING_QTY;
@@ -4042,24 +3990,28 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     }
 
     /**
-     * 判断前物料是否胎胚收尾且本次排程已把胎胚库存分摊额度排满。
+     * 判断前物料是否胎胚收尾且本次已排满单SKU额度或整组胎胚库存。
      * <p>胎胚收尾标识来自 {@code embryoEndingFlagMap}；胎胚库存分摊额度由 {@link TargetScheduleQtyResolver}
      * 在保存前排产时写入，这里按同一口径读取。排量按“物料+产品状态”汇总全部结果，与硫化余量口径
      * 共用同一个汇总方法，不读取运行期消费账本，避免账本被上游规则改写后误判。</p>
-     * <p>额度缺失、额度小于等于0（共用胎胚库存为0）或排量小于额度时均不视为已排满，
-     * 保证只在前物料确实“已无料可产”时才改写下机方式；前物料来源 SKU 缺失或胎胚编码为空时，
-     * 回退到结果行和额度表按“物料+产品状态”取值。</p>
+     * <p>整组耗尽复用结果isEnd的最终判定，要求当前机台前料在交替前已实际开产，
+     * 避免仅继承历史前料的早期交替被其他机台后续耗尽库存的结果追溯改写。
+     * 原有正额度排满分支保留跨机台汇总口径；来源缺失时按物料和产品状态解析胎胚。</p>
      *
      * @param context 排程上下文
      * @param beforeSku 交替计划前物料来源 SKU，可为空
      * @param beforeMaterialCode 交替计划前物料编码
      * @param beforeProductStatus 交替计划前物料产品状态
-     * @return true-胎胚收尾且胎胚库存额度已排满；false-未命中、额度缺失或未排满
+     * @param machineCode 交替计划机台编码
+     * @param changeTime 交替发生时间
+     * @return true-单SKU额度或整组库存已排满；false-不满足对应收尾条件
      */
     private boolean isBeforeMaterialEmbryoStockExhausted(LhScheduleContext context,
                                                          SkuScheduleDTO beforeSku,
                                                          String beforeMaterialCode,
-                                                         String beforeProductStatus) {
+                                                         String beforeProductStatus,
+                                                         String machineCode,
+                                                         Date changeTime) {
         if (Objects.isNull(context) || StringUtils.isEmpty(beforeMaterialCode)) {
             return false;
         }
@@ -4080,6 +4032,12 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             quotaQty = this.resolveEmbryoStockSkuQuotaByMaterialStatus(
                     context, beforeMaterialCode, skuProductStatus);
         }
+        // 先用最终结果核对组库存；SKU额度被候选刷新为0不能抹掉已提交的实际排产。
+        if (this.hasBeforeMaterialProductionBeforeChange(
+                context, machineCode, beforeMaterialCode, skuProductStatus, changeTime)
+                && this.getTargetScheduleQtyResolver().isFinalEmbryoStockExhausted(context, embryoCode)) {
+            return true;
+        }
         if (StringUtils.isEmpty(embryoCode) || quotaQty <= 0) {
             return false;
         }
@@ -4093,6 +4051,45 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                         + "胎胚库存额度: {}, 本次排量: {}",
                 beforeMaterialCode, embryoCode, quotaQty, scheduledQty);
         return scheduledQty >= quotaQty;
+    }
+
+    /**
+     * 判断交替前料在本机是否有已于交替时点之前开始的正量生产。
+     * <p>仅供新增的组库存耗尽分支确认动作身份，不追溯修改只有历史前料的交替计划。</p>
+     *
+     * @param context 排程上下文
+     * @param machineCode 交替机台编码
+     * @param materialCode 前物料编码
+     * @param productStatus 前物料产品状态
+     * @param changeTime 交替发生时间
+     * @return 匹配本机前料且有交替前实际开产的正量班次时返回true
+     */
+    private boolean hasBeforeMaterialProductionBeforeChange(LhScheduleContext context,
+                                                             String machineCode,
+                                                             String materialCode,
+                                                             String productStatus,
+                                                             Date changeTime) {
+        if (Objects.isNull(changeTime) || CollectionUtils.isEmpty(context.getScheduleResultList())) {
+            return false;
+        }
+        String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(materialCode, productStatus);
+        return context.getScheduleResultList().stream()
+                .filter(Objects::nonNull)
+                .filter(result -> StringUtils.equals(machineCode, result.getLhMachineCode()))
+                .filter(result -> StringUtils.equals(skuKey, MonthPlanDateResolver.buildMaterialStatusKey(
+                        result.getMaterialCode(), result.getProductStatus())))
+                .anyMatch(result -> {
+                    for (int shiftPosition = 1;
+                         shiftPosition <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftPosition++) {
+                        Integer planQty = ShiftFieldUtil.getShiftPlanQty(result, shiftPosition);
+                        Date startTime = ShiftFieldUtil.getShiftStartTime(result, shiftPosition);
+                        if (Objects.nonNull(planQty) && planQty > 0
+                                && Objects.nonNull(startTime) && startTime.before(changeTime)) {
+                            return true;
+                        }
+                    }
+                    return false;
+                });
     }
 
     /**

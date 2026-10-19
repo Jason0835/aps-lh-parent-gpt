@@ -1,0 +1,221 @@
+package com.zlt.aps.lh.api.domain.entity;
+
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.common.annotation.ImportExcelValidated;
+import io.swagger.annotations.ApiModel;
+import io.swagger.annotations.ApiModelProperty;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import org.springframework.format.annotation.DateTimeFormat;
+
+import java.io.Serializable;
+import java.util.Date;
+
+/**
+ * 模具交替计划实体
+ *
+ * @author APS Team
+ * @since 2026/04/01
+ */
+@ApiModel(value = "模具交替计划实体", description = "模具交替计划实体")
+@Data
+@EqualsAndHashCode(callSuper = true)
+@TableName("t_lh_mould_change_plan")
+public class LhMouldChangePlan extends BaseEntity implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+    @ApiModelProperty(value = "分厂编号")
+    @Excel(name = "ui.data.column.lhMouldChangePlan.factoryCode", dictType = "biz_factory_name")
+    @ImportExcelValidated(required = true, maxLength = 20)
+    @TableField(value = "FACTORY_CODE")
+    private String factoryCode;
+
+    @ApiModelProperty(value = "硫化结果批次号")
+    @Excel(name = "ui.data.column.lhMouldChangePlan.lhResultBatchNo")
+    @TableField(value = "LH_RESULT_BATCH_NO")
+    private String lhResultBatchNo;
+
+    @ApiModelProperty(value = "工单号")
+    @Excel(name = "ui.data.column.lhMouldChangePlan.orderNo")
+    @TableField(value = "ORDER_NO")
+    private String orderNo;
+
+    @ApiModelProperty(value = "计划日期")
+    @Excel(name = "ui.data.column.lhMouldChangePlan.planDate", dateFormat = "yyyy-MM-dd")
+    @ImportExcelValidated(required = true)
+    @TableField(value = "PLAN_DATE")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    @DateTimeFormat(pattern = "yyyy-MM-dd")
+    private Date planDate;
+
+    @ApiModelProperty(value = "计划顺位")
+    @Excel(name = "ui.data.column.lhMouldChangePlan.planOrder")
+    @TableField(value = "PLAN_ORDER")
+    private Integer planOrder;
+
+    @ApiModelProperty(value = "班次")
+    @Excel(name = "ui.data.column.lhMouldChangePlan.classIndex")
+    @TableField(value = "CLASS_INDEX")
+    private String classIndex;
+
+    @ApiModelProperty(value = "排程日期")
+    @Excel(name = "ui.data.column.lhMouldChangePlan.scheduleDate", dateFormat = "yyyy-MM-dd")
+//    @ImportExcelValidated(required = true)
+    @TableField(value = "SCHEDULE_DATE")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    @DateTimeFormat(pattern = "yyyy-MM-dd")
+    private Date scheduleDate;
+
+    @ApiModelProperty(value = "左右模 L-左模；R-右模；LR-左右模")
+    @Excel(name = "ui.data.column.lhMouldChangePlan.leftRightMould",dictType = "lr_molds")
+    @TableField(value = "LEFT_RIGHT_MOULD")
+    private String leftRightMould;
+
+    @ApiModelProperty(value = "硫化机台编号")
+    @Excel(name = "ui.data.column.lhMouldChangePlan.lhMachineCode")
+    @TableField(value = "LH_MACHINE_CODE")
+    private String lhMachineCode;
+
+    @ApiModelProperty(value = "硫化机台名称")
+//    @Excel(name = "ui.data.column.lhMouldChangePlan.lhMachineName")
+    @TableField(value = "LH_MACHINE_NAME")
+    private String lhMachineName;
+
+    @ApiModelProperty(value = "前规格物料编码")
+    @Excel(name = "ui.data.column.lhMouldChangePlan.beforeMaterialCode")
+    @TableField(value = "BEFORE_MATERIAL_CODE")
+    private String beforeMaterialCode;
+
+    @ApiModelProperty(value = "前规格物料描述")
+    @Excel(name = "ui.data.column.lhMouldChangePlan.beforeMaterialDesc")
+    @TableField(value = "BEFORE_MATERIAL_DESC")
+    private String beforeMaterialDesc;
+
+    @ApiModelProperty(value = "交替类型 数据字典：CHANGE_MOULD_TYPE")
+    @Excel(name = "ui.data.column.lhMouldChangePlan.changeMouldType", dictType = "CHANGE_MOULD_TYPE", width = 25)
+    @TableField(value = "CHANGE_MOULD_TYPE")
+    private String changeMouldType;
+
+    /**
+     * 清洗类型：03为喷砂清洗、04为干冰清洗，可使用英文逗号分隔多值。
+     */
+    @ApiModelProperty(value = "清洗类型：03-喷砂清洗，04-干冰清洗")
+    @TableField(value = "CLEAN_TYPE")
+    private String cleanType;
+
+    /**
+     * 导入模板中的干冰清洗选项，仅用于导入校验和类型转换。
+     */
+    @ApiModelProperty(value = "是否干冰清洗")
+    @TableField(exist = false)
+    private String isDryIceClean;
+
+    /**
+     * 导入模板中的喷砂清洗选项，仅用于导入校验和类型转换。
+     */
+    @ApiModelProperty(value = "是否喷砂清洗")
+    @TableField(exist = false)
+    private String isSandblastingClean;
+
+    /**
+     * 导入模板中的换活字块选项，仅用于交替类型转换。
+     */
+    @ApiModelProperty(value = "是否换活字块")
+    @TableField(exist = false)
+    private String isReplaceBlock;
+
+    @ApiModelProperty(value = "后规格物料编码")
+    @Excel(name = "ui.data.column.lhMouldChangePlan.afterMaterialCode")
+    @TableField(value = "AFTER_MATERIAL_CODE")
+    private String afterMaterialCode;
+
+    @ApiModelProperty(value = "后规格物料描述")
+    @Excel(name = "ui.data.column.lhMouldChangePlan.afterMaterialDesc")
+    @TableField(value = "AFTER_MATERIAL_DESC")
+    private String afterMaterialDesc;
+
+    /**
+     * 模具交替计划示方类型，按 lh_trial_status 字典值存储。
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.constructionStage", type = Excel.Type.IMPORT)
+    @ApiModelProperty(value = "示方类型")
+    @TableField(value = "PRODUCT_STATUS")
+    private String productStatus;
+
+    @ApiModelProperty(value = "更换时间")
+    @Excel(name = "ui.data.column.lhMouldChangePlan.changeTime", dateFormat = "yyyy-MM-dd")
+    @TableField(value = "CHANGE_TIME")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    @DateTimeFormat(pattern = "yyyy-MM-dd")
+    private Date changeTime;
+
+    @ApiModelProperty(value = "模具号")
+//    @Excel(name = "ui.data.column.lhMouldChangePlan.mouldCode")
+    @ImportExcelValidated(required = true, maxLength = 250)
+    @TableField(value = "MOULD_CODE")
+    private String mouldCode;
+
+    /**
+     * 页面展示模具号，直接取库表模具号字段。
+     */
+    @ApiModelProperty(value = "展示模具号")
+    @TableField(exist = false)
+    private String displayMouldCode;
+
+    @ApiModelProperty(value = "是否发布 0-未发布，1-已发布 2-发布失败 3-超时发布 4-待发布")
+    @Excel(name = "ui.data.column.lhMouldChangePlan.isRelease", dictType = "IS_RELEASE")
+    @TableField(value = "IS_RELEASE")
+    private String isRelease;
+
+    @ApiModelProperty(value = "模具交替完成状态 0-未完成；1-已完成")
+    @Excel(name = "ui.data.column.lhMouldChangePlan.mouldStatus", dictType = "finish_completion")
+    @TableField(value = "MOULD_STATUS")
+    private String mouldStatus;
+
+    /**
+     * 收尾类型 1-按时间下机 0-按余量收尾
+     */
+    @ApiModelProperty(value = "收尾类型", name = "endType", notes = "1-按时间下机 0-按余量收尾")
+    @TableField(value = "END_TYPE")
+    private String endType;
+
+
+    @ApiModelProperty(value = "备注说明字段")
+    @Excel(name = "ui.data.column.lhMouldChangePlan.remark", width = 50)
+    @TableField(value = "REMARK")
+    private String remark;
+
+    /**
+     * 区间查询参数，不映射到数据库字段。
+     */
+    @TableField(exist = false)
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date planDateStart;
+
+    @TableField(exist = false)
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date planDateEnd;
+
+    @TableField(exist = false)
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date scheduleDateStart;
+
+    @TableField(exist = false)
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date scheduleDateEnd;
+
+    /**
+     * 是否导出模板
+     */
+    @TableField(exist = false)
+    private Boolean exportTemplate = Boolean.FALSE;
+}

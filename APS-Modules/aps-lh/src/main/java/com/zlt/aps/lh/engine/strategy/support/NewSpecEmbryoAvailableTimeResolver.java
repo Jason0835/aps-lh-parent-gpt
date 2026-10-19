@@ -273,6 +273,7 @@ public final class NewSpecEmbryoAvailableTimeResolver {
 
     /**
      * 解析原有SKU类型门禁，原8班沿用原判断和返回值。
+     * 精确历史指定试制量试及其原机续排不再附加普通中班门禁。
      *
      * @param context 排程上下文
      * @param sku 待排SKU
@@ -283,6 +284,10 @@ public final class NewSpecEmbryoAvailableTimeResolver {
                                                        SkuScheduleDTO sku,
                                                        List<LhShiftConfigVO> shifts) {
         if (Objects.isNull(context) || Objects.isNull(sku) || CollectionUtils.isEmpty(shifts)) {
+            return null;
+        }
+        // 精确历史承接与已绑定原机使用正规时间轴，供胚门禁仍由外层独立合并。
+        if (PreviousAlternateNormalProductionPolicy.usesNormalRules(context, sku)) {
             return null;
         }
         // 去除正规/小批量的生产门禁，只保留试制、量试“首次正计划日中班开产”的 SKU 类型下限。

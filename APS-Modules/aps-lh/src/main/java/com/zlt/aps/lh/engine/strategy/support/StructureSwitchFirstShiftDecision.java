@@ -32,7 +32,7 @@ public class StructureSwitchFirstShiftDecision implements Serializable {
      */
     LhShiftConfigVO supplyShift;
     /**
-     * 达标的供胚班或紧邻下一班；无法判定或超出范围时为空。
+     * 续作结构为T日晚班，非续作结构为供胚班或窗口首班；缺少合法坐标时为空。
      */
     LhShiftConfigVO firstShift;
     /**
@@ -40,19 +40,11 @@ public class StructureSwitchFirstShiftDecision implements Serializable {
      */
     String machineCode;
     /**
-     * 参照组合的运行态完整班产。
+     * 后结构是否存在于基础数据加载的切换完成后结构集合，随首班判定冻结。
      */
-    Integer runtimeCapacity;
+    boolean structureContinuation;
     /**
-     * 普通机台为2条，配置单控运行侧为1条。
-     */
-    Integer minimumQuantity;
-    /**
-     * 供胚后剩余时长能完整完成的数量，禁止向上补模。
-     */
-    Integer availableQuantity;
-    /**
-     * 达标、顺延或拒绝的具体依据。
+     * 续作标识及供胚班定位的具体依据。
      */
     String reason;
     /**

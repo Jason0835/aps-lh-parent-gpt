@@ -10,6 +10,7 @@ import com.zlt.aps.lh.api.enums.UnscheduledReasonEnum;
 import com.zlt.aps.lh.component.OrderNoGenerator;
 import com.zlt.aps.lh.component.SkuDecrementChecker;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
+import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.UnscheduledResultCollector;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.PendingSkuUnscheduledRule;
@@ -86,6 +87,9 @@ public class TrialVirtualMachineProductionHandler extends AbsScheduleStepHandler
      */
     @Override
     protected void doHandle(LhScheduleContext context) {
+        // 专用历史候选可能未进入普通新增池，真实机台阶段结束后仍须参加最终补余量。
+        new ArrayList<>(context.getPreviousAlternateTrialSkuMap().values())
+                .forEach(context::registerTrialVirtualMachineCandidate);
         if (CollectionUtils.isEmpty(context.getTrialVirtualMachineCandidateList())) {
             log.info("试制量试虚拟机台排产跳过, factoryCode: {}, batchNo: {}, reason: 无兜底候选",
                     context.getFactoryCode(), context.getBatchNo());
@@ -107,12 +111,6 @@ public class TrialVirtualMachineProductionHandler extends AbsScheduleStepHandler
             if (Objects.isNull(sku) || !PendingSkuUnscheduledRule.isTrialOrMassTrialSku(sku)) {
                 continue;
             }
-            // S4.3可能早于历史资格冻结已登记候选，最终消费时仍须排除，不能只在登记处过滤。
-            if (context.hasPreviousAlternateTrialPlan(sku)) {
-                log.info("前日指定交替试制量试不进入虚拟机, factoryCode: {}, batchNo: {}, materialCode: {}, productStatus: {}",
-                        context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(), sku.getProductStatus());
-                continue;
-            }
             /*
              * 减量清单兜底复核：候选可能注册于S4.3统一减量过滤之前（无日计划保留、前日交替复用等），
              * 消费时统一复核，防止虚拟机台兜底绕过减量清单拦截。
@@ -127,6 +125,16 @@ public class TrialVirtualMachineProductionHandler extends AbsScheduleStepHandler
                         sku.getProductStatus(), sku.getSurplusQty());
                 continue;
             }
+            // 成型胎胚已收尾且无库存：不会再有胎胚供应，虚拟机台兜底不再排产，
+            // 落未排记录保留需求可见性（避免产生永远缺料的幻影计划）
+            if (this.isEndingEmbryoWithoutStock(context, sku)) {
+                this.recordEndingEmbryoUnscheduled(context, sku);
+                log.info("试制量试虚拟机台排产跳过, materialCode: {}, productStatus: {}, 胎胚: {}, "
+                                + "surplusQty: {}, reason: 成型胎胚已收尾且无库存",
+                        sku.getMaterialCode(), sku.getProductStatus(), sku.getEmbryoCode(),
+                        sku.getSurplusQty());
+                continue;
+            }
             String skuKey = this.buildSkuKey(sku);
             if (!processedSkuKeySet.add(skuKey) || sku.getSurplusQty() <= 0) {
                 continue;
@@ -134,11 +142,20 @@ public class TrialVirtualMachineProductionHandler extends AbsScheduleStepHandler
 
             int actualMachineScheduledQty = this.resolveScheduledQty(context, sku);
             int remainingCuringQty = Math.max(0, sku.getSurplusQty() - actualMachineScheduledQty);
+            Integer targetQty = context.getSkuProductionTargetQtyMap().get(
+                    MonthPlanDateResolver.buildMaterialStatusKey(sku.getMaterialCode(), sku.getProductStatus()));
+            if (context.hasPreviousAlternateTrialPlan(sku) && Objects.nonNull(targetQty)) {
+                // 实机部分成功后只补合法总目标的缺口，不能把硫化余量再次当作新增目标。
+                remainingCuringQty = Math.min(remainingCuringQty, Math.max(0, targetQty - actualMachineScheduledQty));
+            }
             String originalUnscheduledReason = this.resolveOriginalUnscheduledReason(context, sku);
             if (remainingCuringQty <= 0) {
-                this.reconcileUnscheduledResult(context, sku, 0, originalUnscheduledReason);
+                // 零合法需求不是生产完成，无正量结果时保留原准入诊断。
+                if (actualMachineScheduledQty > 0) {
+                    this.reconcileUnscheduledResult(context, sku, 0, originalUnscheduledReason);
+                }
                 log.info("试制量试虚拟机台排产跳过, materialCode: {}, productStatus: {}, "
-                                + "surplusQty: {}, actualMachineScheduledQty: {}, reason: 实际机台已排完硫化余量",
+                                + "surplusQty: {}, actualMachineScheduledQty: {}, reason: 合法目标无待补余量",
                         sku.getMaterialCode(), sku.getProductStatus(), sku.getSurplusQty(),
                         actualMachineScheduledQty);
                 continue;
@@ -201,8 +218,18 @@ public class TrialVirtualMachineProductionHandler extends AbsScheduleStepHandler
                                          String originalUnscheduledReason) {
         LhScheduleResult result = this.buildVirtualScheduleResult(
                 context, sku, virtualMachineCode, shiftCapacity);
-        targetScheduleQtyResolver.syncProductionRemainingQtyToRemaining(
-                context, sku, remainingCuringQty, VIRTUAL_MACHINE_SCENE + "初始化硫化余量");
+        String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(sku.getMaterialCode(), sku.getProductStatus());
+        Integer targetQty = context.getSkuProductionTargetQtyMap().get(skuKey);
+        if (context.hasPreviousAlternateTrialPlan(sku) && Objects.nonNull(targetQty)) {
+            // 实际结果是最终补量依据；只校正未完成余额，禁止把历史已消费量与待补量相加重建总目标。
+            context.getSkuProductionRemainingQtyMap().put(skuKey, remainingCuringQty);
+            log.info("历史指定试制量试虚拟补量余额对账, 工厂={}, 批次={}, 物料={}, 状态={}, 合法总目标={}, 待补量={}",
+                    context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(), sku.getProductStatus(),
+                    targetQty, remainingCuringQty);
+        } else {
+            targetScheduleQtyResolver.syncProductionRemainingQtyToRemaining(
+                    context, sku, remainingCuringQty, VIRTUAL_MACHINE_SCENE + "初始化硫化余量");
+        }
         int remaining = remainingCuringQty;
         StringBuilder shiftPlanSummary = new StringBuilder(192);
         for (LhShiftConfigVO shift : schedulingShifts) {
@@ -503,6 +530,52 @@ public class TrialVirtualMachineProductionHandler extends AbsScheduleStepHandler
                 .append(", originalReason=").append(originalReason)
                 .toString());
         unscheduledResultCollector.add(context, sku, retainedResult);
+    }
+
+    /**
+     * 判断当前 SKU 的成型胎胚是否「已收尾且无库存」——不会再有胎胚可供硫化。
+     *
+     * <p>口径与示方书校验的跳过条件一致（{@code 胎胚收尾标识=1 且 胎胚实时库存为空或<=0}）：
+     * 胎胚收尾表示成型不再生产该胎胚，库存为 0 时虚拟机台兜底排出的量永远缺料，
+     * 因此不再生成排产结果，改为落未排记录保留需求可见性。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前SKU
+     * @return true-胎胚已收尾且无库存，虚拟机台兜底不应排产
+     */
+    private boolean isEndingEmbryoWithoutStock(LhScheduleContext context, SkuScheduleDTO sku) {
+        if (Objects.isNull(context) || Objects.isNull(sku) || StringUtils.isEmpty(sku.getEmbryoCode())) {
+            return false;
+        }
+        // 胎胚收尾标识必须为 1（由 S4.2 loadEmbryoEndingFlagMap 判定）
+        if (!targetScheduleQtyResolver.isEmbryoStockEndingFlagYes(context, sku.getEmbryoCode())) {
+            return false;
+        }
+        // 胎胚实时库存为空或<=0：没有可消耗的胎胚
+        Integer embryoStock = context.getEmbryoRealtimeStockMap().get(sku.getEmbryoCode());
+        return Objects.isNull(embryoStock) || embryoStock <= 0;
+    }
+
+    /**
+     * 为「成型胎胚已收尾且无库存」的 SKU 重写未排记录。
+     *
+     * <p>先清掉前面阶段残留的同需求未排投影，再按“胎胚库存不足”原因重新落一条，
+     * 保证未排原因唯一、可控，避免出现同一需求多条未排记录或原因错位。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前SKU
+     */
+    private void recordEndingEmbryoUnscheduled(LhScheduleContext context, SkuScheduleDTO sku) {
+        context.getUnscheduledResultList().removeIf(result -> Objects.nonNull(result)
+                && unscheduledResultCollector.isSameDemand(context, sku, result));
+        int unscheduledQty = Math.max(0, sku.getSurplusQty());
+        LhUnscheduledResult result = unscheduledResultCollector.buildResult(
+                context, sku, unscheduledQty,
+                UnscheduledReasonEnum.EMBRYO_STOCK_INSUFFICIENT,
+                "成型胎胚已收尾且无库存，虚拟机台兜底不排产",
+                "embryoCode=" + sku.getEmbryoCode() + ", surplusQty=" + unscheduledQty);
+        result.setMouldQty(VIRTUAL_MACHINE_MOULD_QTY);
+        unscheduledResultCollector.add(context, sku, result);
     }
 
     /**

@@ -52,7 +52,7 @@ public final class TimedMachineOffReleaseResolver {
             }
         }
         Date available = Objects.nonNull(completed) ? completed : zeroQuantityAvailableTime;
-        Date released = request.getProfile().physicalReadyTime(available);
+        Date released = request.getProfile().physicalReadyTime(available, ruleDecision.getRuleOffMachineTime());
         OffMachineDecision resolved = BeanUtil.copyProperties(ruleDecision, OffMachineDecision.class);
         resolved.setScheduledQty(totalQuantity);
         resolved.setProductionEndTime(completed);

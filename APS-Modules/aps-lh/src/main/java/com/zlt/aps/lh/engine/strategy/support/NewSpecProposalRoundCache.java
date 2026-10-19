@@ -4,6 +4,7 @@ import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.component.StructureEarlyProductionAdmission;
 import org.apache.commons.lang3.StringUtils;
 
+import java.time.LocalDate;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -12,14 +13,36 @@ import java.util.Map;
  * 新增排产同一运行态版本内的提案只读缓存。
  *
  * <p>缓存只保存 SKU 级收尾判断、结构×班次有效机台统计、日志指纹和扫描统计，不保存
- * Machine×SKU反向匹配或真实时间轴计划。正式结果、终局未排、候选池或业务日阶段变化时
+ * Machine×SKU反向匹配或真实时间轴计划，只读准入失败最多保存512条轻量原因。
+ * 正式结果、终局未排、候选池或业务日阶段变化时
  * 清空快照；失败组合由主循环保存轻量AssignmentKey，避免构造完整匹配矩阵。</p>
  *
  * <p>缓存对象只在单次业务日阶段内存活，不进入排程上下文、不跨批次共享。</p>
  *
  * @author APS
+ * @date 2026/10/17
  */
 public final class NewSpecProposalRoundCache {
+
+    /**
+     * 同一资源版本最多保存的只读准入失败数，满额时仅清除此类缓存，避免形成匹配矩阵。
+     */
+    private static final int MAX_READ_ONLY_FAILURE_COUNT = 512;
+
+    /**
+     * 按候选对象身份及机台、日期池、班次隔离的轻量只读准入失败原因。
+     */
+    private final Map<DailyNewSpecCandidate, Map<String, String>> readOnlyFailureMap = new IdentityHashMap<>();
+
+    /**
+     * 当前资源版本已保存的只读失败条数。
+     */
+    private int readOnlyFailureCount;
+
+    /**
+     * 当前业务日阶段通过失败原因缓存避免的重复准入次数。
+     */
+    private int readOnlyFailureCacheHitCount;
 
     /** 当前运行态版本下SKU窗口收尾判断 */
     private final Map<DailyNewSpecCandidate, Boolean> endingFlagMap;
@@ -63,7 +86,76 @@ public final class NewSpecProposalRoundCache {
         endingFlagMap.clear();
         expectedEndingTraceMap.clear();
         structureMachineStatisticsMap.clear();
+        readOnlyFailureMap.clear();
+        readOnlyFailureCount = 0;
         lastQueueTraceFingerprint = null;
+    }
+
+    /**
+     * 读取同一候选、机台、日期池和竞争班次已经确定的只读拒绝原因。
+     *
+     * @param candidate 当前候选对象
+     * @param machineCode 当前被扫描的运行态机台
+     * @param poolDate 当前日期池
+     * @param shiftIndex 当前竞争班次
+     * @return 已冻结拒绝原因；尚未计算或资源版本已失效时为空
+     */
+    public String getReadOnlyFailure(DailyNewSpecCandidate candidate, String machineCode,
+            LocalDate poolDate, Integer shiftIndex) {
+        Map<String, String> failures = readOnlyFailureMap.get(candidate);
+        return failures == null ? null : failures.get(this.buildReadOnlyFailureKey(machineCode, poolDate, shiftIndex));
+    }
+
+    /**
+     * 保存无副作用准入失败，不保存完整匹配或时间轴；容量满后重新计算，不能无界增长。
+     *
+     * @param candidate 当前候选对象
+     * @param machineCode 当前被扫描的运行态机台
+     * @param poolDate 当前日期池
+     * @param shiftIndex 当前竞争班次
+     * @param reason 非空拒绝原因
+     */
+    public void putReadOnlyFailure(DailyNewSpecCandidate candidate, String machineCode,
+            LocalDate poolDate, Integer shiftIndex, String reason) {
+        if (StringUtils.isEmpty(reason)) {
+            return;
+        }
+        if (readOnlyFailureCount >= MAX_READ_ONLY_FAILURE_COUNT) {
+            readOnlyFailureMap.clear();
+            readOnlyFailureCount = 0;
+        }
+        Map<String, String> failures = readOnlyFailureMap.computeIfAbsent(candidate, key -> new LinkedHashMap<>());
+        if (failures.put(this.buildReadOnlyFailureKey(machineCode, poolDate, shiftIndex), reason) == null) {
+            readOnlyFailureCount++;
+        }
+    }
+
+    /**
+     * 构建单阶段内机台、日期池和竞争班次的失败键，候选身份由外层IdentityHashMap隔离。
+     *
+     * @param machineCode 运行态机台
+     * @param poolDate 候选日期池
+     * @param shiftIndex 竞争班次
+     * @return 当前候选内的轻量失败键
+     */
+    private String buildReadOnlyFailureKey(String machineCode, LocalDate poolDate, Integer shiftIndex) {
+        return machineCode + "|" + poolDate + "|" + shiftIndex;
+    }
+
+    /**
+     * 记录一次无需重跑硬匹配和只读准入的失败缓存命中。
+     */
+    public void recordReadOnlyFailureCacheHit() {
+        readOnlyFailureCacheHitCount++;
+    }
+
+    /**
+     * 获取当前阶段被缓存阻止的重复准入次数。
+     *
+     * @return 当前阶段累计缓存命中数
+     */
+    public int getReadOnlyFailureCacheHitCount() {
+        return readOnlyFailureCacheHitCount;
     }
 
     /** @param version 当前设备约束版本 @return 是否已失效旧提案缓存 */

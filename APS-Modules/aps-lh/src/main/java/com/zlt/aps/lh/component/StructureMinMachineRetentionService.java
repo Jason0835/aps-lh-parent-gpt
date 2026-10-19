@@ -30,12 +30,14 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 结构最低硫化机台配置解析与在机统计工具。
@@ -173,6 +175,95 @@ public class StructureMinMachineRetentionService {
     }
 
     /**
+     * 统计扣除成型收尾豁免后仍占结构配额的物理机台。
+     * 同物理机台任一同结构占用不豁免时保留整机，避免多SKU和L/R重复扣减。
+     *
+     * @param context 排程上下文
+     * @param structureName 当前统计结构
+     * @param shiftIndex 窗口班次序号
+     * @return 有效结构物理机台集合
+     */
+    public Set<String> collectEffectiveStructureInMachinePhysicalCodes(LhScheduleContext context,
+            String structureName, int shiftIndex) {
+        if (Objects.isNull(context) || StringUtils.isEmpty(structureName)
+                || Objects.isNull(this.resolveShift(context, shiftIndex))) {
+            return Collections.emptySet();
+        }
+        return this.collectStructureRuntimeMachineCodes(context, structureName).stream()
+                .filter(machineCode -> this.isMachineInStructureAtShift(
+                        context, structureName, machineCode, shiftIndex))
+                .filter(machineCode -> !this.isMachineExemptAtShift(context, structureName, machineCode, shiftIndex))
+                .map(LhSingleControlMachineUtil::resolvePhysicalMachineCode)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    /**
+     * 判断运行侧在当前结构班次的全部有效SKU占用是否均可豁免。
+     * 正量结果逐条判断；业务停机零量按实际归属SKU判断，身份不完整时保持原计数。
+     *
+     * @param context 排程上下文
+     * @param structureName 当前统计结构
+     * @param machineCode 运行机台编码，单控侧独立判断
+     * @param shiftIndex 窗口班次序号
+     * @return 该侧所有当前结构占用均豁免时返回true
+     */
+    public boolean isMachineExemptAtShift(LhScheduleContext context, String structureName,
+            String machineCode, int shiftIndex) {
+        if (Objects.isNull(context) || CollectionUtils.isEmpty(context.getCxEmbryoEndingShiftIndex())) {
+            return false;
+        }
+        LhShiftConfigVO shift = this.resolveShift(context, shiftIndex);
+        List<LhScheduleResult> positiveResults = context.getScheduleResultList().stream()
+                .filter(result -> this.isResultForStructure(context, result, structureName, machineCode))
+                .filter(result -> Objects.nonNull(ShiftFieldUtil.getShiftPlanQty(result, shiftIndex))
+                        && ShiftFieldUtil.getShiftPlanQty(result, shiftIndex) > 0)
+                .collect(Collectors.toList());
+        if (!positiveResults.isEmpty()) {
+            return positiveResults.stream().allMatch(result -> this.isResultExemptAtShift(
+                    context, structureName, result, shift));
+        }
+        MachineScheduleDTO machine = context.getMachineScheduleMap().get(machineCode);
+        if (Objects.nonNull(machine) && StringUtils.isNotEmpty(machine.getCurrentMaterialCode())) {
+            List<SkuScheduleDTO> owners = context.getStructureSkuSnapshotMap()
+                    .getOrDefault(structureName, Collections.emptyList()).stream()
+                    .filter(Objects::nonNull)
+                    .filter(sku -> StringUtils.equals(machine.getCurrentMaterialCode(), sku.getMaterialCode()))
+                    .collect(Collectors.toList());
+            if (!owners.isEmpty()) {
+                return owners.stream().allMatch(sku -> EmbryoEndingStructureMachineExemptionPolicy.isExempt(
+                        context, structureName, sku.getEmbryoCode(), sku.getStructureName(), shift));
+            }
+        }
+        LhScheduleResult owner = this.resolveActiveOwnerResultAtShift(context, machineCode, shiftIndex);
+        if (Objects.nonNull(machine) && StringUtils.isNotEmpty(machine.getCurrentMaterialCode())
+                && (Objects.isNull(owner) || !StringUtils.equals(
+                machine.getCurrentMaterialCode(), owner.getMaterialCode()))) {
+            return false;
+        }
+        return Objects.nonNull(owner) && this.isResultExemptAtShift(context, structureName, owner, shift);
+    }
+
+    /**
+     * 按排程结果的胎胚代码判断收尾豁免，优先保留结果实际结构，不区分产品状态。
+     *
+     * @param context 排程上下文
+     * @param structureName 当前统计结构
+     * @param result 当前占用结果
+     * @param shift 当前班次
+     * @return 同胎胚同结构且已过任一匹配收尾班次时返回true
+     */
+    public boolean isResultExemptAtShift(LhScheduleContext context, String structureName,
+            LhScheduleResult result, LhShiftConfigVO shift) {
+        if (Objects.isNull(result)) {
+            return false;
+        }
+        String resultStructure = StringUtils.isNotEmpty(result.getStructureName())
+                ? result.getStructureName() : this.resolveStructureNameByMaterial(context, result.getMaterialCode());
+        return EmbryoEndingStructureMachineExemptionPolicy.isExempt(
+                context, structureName, result.getEmbryoCode(), resultStructure, shift);
+    }
+
+    /**
      * 统计提前生产资格班次内仍应计入结构的物理机台。
      *
      * <p>复用统一结构班次在机口径。正量收尾机台在其收尾班次仍完整计入，不能因班内
@@ -214,7 +305,7 @@ public class StructureMinMachineRetentionService {
      * 统计指定班次占用结构名额的物理机台。
      *
      * <p>参数 {@code productionOccupationStartTime} 为兼容现有调用链保留，但班次机台数不再
-     * 随班内时刻变化。只要机台在当前班次符合统一在机口径，就在整个班次内计入。</p>
+     * 随班内时刻变化。实际集合按原在机口径保留，配额集合仅按成型收尾班次边界扣减。</p>
      *
      * @param context 排程上下文
      * @param structureName 产品结构
@@ -239,13 +330,17 @@ public class StructureMinMachineRetentionService {
         Set<String> rawPhysicalMachineCodes =
                 Objects.nonNull(context.getStructureShiftInMachineIndex())
                         ? context.getStructureShiftInMachineIndex()
-                        .resolveInMachinePhysicalCodes(structureName, shiftIndex)
+                        .resolveRawInMachinePhysicalCodes(structureName, shiftIndex)
                         : this.collectStructureInMachinePhysicalCodes(
                         context, structureName, shiftIndex);
         admission.getRawScheduledPhysicalMachineCodes().addAll(
                 rawPhysicalMachineCodes);
-        // 收尾班次仍完整计入结构机台数，不再根据班内收尾时刻移出有效集合。
-        admission.getScheduledPhysicalMachineCodes().addAll(rawPhysicalMachineCodes);
+        // 实际资源集合保持原在机口径，只有成型收尾后的同胎胚同结构占用退出配额集合。
+        admission.getScheduledPhysicalMachineCodes().addAll(
+                Objects.nonNull(context.getStructureShiftInMachineIndex())
+                        ? context.getStructureShiftInMachineIndex()
+                        .resolveInMachinePhysicalCodes(structureName, shiftIndex)
+                        : this.collectEffectiveStructureInMachinePhysicalCodes(context, structureName, shiftIndex));
         admission.setScheduledStructureCount(
                 admission.getScheduledPhysicalMachineCodes().size());
         return admission;
@@ -270,7 +365,7 @@ public class StructureMinMachineRetentionService {
         Set<String> rawPhysicalMachineCodes =
                 Objects.nonNull(context.getStructureShiftInMachineIndex())
                         ? context.getStructureShiftInMachineIndex()
-                        .resolveInMachinePhysicalCodes(
+                        .resolveRawInMachinePhysicalCodes(
                                 structureName, shift.getShiftIndex())
                         : this.collectStructureInMachinePhysicalCodes(
                         context, structureName, shift.getShiftIndex());

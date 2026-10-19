@@ -15,6 +15,14 @@ import java.util.Date;
 @Getter
 public final class ContinuationTDayFinishConstraint implements Serializable {
     /**
+     * T日小余量早班节点规则标识，供分配与审计共同使用。
+     */
+    public static final String MORNING_RULE_NAME = "T日06点节点释放";
+    /**
+     * T日大余量中班节点规则标识，供分配与审计共同使用。
+     */
+    public static final String AFTERNOON_RULE_NAME = "T日19点节点释放";
+    /**
      * 续作快照序列化版本。
      */
     private static final long serialVersionUID = 1L;

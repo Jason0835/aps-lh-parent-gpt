@@ -6,7 +6,6 @@ import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
-import com.zlt.aps.lh.api.enums.SingleControlMachineModeEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
@@ -18,6 +17,7 @@ import java.text.MessageFormat;
 import java.util.Collections;
 import java.util.Date;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -140,6 +140,7 @@ public final class StructureSwitchFirstShiftQuantityPolicy {
 
     /**
      * 冻结首检写入前复核额度，防止预演之后其他提案已消费同组额度。
+     *
      * @param context 本批上下文
      * @param result 当前候选结果
      * @param plan 冻结首检计划
@@ -148,10 +149,9 @@ public final class StructureSwitchFirstShiftQuantityPolicy {
     public static boolean canWriteInspection(LhScheduleContext context, LhScheduleResult result,
             FirstInspectionAllocationPlan plan) {
         CxEmbryoLhTime source = resolveSource(context, result);
-        // 首检写入早于结果来源SKU登记，直接读取S4.3冻结的同一物料状态模式。
-        String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(result.getMaterialCode(), result.getProductStatus());
+        // 首检早于结果来源登记，读取冻结模式时仍须保留独立历史指定的精确侧别范围。
         int sides = LhSingleControlMachineUtil.isConfiguredSingleControlMachine(context, result.getLhMachineCode())
-                && SingleControlMachineModeEnum.WHOLE_PAIR == context.getSingleControlModeSnapshotMap().get(skuKey)
+                && LhSingleControlMachineUtil.isWholeMachineGranularityResult(context, result)
                 ? WHOLE_MACHINE_SIDES : 1;
         for (FirstInspectionShiftAllocation allocation : plan.getShiftAllocations()) {
             LhShiftConfigVO shift = allocation.getShift();
@@ -182,7 +182,7 @@ public final class StructureSwitchFirstShiftQuantityPolicy {
         }
         int existing = StructureSwitchSchedulingPolicy.quantity(result, shift.getShiftIndex());
         int sides = resolvePreviewSides(context, sku, result.getLhMachineCode());
-        int total = capTotal(context, source, result, shift, existing + Math.max(0, proposed), sides);
+        int total = capTotal(context, source, result, shift, existing + Math.max(0, proposed), sides, true);
         return Math.max(0, total - existing);
     }
 
@@ -210,7 +210,78 @@ public final class StructureSwitchFirstShiftQuantityPolicy {
      */
     public static int capRetainedTotal(LhScheduleContext context, LhScheduleResult result,
             LhShiftConfigVO shift, int proposedTotal) {
-        return capTotal(context, resolveSource(context, result), result, shift, proposedTotal, 1);
+        return capTotal(context, resolveSource(context, result), result, shift, proposedTotal, 1, true);
+    }
+
+    /**
+     * 在跨日临时副本清空原班次后，冻结原结果已消费后的供胚首班剩余时间产能。
+     * 配对侧共用同次分班时取两侧较小剩余额度，禁止临时结果再次取得完整残班产能。
+     *
+     * @param context 当前排程上下文及已提交结果
+     * @param sourceResult 原已提交结果
+     * @param pairedSourceResult 同次分班的配对侧原结果，普通机台为空
+     * @param deltaResult 只承载本次增量的临时结果
+     * @param shifts 完整窗口班次
+     */
+    public static void inheritRemainingCapacity(LhScheduleContext context, LhScheduleResult sourceResult,
+            LhScheduleResult pairedSourceResult, LhScheduleResult deltaResult, List<LhShiftConfigVO> shifts) {
+        deltaResult.setCarryOverSupplyFirstShiftStartTime(null);
+        deltaResult.setCarryOverSupplyFirstShiftQtyLimit(null);
+        CxEmbryoLhTime source = resolveSource(context, sourceResult);
+        for (LhShiftConfigVO shift : shifts) {
+            if (!isSupplyFirstShift(context, source, shift)) {
+                continue;
+            }
+            int remaining = resolveRemainingCapacity(context, sourceResult, shift);
+            if (Objects.nonNull(pairedSourceResult)) {
+                remaining = Math.min(remaining, resolveRemainingCapacity(context, pairedSourceResult, shift));
+            }
+            deltaResult.setCarryOverSupplyFirstShiftStartTime(shift.getShiftStartDateTime());
+            deltaResult.setCarryOverSupplyFirstShiftQtyLimit(remaining);
+            return;
+        }
+    }
+
+    /**
+     * 以原结果的首检和真实起点计算整班合法总量，再扣除原结果已经落地的数量。
+     *
+     * @param context 当前共享额度及数量规则
+     * @param sourceResult 原已提交结果
+     * @param shift 供胚首班
+     * @return 本侧允许追加的非负数量
+     */
+    private static int resolveRemainingCapacity(LhScheduleContext context, LhScheduleResult sourceResult,
+            LhShiftConfigVO shift) {
+        int legalTotal = capTotal(context, resolveSource(context, sourceResult), sourceResult,
+                shift, Integer.MAX_VALUE, 1, false);
+        return Math.max(0, legalTotal - StructureSwitchSchedulingPolicy.quantity(sourceResult, shift.getShiftIndex()));
+    }
+
+    /**
+     * 将临时副本继承的单侧供胚首班额度换算为L/R整机合计，绝对班次坐标保持不变。
+     *
+     * @param groupResult 已复制单侧字段的整机临时结果
+     */
+    public static void scaleCarryOverLimitToWholeMachine(LhScheduleResult groupResult) {
+        Integer remaining = groupResult.getCarryOverSupplyFirstShiftQtyLimit();
+        if (Objects.nonNull(remaining)) {
+            groupResult.setCarryOverSupplyFirstShiftQtyLimit(
+                    (int) Math.min(Integer.MAX_VALUE, (long) remaining * WHOLE_MACHINE_SIDES));
+        }
+    }
+
+    /**
+     * 判断当前班次是否承接了原结果已经消耗后的供胚首班增量上限。
+     *
+     * @param result 当前临时结果
+     * @param shift 当前真实班次
+     * @return 存在同一绝对班次的继承额度时返回true
+     */
+    public static boolean isCarryOverLimited(LhScheduleResult result, LhShiftConfigVO shift) {
+        return Objects.nonNull(result) && Objects.nonNull(shift)
+                && Objects.nonNull(result.getCarryOverSupplyFirstShiftQtyLimit())
+                && Objects.nonNull(result.getCarryOverSupplyFirstShiftStartTime())
+                && Objects.equals(result.getCarryOverSupplyFirstShiftStartTime(), shift.getShiftStartDateTime());
     }
 
     /**
@@ -222,10 +293,11 @@ public final class StructureSwitchFirstShiftQuantityPolicy {
      * @param shift 受限班次
      * @param proposedTotal 当前候选含首检总量
      * @param sides 预演整机倍率，提交后独立行固定为1
+     * @param logAdjustment 是否输出本次实际数量收口日志，剩余产能预计算时关闭
      * @return 当前行或预演单侧可排总量
      */
     private static int capTotal(LhScheduleContext context, CxEmbryoLhTime source, LhScheduleResult result,
-            LhShiftConfigVO shift, int proposedTotal, int sides) {
+            LhShiftConfigVO shift, int proposedTotal, int sides, boolean logAdjustment) {
         Integer limit = resolveLimit(context, source, result.getEmbryoCode(), shift);
         if (!isSupplyFirstShift(context, source, shift)) {
             return proposedTotal;
@@ -236,6 +308,10 @@ public final class StructureSwitchFirstShiftQuantityPolicy {
                 Objects.isNull(result.getMouldQty()) ? 0 : result.getMouldQty());
         int multiple = QUANTITY_POLICY.resolveAllocationMultiple(context, result, mouldQty);
         int total = Math.min(Math.max(0, proposedTotal), available);
+        if (isCarryOverLimited(result, shift)) {
+            // 临时副本只代表增量，原班次已用产能不能因副本数量清零而重新分配。
+            total = Math.min(total, result.getCarryOverSupplyFirstShiftQtyLimit());
+        }
         // 含首检量必须受真实时间上限约束，不能对已经向上补成偶数的数量再次取偶了事。
         Date start = StructureSwitchSchedulingPolicy.later(source.getEarliestLhTime(),
                 ShiftFieldUtil.getShiftStartTime(result, shift.getShiftIndex()));
@@ -258,7 +334,7 @@ public final class StructureSwitchFirstShiftQuantityPolicy {
                     mouldQty, ShiftCapacityResolverUtil.resolveShiftDurationSeconds(shift), seconds, true));
         }
         total -= total % multiple;
-        if (total != proposedTotal) {
+        if (logAdjustment && total != proposedTotal && log.isInfoEnabled()) {
             log.info("结构胎胚首班限量, factoryCode={}, batchNo={}, sourceId={}, structure={}, embryo={}, "
                             + "sku={}, status={}, machine={}, shift={}, supplyTime={}, limit={}, used={}, proposed={}, finalQty={}",
                     context.getFactoryCode(), context.getBatchNo(), source.getId(), result.getStructureName(),

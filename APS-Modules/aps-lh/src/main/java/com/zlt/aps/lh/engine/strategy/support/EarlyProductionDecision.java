@@ -79,6 +79,10 @@ public class EarlyProductionDecision implements Serializable {
     /**
      * 按约定格式生成硫化排程结果备注片段。
      *
+     * <p><b>当前不启用：</b>新增SKU、换活字块两条提前生产链路已不再调用本方法，
+     * 结果表备注不写结构计划机台数文案；方法保留以便后续需要恢复该审计信息时直接复用。
+     * 调用方仍只回写 {@code IS_EARLY_PRODUCTION} 标识。</p>
+     *
      * @return 允许提前生产时返回备注片段；非提前生产或准入失败时返回空字符串
      */
     public String buildRemark() {

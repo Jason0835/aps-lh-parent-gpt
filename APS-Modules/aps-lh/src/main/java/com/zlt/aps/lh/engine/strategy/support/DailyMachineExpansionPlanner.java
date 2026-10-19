@@ -103,7 +103,8 @@ public final class DailyMachineExpansionPlanner {
     public static Set<String> resolveReleasedDemandMachines(LhScheduleContext context,
                                                             SkuScheduleDTO sku,
                                                             LocalDate productionDate) {
-        Set<String> machines = new LinkedHashSet<String>(context.resolveForcedReleasedPhysicalMachineCodes(sku));
+        Set<String> machines = new LinkedHashSet<String>(
+                context.resolveForcedReleasedPhysicalMachineCodes(sku, productionDate));
         if (Objects.nonNull(productionDate)) {
             machines.addAll(context.resolvePreviousAlternateReleasedMachines(sku, productionDate));
         }
@@ -165,6 +166,10 @@ public final class DailyMachineExpansionPlanner {
                                                                LhScheduleContext context,
                                                                SkuScheduleDTO sku,
                                                                LocalDate productionDate) {
+        // 精确历史补侧只使用已落实物理机的另一侧；与指定复用共用完成状态，不被名额复核再次拦截。
+        if (PreviousAlternateTrialSideAdmissionPolicy.canCompleteSpecifiedSide(context, sku)) {
+            return false;
+        }
         Set<String> committedMachines = resolvePreScheduledDemandMachines(context, sku, productionDate);
         if (CollectionUtils.isEmpty(committedMachines)) {
             return false;

@@ -74,13 +74,14 @@ public class SingleControlModeSnapshotInitializer {
     }
 
     /**
-     * 汇总续作和新增SKU，保持原列表顺序并允许同物料多个续作侧共享同一模式键。
+     * 汇总续作、普通新增和历史指定独立需求，保持原列表顺序并共享同一物料状态模式键。
      *
      * @param context 排程上下文
      * @return 本次排程待处理SKU列表
      */
     private List<SkuScheduleDTO> collectScheduleSkus(LhScheduleContext context) {
-        int initialCapacity = context.getContinuousSkuList().size() + context.getNewSpecSkuList().size();
+        int initialCapacity = context.getContinuousSkuList().size() + context.getNewSpecSkuList().size()
+                + context.getPreviousAlternateTrialDemandList().size();
         List<SkuScheduleDTO> result = new ArrayList<SkuScheduleDTO>(Math.max(initialCapacity, 4));
         if (!CollectionUtils.isEmpty(context.getContinuousSkuList())) {
             result.addAll(context.getContinuousSkuList());
@@ -88,6 +89,8 @@ public class SingleControlModeSnapshotInitializer {
         if (!CollectionUtils.isEmpty(context.getNewSpecSkuList())) {
             result.addAll(context.getNewSpecSkuList());
         }
+        // 无窗口日计划的历史指定需求不在普通新增池中，但同样必须在首次扣账前冻结真实数量粒度。
+        result.addAll(context.getPreviousAlternateTrialDemandList());
         return result;
     }
 

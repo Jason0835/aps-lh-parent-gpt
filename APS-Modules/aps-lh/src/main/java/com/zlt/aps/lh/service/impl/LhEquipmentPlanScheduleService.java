@@ -560,7 +560,9 @@ public class LhEquipmentPlanScheduleService {
     }
 
     /**
-     * 后置回裁完成后，按正式排量同一维护容量窗口核对受影响班次；不通过修改已扣账数量掩盖穿透。
+     * 后置回裁完成后，按正式排量同一维护容量窗口审计受影响班次。
+     * <p>本方法只做只读核对并输出告警日志：命中穿透截止、首检时间不一致或班次容量超限时
+     * 不再抛出异常中止保存，也不登记未支持组合、不改写已扣账数量，便于先观察真实数据分布。</p>
      * @param context 最终上下文
      * @param timeline 仍有效的安排
      */
@@ -575,18 +577,37 @@ public class LhEquipmentPlanScheduleService {
             Date lastEnd = ShiftFieldUtil.getShiftEndTime(result, ShiftFieldUtil.resolveLastPlannedShiftIndex(result));
             if (arrangement.constrainsSourceResult(result) && Objects.nonNull(lastEnd)
                     && lastEnd.after(timeline.getMaintenanceStartTime())) {
-                throw new IllegalStateException("原生产结果在设备安排接受后穿透维护截止：" + result.getLhMachineCode());
+                log.warn("原生产结果在设备安排接受后穿透维护截止, 批次: {}, 工厂: {}, 物理机台: {}, 机台: {}, 物料: {}, "
+                                + "产品状态: {}, 排程类型: {}, 计划主键: {}, 最后班次结束: {}, 保养开始: {}, 强制下机: {}",
+                        context.getBatchNo(), context.getFactoryCode(), timeline.getPhysicalMachineCode(),
+                        result.getLhMachineCode(), result.getMaterialCode(), result.getProductStatus(),
+                        result.getScheduleType(), timeline.getPrecisionPlanId(),
+                        LhScheduleTimeUtil.formatDateTime(lastEnd),
+                        LhScheduleTimeUtil.formatDateTime(timeline.getMaintenanceStartTime()), timeline.isForceDown());
             }
             SkuScheduleDTO sku = context.getScheduleResultSourceSkuMap().get(result);
             FirstInspectionAllocationPlan inspection = context.getFirstInspectionResultPlanMap().get(result);
             if (Objects.nonNull(inspection) && Objects.equals(timeline.getPrecisionPlanId(), inspection.getEquipmentPlanId())
                     && (!Objects.equals(timeline.getInspectionStartTime(), inspection.getInspectionStartTime())
                     || !Objects.equals(timeline.getProductionResumeTime(), inspection.getInspectionEndTime()))) {
-                throw new IllegalStateException("精度公共首检与最终有效安排时间不一致：" + result.getLhMachineCode());
+                log.warn("精度公共首检与最终有效安排时间不一致, 批次: {}, 机台: {}, 物料: {}, 计划主键: {}, "
+                                + "首检开始: {}, 首检结束: {}, 安排首检开始: {}, 安排恢复生产: {}",
+                        context.getBatchNo(), result.getLhMachineCode(), result.getMaterialCode(),
+                        timeline.getPrecisionPlanId(),
+                        LhScheduleTimeUtil.formatDateTime(inspection.getInspectionStartTime()),
+                        LhScheduleTimeUtil.formatDateTime(inspection.getInspectionEndTime()),
+                        LhScheduleTimeUtil.formatDateTime(timeline.getInspectionStartTime()),
+                        LhScheduleTimeUtil.formatDateTime(timeline.getProductionResumeTime()));
             }
             Map<Integer, Integer> inspectionQuantities = Objects.nonNull(inspection)
                     && Objects.equals(timeline.getPrecisionPlanId(), inspection.getEquipmentPlanId())
                     ? FirstInspectionAllocationUtil.toShiftQtyMap(inspection) : java.util.Collections.emptyMap();
+            if (Objects.isNull(machine)) {
+                log.warn("精度最终容量审计缺少运行态机台, 批次: {}, 物理机台: {}, 机台: {}, 物料: {}",
+                        context.getBatchNo(), timeline.getPhysicalMachineCode(), result.getLhMachineCode(),
+                        result.getMaterialCode());
+                continue;
+            }
             List<MachineMaintenanceWindowDTO> windows = ShiftCapacityResolverUtil.resolveCapacityMaintenanceWindowList(
                     context, context.getDevicePlanShutList(), machine.getMachineCode(), machine.getMaintenanceWindowList());
             for (LhShiftConfigVO shift : context.getScheduleWindowShifts()) {
@@ -598,7 +619,10 @@ public class LhEquipmentPlanScheduleService {
                     continue;
                 }
                 if (Objects.isNull(sku)) {
-                    throw new IllegalStateException("精度最终容量校验缺少结果来源SKU：" + result.getLhMachineCode());
+                    log.warn("精度最终容量审计缺少结果来源SKU, 批次: {}, 机台: {}, 物料: {}, 班次: {}, 计划量: {}",
+                            context.getBatchNo(), result.getLhMachineCode(), result.getMaterialCode(),
+                            shift.getShiftIndex(), quantity);
+                    continue;
                 }
                 int baseCapacity = ShiftCapacityResolverUtil.resolveActualShiftPlanQty(
                         ShiftCapacityResolverUtil.resolveRuntimeShiftCapacity(context, machine, sku.getShiftCapacity()),
@@ -613,11 +637,11 @@ public class LhEquipmentPlanScheduleService {
                         context.getParamIntValue(LhScheduleParamConstant.PLANNED_REPAIR_FIXED_QTY, LhScheduleConstant.PLANNED_REPAIR_FIXED_QTY));
                 int inspectionQty = inspectionQuantities.getOrDefault(shift.getShiftIndex(), 0);
                 if (quantity > normalCapacity + inspectionQty) {
-                    String reason = "精度最终班次容量不一致，物料=" + result.getMaterialCode()
-                            + "，机台=" + machine.getMachineCode() + "，班次=" + shift.getShiftIndex()
-                            + "，实际=" + quantity + "，正常产能=" + normalCapacity + "，已归属首检=" + inspectionQty;
-                    this.recordUnsupported(context, timeline.getPhysicalMachineCode(), reason);
-                    throw new IllegalStateException(reason);
+                    log.warn("精度最终班次容量不一致, 批次: {}, 工厂: {}, 物理机台: {}, 机台: {}, 物料: {}, 产品状态: {}, "
+                                    + "班次: {}, 实际: {}, 正常产能: {}, 已归属首检: {}",
+                            context.getBatchNo(), context.getFactoryCode(), timeline.getPhysicalMachineCode(),
+                            machine.getMachineCode(), result.getMaterialCode(), result.getProductStatus(),
+                            shift.getShiftIndex(), quantity, normalCapacity, inspectionQty);
                 }
             }
         }

@@ -42,7 +42,8 @@ public class HistoricalMouldChangeQuotaService {
     private LhMouldChangePlanEntityMapper lhMouldChangePlanMapper;
 
     /**
-     * 基础数据完成后初始化一次；查询异常直接透传到原加载失败机制。
+     * 基础数据完成后初始化一次，读取独立清洗类型用于历史限额过滤；查询异常直接透传。
+     *
      * @param context 当前排程上下文
      */
     public void initializeSnapshot(LhScheduleContext context) {
@@ -57,7 +58,8 @@ public class HistoricalMouldChangeQuotaService {
                         .select(LhMouldChangePlan::getId, LhMouldChangePlan::getFactoryCode,
                                 LhMouldChangePlan::getLhResultBatchNo, LhMouldChangePlan::getScheduleDate,
                                 LhMouldChangePlan::getPlanDate, LhMouldChangePlan::getClassIndex,
-                                LhMouldChangePlan::getChangeMouldType, LhMouldChangePlan::getAfterMaterialCode,
+                                LhMouldChangePlan::getChangeMouldType, LhMouldChangePlan::getCleanType,
+                                LhMouldChangePlan::getAfterMaterialCode,
                                 LhMouldChangePlan::getLhMachineCode, LhMouldChangePlan::getRemark)
                         .eq(LhMouldChangePlan::getFactoryCode, context.getFactoryCode())
                         .eq(LhMouldChangePlan::getScheduleDate, sourceDate));
@@ -125,7 +127,8 @@ public class HistoricalMouldChangeQuotaService {
     }
 
     /**
-     * 检查可用于上限统计的历史字段及业务范围，不从时间或当前SKU模式猜测班次。
+     * 检查历史字段及业务范围，清洗类型有值的记录不参与上限统计，不推测班次。
+     *
      * @param context 当前上下文，仅用于工厂核对和日志
      * @param plan 历史源记录
      * @param sourceDate 历史保存日
@@ -157,7 +160,9 @@ public class HistoricalMouldChangeQuotaService {
             this.logExcluded(context, plan, "非早中班有效班次编码");
             return false;
         }
-        return !StringUtils.startsWith(plan.getRemark(), OFF_MACHINE_ONLY_PREFIX)
+        // 历史清洗记录可能同时保留01/02动作码，需先排除有清洗类型的整条记录，避免抬高限额。
+        return StringUtils.isBlank(plan.getCleanType())
+                && !StringUtils.startsWith(plan.getRemark(), OFF_MACHINE_ONLY_PREFIX)
                 && MouldChangeTypeEnum.containsAnyCode(plan.getChangeMouldType(),
                         MouldChangeTypeEnum.REGULAR.getCode(), MouldChangeTypeEnum.TYPE_BLOCK.getCode());
     }

@@ -2,8 +2,9 @@
 <configuration scan="true" scanPeriod="60 seconds" debug="false">
     <!-- 日志存放路径 -->
     <property name="log.path" value="logs/aps-lh"/>
-    <!-- 日志输出格式 -->
-    <property name="log.pattern" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{20} - [%method,%line] - %msg%n"/>
+    <!-- 默认不采集每条日志的方法及行号；专项定位时通过lh.log.caller系统属性按需开启。 -->
+    <property name="log.caller" value="${lh.log.caller:--}"/>
+    <property name="log.pattern" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{20} ${log.caller} %msg%n"/>
 
     <!-- 控制台输出 -->
     <appender name="console" class="ch.qos.logback.core.ConsoleAppender">

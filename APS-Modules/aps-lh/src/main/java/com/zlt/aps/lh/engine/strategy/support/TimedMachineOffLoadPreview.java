@@ -33,6 +33,14 @@ public final class TimedMachineOffLoadPreview {
      * 以完整原动作内核复核固定后料，返回合法开始时间。
      */
     private ActionRevalidator actionRevalidator;
+    /**
+     * 在当前时间决定上重验全部固定操作及结构接替证据的隔离内核。
+     */
+    private StructureHandoffRevalidator structureHandoffRevalidator;
+    /**
+     * 动作发生重评后，第二轮不得继续使用主预演的旧结构接替证明。
+     */
+    private boolean structureHandoffsDirty;
 
     /**
      * 时间下机机台自己已被预演计入的动作，判断该机台时扣除，防止日满额自阻塞。
@@ -46,6 +54,10 @@ public final class TimedMachineOffLoadPreview {
      * 物理下机机台、日期到已验证的同结构接替原因。
      */
     private final Map<String, Map<LocalDate, String>> structureHandoffs = new LinkedHashMap<>();
+    /**
+     * 主预演的结构接替候选，只提供隔离试算入口，不能单独授予正式提前释放资格。
+     */
+    private final Map<String, Map<LocalDate, String>> structureHandoffCandidates = new LinkedHashMap<>();
 
     /**
      * 创建独立预演负荷。
@@ -76,6 +88,8 @@ public final class TimedMachineOffLoadPreview {
                         .computeIfAbsent(event.date.toString(), key -> new int[2])[event.slot]++);
         structureHandoffs.forEach((machine, reasons) ->
                 this.structureHandoffs.put(machine, new LinkedHashMap<>(reasons)));
+        structureHandoffs.forEach((machine, reasons) ->
+                this.structureHandoffCandidates.put(machine, new LinkedHashMap<>(reasons)));
     }
 
     /**
@@ -88,7 +102,11 @@ public final class TimedMachineOffLoadPreview {
         events.forEach(event -> copied.events.add(new ChangeoverEvent(event)));
         structureHandoffs.forEach((machine, reasons) ->
                 copied.structureHandoffs.put(machine, new LinkedHashMap<>(reasons)));
+        structureHandoffCandidates.forEach((machine, reasons) ->
+                copied.structureHandoffCandidates.put(machine, new LinkedHashMap<>(reasons)));
         copied.actionRevalidator = actionRevalidator;
+        copied.structureHandoffRevalidator = structureHandoffRevalidator;
+        copied.structureHandoffsDirty = structureHandoffsDirty;
         return copied;
     }
 
@@ -117,6 +135,30 @@ public final class TimedMachineOffLoadPreview {
     }
 
     /**
+     * 读取主预演的结构接替候选原因，仅供第二轮隔离提前释放试算。
+     *
+     * @param machineCodes 同一物理机的运行态编码
+     * @param date 候选提前释放日期
+     * @return 原候选原因，无候选时为空
+     */
+    public String structureHandoffCandidateReason(Collection<String> machineCodes, LocalDate date) {
+        return machineCodes.stream().map(LhSingleControlMachineUtil::resolvePhysicalMachineCode)
+                .map(machine -> structureHandoffCandidates.getOrDefault(machine, Collections.emptyMap()).get(date))
+                .filter(Objects::nonNull).findFirst().orElse(null);
+    }
+
+    /**
+     * 判断主预演是否提供了需要隔离复核的结构接替候选。
+     *
+     * @param machineCodes 同一物理机的运行态编码
+     * @return 存在原候选时为真，不代表当前已满足提前释放条件
+     */
+    public boolean hasStructureHandoffCandidate(Collection<String> machineCodes) {
+        return machineCodes.stream().map(LhSingleControlMachineUtil::resolvePhysicalMachineCode)
+                .anyMatch(machine -> !structureHandoffCandidates.getOrDefault(machine, Collections.emptyMap()).isEmpty());
+    }
+
+    /**
      * 创建可定向重评的完整预演负荷。
      *
      * @param dailyCounts 全部动作次数
@@ -128,6 +170,23 @@ public final class TimedMachineOffLoadPreview {
             Map<String, Map<LocalDate, String>> structureHandoffs, ActionRevalidator actionRevalidator) {
         this(dailyCounts, events, structureHandoffs);
         this.actionRevalidator = Objects.requireNonNull(actionRevalidator, "完整动作重评内核不能为空");
+    }
+
+    /**
+     * 创建支持当前动作负荷与结构接替证据同步复核的独立预演。
+     *
+     * @param dailyCounts 全部已验证动作次数
+     * @param events 固定成功动作
+     * @param structureHandoffs 主预演形成的结构接替证据
+     * @param actionRevalidator 首次交接及固定前缀重评内核
+     * @param structureHandoffRevalidator 全部固定操作及结构接替重评内核
+     */
+    public TimedMachineOffLoadPreview(Map<String, int[]> dailyCounts, List<ChangeoverEvent> events,
+            Map<String, Map<LocalDate, String>> structureHandoffs, ActionRevalidator actionRevalidator,
+            StructureHandoffRevalidator structureHandoffRevalidator) {
+        this(dailyCounts, events, structureHandoffs, actionRevalidator);
+        this.structureHandoffRevalidator = Objects.requireNonNull(
+                structureHandoffRevalidator, "结构接替重评内核不能为空");
     }
 
     /**
@@ -143,6 +202,67 @@ public final class TimedMachineOffLoadPreview {
             OffMachineDecision decision) {
         TimedMachineOffLoadPreview working = this.copyForDecision();
         String movements = working.revalidateOwnActions(context, machineCodes, decision);
+        if (Objects.nonNull(structureHandoffRevalidator)) {
+            working.structureHandoffs.clear();
+            working.structureHandoffsDirty = true;
+        }
+        this.replaceWith(working);
+        return movements;
+    }
+
+    /**
+     * 时间决定改变后，按全部固定成功组合更新负荷和结构接替证据，不重新扫描候选。
+     *
+     * @param context 当前时间下机决定及动态额度上下文
+     * @return 全部固定动作的模拟配额迁移明细，无需重评时为空串
+     */
+    public String refreshStructureHandoffs(LhScheduleContext context) {
+        if (!structureHandoffsDirty) {
+            return "";
+        }
+        TimedMachineOffLoadPreview working = this.copyForDecision();
+        Map<String, int[]> simulatedCounts = working.copyCounts(working.dailyCounts);
+        Map<TimedMachineOffActionPreviewCapture.PreparedAction, ChangeoverEvent> actions = new IdentityHashMap<>();
+        for (ChangeoverEvent event : working.events) {
+            if (Objects.isNull(event.preparedAction)) {
+                continue;
+            }
+            if (Objects.nonNull(actions.put(event.preparedAction, event))) {
+                throw new IllegalStateException("结构接替重评不得重复登记同一固定动作");
+            }
+            if (Objects.nonNull(event.date)) {
+                simulatedCounts.get(event.date.toString())[event.slot]--;
+            }
+        }
+        working.validateNonnegativeCounts(simulatedCounts);
+        StructureHandoffRevalidationResult result = Objects.requireNonNull(
+                structureHandoffRevalidator.revalidate(Collections.unmodifiableList(working.events), simulatedCounts),
+                "结构接替重评必须返回完整动作及结构证据");
+        if (!actions.keySet().equals(result.actionTimes.keySet())
+                || !actions.keySet().equals(result.releaseTimes.keySet())) {
+            throw new IllegalStateException("结构接替重评必须覆盖全部固定换模动作");
+        }
+        Map<ChangeoverEvent, Date> starts = new IdentityHashMap<>();
+        actions.forEach((action, event) -> {
+            Date start = result.actionTimes.get(action);
+            working.validateActionTime(context, start, result.releaseTimes.get(action));
+            starts.put(event, start);
+        });
+        String movements = working.updateActionTimes(context, starts);
+        working.structureHandoffs.clear();
+        result.structureHandoffs.forEach((machine, reasons) ->
+                working.structureHandoffs.put(machine, new LinkedHashMap<>(reasons)));
+        working.structureHandoffsDirty = false;
+        this.replaceWith(working);
+        return movements;
+    }
+
+    /**
+     * 仅在动作、次数及结构证据全部校验成功后替换独立账本。
+     *
+     * @param working 已完成完整校验的工作副本
+     */
+    private void replaceWith(TimedMachineOffLoadPreview working) {
         // 全部返回时刻和预算校验通过后才原子替换；异常不能留下部分前缀迁移。
         dailyCounts.clear();
         dailyCounts.putAll(working.dailyCounts);
@@ -152,7 +272,10 @@ public final class TimedMachineOffLoadPreview {
             events.get(index).date = working.events.get(index).date;
             events.get(index).slot = working.events.get(index).slot;
         }
-        return movements;
+        structureHandoffs.clear();
+        working.structureHandoffs.forEach((machine, reasons) ->
+                structureHandoffs.put(machine, new LinkedHashMap<>(reasons)));
+        structureHandoffsDirty = working.structureHandoffsDirty;
     }
 
     /**
@@ -207,27 +330,43 @@ public final class TimedMachineOffLoadPreview {
                 this.validateActionTime(context, start, result.prefixReleaseTimes.get(action));
                 starts.put(prior, start);
             });
-            // 先整体撤销旧预算再加入真实结果，避免同日互换时出现中间态重复占用。
-            starts.keySet().forEach(changed -> this.changeEventCount(changed, -1));
-            starts.forEach((changed, start) -> {
-                LocalDate date = start == null ? null
-                        : start.toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate();
-                int slot = changed.slot;
-                if (start != null) {
-                    slot = LhScheduleTimeUtil.isMorningShift(context, start) ? 0 : 1;
-                }
-                if (!Objects.equals(changed.date, date) || changed.slot != slot) {
-                    movements.add(changed.physicalMachineCode + "/" + changed.materialCode + "/" + changed.productStatus
-                            + ":" + changed.date + "/" + changed.slot + "->" + date + "/" + slot);
-                }
-                changed.date = date;
-                changed.slot = slot;
-                this.changeEventCount(changed, 1);
-            });
-            this.validateNonnegativeCounts(dailyCounts);
-            this.validateQuotaLimits(context, dailyCounts);
-            ownCounts.values().forEach(this::validateNonnegativeCounts);
+            String updated = this.updateActionTimes(context, starts);
+            if (!updated.isEmpty()) {
+                movements.add(updated);
+            }
         }
+        return String.join(";", movements);
+    }
+
+    /**
+     * 按同一次重评结果整体替换动作时刻及配额，保留其他固定动作和正式基线预算。
+     *
+     * @param context 当前日期的有效换模额度
+     * @param starts 本次完整重评的动作及合法开始时刻，失败为空
+     * @return 发生变化的动作日期及班次明细
+     */
+    private String updateActionTimes(LhScheduleContext context, Map<ChangeoverEvent, Date> starts) {
+        List<String> movements = new ArrayList<>();
+        // 先整体撤销旧预算再加入真实结果，避免同日互换时出现中间态重复占用。
+        starts.keySet().forEach(changed -> this.changeEventCount(changed, -1));
+        starts.forEach((changed, start) -> {
+            LocalDate date = start == null ? null
+                    : start.toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate();
+            int slot = changed.slot;
+            if (start != null) {
+                slot = LhScheduleTimeUtil.isMorningShift(context, start) ? 0 : 1;
+            }
+            if (!Objects.equals(changed.date, date) || changed.slot != slot) {
+                movements.add(changed.physicalMachineCode + "/" + changed.materialCode + "/" + changed.productStatus
+                        + ":" + changed.date + "/" + changed.slot + "->" + date + "/" + slot);
+            }
+            changed.date = date;
+            changed.slot = slot;
+            this.changeEventCount(changed, 1);
+        });
+        this.validateNonnegativeCounts(dailyCounts);
+        this.validateQuotaLimits(context, dailyCounts);
+        ownCounts.values().forEach(this::validateNonnegativeCounts);
         return String.join(";", movements);
     }
 
@@ -306,8 +445,8 @@ public final class TimedMachineOffLoadPreview {
                 Map<TimedMachineOffActionPreviewCapture.PreparedAction, Date> prefixActionTimes,
                 Map<TimedMachineOffActionPreviewCapture.PreparedAction, Date> prefixReleaseTimes) {
             this.targetActionTime = targetActionTime == null ? null : new Date(targetActionTime.getTime());
-            this.prefixActionTimes = this.copyTimes(prefixActionTimes);
-            this.prefixReleaseTimes = this.copyTimes(prefixReleaseTimes);
+            this.prefixActionTimes = TimedMachineOffLoadPreview.copyActionTimes(prefixActionTimes);
+            this.prefixReleaseTimes = TimedMachineOffLoadPreview.copyActionTimes(prefixReleaseTimes);
         }
 
         /**
@@ -335,7 +474,7 @@ public final class TimedMachineOffLoadPreview {
          * @return 按原组合身份关联的动作时刻
          */
         public Map<TimedMachineOffActionPreviewCapture.PreparedAction, Date> getPrefixActionTimes() {
-            return this.copyTimes(prefixActionTimes);
+            return TimedMachineOffLoadPreview.copyActionTimes(prefixActionTimes);
         }
 
         /**
@@ -344,20 +483,7 @@ public final class TimedMachineOffLoadPreview {
          * @return 按原组合身份关联的释放时刻
          */
         public Map<TimedMachineOffActionPreviewCapture.PreparedAction, Date> getPrefixReleaseTimes() {
-            return this.copyTimes(prefixReleaseTimes);
-        }
-
-        /**
-         * 保留身份键并复制可变日期，失败动作的空值必须保留。
-         *
-         * @param source 原结果映射
-         * @return 不与原映射共享日期的身份映射
-         */
-        private Map<TimedMachineOffActionPreviewCapture.PreparedAction, Date> copyTimes(
-                Map<TimedMachineOffActionPreviewCapture.PreparedAction, Date> source) {
-            Map<TimedMachineOffActionPreviewCapture.PreparedAction, Date> copied = new IdentityHashMap<>();
-            source.forEach((action, time) -> copied.put(action, time == null ? null : new Date(time.getTime())));
-            return copied;
+            return TimedMachineOffLoadPreview.copyActionTimes(prefixReleaseTimes);
         }
     }
 
@@ -375,6 +501,75 @@ public final class TimedMachineOffLoadPreview {
          * @return 目标与全部已重评前缀的显式结果，准入失败以对应空时间表示
          */
         ActionRevalidationResult revalidate(ChangeoverEvent event, Date release, Map<String, int[]> simulatedCounts);
+    }
+
+    /**
+     * 全部固定操作重放契约，动作配额与结构证明必须来自同一隔离状态。
+     *
+     * @author APS
+     * @date 2026/10/18
+     */
+    @FunctionalInterface
+    public interface StructureHandoffRevalidator {
+        /**
+         * 根据当前已确认的时间下机决定重放全部固定成功操作。
+         *
+         * @param events 当前动作及基线事件
+         * @param simulatedCounts 已扣除全部待重放动作预算的独立计数
+         * @return 全部动作事实及重新验证的结构接替证明
+         */
+        StructureHandoffRevalidationResult revalidate(List<ChangeoverEvent> events, Map<String, int[]> simulatedCounts);
+    }
+
+    /**
+     * 同一次完整重放产生的动作、真实释放和结构接替证据。
+     *
+     * @author APS
+     * @date 2026/10/18
+     */
+    public static final class StructureHandoffRevalidationResult {
+        /**
+         * 固定动作合法开始时间，失败动作保留空值。
+         */
+        private final Map<TimedMachineOffActionPreviewCapture.PreparedAction, Date> actionTimes;
+        /**
+         * 同一固定动作的本次真实可交接时刻。
+         */
+        private final Map<TimedMachineOffActionPreviewCapture.PreparedAction, Date> releaseTimes;
+        /**
+         * 本次重放中仍有正量接替及结构满额依据的证明。
+         */
+        private final Map<String, Map<LocalDate, String>> structureHandoffs = new LinkedHashMap<>();
+
+        /**
+         * 复制动作时间和结构证明，避免隔离上下文回滚后改写返回事实。
+         *
+         * @param actionTimes 全部固定换模动作的成功或失败时间
+         * @param releaseTimes 对应动作本次使用的真实可交接时刻
+         * @param structureHandoffs 重新核实的结构接替证明
+         */
+        public StructureHandoffRevalidationResult(
+                Map<TimedMachineOffActionPreviewCapture.PreparedAction, Date> actionTimes,
+                Map<TimedMachineOffActionPreviewCapture.PreparedAction, Date> releaseTimes,
+                Map<String, Map<LocalDate, String>> structureHandoffs) {
+            this.actionTimes = TimedMachineOffLoadPreview.copyActionTimes(actionTimes);
+            this.releaseTimes = TimedMachineOffLoadPreview.copyActionTimes(releaseTimes);
+            structureHandoffs.forEach((machine, reasons) ->
+                    this.structureHandoffs.put(machine, new LinkedHashMap<>(reasons)));
+        }
+    }
+
+    /**
+     * 保留固定操作身份并复制可变日期，失败动作的空值必须保留。
+     *
+     * @param source 原动作事实映射
+     * @return 不与原映射共享日期的身份映射
+     */
+    private static Map<TimedMachineOffActionPreviewCapture.PreparedAction, Date> copyActionTimes(
+            Map<TimedMachineOffActionPreviewCapture.PreparedAction, Date> source) {
+        Map<TimedMachineOffActionPreviewCapture.PreparedAction, Date> copied = new IdentityHashMap<>();
+        source.forEach((action, time) -> copied.put(action, time == null ? null : new Date(time.getTime())));
+        return copied;
     }
 
     /**

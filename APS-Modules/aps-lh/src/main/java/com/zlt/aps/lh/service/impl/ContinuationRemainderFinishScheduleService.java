@@ -212,7 +212,8 @@ public class ContinuationRemainderFinishScheduleService {
     /**
      * 计算整窗实际排量，先保留目标日前的连续生产前缀，再对目标日剩余量执行节点规则。
      * 前日19:00释放会撤回该台前缀的尾量，并归还本次统一余量，不能重复计量。
-     * @param machines 已按场景角色排序的物理机台画像：T日大余量及多机阶段式收尾按保留顺序
+     *
+     * @param machines 已排序的物理机台画像：T日双机2.2按下机顺序，跨日3.2及多机大余量按保留顺序
      * @param shifts 真实排程班次
      * @param remainQty 本组整窗尚可消费的余量，不含其他固定结果
      * @param shiftQty SKU标准单台班产，用于业务阈值；实际分配采用逐机真实容量
@@ -313,7 +314,8 @@ public class ContinuationRemainderFinishScheduleService {
             plan.setTDayFinishConstraint(tDayConstraints.get(position));
             plan.setFinishRoleMachineCode(LhSingleControlMachineUtil.resolvePhysicalMachineCode(
                     machines.get(position).getOriginals().get(0).getLhMachineCode()));
-            plan.setFinishRule(remainQty <= shiftQty ? "T日06点节点释放" : "T日19点节点释放");
+            plan.setFinishRule(remainQty <= shiftQty ? ContinuationTDayFinishConstraint.MORNING_RULE_NAME
+                    : ContinuationTDayFinishConstraint.AFTERNOON_RULE_NAME);
         }
         this.applyFinishStates(machines, windowEnd, calculated, limits, null);
         return calculated;

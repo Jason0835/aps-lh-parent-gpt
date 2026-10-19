@@ -431,6 +431,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         setExportTitleFieldName(tableMap);
         if (CollectionUtils.isNotEmpty(list)) {
             List<LhMouldChangePlanVo> exportList = this.buildLhMouldChangePlanVoList(list, queryVO);
+            lhMouldChangePlanService.applyTimedOffShiftStartRemark(list, exportList);
             // listExportData 已完成默认全量排序，模板组装阶段直接复用该顺序，避免重复查询计划量。
             excelDataList.add(buildExportDataList(exportList, queryVO, previousDayPlanKeySet, true));
         }

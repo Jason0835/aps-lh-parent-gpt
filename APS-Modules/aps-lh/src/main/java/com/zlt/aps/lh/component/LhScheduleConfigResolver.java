@@ -59,7 +59,10 @@ public class LhScheduleConfigResolver {
                         .eq(LhParams::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
         if (paramsList != null) {
             for (LhParams param : paramsList) {
-                if (StringUtils.isNotEmpty(param.getParamCode()) && StringUtils.isNotEmpty(param.getParamValue())) {
+                // 新首班参数必须保留明确空值，不能与“尚未配置、使用默认10条”混为一谈。
+                if (StringUtils.isNotEmpty(param.getParamCode())
+                        && (StringUtils.isNotEmpty(param.getParamValue())
+                        || LhScheduleParamConstant.FIRST_SHIFT_PLAN_QTY_LIMIT.equals(param.getParamCode()))) {
                     lhParamsMap.put(param.getParamCode(), param.getParamValue());
                 }
             }
@@ -77,6 +80,12 @@ public class LhScheduleConfigResolver {
      */
     private LhScheduleConfig buildConfig(Map<String, String> lhParamsMap) {
         Map<String, String> resolvedParamMap = new HashMap<>(DEFAULT_PARAM_CAPACITY);
+
+        // 只传递本批已加载值，不使用通用空值回退；其他参数继续沿用原解析规则。
+        if (lhParamsMap.containsKey(LhScheduleParamConstant.FIRST_SHIFT_PLAN_QTY_LIMIT)) {
+            resolvedParamMap.put(LhScheduleParamConstant.FIRST_SHIFT_PLAN_QTY_LIMIT,
+                    lhParamsMap.get(LhScheduleParamConstant.FIRST_SHIFT_PLAN_QTY_LIMIT));
+        }
 
         // 班次与时间窗口参数
         putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.NIGHT_START_HOUR, LhScheduleConstant.NIGHT_SHIFT_START_HOUR);
@@ -129,6 +138,7 @@ public class LhScheduleConfigResolver {
                 LhScheduleConstant.DEFAULT_ENDING_TIME_TOLERANCE_MINUTES);
 
         // 清洗与保养参数
+        this.putCleaningOnlineMouldCheckEnabled(resolvedParamMap, lhParamsMap);
         putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.DRY_ICE_WARNING_DAYS,
                 LhScheduleConstant.DRY_ICE_WARNING_DAYS, 0);
         putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.DRY_ICE_ADVANCE_DAYS,
@@ -305,6 +315,26 @@ public class LhScheduleConfigResolver {
         putTrialMassTrialSchedulingEnabled(resolvedParamMap, lhParamsMap);
 
         return new LhScheduleConfig(resolvedParamMap);
+    }
+
+    /**
+     * 将清洗模具校验开关解析为本批次固定快照，缺省或非法值使用默认关闭。
+     *
+     * @param resolvedParamMap 已解析参数快照
+     * @param lhParamsMap 当前工厂的原始硫化参数
+     */
+    private void putCleaningOnlineMouldCheckEnabled(Map<String, String> resolvedParamMap,
+            Map<String, String> lhParamsMap) {
+        String paramCode = LhScheduleParamConstant.CLEANING_ONLINE_MOULD_CHECK_ENABLED;
+        String value = StringUtils.trim(lhParamsMap.get(paramCode));
+        if (!StringUtils.equals("0", value) && !StringUtils.equals("1", value)) {
+            if (StringUtils.isNotBlank(value)) {
+                log.warn("清洗在机模具一致性校验开关非法，使用默认关闭, paramCode={}, value={}", paramCode, value);
+            }
+            value = String.valueOf(LhScheduleConstant.CLEANING_ONLINE_MOULD_CHECK_ENABLED);
+        }
+        resolvedParamMap.put(paramCode, value);
+        log.info("清洗在机模具一致性校验开关快照, paramCode={}, enabled={}", paramCode, value);
     }
 
     /**

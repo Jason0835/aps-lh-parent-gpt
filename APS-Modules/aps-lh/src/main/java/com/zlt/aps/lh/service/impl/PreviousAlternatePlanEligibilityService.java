@@ -254,7 +254,7 @@ public class PreviousAlternatePlanEligibilityService {
                            DailyNewSpecCandidate candidate) {
         SkuScheduleDTO sku = candidate.getSku();
         if (StringUtils.equals(SkuScheduleSourceTypeEnum.PREVIOUS_ALTERNATE_TRIAL.getCode(), sku.getSourceType())) {
-            // 独立承接需求没有月计划目标台数，只允许一台指定物理机消费共享的严格余量。
+            // 独立承接需求只允许一台指定物理机；其有效历史指定侧别分别承接同一共享严格余量。
             candidate.setTargetMachineCount(1);
             candidate.setScheduledMachineCount(DailyMachineExpansionPlanner.countCommittedMachineDemand(
                     context, sku, businessDate));
@@ -272,7 +272,7 @@ public class PreviousAlternatePlanEligibilityService {
         int scheduledMachineCount = DailyMachineExpansionPlanner.countCommittedMachineDemand(
                 context, sku, businessDate);
         Set<String> forcedReleasedMachineCodeSet =
-                context.resolveForcedReleasedPhysicalMachineCodes(sku);
+                context.resolveForcedReleasedPhysicalMachineCodes(sku, businessDate);
         if (!CollectionUtils.isEmpty(forcedReleasedMachineCodeSet)) {
             int activeMachineCount = context.getSkuScheduledMachineCountExcluding(
                     businessDate, sku.getMaterialCode(), sku.getProductStatus(),

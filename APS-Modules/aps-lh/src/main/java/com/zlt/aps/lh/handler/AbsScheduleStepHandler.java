@@ -14,7 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 public abstract class AbsScheduleStepHandler {
 
     /**
-     * 执行步骤处理
+     * 执行步骤处理，并在阶段结束后输出已形成的结构配额快照和耗时。
      *
      * @param context 排程上下文
      */
@@ -47,6 +47,10 @@ public abstract class AbsScheduleStepHandler {
             log.error("[{}] 执行异常", getStepName(), e);
             context.interruptSchedule(getStepName() + "执行异常: " + e.getMessage());
         } finally {
+            // 只在阶段末读取已形成的索引；回滚内部不再逐机打印，不重新计算或改变配额状态。
+            if (!context.isInterrupted() && context.getStructureShiftInMachineIndex() != null) {
+                context.getStructureShiftInMachineIndex().logExemptionSnapshot(context);
+            }
             long elapsed = System.currentTimeMillis() - startTime;
             log.info("[{}] 执行完成, 耗时: {}ms", getStepName(), elapsed);
         }

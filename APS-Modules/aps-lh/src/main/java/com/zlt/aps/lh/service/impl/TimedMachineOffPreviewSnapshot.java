@@ -1,6 +1,7 @@
 package com.zlt.aps.lh.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import com.zlt.aps.cx.entity.config.CxEmbryoLhTime;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.context.LhScheduleContext;
@@ -12,6 +13,7 @@ import com.zlt.aps.lh.engine.strategy.support.TimedMachineOffRequest;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Date;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
@@ -20,7 +22,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/** 时间下机整批预演快照；通用候选快照之外补齐续作提交和历史事件的可变状态。 */
+/**
+ * 时间下机阶段快照，在通用候选快照之外保存续作提交、历史事件及喷砂联合作用域。
+ *
+ * @author APS
+ * @date 2026/10/18
+ */
 final class TimedMachineOffPreviewSnapshot {
     /** 通用数量、模具、首检、机台及结果快照，只在整批预演开始时捕获一次。 */
     private final ScheduleSubstitutionAttemptSnapshot resources;
@@ -53,8 +60,29 @@ final class TimedMachineOffPreviewSnapshot {
     private final Map<ActiveMachineBinding, ActiveMachineBinding> bindingStates = new IdentityHashMap<>();
     /** 模拟候选的告警不能出现在正式批次。 */
     private final List<String> warnings;
+    /**
+     * 结构切换候选冻结归属与阶段一并恢复，不能残留失败联合尝试新增的候选。
+     */
+    private final Map<String, SkuScheduleDTO> structureSwitchCandidates;
+    /**
+     * 结构切换候选来源与候选身份同时恢复。
+     */
+    private final Map<String, CxEmbryoLhTime> structureSwitchSources;
+    /**
+     * 喷砂联合尝试作用域与已兑现节点随整阶段回滚，普通请求不继承候选豁免。
+     */
+    private final Map<String, Date> cleaningCandidates;
+    /**
+     * 已确认喷砂接管节点的独立副本。
+     */
+    private final Map<String, Date> cleaningConfirmed;
 
-    /** @param context 待预演上下文 @param sources 全部可能被预演消费的来源SKU */
+    /**
+     * 捕获整个时间下机及历史承接阶段可能修改的状态，保留原结果和来源对象身份。
+     *
+     * @param context 待预演或联合尝试的上下文
+     * @param sources 全部可能被阶段消费的来源SKU
+     */
     TimedMachineOffPreviewSnapshot(LhScheduleContext context, Collection<SkuScheduleDTO> sources) {
         resources = ScheduleSubstitutionAttemptSnapshot.capture(context, sources);
         events = new LinkedHashMap<>(context.getPreviousAlternateReleaseEventMap());
@@ -83,9 +111,17 @@ final class TimedMachineOffPreviewSnapshot {
         endingResults.addAll(context.getContinuationSurplusEndingAllocatedResults());
         context.getPreScheduledMachineBindingList().forEach(binding -> bindingStates.put(binding, this.copyBinding(binding)));
         warnings = new ArrayList<>(context.getWarningMessageList());
+        structureSwitchCandidates = new LinkedHashMap<>(context.getStructureSwitchCandidateSkuMap());
+        structureSwitchSources = new LinkedHashMap<>(context.getStructureSwitchCandidateSourceMap());
+        cleaningCandidates = new LinkedHashMap<>(context.getTimedMachineOffCleaningCandidateMap());
+        cleaningConfirmed = new LinkedHashMap<>(context.getTimedMachineOffCleaningConfirmedMap());
     }
 
-    /** @param context 模拟上下文，正常结束和异常退出均完整恢复 */
+    /**
+     * 完整恢复阶段状态，用于预演结束、业务未兑现及异常退出。
+     *
+     * @param context 需要恢复的阶段上下文
+     */
     void restore(LhScheduleContext context) {
         eventStates.forEach((event, state) -> BeanUtil.copyProperties(state, event));
         bindingStates.forEach((binding, state) -> BeanUtil.copyProperties(state, binding));
@@ -112,6 +148,10 @@ final class TimedMachineOffPreviewSnapshot {
         context.setContinuationSurplusEndingAllocatedResults(restoredEndingResults);
         resources.restore(context);
         context.setWarningMessageList(new ArrayList<>(warnings));
+        context.setStructureSwitchCandidateSkuMap(new LinkedHashMap<>(structureSwitchCandidates));
+        context.setStructureSwitchCandidateSourceMap(new LinkedHashMap<>(structureSwitchSources));
+        context.setTimedMachineOffCleaningCandidateMap(new LinkedHashMap<>(cleaningCandidates));
+        context.setTimedMachineOffCleaningConfirmedMap(new LinkedHashMap<>(cleaningConfirmed));
     }
 
     /** @param binding 已有绑定 @return 保留不可变身份并冻结三个可变跨日字段 */

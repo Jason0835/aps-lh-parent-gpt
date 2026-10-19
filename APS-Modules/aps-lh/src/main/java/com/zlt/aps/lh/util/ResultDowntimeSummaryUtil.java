@@ -114,6 +114,48 @@ public final class ResultDowntimeSummaryUtil {
     }
 
     /**
+     * 根据同一来源事件的最终处置更新清洗摘要，移除取消事件遗留的独立清洗原因。
+     * 只修改清洗摘要，不重新分配数量，也不清除维修、普通首检和换模等原因。
+     *
+     * @param result 当前机台排程结果
+     * @param effectiveWindows 仍在机执行的独立清洗窗口
+     * @param cancelledWindows 已取消的来源清洗窗口
+     * @param shifts 当前排程窗口班次
+     */
+    public static void refreshCancelledCleaningSummary(LhScheduleResult result,
+            List<MachineCleaningWindowDTO> effectiveWindows,
+            List<MachineCleaningWindowDTO> cancelledWindows, List<LhShiftConfigVO> shifts) {
+        result.setCleaningStartTime(null);
+        result.setCleaningEndTime(null);
+        fillCleaningSummary(result, effectiveWindows);
+        for (MachineCleaningWindowDTO cancelled : cancelledWindows) {
+            for (LhShiftConfigVO shift : shifts) {
+                if (!MachineCleaningOverlapUtil.isOverlap(cancelled,
+                        shift.getShiftStartDateTime(), shift.getShiftEndDateTime())
+                        && !(MachineCleaningOverlapUtil.isSandBlastCleaning(cancelled)
+                        && Objects.equals(cancelled.getSandBlastInspectionShiftStartTime(), shift.getShiftStartDateTime()))) {
+                    continue;
+                }
+                // 同班仍有相同类型的独立清洗时，不能把另一个来源事件的有效原因清掉。
+                boolean retained = effectiveWindows.stream()
+                        .filter(window -> Objects.equals(window.getCleanType(), cancelled.getCleanType()))
+                        .anyMatch(window -> MachineCleaningOverlapUtil.isOverlap(window,
+                                shift.getShiftStartDateTime(), shift.getShiftEndDateTime()));
+                if (retained) {
+                    continue;
+                }
+                ShiftFieldUtil.removeShiftAnalysis(result, shift.getShiftIndex(),
+                        resolveStandaloneCleaningAnalysis(cancelled));
+                if (MachineCleaningOverlapUtil.isSandBlastCleaning(cancelled)) {
+                    ShiftFieldUtil.removeShiftAnalysis(result, shift.getShiftIndex(), "喷砂清洗首检");
+                    ShiftFieldUtil.removeShiftAnalysis(result, shift.getShiftIndex(), SAND_BLAST_PRECISION_ANALYSIS);
+                    ShiftFieldUtil.removeShiftAnalysis(result, shift.getShiftIndex(), SAND_BLAST_SHUTDOWN_ANALYSIS);
+                }
+            }
+        }
+    }
+
+    /**
      * 清除单条结果上的精度保养摘要和固定班次原因。
      * <p>最终结果绑定前先清理同机台所有结果，再仅对唯一目标结果重新绑定，保证“精度计划”及
      * “换模+精度计划”不会因中间态重算、结果复制或无后续 SKU 回退而重复落到多条结果；

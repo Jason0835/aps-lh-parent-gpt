@@ -139,6 +139,8 @@ public class SpecifiedMachineProductionService {
 
     /**
      * 声明指定组合占用的物理资源，不执行尺寸匹配、优先级比较或机台选择。
+     * 独立历史试制量试只有两侧有效关系齐备时才声明整机，单侧指令保持原范围。
+     *
      * @param context 排程上下文
      * @param machine 已明确的机台
      * @param sku 已具备本次资格的物料
@@ -151,7 +153,7 @@ public class SpecifiedMachineProductionService {
         }
         boolean wholeMachine = LhSingleControlMachineUtil.isConfiguredSingleControlMachine(
                 context, machine.getMachineCode())
-                && LhSingleControlMachineUtil.isWholeMachineGranularitySku(context, sku);
+                && LhSingleControlMachineUtil.isWholeMachineGranularitySku(context, sku, machine.getMachineCode());
         if (!wholeMachine) {
             return MachineSkuMatchResult.matched(machine, sku,
                     Collections.singletonList(machine.getMachineCode()), null, null);

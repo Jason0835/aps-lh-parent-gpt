@@ -80,6 +80,10 @@ final class ScheduleSubstitutionAttemptSnapshot {
     private Map<LhScheduleResult, StructureSwitchPlan> structureSwitchResultPlanMap;
     /** 首检保护关系随候选结果一起回滚，不能污染后续重试。 */
     private Map<LhScheduleResult, FirstInspectionAllocationPlan> firstInspectionResultPlanMap;
+    /**
+     * 实际整机成对提交关系与结果身份一起恢复，失败候选及预演不能残留计数合并依据。
+     */
+    private Map<LhScheduleResult, LhScheduleResult> committedWholeSingleControlPairMap;
 
     /** 置换前排程结果对象顺序 */
     private List<LhScheduleResult> scheduleResultList;
@@ -111,6 +115,26 @@ final class ScheduleSubstitutionAttemptSnapshot {
     private Map<String, Integer> embryoStockSkuQuotaMap;
     /** 置换前按胎胚库存硬收口的 SKU 集合 */
     private Set<String> embryoStockHardTargetMaterialSet;
+    /**
+     * 候选试排前已成立的共用胎胚收尾身份。
+     */
+    private Map<String, String> sharedEmbryoStockEndingIdentityMap;
+    /**
+     * 候选试排前的共用胎胚首次额度。
+     */
+    private Map<String, Integer> sharedEmbryoStockEndingInitialQuotaMap;
+    /**
+     * 候选试排前的共用胎胚实际消费量。
+     */
+    private Map<String, Integer> sharedEmbryoStockEndingConsumedQtyMap;
+    /**
+     * 试排前独立胎胚收尾的逐机任务量。
+     */
+    private Map<LhScheduleResult, Integer> sharedEmbryoStockEndingMachineQuotaMap;
+    /**
+     * 试排前独立胎胚收尾的逐机释放时间。
+     */
+    private Map<LhScheduleResult, Date> sharedEmbryoStockEndingMachineReleaseMap;
     /** 置换前满足降模条件的 SKU 集合 */
     private Set<String> skuDecrementKeySet;
     /** 置换前已执行降模处理的 SKU 集合 */
@@ -246,6 +270,10 @@ final class ScheduleSubstitutionAttemptSnapshot {
     private Map<SkuScheduleDTO, Date> previousAlternateCandidateAvailableTimeMap;
     /** 正式交替结果标记，避免失败结果残留影响同料计划生成。 */
     private Map<LhScheduleResult, LhMouldChangePlan> previousAlternateResultPlanMap;
+    /**
+     * 成对承接的前料展示来源快照，恢复时保持原结果对象身份且不残留预演关联。
+     */
+    private Map<LhScheduleResult, LhMouldChangePlan> previousAlternateBeforeMaterialSourceMap;
     /** 历史指定增机值对象不可变，复制映射即可恢复失败尝试及整批预演。 */
     private Map<String, PreviousAlternateAdditionalMachineDemand>
             previousAlternateAdditionalMachineDemandMap;
@@ -289,6 +317,8 @@ final class ScheduleSubstitutionAttemptSnapshot {
         snapshot.previousAlternateReleasedSkuKeyMap = new LinkedHashMap<>(context.getPreviousAlternateReleasedSkuKeyMap());
         snapshot.previousAlternateCandidateAvailableTimeMap = new IdentityHashMap<>(context.getPreviousAlternateCandidateAvailableTimeMap());
         snapshot.previousAlternateResultPlanMap = new IdentityHashMap<>(context.getPreviousAlternateResultPlanMap());
+        snapshot.previousAlternateBeforeMaterialSourceMap =
+                new IdentityHashMap<>(context.getPreviousAlternateBeforeMaterialSourceMap());
         snapshot.previousAlternateAdditionalMachineDemandMap =
                 new LinkedHashMap<>(context.getPreviousAlternateAdditionalMachineDemandMap());
         snapshot.continuationFinishSnapshots = copyContinuationFinishSnapshots(context.getContinuationSurplusEndingSnapshotMap());
@@ -299,6 +329,7 @@ final class ScheduleSubstitutionAttemptSnapshot {
         snapshot.structureSwitchRuntimeMap = new LinkedHashMap<>(context.getStructureSwitchRuntimeMap());
         snapshot.structureSwitchResultPlanMap = new IdentityHashMap<>(context.getStructureSwitchResultPlanMap());
         snapshot.firstInspectionResultPlanMap = new IdentityHashMap<>(context.getFirstInspectionResultPlanMap());
+        snapshot.committedWholeSingleControlPairMap = new IdentityHashMap<>(context.getCommittedWholeSingleControlPairMap());
         snapshot.scheduleResultList = new ArrayList<LhScheduleResult>(context.getScheduleResultList());
         snapshot.scheduleResultStateMap = new IdentityHashMap<LhScheduleResult, LhScheduleResult>(
                 Math.max(16, context.getScheduleResultList().size() * 2));
@@ -337,6 +368,16 @@ final class ScheduleSubstitutionAttemptSnapshot {
                 new LinkedHashMap<String, Integer>(context.getEmbryoStockSkuQuotaMap());
         snapshot.embryoStockHardTargetMaterialSet =
                 new LinkedHashSet<String>(context.getEmbryoStockHardTargetMaterialSet());
+        snapshot.sharedEmbryoStockEndingIdentityMap =
+                new LinkedHashMap<>(context.getSharedEmbryoStockEndingIdentityMap());
+        snapshot.sharedEmbryoStockEndingInitialQuotaMap =
+                new LinkedHashMap<>(context.getSharedEmbryoStockEndingInitialQuotaMap());
+        snapshot.sharedEmbryoStockEndingConsumedQtyMap =
+                new LinkedHashMap<>(context.getSharedEmbryoStockEndingConsumedQtyMap());
+        snapshot.sharedEmbryoStockEndingMachineQuotaMap =
+                new IdentityHashMap<>(context.getSharedEmbryoStockEndingMachineQuotaMap());
+        snapshot.sharedEmbryoStockEndingMachineReleaseMap =
+                new IdentityHashMap<>(context.getSharedEmbryoStockEndingMachineReleaseMap());
         snapshot.skuDecrementKeySet =
                 new LinkedHashSet<String>(context.getSkuDecrementKeySet());
         snapshot.decrementHandledSkuKeySet =
@@ -564,6 +605,7 @@ final class ScheduleSubstitutionAttemptSnapshot {
         context.setScheduleResultList(new ArrayList<LhScheduleResult>(scheduleResultList));
         context.setScheduleResultSourceSkuMap(
                 new IdentityHashMap<LhScheduleResult, SkuScheduleDTO>(scheduleResultSourceSkuMap));
+        context.setCommittedWholeSingleControlPairMap(new IdentityHashMap<>(committedWholeSingleControlPairMap));
         context.setMachineAssignmentMap(copyResultListMap(machineAssignmentMap));
         restoreMachineScheduleMap(context);
         context.setMachineShiftCapacityMap(copyIntArrayMap(machineShiftCapacityMap));
@@ -587,6 +629,11 @@ final class ScheduleSubstitutionAttemptSnapshot {
                 new LinkedHashMap<String, Integer>(embryoStockSkuQuotaMap));
         context.setEmbryoStockHardTargetMaterialSet(
                 new LinkedHashSet<String>(embryoStockHardTargetMaterialSet));
+        context.setSharedEmbryoStockEndingIdentityMap(new LinkedHashMap<>(sharedEmbryoStockEndingIdentityMap));
+        context.setSharedEmbryoStockEndingInitialQuotaMap(new LinkedHashMap<>(sharedEmbryoStockEndingInitialQuotaMap));
+        context.setSharedEmbryoStockEndingConsumedQtyMap(new LinkedHashMap<>(sharedEmbryoStockEndingConsumedQtyMap));
+        context.setSharedEmbryoStockEndingMachineQuotaMap(new IdentityHashMap<>(sharedEmbryoStockEndingMachineQuotaMap));
+        context.setSharedEmbryoStockEndingMachineReleaseMap(new IdentityHashMap<>(sharedEmbryoStockEndingMachineReleaseMap));
         context.setSkuDecrementKeySet(new LinkedHashSet<String>(skuDecrementKeySet));
         context.setDecrementHandledSkuKeySet(
                 new LinkedHashSet<String>(decrementHandledSkuKeySet));
@@ -736,6 +783,8 @@ final class ScheduleSubstitutionAttemptSnapshot {
         context.setPreviousAlternateReleasedSkuKeyMap(new LinkedHashMap<>(previousAlternateReleasedSkuKeyMap));
         context.setPreviousAlternateCandidateAvailableTimeMap(new IdentityHashMap<>(previousAlternateCandidateAvailableTimeMap));
         context.setPreviousAlternateResultPlanMap(new IdentityHashMap<>(previousAlternateResultPlanMap));
+        context.setPreviousAlternateBeforeMaterialSourceMap(
+                new IdentityHashMap<>(previousAlternateBeforeMaterialSourceMap));
         context.setPreviousAlternateAdditionalMachineDemandMap(new LinkedHashMap<>(previousAlternateAdditionalMachineDemandMap));
         context.setContinuationSurplusEndingSnapshotMap(copyContinuationFinishSnapshots(continuationFinishSnapshots));
         context.setMouldResourceContext(MouldResourceContext.from(context));

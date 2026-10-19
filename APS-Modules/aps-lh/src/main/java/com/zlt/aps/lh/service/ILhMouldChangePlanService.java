@@ -19,6 +19,15 @@ public interface ILhMouldChangePlanService extends IDocService<LhMouldChangePlan
     String[] getQueryFormulas();
 
     /**
+     * 根据原始计划匹配班次开始时间，更新按时间下机计划的导出备注。
+     *
+     * @param sourceList 原始模具交替计划，提供工厂、排程日期和计划日期
+     * @param exportList 待回填备注的导出视图列表
+     */
+    void applyTimedOffShiftStartRemark(List<LhMouldChangePlan> sourceList,
+                                       List<LhMouldChangePlanVo> exportList);
+
+    /**
      * 解析模具交替计划最终展示的模具号。
      *
      * <p>方法按计划记录的分厂和排程日期匹配模具号，并将原模具号与匹配结果取并集后回填。</p>

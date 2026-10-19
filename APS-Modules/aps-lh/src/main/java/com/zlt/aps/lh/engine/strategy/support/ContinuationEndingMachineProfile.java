@@ -10,6 +10,7 @@ import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
+import com.zlt.aps.lh.util.CleaningDispositionResolver;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.MachineCleaningOverlapUtil;
@@ -372,6 +373,18 @@ public final class ContinuationEndingMachineProfile {
      * @throws IllegalArgumentException 未提供生产完成或零量可用起点时抛出
      */
     public Date physicalReadyTime(Date completedOrAvailable) {
+        return this.physicalReadyTime(completedOrAvailable, null);
+    }
+
+    /**
+     * 在历史联合尝试的精确正规换模节点检查物理交接，保留其他清洗及全部真实设备占用。
+     *
+     * @param completedOrAvailable 实际生产完成或零量需求日起点
+     * @param changeStart 候选正规换模节点；为空时只认可已提交取消事实
+     * @return 剩余物理占用结束后的可交接时刻
+     * @throws IllegalArgumentException 未提供完成或可用时刻时抛出
+     */
+    public Date physicalReadyTime(Date completedOrAvailable, Date changeStart) {
         if (Objects.isNull(completedOrAvailable)) {
             throw new IllegalArgumentException("时间下机缺少真实完成或零量可用起点");
         }
@@ -386,13 +399,15 @@ public final class ContinuationEndingMachineProfile {
                 MachineScheduleDTO machine = context.getMachineScheduleMap()
                         .get(originals.get(side).getLhMachineCode());
                 available = MachineCleaningOverlapUtil.resolveEarliestAvailableTime(available,
-                        cleaningWindows.get(side),
+                        CleaningDispositionResolver.resolvePhysicalReleaseWindows(context,
+                                originals.get(side).getLhMachineCode(), cleaningWindows.get(side), changeStart),
                         Objects.nonNull(machine) ? machine.getPlanStopStartTime() : null,
                         Objects.nonNull(machine) ? machine.getPlanStopEndTime() : null);
                 if (Objects.nonNull(machine)) {
                     available = MachineCleaningOverlapUtil.resolveEarliestAvailableTime(available,
-                            machine.getCleaningWindowList(), machine.getPlanStopStartTime(),
-                            machine.getPlanStopEndTime());
+                            CleaningDispositionResolver.resolvePhysicalReleaseWindows(context,
+                                    originals.get(side).getLhMachineCode(), machine.getCleaningWindowList(), changeStart),
+                            machine.getPlanStopStartTime(), machine.getPlanStopEndTime());
                 }
                 for (MachineMaintenanceWindowDTO window : maintenanceWindows.get(side)) {
                     available = this.afterOccupiedWindow(available,

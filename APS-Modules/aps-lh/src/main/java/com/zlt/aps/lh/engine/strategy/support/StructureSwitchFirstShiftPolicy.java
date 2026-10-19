@@ -2,38 +2,25 @@ package com.zlt.aps.lh.engine.strategy.support;
 
 import cn.hutool.core.bean.BeanUtil;
 import com.zlt.aps.cx.entity.config.CxEmbryoLhTime;
-import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
-import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
-import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
-import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
 import lombok.extern.slf4j.Slf4j;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.TimeUnit;
 
 /**
- * 按供胚到班末的时间产能统一判定结构切换规则首班，试算不登记资源。
+ * 按后结构续作标识及供胚所在班统一判定结构切换规则首班，试算不登记资源。
  *
  * @author APS
  * @date 2026/10/14
  */
 @Slf4j
 public final class StructureSwitchFirstShiftPolicy {
-    /**
-     * 普通机台首班至少完整完成两条。
-     */
-    private static final int NORMAL_MINIMUM_QUANTITY = 2;
-    /**
-     * 单控运行侧首班至少完整完成一条。
-     */
-    private static final int SINGLE_CONTROL_MINIMUM_QUANTITY = 1;
     /**
      * T日晚班只作判定坐标，不新增结果班次槽位。
      */
@@ -78,39 +65,18 @@ public final class StructureSwitchFirstShiftPolicy {
     }
 
     /**
-     * 为当前SKU和机台取得共享首班判定，运行侧班产沿用正式数量内核的拆分规则。
+     * 按后结构续作标识及供胚所在班认定首班，已成功提交的同来源判定跨SKU共享。
+     * 续作结构固定T日晚班；非续作结构取供胚所在班，窗口前T日晚班映射为窗口首班。
+     * 首班定位不判断剩余产能，实际首检和生产继续执行原数量及资源约束。
      *
-     * @param context 本批上下文
+     * @param context 本批上下文和班次配置
      * @param source 有效供胚来源
-     * @param sku 当前候选
-     * @param machineCode 运行态机台编码
-     * @return 只读判定，非适用范围返回空
+     * @param sku 当前候选SKU
+     * @param machineCode 参照运行态机台编码
+     * @return 只读首班判定；非结构切换或非续作供胚超出既有判定范围时为空
      */
     public static StructureSwitchFirstShiftDecision resolve(LhScheduleContext context, CxEmbryoLhTime source,
             SkuScheduleDTO sku, String machineCode) {
-        MachineScheduleDTO machine = context.getMachineScheduleMap().get(machineCode);
-        int capacity = Objects.isNull(sku) ? 0 : sku.getShiftCapacity();
-        if (Objects.isNull(machine)) {
-            // 某些固定组合入口只传编码；仍通过现有班产解析器取得单控侧班产。
-            machine = new MachineScheduleDTO();
-            machine.setMachineCode(machineCode);
-        }
-        return resolve(context, source, sku, machineCode,
-                ShiftCapacityResolverUtil.resolveRuntimeShiftCapacity(context, machine, capacity));
-    }
-
-    /**
-     * 按供胚后的原始时间产能认定首班，已成功提交的同来源判定跨SKU共享。
-     *
-     * @param context 本批上下文和班次配置
-     * @param source 有效来源
-     * @param sku 参照候选SKU
-     * @param machineCode 参照运行态机台
-     * @param runtimeCapacity 正式内核使用的运行态完整班产
-     * @return 判定结果；非结构切换或供胚不在适用范围时为空
-     */
-    public static StructureSwitchFirstShiftDecision resolve(LhScheduleContext context, CxEmbryoLhTime source,
-            SkuScheduleDTO sku, String machineCode, int runtimeCapacity) {
         if (!StructureSwitchSchedulingPolicy.isEnabled(context) || Objects.isNull(source)
                 || Objects.isNull(source.getEarliestLhTime()) || Objects.isNull(sku)) {
             return null;
@@ -125,51 +91,35 @@ public final class StructureSwitchFirstShiftPolicy {
         }
         List<LhShiftConfigVO> shifts = decisionShifts(context);
         LhShiftConfigVO supplyShift = LhScheduleTimeUtil.resolveShiftByTime(shifts, source.getEarliestLhTime());
-        if (Objects.isNull(supplyShift)) {
+        boolean structureContinuation = context.getSwitchedNextStructureNameSet().contains(source.getNextStructureName());
+        if (!structureContinuation && Objects.isNull(supplyShift)) {
             return null;
         }
-        boolean singleControl = LhSingleControlMachineUtil.isConfiguredSingleControlMachine(context, machineCode);
-        int minimum = singleControl ? SINGLE_CONTROL_MINIMUM_QUANTITY : NORMAL_MINIMUM_QUANTITY;
-        // 复用数量内核的完整班长基准，不能因有效窗口缩短而把主数据班产对应速度放大。
-        long duration = ShiftCapacityResolverUtil.resolveShiftDurationSeconds(supplyShift);
-        long remaining = TimeUnit.MILLISECONDS.toSeconds(
-                supplyShift.getShiftEndDateTime().getTime() - source.getEarliestLhTime().getTime());
-        MachineScheduleDTO machine = context.getMachineScheduleMap().get(machineCode);
-        int mouldQty = sku.getMouldQty();
-        if (singleControl) {
-            mouldQty = SINGLE_CONTROL_MINIMUM_QUANTITY;
-        } else if (Objects.nonNull(machine)) {
-            mouldQty = ShiftCapacityResolverUtil.resolveMachineMouldQty(machine);
-        }
-        int actualCapacity = ShiftCapacityResolverUtil.resolveActualShiftPlanQty(runtimeCapacity, supplyShift,
-                ShiftCapacityResolverUtil.resolveOddShiftCapacityPlusShiftType(context),
-                ScheduleTypeEnum.NEW_SPEC.getCode());
-        boolean capacityKnown = duration > 0 && (actualCapacity > 0
-                || (sku.getLhTimeSeconds() > 0 && mouldQty > 0));
-        int quantity = capacityKnown ? ShiftCapacityResolverUtil.resolveShiftCapacity(actualCapacity,
-                sku.getLhTimeSeconds(), mouldQty, duration, remaining, true) : 0;
-        LhShiftConfigVO first = null;
-        String reason = "首班缺少有效产能依据";
-        if (capacityKnown) {
-            first = quantity >= minimum ? supplyShift : shifts.stream()
-                    .filter(shift -> shift.getShiftStartDateTime().after(supplyShift.getShiftStartDateTime()))
+        LhShiftConfigVO first;
+        String reason;
+        if (structureContinuation) {
+            // 后结构已完成承接，固定从窗口前T日晚班计序，不能被供胚或实际首产后移。
+            first = shifts.stream().filter(shift -> shift.getShiftIndex() == HISTORICAL_SHIFT_INDEX)
                     .findFirst().orElse(null);
-            if (quantity >= minimum) {
-                reason = "供胚班时间产能达标";
-            } else if (Objects.nonNull(first)) {
-                reason = "供胚班时间产能不足，首班顺延紧邻下一班";
-            } else {
-                reason = "首班超出本次判定范围";
-            }
+            reason = Objects.nonNull(first) ? "后结构续作，首班固定T日晚班" : "首班超出本次判定范围";
+        } else if (supplyShift.getShiftIndex() == HISTORICAL_SHIFT_INDEX) {
+            // 非续作结构不得占用窗口前首班坐标，供胚仍保留其真实所属班用于额度计算。
+            first = StructureSwitchSchedulingPolicy.orderedShifts(context).stream().findFirst().orElse(null);
+            reason = Objects.nonNull(first) ? "后结构非续作，T日晚班供胚映射到窗口首班" : "首班超出本次判定范围";
+        } else {
+            first = supplyShift;
+            reason = "后结构非续作，首班取供胚所在班";
         }
-        log.debug("结构切换首班判定, batchNo={}, sourceId={}, sku={}, machine={}, supplyTime={}, "
-                        + "supplyShift={}, durationSeconds={}, remainingSeconds={}, runtimeCapacity={}, "
-                        + "minimumQty={}, availableQty={}, firstShift={}, reason={}",
-                context.getBatchNo(), source.getId(), sku.getMaterialCode(), machineCode, source.getEarliestLhTime(),
-                supplyShift.getShiftName(), duration, remaining, actualCapacity, minimum, quantity,
+        log.debug("结构切换首班判定, factoryCode={}, scheduleDate={}, batchNo={}, sourceId={}, sku={}, "
+                        + "status={}, machine={}, structure={}, structureContinuation={}, waitNotify={}, "
+                        + "supplyTime={}, supplyShift={}, firstShift={}, reason={}",
+                context.getFactoryCode(), context.getScheduleTargetDate(), context.getBatchNo(), source.getId(),
+                sku.getMaterialCode(), sku.getProductStatus(), machineCode, source.getNextStructureName(),
+                structureContinuation, source.getIsWaitNotify(), source.getEarliestLhTime(),
+                Objects.isNull(supplyShift) ? null : supplyShift.getShiftName(),
                 Objects.isNull(first) ? null : first.getShiftName(), reason);
         return new StructureSwitchFirstShiftDecision(source.getId(), source.getEarliestLhTime(), supplyShift,
-                first, machineCode, actualCapacity, minimum, quantity, reason,
+                first, machineCode, structureContinuation, reason,
                 Collections.unmodifiableList(new ArrayList<>(shifts)));
     }
 }

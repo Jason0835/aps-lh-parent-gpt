@@ -21,6 +21,7 @@ import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IEmbryoEndingBalanceStrategy;
+import com.zlt.aps.lh.engine.strategy.support.ChangeoverFirstShiftQuantityPolicy;
 import com.zlt.aps.lh.engine.strategy.IMouldChangeBalanceStrategy;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationEndingAllocationSnapshot;
 import com.zlt.aps.lh.util.CleaningScheduleRuleUtil;
@@ -342,6 +343,7 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
                     && this.isRuntimeSharedEmbryo(context, groupSourceSku)) {
                 // 硫化余量收尾不再执行旧均衡；即使未登记对象标记，也不能从旧类型入口重新接管。
                 List<LhScheduleResult> remainingResults = groupResultList.stream()
+                        .filter(result -> !targetScheduleQtyResolver.isSharedEmbryoStockEnding(context, sourceSkuMap.get(result)))
                         .filter(result -> !context.getContinuationSurplusEndingAllocatedResults().contains(result))
                         .filter(result -> !StringUtils.equals(ENDING_TYPE_SKU, endingTypeMap.get(result)))
                         .collect(Collectors.toList());
@@ -448,7 +450,8 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
                 || StringUtils.isEmpty(result.getLhMachineCode())
                 || !LhSingleControlMachineUtil.isConfiguredSingleControlMachine(
                         context, result.getLhMachineCode())
-                || !LhSingleControlMachineUtil.isWholeMachineGranularitySku(context, sourceSku)) {
+                || !LhSingleControlMachineUtil.isWholeMachineGranularitySku(
+                        context, sourceSku, result.getLhMachineCode())) {
             return null;
         }
         String pairMachineCode = LhSingleControlMachineUtil.resolvePairMachineCode(result.getLhMachineCode());
@@ -3151,7 +3154,7 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
     }
 
     /**
-     * 解析指定班次的剩余可排产能。
+     * 在原物理产能基础上解析指定班次可追加数量，实际切换首班继续遵守冻结上限。
      *
      * @param context 排程上下文
      * @param result 排程结果
@@ -3165,7 +3168,8 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
         if (capacity <= 0) {
             return 0;
         }
-        return Math.max(0, capacity - resolveShiftPlanQty(result, shift.getShiftIndex()));
+        int availableQty = Math.max(0, capacity - resolveShiftPlanQty(result, shift.getShiftIndex()));
+        return ChangeoverFirstShiftQuantityPolicy.capIncrement(context, result, shift, availableQty);
     }
 
     /**

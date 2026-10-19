@@ -8,6 +8,8 @@ import com.zlt.aps.common.engine.domain.LhMonthStartDayResult;
 import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
 import com.zlt.aps.cx.entity.CxStock;
 import com.zlt.aps.cx.entity.config.CxEmbryoLhTime;
+import com.zlt.aps.cx.entity.schedule.CxEmbryoEndingShift;
+import com.zlt.aps.lh.component.EmbryoEndingStructureMachineExemptionPolicy;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
@@ -16,7 +18,6 @@ import com.zlt.aps.lh.api.enums.*;
 import com.zlt.aps.lh.component.LhMachineSupplyStructureRule;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.SkuDecrementChecker;
-import com.zlt.aps.lh.component.StructureEndingRecalcService;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.exception.ScheduleDomainExceptionHelper;
 import com.zlt.aps.lh.exception.ScheduleErrorCode;
@@ -73,9 +74,6 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     @Resource
     private HistoricalMouldChangeQuotaService historicalMouldChangeQuotaService;
 
-    @Resource
-    private StructureEndingRecalcService structureEndingRecalcService;
-
     /**
      * 排产版本已定稿（与 MpFactoryProductionVersion.isFinal 一致）
      */
@@ -102,12 +100,6 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     private static final int NON_MAIN_PRODUCT_ENDING_THRESHOLD = 2;
 
     /**
-     * 「更新结构切换时间」开关的开启值：前端勾选后传 1，执行 T_CX_EMBRYO_LH_TIME 结构可收尾时间重算。
-     * <p>默认不勾选（缺省 0），未勾选时整步跳过、保留成型排程写入的原始快照。
-     */
-    private static final String UPDATE_STRUCTURE_LH_TIME_ENABLED = "1";
-
-    /**
      * 主销合并胎胚的收尾余量阈值：胎胚余量 <= 该值视为收尾
      */
     private static final int MAIN_PRODUCT_ENDING_THRESHOLD = 0;
@@ -121,6 +113,17 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
      * 胎胚收尾标识：非收尾
      */
     private static final int EMBRYO_ENDING_FLAG_NO = 0;
+
+    /**
+     * 交班在机标识：仍在产（MES 6 点交班版本同步时置 '1'，与成型侧 CxMachineOnlineInfo.HANDOVER_ONLINE 同源）
+     */
+    private static final String HANDOVER_ONLINE_FLAG_ON = "1";
+
+    /**
+     * 前结构判定月份回溯上限（含排程日所在月）：
+     * 月初的前结构通常在上月配置中；同一结构跨月连续时还需再往前回溯，故取 3 个月
+     */
+    private static final int PREV_STRUCTURE_MONTH_LOOKBACK = 3;
 
     /** 设备停机时间转换与故障分流。 */
     @Resource
@@ -178,6 +181,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     private LhMachineOnlineInfoMapper lhMachineOnlineInfoMapper;
 
     @Resource
+    private CxMachineOnlineInfoMapper cxMachineOnlineInfoMapper;
+
+    @Resource
     private LhSpecifyMachineMapper lhSpecifyMachineMapper;
 
     @Resource
@@ -197,6 +203,12 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
 
     @Resource
     private CxEmbryoLhTimeMapper cxEmbryoLhTimeMapper;
+
+    /**
+     * 成型胎胚收尾班次批量读取入口。
+     */
+    @Resource
+    private CxEmbryoEndingShiftMapper cxEmbryoEndingShiftMapper;
 
     @Resource
     private CxStructureTreadConfigMapper cxStructureTreadConfigMapper;
@@ -232,6 +244,38 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     @Resource(name = "lhDataInitExecutor")
     private Executor lhDataInitExecutor;
 
+    /**
+     * 按工厂及收尾班次归属日批量加载T至T+2的成型收尾输入，仅按胎胚代码建立索引，不区分产品状态。
+     * 写入批次日期和硫化收尾标识均不参与筛选，排产循环只读不可变索引。
+     *
+     * @param context 排程上下文
+     * @param factoryCode 工厂编码
+     * @param startDate 当前窗口T日
+     */
+    private void loadCxEmbryoEndingShifts(LhScheduleContext context, String factoryCode, Date startDate) {
+        Date endDateExclusive = LhScheduleTimeUtil.addDays(startDate, 3);
+        List<CxEmbryoEndingShift> records = cxEmbryoEndingShiftMapper.selectList(
+                new LambdaQueryWrapper<CxEmbryoEndingShift>()
+                        .eq(CxEmbryoEndingShift::getFactoryCode, factoryCode)
+                        .ge(CxEmbryoEndingShift::getShiftDate, startDate)
+                        .lt(CxEmbryoEndingShift::getShiftDate, endDateExclusive)
+                        .in(CxEmbryoEndingShift::getShiftIndex, Arrays.asList("01", "02", "03")));
+        context.setCxEmbryoEndingShiftIndex(EmbryoEndingStructureMachineExemptionPolicy.buildIndex(
+                factoryCode, startDate, endDateExclusive, records));
+        if (log.isInfoEnabled()) {
+            log.info("成型胎胚收尾班次加载, factoryCode: {}, batchNo: {}, startDate: {}, endDateExclusive: {}, "
+                            + "recordCount: {}, embryoEndingShifts: {}",
+                    factoryCode, context.getBatchNo(), startDate, endDateExclusive,
+                    records.size(), context.getCxEmbryoEndingShiftIndex());
+        }
+    }
+
+    /**
+     * 初始化本工厂排程基础数据，等待所有输入完成后再计算派生账本。
+     * 成型收尾索引与原硫化收尾标识分别加载，后续排产只读冻结输入。
+     *
+     * @param context 当前工厂及排程窗口上下文
+     */
     @Override
     public void loadAllBaseData(LhScheduleContext context) {
         long totalStartTime = System.currentTimeMillis();
@@ -414,6 +458,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         //      因此此处只需等待顶层 Future 完成即可（底层依赖链会自动传递完成状态）。
         waitForDataInitTasks(
                 monthPlanFuture,
+                this.runDataInitTaskAsync("成型胎胚收尾班次",
+                        () -> this.loadCxEmbryoEndingShifts(context, factoryCode, startDate),
+                        () -> this.sizeOf(context.getCxEmbryoEndingShiftIndex())),
                 continuationReduceDimensionMonthPlanFuture,
                 yearMonthLhDayAdjustFuture,
                 structureEndingDateFuture,
@@ -494,17 +541,6 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         // 4. 胎胚收尾标识：依赖月计划、胎胚库存、月累计完成量、T日班次完成量、前日排程结果等均已就绪，
         //    故在屏障同步之后计算；以胎胚维度合并硫化余量并按主销参与情况判定收尾。
         this.loadEmbryoEndingFlagMap(context);
-
-        // 4.1 结构可收尾时间重算：依赖月计划（成型余量）、胎胚库存、物料信息、工作日历、班次窗口、
-        //     日硫化产能、结构排产配置，须晚于上述数据、早于硫化排程读取结构胎胚可供时间，
-        //     使「胎胚最早可供硫化时间」按最新成型余量而非成型排程快照生效。
-        //     由前端「更新结构切换时间」勾选控制：未勾选时整步跳过，保留成型排程写入的原始快照。
-        if (UPDATE_STRUCTURE_LH_TIME_ENABLED.equals(context.getUpdateStructureLhTime())) {
-            this.structureEndingRecalcService.recalc(context, scheduleDate);
-        } else {
-            log.info("结构可收尾时间重算跳过, 原因: 未勾选「更新结构切换时间」, factoryCode: {}, T日: {}",
-                    factoryCode, LhScheduleTimeUtil.formatDate(scheduleDate));
-        }
 
         // 5. 目标机台数统一Map预计算：依赖工作日历和月计划均已就绪，覆盖停产保机前N日、
         //    实际排程窗口、T+3增机及特殊材料窗口后两日判断；以物料+产品状态+自然日为完整维度，
@@ -1304,8 +1340,10 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                         .in(LhMouldChangePlan::getChangeMouldType,
                                 MouldChangeTypeEnum.REGULAR.getCode(),
                                 MouldChangeTypeEnum.TYPE_BLOCK.getCode()));
+        // 空前料侧必须先与同动作另一侧归并，再交给资格、排序和释放索引，不能先过滤掉来源。
         context.setHistoricalReverseMouldChangePlanList(
-                Objects.nonNull(list) ? list : new ArrayList<LhMouldChangePlan>(0));
+                LhMouldChangePlanNormalizer.normalize(
+                        Objects.nonNull(list) ? list : new ArrayList<LhMouldChangePlan>(0)));
         log.info("反选历史模具交替计划加载完成, factoryCode: {}, scheduleTargetDate: {}, "
                         + "historicalScheduleDate: {}, 数量: {}",
                 factoryCode, LhScheduleTimeUtil.formatDate(targetDate),
@@ -2080,29 +2118,109 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     /**
      * 独立加载排程窗口内按结构配置的胎胚最早可供硫化时间。
      *
-     * <p>按工厂和排程起始日期读取同一配置快照，后结构名称保持大小写敏感的精确键；
+     * <p>按工厂读取成型批次快照，后结构名称保持大小写敏感的精确键；
      * 同结构取最早时间，同时刻按主键稳定选择来源，时间和标识不得跨记录拼接。</p>
+     *
+     * <p><b>批次合并口径</b>：成型每批产出「窗口 8 个班次 + 窗口外最多 4 个班次预测」，
+     * 相邻两批（键=成型排程日）覆盖的班次有交集、并集更远。因此：</p>
+     * <ul>
+     *   <li>窗口第一天批次（= {@code T日}）：上一轮成型产出，历史口径，恒参与；</li>
+     *   <li>窗口中间日批次（= 硫化目标日，即本次编排里今天刚跑完的成型批次）：
+     *       仅当勾选「更新结构最早可供硫化时间」（{@link LhScheduleContext#isUpdateStructureLhTimeEnabled()}）时参与，
+     *       其结构取值<b>覆盖</b>窗口第一天批次的同名结构（今天排的数据更新交集部分），
+     *       窗口第一天批次独有的结构保留 —— 两批并集即给出更远的班次预测覆盖。</li>
+     * </ul>
      *
      * @param context         排程上下文
      * @param factoryCode     分厂编号
-     * @param windowStartTime 排程窗口开始时间（包含）
+     * @param windowStartTime 排程窗口开始时间（包含），即 T 日
      * @param windowEndTime   排程窗口结束时间（不包含）
      */
     private void loadStructureEarliestLhTime(LhScheduleContext context,
                                              String factoryCode,
                                              Date windowStartTime,
                                              Date windowEndTime) {
-        Map<String, Date> earliestTimeMap = new HashMap<String, Date>(16);
+        // 1. 窗口第一天批次（T 日）：历史口径，恒加载
+        StructureLhTimeBatch firstDayBatch = this.loadStructureLhTimeBatch(factoryCode, windowStartTime);
+        Map<String, Date> earliestTimeMap = new LinkedHashMap<>(firstDayBatch.getEarliestTimeMap());
+        Map<String, CxEmbryoLhTime> sourceMap = new LinkedHashMap<>(firstDayBatch.getSourceMap());
+
+        // 2. 窗口中间日批次（= 硫化目标日，本次编排里今天刚排出的成型数据）：
+        //    勾选更新开关时参与，重叠结构用新批覆盖老批；未勾选保持原口径（只认窗口第一天批次）。
+        StructureLhTimeBatch targetDayBatch = null;
+        Date targetDayBatchDate = Objects.nonNull(context.getScheduleTargetDate())
+                ? LhScheduleTimeUtil.clearTime(context.getScheduleTargetDate()) : null;
+        boolean mergeTargetDayBatch = context.isUpdateStructureLhTimeEnabled()
+                && Objects.nonNull(targetDayBatchDate)
+                && !Objects.equals(targetDayBatchDate, windowStartTime);
+        if (mergeTargetDayBatch) {
+            targetDayBatch = this.loadStructureLhTimeBatch(factoryCode, targetDayBatchDate);
+            List<String> changedDetails = new ArrayList<>();
+            for (Map.Entry<String, Date> entry : targetDayBatch.getEarliestTimeMap().entrySet()) {
+                String structureName = entry.getKey();
+                Date previousTime = earliestTimeMap.get(structureName);
+                if (Objects.isNull(previousTime)) {
+                    // 窗口第一天批次没有该结构 → 新增（并集扩大预测覆盖范围）
+                    changedDetails.add(structureName + ": 新增 " + LhScheduleTimeUtil.formatDateTime(entry.getValue()));
+                } else if (!Objects.equals(previousTime, entry.getValue())) {
+                    // 交集结构：记录"老 -> 新"对比，便于现场核对今天排出的数据更新结果
+                    changedDetails.add(structureName + ": " + LhScheduleTimeUtil.formatDateTime(previousTime)
+                            + " -> " + LhScheduleTimeUtil.formatDateTime(entry.getValue()));
+                }
+                earliestTimeMap.put(structureName, entry.getValue());
+                CxEmbryoLhTime targetSource = targetDayBatch.getSourceMap().get(structureName);
+                if (Objects.nonNull(targetSource)) {
+                    sourceMap.put(structureName, targetSource);
+                }
+            }
+            context.setStructureLhTimeOverriddenDetail(String.join(", ", changedDetails));
+        }
+
         context.setStructureEarliestLhTimeMap(earliestTimeMap);
-        Map<String, CxEmbryoLhTime> sourceMap = new LinkedHashMap<>(16);
         context.setStructureSwitchSourceMap(sourceMap);
-        // 沿用排程起始日期对应的成型配置快照，不扩展查询到其它日期。
+        log.info("胎胚最早可供硫化时间加载完成, factoryCode: {}, 窗口第一天批次: {}, 窗口中间日批次: {}, "
+                        + "启用中间日合并: {}, 批次条数: 第一天{}条/中间日{}条, 有效结构: 第一天{}个/中间日{}个/合并后{}个, "
+                        + "中间日覆盖明细(新增或老->新): {}, 忽略条数: 第一天{}/中间日{}, "
+                        + "批内同结构重复: 第一天{}/中间日{}, 窗口结束时间: {}, finalEarliestTimeMap: {}",
+                factoryCode,
+                LhScheduleTimeUtil.formatDateTime(windowStartTime),
+                Objects.nonNull(targetDayBatch) ? LhScheduleTimeUtil.formatDateTime(targetDayBatchDate) : "未启用",
+                mergeTargetDayBatch,
+                firstDayBatch.getRowCount(),
+                Objects.nonNull(targetDayBatch) ? targetDayBatch.getRowCount() : 0,
+                firstDayBatch.getEarliestTimeMap().size(),
+                Objects.nonNull(targetDayBatch) ? targetDayBatch.getEarliestTimeMap().size() : 0,
+                earliestTimeMap.size(),
+                context.getStructureLhTimeOverriddenDetail(),
+                firstDayBatch.getIgnoredCount(),
+                Objects.nonNull(targetDayBatch) ? targetDayBatch.getIgnoredCount() : 0,
+                firstDayBatch.getDuplicateCount(),
+                Objects.nonNull(targetDayBatch) ? targetDayBatch.getDuplicateCount() : 0,
+                LhScheduleTimeUtil.formatDateTime(windowEndTime),
+                earliestTimeMap);
+    }
+
+    /**
+     * 加载单个成型批次的「后结构 -> 最早可供硫化时间」快照。
+     *
+     * <p>取数口径：工厂 + 成型排程日精确匹配（成型按「工厂 + 排程日」批次先删后插，一日期一快照），
+     * 按主键升序保证同时刻稳定选择来源；逻辑删除由框架过滤。</p>
+     * <p>聚合口径：键取后结构名称（{@code NEXT_STRUCTURE_NAME}，大小写敏感精确匹配），
+     * 同结构取最早时间；命中更早时间时时间与来源记录成对覆盖，禁止跨记录拼接。</p>
+     *
+     * @param factoryCode 分厂编号
+     * @param batchDate   成型批次日期（= 成型排程日）
+     * @return 该批次的加载结果（无数据时为空映射，不为 null）
+     */
+    private StructureLhTimeBatch loadStructureLhTimeBatch(String factoryCode, Date batchDate) {
         List<CxEmbryoLhTime> configuredTimeList = cxEmbryoLhTimeMapper.selectList(
                 new LambdaQueryWrapper<CxEmbryoLhTime>()
                         .eq(CxEmbryoLhTime::getFactoryCode, factoryCode)
-                        .eq(CxEmbryoLhTime::getScheduleDate, windowStartTime)
+                        .eq(CxEmbryoLhTime::getScheduleDate, batchDate)
                         // 同时刻按主键稳定选择来源；逻辑删除由框架过滤。
                         .orderByAsc(CxEmbryoLhTime::getId));
+        Map<String, Date> earliestTimeMap = new LinkedHashMap<>(16);
+        Map<String, CxEmbryoLhTime> sourceMap = new LinkedHashMap<>(16);
         int ignoredCount = 0;
         int duplicateCount = 0;
         if (!CollectionUtils.isEmpty(configuredTimeList)) {
@@ -2127,13 +2245,59 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 }
             }
         }
-        log.info("胎胚最早可供硫化时间加载完成, factoryCode: {}, queryStartDate: {}, windowEndTime: {}, "
-                        + "queryCount: {}, validStructureCount: {}, duplicateStructureCount: {}, ignoredCount: {}, "
-                        + "finalEarliestTimeMap: {}",
-                factoryCode, LhScheduleTimeUtil.formatDateTime(windowStartTime),
-                LhScheduleTimeUtil.formatDateTime(windowEndTime),
-                CollectionUtils.isEmpty(configuredTimeList) ? 0 : configuredTimeList.size(),
-                earliestTimeMap.size(), duplicateCount, ignoredCount, earliestTimeMap);
+        return new StructureLhTimeBatch(CollectionUtils.isEmpty(configuredTimeList) ? 0 : configuredTimeList.size(),
+                earliestTimeMap, sourceMap, ignoredCount, duplicateCount);
+    }
+
+    /**
+     * 单个成型批次的胎胚最早可供硫化时间加载结果。
+     */
+    private static class StructureLhTimeBatch {
+
+        /** 该批次查询到的原始条数 */
+        private final int rowCount;
+
+        /** 后结构名称 -> 该批次内的最早可供硫化时间 */
+        private final Map<String, Date> earliestTimeMap;
+
+        /** 后结构名称 -> 命中的来源记录（与时间同源，保证不跨记录拼接） */
+        private final Map<String, CxEmbryoLhTime> sourceMap;
+
+        /** 被忽略条数（后结构为空 / 最早时间为空 / 已逻辑删除） */
+        private final int ignoredCount;
+
+        /** 批内同结构重复条数（用于日志核对，不影响取最早结果） */
+        private final int duplicateCount;
+
+        private StructureLhTimeBatch(int rowCount, Map<String, Date> earliestTimeMap,
+                                     Map<String, CxEmbryoLhTime> sourceMap,
+                                     int ignoredCount, int duplicateCount) {
+            this.rowCount = rowCount;
+            this.earliestTimeMap = earliestTimeMap;
+            this.sourceMap = sourceMap;
+            this.ignoredCount = ignoredCount;
+            this.duplicateCount = duplicateCount;
+        }
+
+        private int getRowCount() {
+            return rowCount;
+        }
+
+        private Map<String, Date> getEarliestTimeMap() {
+            return earliestTimeMap;
+        }
+
+        private Map<String, CxEmbryoLhTime> getSourceMap() {
+            return sourceMap;
+        }
+
+        private int getIgnoredCount() {
+            return ignoredCount;
+        }
+
+        private int getDuplicateCount() {
+            return duplicateCount;
+        }
     }
 
     /**
@@ -2179,9 +2343,13 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
      * <ul>
      *   <li>合并余量中含主销产品：胎胚余量 &lt;= 0 标识收尾(1)</li>
      *   <li>合并余量全为非主销：胎胚余量 &lt;= 2 标识收尾(1)</li>
+     *   <li>结构切换完成（成型在机双结构判定，与成型侧 {@code buildMachineOnlineEmbryoMap} 同源）：
+     *       前结构胎胚无论余量多少强制标识收尾(1)，优先级高于前两条余量判定</li>
      *   <li>其余标识非收尾(0)</li>
      * </ul>
-     * 胎胚余量 = 合并后硫化余量 - 胎胚库存；key取月计划中所有胎胚代码全集，无库存记录默认0。</p>
+     * 胎胚余量 = 合并后硫化余量 - 胎胚库存；key取月计划中所有胎胚代码全集，无库存记录默认0。
+     * 同时把「结构切换完成」的那些机台的<b>后结构</b>（= 机台当前在产结构）集合写入
+     * {@link LhScheduleContext#getSwitchedNextStructureNameSet()}，供硫化算法后续使用。</p>
      *
      * @param context 排程上下文
      */
@@ -2203,6 +2371,18 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 .filter(StringUtils::isNotEmpty)
                 .collect(Collectors.toSet());
 
+        // 1.5 结构切换判定（成型在机双结构，与成型侧 buildMachineOnlineEmbryoMap 同源）：
+        //     同一台成型机的在机快照同时存在结构切换前后两个结构的胎胚行时，说明结构切换已经完成——
+        //     命中的前结构胎胚强制标记收尾（优先级高于步骤 3 的余量判定）；
+        //     同时留存这些机台切换后的「后结构」，供硫化算法后续使用
+        StructureSwitchDetectionResult switchDetectionResult = this.detectStructureSwitch(context);
+        Set<String> switchedStructureEmbryoSet = switchDetectionResult.getPrevStructureEmbryoCodeSet();
+
+        // 1.6 前结构已结束判定（交班在机标识 + 月度结构配置时间线，含跨月回溯）：
+        //     机台交班在产结构在配置时间线上已有后继 → 其前结构不再成型，前结构胎胚强制收尾。
+        //     与在机双结构判定互补：双结构依赖切换当天的在机快照（跨天即消失），本判定跨天、跨月仍可判。
+        PrevStructureEndedResult prevStructureEndedResult = this.detectPrevStructureEndedStructures(context);
+
         // 2. 以胎胚维度合并硫化余量，并记录该胎胚下是否含主销产品
         Map<String, Integer> embryoSurplusMap = new LinkedHashMap<>();
         Map<String, Boolean> embryoHasMainMap = new LinkedHashMap<>();
@@ -2222,7 +2402,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
             }
         }
 
-        // 3. 按主销参与情况判定收尾标识：胎胚余量 = 合并硫化余量 - 胎胚库存
+        // 3. 判定收尾标识：结构切换完成强制收尾 > 主销参与情况下的余量判定
         Map<String, Integer> embryoStockMap = context.getEmbryoRealtimeStockMap();
         for (Map.Entry<String, Integer> entry : embryoSurplusMap.entrySet()) {
             String embryoCode = entry.getKey();
@@ -2231,17 +2411,497 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
             int embryoRemainQty = mergedSurplusQty - embryoStock;
             boolean hasMain = embryoHasMainMap.getOrDefault(embryoCode, Boolean.FALSE);
             int threshold = hasMain ? MAIN_PRODUCT_ENDING_THRESHOLD : NON_MAIN_PRODUCT_ENDING_THRESHOLD;
-            int endingFlag = embryoRemainQty <= threshold ? EMBRYO_ENDING_FLAG_YES : EMBRYO_ENDING_FLAG_NO;
+            int endingFlag;
+            if (switchedStructureEmbryoSet.contains(embryoCode)) {
+                // 结构切换完成（在机双结构）：前结构胎胚不再成型，无论余量多少都视为收尾
+                endingFlag = EMBRYO_ENDING_FLAG_YES;
+            } else if (prevStructureEndedResult.getEndedEmbryoCodeSet().contains(embryoCode)) {
+                // 前结构已结束（交班在机 + 配置时间线）：前结构胎胚不再成型，无论余量多少都视为收尾
+                endingFlag = EMBRYO_ENDING_FLAG_YES;
+            } else {
+                endingFlag = embryoRemainQty <= threshold ? EMBRYO_ENDING_FLAG_YES : EMBRYO_ENDING_FLAG_NO;
+            }
             embryoEndingFlagMap.put(embryoCode, endingFlag);
         }
 
         context.setEmbryoEndingFlagMap(embryoEndingFlagMap);
+        // 结构切换完成的后结构集合落上下文：硫化算法后续按"这些结构已接手机台"处理，无需重复判定
+        context.setSwitchedNextStructureNameSet(switchDetectionResult.getNextStructureNameSet());
         int endingCount = embryoEndingFlagMap.values().stream()
                 .mapToInt(Integer::intValue)
                 .filter(v -> v == EMBRYO_ENDING_FLAG_YES)
                 .sum();
-        log.info("胎胚收尾标识加载完成, 胎胚数量: {}, 主销产品数量: {}, 收尾胎胚数量: {}",
-                embryoSurplusMap.size(), mainProductCodes.size(), endingCount);
+        log.info("胎胚收尾标识加载完成, 胎胚数量: {}, 主销产品数量: {}, 收尾胎胚数量: {}, 结构切换完成胎胚数量: {}, "
+                        + "结构切换完成的后结构: {}, 前结构已结束: {}, 前结构已结束胎胚数量: {}",
+                embryoSurplusMap.size(), mainProductCodes.size(), endingCount,
+                switchedStructureEmbryoSet.size(), switchDetectionResult.getNextStructureNameSet(),
+                prevStructureEndedResult.getEndedStructureSet(), prevStructureEndedResult.getEndedEmbryoCodeSet().size());
+    }
+
+    /**
+     * 结构切换判定结果：前结构残留胎胚（强制收尾对象）+ 切换完成后接手机台的后结构。
+     */
+    static class StructureSwitchDetectionResult {
+
+        /** 前结构残留胎胚编码集合（结构切换已完成，需要强制标记胎胚收尾） */
+        private final Set<String> prevStructureEmbryoCodeSet;
+
+        /** 切换完成后接手机台的**后结构**集合（= 发生切换机台的当前在产结构） */
+        private final Set<String> nextStructureNameSet;
+
+        StructureSwitchDetectionResult(Set<String> prevStructureEmbryoCodeSet, Set<String> nextStructureNameSet) {
+            this.prevStructureEmbryoCodeSet = prevStructureEmbryoCodeSet;
+            this.nextStructureNameSet = nextStructureNameSet;
+        }
+
+        Set<String> getPrevStructureEmbryoCodeSet() {
+            return prevStructureEmbryoCodeSet;
+        }
+
+        Set<String> getNextStructureNameSet() {
+            return nextStructureNameSet;
+        }
+    }
+
+    /**
+     * 检测「结构切换完成」（与成型侧 {@code buildMachineOnlineEmbryoMap} 同源判定）。
+     *
+     * <p><b>判定依据</b>：MES 成型在机快照中，同一台成型机可能同时残留结构切换前后两个结构的在机行
+     * （切换班次旧结构残留上报）；一台成型机同一时刻只能生产一个结构，按「UPDATE_TIME 最新行的胎胚
+     * 所属结构」确定为当前结构，其余非当前结构的胎胚行即为切换前残留（前结构）——说明该机台结构切换
+     * 已经完成：前结构胎胚不再成型需要被标记为胎胚收尾，而这些机台的当前结构即为<b>后结构</b>。</p>
+     *
+     * <p><b>查询窗口与成型侧 {@code loadOnlineInfos} 同源</b>：T 日与 T-1 日两天
+     * （兜住切换发生在前一天晚些时候、旧结构行只落在 T-1 的场景，避免只取一天漏判）。
+     * 当前结构无法判定的机台整体不参与（保守不标记），结构未知的胎胚行保守不标记。</p>
+     *
+     * @param context 排程上下文（依赖物料主数据 {@code materialInfoMap} 反查胎胚所属结构）
+     * @return 判定结果（前结构胎胚集合 + 后结构集合；无数据时均为空集，不为 null）
+     */
+    private StructureSwitchDetectionResult detectStructureSwitch(LhScheduleContext context) {
+        // 1. 查询成型在机：工厂 + 窗口 [T-1, T]，按更新时间倒序（分组后首行即该机台最新行）
+        Date tDay = LhScheduleTimeUtil.clearTime(context.getScheduleDate());
+        Date yesterday = LhScheduleTimeUtil.addDays(tDay, -1);
+        List<CxMachineOnlineInfo> onlineInfos = cxMachineOnlineInfoMapper.selectList(
+                new LambdaQueryWrapper<CxMachineOnlineInfo>()
+                        .eq(CxMachineOnlineInfo::getFactoryCode, context.getFactoryCode())
+                        .in(CxMachineOnlineInfo::getOnlineDate, yesterday, tDay)
+                        .orderByDesc(CxMachineOnlineInfo::getUpdateTime));
+        if (CollectionUtils.isEmpty(onlineInfos)) {
+            log.info("成型在机双结构判定跳过, 原因: 窗口 [{} ~ {}] 无成型在机数据",
+                    LhScheduleTimeUtil.formatDate(yesterday), LhScheduleTimeUtil.formatDate(tDay));
+            return new StructureSwitchDetectionResult(new LinkedHashSet<>(), new LinkedHashSet<>());
+        }
+        // 2. 胎胚编码 → 结构名称（物料主数据反查；在机表无结构字段，MATERIAL_CODE 实际存胎胚编号）
+        Map<String, String> embryoStructureMap = this.buildEmbryoStructureMap(context);
+        // 3. 双结构判定（纯函数，便于单测）
+        StructureSwitchDetectionResult detectionResult = detectStructureSwitch(onlineInfos, embryoStructureMap);
+        log.info("成型在机双结构判定完成, 窗口: [{} ~ {}], 在机行数: {}, 前结构胎胚数: {}, 切换完成的后结构: {}",
+                LhScheduleTimeUtil.formatDate(yesterday), LhScheduleTimeUtil.formatDate(tDay),
+                onlineInfos.size(), detectionResult.getPrevStructureEmbryoCodeSet().size(),
+                detectionResult.getNextStructureNameSet());
+        return detectionResult;
+    }
+
+    /**
+     * 成型在机双结构判定（纯函数）：按机台取 UPDATE_TIME 最新在机行的胎胚结构为当前结构，
+     * 其余结构不同的胎胚行判为切换前残留（前结构）；确有前结构残留的机台即"结构切换已完成"，
+     * 其当前结构作为<b>后结构</b>输出。
+     *
+     * @param onlineInfos        成型在机行（建议已按 UPDATE_TIME 倒序，分组后保持相遇顺序）
+     * @param embryoStructureMap 胎胚编码 → 结构名称
+     * @return 判定结果：前结构残留胎胚编码集合 + 切换完成的后结构集合
+     */
+    static StructureSwitchDetectionResult detectStructureSwitch(List<CxMachineOnlineInfo> onlineInfos,
+                                                                 Map<String, String> embryoStructureMap) {
+        Set<String> switchedEmbryoSet = new LinkedHashSet<>();
+        Set<String> nextStructureNameSet = new LinkedHashSet<>();
+        if (CollectionUtils.isEmpty(onlineInfos) || CollectionUtils.isEmpty(embryoStructureMap)) {
+            return new StructureSwitchDetectionResult(switchedEmbryoSet, nextStructureNameSet);
+        }
+        // 按成型机台分组（分组保持相遇顺序：入参按更新时间倒序时，首行即该机台最新行）
+        Map<String, List<CxMachineOnlineInfo>> machineRowsMap = onlineInfos.stream()
+                .filter(onlineInfo -> StringUtils.isNotEmpty(onlineInfo.getCxCode()))
+                .collect(Collectors.groupingBy(CxMachineOnlineInfo::getCxCode));
+        for (List<CxMachineOnlineInfo> machineRows : machineRowsMap.values()) {
+            // 当前结构：UPDATE_TIME 最新行的胎胚所属结构（与成型侧 resolveMachineCurrentStructureMap 同口径）
+            CxMachineOnlineInfo latestRow = machineRows.stream()
+                    .filter(row -> Objects.nonNull(row.getUpdateTime()))
+                    .max(Comparator.comparing(CxMachineOnlineInfo::getUpdateTime))
+                    .orElse(null);
+            if (Objects.isNull(latestRow)) {
+                continue;
+            }
+            String currentStructure = embryoStructureMap.get(latestRow.getMaterialCode());
+            if (StringUtils.isEmpty(currentStructure)) {
+                // 最新行结构无法判定 → 该机台整体不参与，保守不标记
+                continue;
+            }
+            // 非当前结构的胎胚行为切换前残留，标记；结构未知的行保守不标记
+            Set<String> prevStructureEmbryos = machineRows.stream()
+                    .map(CxMachineOnlineInfo::getMaterialCode)
+                    .filter(StringUtils::isNotEmpty)
+                    .filter(embryoCode -> StringUtils.isNotEmpty(embryoStructureMap.get(embryoCode))
+                            && !embryoStructureMap.get(embryoCode).equals(currentStructure))
+                    .collect(Collectors.toSet());
+            if (prevStructureEmbryos.isEmpty()) {
+                // 该机台在窗口内只有单一结构 → 未发生切换，不记前结构胎胚也不记后结构
+                continue;
+            }
+            switchedEmbryoSet.addAll(prevStructureEmbryos);
+            // 确有切换的机台才把当前结构记为「切换完成的后结构」
+            nextStructureNameSet.add(currentStructure);
+        }
+        return new StructureSwitchDetectionResult(switchedEmbryoSet, nextStructureNameSet);
+    }
+
+    /**
+     * 构建胎胚编码 → 结构名称映射（物料主数据反查，供成型在机双结构判定使用）。
+     *
+     * @param context 排程上下文（物料主数据 {@code materialInfoMap}，key=物料编码）
+     * @return 胎胚编码 → 结构名称
+     */
+    private Map<String, String> buildEmbryoStructureMap(LhScheduleContext context) {
+        Map<String, String> embryoStructureMap = new HashMap<>();
+        if (CollectionUtils.isEmpty(context.getMaterialInfoMap())) {
+            return embryoStructureMap;
+        }
+        for (MdmMaterialInfo materialInfo : context.getMaterialInfoMap().values()) {
+            if (Objects.nonNull(materialInfo)
+                    && StringUtils.isNotEmpty(materialInfo.getEmbryoCode())
+                    && StringUtils.isNotEmpty(materialInfo.getStructureName())) {
+                embryoStructureMap.putIfAbsent(materialInfo.getEmbryoCode(), materialInfo.getStructureName());
+            }
+        }
+        return embryoStructureMap;
+    }
+
+    /**
+     * 检测「前结构已结束」：MES 6 点交班在机标识（{@code HANDOVER_ONLINE='1'}）给出各机台当前在产结构，
+     * 结合 {@code T_MP_STRUCTURE_ALLOCATION} 的机台结构配置时间线，定位当前结构之前最近的异结构段；
+     * 该前结构在其全部配置机台上均已不再在产时判定为已结束，其下胎胚需要强制收尾。
+     *
+     * <p>与「在机双结构」判定互补：双结构判定要求 [T-1, T] 的在机快照同时存在前后两个结构，
+     * 结构切换发生在更早的班次后该条件即失效；本判定以交班在产结构为事实锚点、配置时间线为推导线，
+     * 跨天、跨月仍可判定。</p>
+     *
+     * <p>数据要求与兜底：</p>
+     * <ul>
+     *   <li>交班在机标识由 MES 6 点版本同步时置 '1'（成型侧 {@code CxMachineOnlineInfoServiceImpl#resolveHandoverOnline}），
+     *       窗口内无该标识时本判定整体跳过，保持原有「在机双结构 + 余量」口径，不改变既有结果；</li>
+     *   <li>同一机台交班在机存在多个结构（MES 残留）→ 该机台跳过并告警，宁可漏标不误杀；</li>
+     *   <li>结构配置时间线缺失（当月/上月无配置或排产版本为空）→ 对应机台判不出前结构，跳过；</li>
+     *   <li>前结构仍有配置机台无交班在机数据（停机/未上报）→ 无法确认已切走，本次不标。</li>
+     * </ul>
+     *
+     * @param context 排程上下文
+     * @return 前结构已结束判定结果（已结束的前结构 + 需强制收尾的胎胚）；无法判定时返回空结果
+     */
+    private PrevStructureEndedResult detectPrevStructureEndedStructures(LhScheduleContext context) {
+        Set<String> emptySet = new LinkedHashSet<>();
+        PrevStructureEndedResult emptyResult = new PrevStructureEndedResult(emptySet, emptySet);
+        if (Objects.isNull(context.getScheduleDate()) || StringUtils.isEmpty(context.getFactoryCode())) {
+            log.warn("前结构已结束判定跳过, 原因: 排程日期或工厂编号为空");
+            return emptyResult;
+        }
+        // 1. 读取交班在机快照（HANDOVER_ONLINE='1'）：T 日与 T-1 日一起查，取最近一个有标识的日期
+        Date tDay = LhScheduleTimeUtil.clearTime(context.getScheduleDate());
+        Date yesterday = LhScheduleTimeUtil.addDays(tDay, -1);
+        List<CxMachineOnlineInfo> onlineInfos = cxMachineOnlineInfoMapper.selectList(
+                new LambdaQueryWrapper<CxMachineOnlineInfo>()
+                        .eq(CxMachineOnlineInfo::getFactoryCode, context.getFactoryCode())
+                        .in(CxMachineOnlineInfo::getOnlineDate, yesterday, tDay)
+                        .eq(CxMachineOnlineInfo::getHandoverOnline, HANDOVER_ONLINE_FLAG_ON)
+                        .orderByDesc(CxMachineOnlineInfo::getUpdateTime));
+        if (CollectionUtils.isEmpty(onlineInfos)) {
+            log.warn("前结构已结束判定跳过, 原因: [{} ~ {}] 无交班在机标识(HANDOVER_ONLINE=1)数据",
+                    LhScheduleTimeUtil.formatDate(yesterday), LhScheduleTimeUtil.formatDate(tDay));
+            return emptyResult;
+        }
+        Date latestOnlineDate = onlineInfos.stream()
+                .map(CxMachineOnlineInfo::getOnlineDate)
+                .filter(Objects::nonNull)
+                .max(Date::compareTo)
+                .orElse(null);
+        List<CxMachineOnlineInfo> latestOnlineInfos = onlineInfos.stream()
+                .filter(info -> Objects.nonNull(info.getOnlineDate()) && info.getOnlineDate().equals(latestOnlineDate))
+                .collect(Collectors.toList());
+        // 2. 交班在机 -> 机台当前在产结构（物料主数据反查胎胚所属结构）
+        Map<String, String> embryoStructureMap = this.buildEmbryoStructureMap(context);
+        Map<String, Set<String>> machineStructureSetMap = new LinkedHashMap<>();
+        for (CxMachineOnlineInfo onlineInfo : latestOnlineInfos) {
+            if (StringUtils.isEmpty(onlineInfo.getCxCode()) || StringUtils.isEmpty(onlineInfo.getMaterialCode())) {
+                continue;
+            }
+            String structureName = embryoStructureMap.get(onlineInfo.getMaterialCode());
+            if (StringUtils.isEmpty(structureName)) {
+                continue;
+            }
+            machineStructureSetMap.computeIfAbsent(onlineInfo.getCxCode(), key -> new LinkedHashSet<>())
+                    .add(structureName);
+        }
+        Map<String, String> machineCurrentStructureMap = new LinkedHashMap<>();
+        for (Map.Entry<String, Set<String>> entry : machineStructureSetMap.entrySet()) {
+            if (entry.getValue().size() > 1) {
+                log.warn("前结构已结束判定跳过机台, 原因: 交班在机同时存在多个结构, 机台={}, 结构={}",
+                        entry.getKey(), entry.getValue());
+                continue;
+            }
+            machineCurrentStructureMap.put(entry.getKey(), entry.getValue().iterator().next());
+        }
+        if (machineCurrentStructureMap.isEmpty()) {
+            log.warn("前结构已结束判定跳过, 原因: 交班在机无法定位当前在产结构, 在机行数={}", latestOnlineInfos.size());
+            return emptyResult;
+        }
+        // 3. 加载机台结构配置时间线（月度配置 + 逐月排产版本，最多回溯 PREV_STRUCTURE_MONTH_LOOKBACK 个月）
+        Map<String, List<StructureSegment>> machineTimelineMap = this.loadMachineStructureTimeline(context);
+        if (CollectionUtils.isEmpty(machineTimelineMap)) {
+            log.warn("前结构已结束判定跳过, 原因: 结构配置时间线为空, 交班在机机台数={}",
+                    machineCurrentStructureMap.size());
+            return emptyResult;
+        }
+        // 4. 纯函数判定：机台当前结构 -> 前结构 -> 结构级收敛
+        Set<String> endedStructureSet = resolvePrevStructureEndedStructures(
+                machineCurrentStructureMap, machineTimelineMap);
+        // 5. 前结构下的胎胚 = 强制收尾对象
+        Set<String> endedEmbryoCodeSet = embryoStructureMap.entrySet().stream()
+                .filter(entry -> endedStructureSet.contains(entry.getValue()))
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        // 6. 判定明细日志：每台机的「当前结构 -> 前结构」，便于现场核对配置时间线取值
+        String machineDetail = machineCurrentStructureMap.entrySet().stream()
+                .map(entry -> {
+                    List<StructureSegment> segments = machineTimelineMap.getOrDefault(
+                            entry.getKey(), Collections.emptyList());
+                    int currentIndex = indexOfStructure(segments, entry.getValue());
+                    String prevStructure = currentIndex > 0
+                            ? segments.get(currentIndex - 1).getStructureName() : "-";
+                    return entry.getKey() + ": " + entry.getValue() + " -> " + prevStructure;
+                })
+                .collect(Collectors.joining(", "));
+        log.info("前结构已结束判定完成, 交班在机日期={}, 在机行数={}, 可判定机台数={}, 机台明细=[{}], 前结构集合={}, 命中胎胚数={}",
+                LhScheduleTimeUtil.formatDate(latestOnlineDate), latestOnlineInfos.size(),
+                machineCurrentStructureMap.size(), machineDetail, endedStructureSet, endedEmbryoCodeSet.size());
+        return new PrevStructureEndedResult(endedStructureSet, endedEmbryoCodeSet);
+    }
+
+    /**
+     * 加载机台结构配置时间线（月度配置 + 逐月排产版本，最多回溯 {@link #PREV_STRUCTURE_MONTH_LOOKBACK} 个月）。
+     *
+     * <p>跨月要点：</p>
+     * <ul>
+     *   <li>月初的「前结构」通常在上月配置中，因此从排程日所在月往前逐月加载；</li>
+     *   <li>同一结构跨月连续出现（如上月段 + 当月段）时合并为一段，避免把同一结构当成自己的前结构；</li>
+     *   <li>某月排产版本为空 → 该月跳过并告警（不因缺月整体失败，缺失月份的机台判不出前结构）；</li>
+     *   <li>段起点用「年*10000 + 月*100 + 开始日」复合键排序，跨年/跨月先后顺序天然正确。</li>
+     * </ul>
+     *
+     * @param context 排程上下文
+     * @return 机台 -> 结构段列表（按段起点升序、同结构相邻段已合并）；无配置时返回空 Map
+     */
+    private Map<String, List<StructureSegment>> loadMachineStructureTimeline(LhScheduleContext context) {
+        Map<String, List<StructureSegment>> machineSegmentMap = new LinkedHashMap<>();
+        LocalDate scheduleLocalDate = context.getScheduleDate().toInstant()
+                .atZone(ZoneId.systemDefault()).toLocalDate();
+        YearMonth startYearMonth = YearMonth.from(scheduleLocalDate);
+        for (int i = 0; i < PREV_STRUCTURE_MONTH_LOOKBACK; i++) {
+            YearMonth yearMonth = startYearMonth.minusMonths(i);
+            String productionVersion = this.resolveProductionVersion(
+                    context, yearMonth.getYear(), yearMonth.getMonthValue());
+            if (StringUtils.isEmpty(productionVersion)) {
+                log.warn("前结构时间线月份跳过, 原因: 排产版本为空, 月份={}", yearMonth);
+                continue;
+            }
+            List<MpStructureAllocation> allocationList = lhMpStructureAllocationMapper.selectList(
+                    new LambdaQueryWrapper<MpStructureAllocation>()
+                            .select(MpStructureAllocation::getStructureName,
+                                    MpStructureAllocation::getCxMachineCode,
+                                    MpStructureAllocation::getBeginDay)
+                            .eq(MpStructureAllocation::getFactoryCode, context.getFactoryCode())
+                            .eq(MpStructureAllocation::getYear, yearMonth.getYear())
+                            .eq(MpStructureAllocation::getMonth, yearMonth.getMonthValue())
+                            .eq(MpStructureAllocation::getProductionVersion, productionVersion)
+                            .eq(MpStructureAllocation::getPlanType, STRUCTURE_ALLOCATION_NORMAL_PLAN_TYPE));
+            for (MpStructureAllocation allocation : allocationList) {
+                if (StringUtils.isEmpty(allocation.getCxMachineCode())
+                        || StringUtils.isEmpty(allocation.getStructureName())
+                        || Objects.isNull(allocation.getBeginDay())) {
+                    continue;
+                }
+                int beginComposite = yearMonth.getYear() * 10000 + yearMonth.getMonthValue() * 100
+                        + allocation.getBeginDay();
+                machineSegmentMap.computeIfAbsent(allocation.getCxMachineCode(), key -> new ArrayList<>())
+                        .add(new StructureSegment(allocation.getStructureName(), beginComposite));
+            }
+        }
+        // 排序 + 同结构相邻段合并（跨月连续段合并，保留最早起点）
+        Map<String, List<StructureSegment>> mergedTimelineMap = new LinkedHashMap<>();
+        for (Map.Entry<String, List<StructureSegment>> entry : machineSegmentMap.entrySet()) {
+            List<StructureSegment> sortedSegments = entry.getValue().stream()
+                    .sorted(Comparator.comparingInt(StructureSegment::getBeginComposite))
+                    .collect(Collectors.toList());
+            List<StructureSegment> mergedSegments = new ArrayList<>();
+            for (StructureSegment segment : sortedSegments) {
+                if (!mergedSegments.isEmpty()
+                        && mergedSegments.get(mergedSegments.size() - 1).getStructureName()
+                        .equals(segment.getStructureName())) {
+                    continue;
+                }
+                mergedSegments.add(segment);
+            }
+            mergedTimelineMap.put(entry.getKey(), mergedSegments);
+        }
+        return mergedTimelineMap;
+    }
+
+    /**
+     * 前结构判定纯函数（便于单测）：机台当前在产结构 + 机台结构时间线 -> 已结束的前结构集合。
+     *
+     * <p>规则：</p>
+     * <ul>
+     *   <li>在机台时间线上定位当前结构（精确匹配优先，前缀互匹配兜底），取它起点之前最近的异结构段为前结构；</li>
+     *   <li>当前结构是时间线第一段（无前段）→ 该机台无候选；</li>
+     *   <li>结构级收敛：前结构的全部配置机台都必须有交班在机数据、且都不在产该前结构，才判定已结束
+     *       （多机台同结构时防止某台已切走、另一台仍在产被误杀）。</li>
+     * </ul>
+     *
+     * @param machineCurrentStructureMap 机台 -> 当前在产结构（来自交班在机标识）
+     * @param machineTimelineMap         机台 -> 结构时间线
+     * @return 已结束的前结构名称集合
+     */
+    static Set<String> resolvePrevStructureEndedStructures(
+            Map<String, String> machineCurrentStructureMap,
+            Map<String, List<StructureSegment>> machineTimelineMap) {
+        Set<String> endedStructureSet = new LinkedHashSet<>();
+        if (CollectionUtils.isEmpty(machineCurrentStructureMap) || CollectionUtils.isEmpty(machineTimelineMap)) {
+            return endedStructureSet;
+        }
+        // 结构 -> 配置机台集合（结构级收敛用）
+        Map<String, Set<String>> structureMachineMap = new LinkedHashMap<>();
+        for (Map.Entry<String, List<StructureSegment>> entry : machineTimelineMap.entrySet()) {
+            for (StructureSegment segment : entry.getValue()) {
+                structureMachineMap.computeIfAbsent(segment.getStructureName(), key -> new LinkedHashSet<>())
+                        .add(entry.getKey());
+            }
+        }
+        // 机台 -> 前结构候选
+        Set<String> prevStructureCandidateSet = new LinkedHashSet<>();
+        for (Map.Entry<String, String> entry : machineCurrentStructureMap.entrySet()) {
+            List<StructureSegment> segments = machineTimelineMap.get(entry.getKey());
+            int currentIndex = indexOfStructure(segments, entry.getValue());
+            if (currentIndex <= 0) {
+                continue;
+            }
+            String prevStructure = segments.get(currentIndex - 1).getStructureName();
+            if (StringUtils.isNotEmpty(prevStructure) && !prevStructure.equals(entry.getValue())) {
+                prevStructureCandidateSet.add(prevStructure);
+            }
+        }
+        // 结构级收敛：前结构的配置机台必须全部有交班在机数据且都不在产该结构
+        for (String prevStructure : prevStructureCandidateSet) {
+            Set<String> configuredMachines = structureMachineMap.get(prevStructure);
+            if (CollectionUtils.isEmpty(configuredMachines)) {
+                continue;
+            }
+            // 无交班在机数据的配置机台：停机或未上报，无法确认已切走 → 保守不标并告警
+            Set<String> unknownMachines = configuredMachines.stream()
+                    .filter(machineCode -> !machineCurrentStructureMap.containsKey(machineCode))
+                    .collect(Collectors.toCollection(LinkedHashSet::new));
+            if (!unknownMachines.isEmpty()) {
+                log.warn("前结构已结束判定跳过结构, 原因: 前结构配置机台无交班在机数据, 结构={}, 机台={}",
+                        prevStructure, unknownMachines);
+                continue;
+            }
+            // 仍有配置机台在产该结构：说明前结构只是部分机台切走 → 不判结束
+            Set<String> stillProducingMachines = configuredMachines.stream()
+                    .filter(machineCode -> prevStructure.equals(machineCurrentStructureMap.get(machineCode)))
+                    .collect(Collectors.toCollection(LinkedHashSet::new));
+            if (!stillProducingMachines.isEmpty()) {
+                log.info("前结构已结束判定跳过结构, 原因: 仍有配置机台在产该结构, 结构={}, 机台={}",
+                        prevStructure, stillProducingMachines);
+                continue;
+            }
+            endedStructureSet.add(prevStructure);
+        }
+        return endedStructureSet;
+    }
+
+    /**
+     * 在机台结构时间线上定位当前结构所在段（精确匹配优先，前缀互匹配兜底）。
+     *
+     * @param segments         结构时间线（按段起点升序）
+     * @param currentStructure 当前在产结构
+     * @return 段索引（同一结构多次出现时取最后一次）；定位不到返回 -1
+     */
+    private static int indexOfStructure(List<StructureSegment> segments, String currentStructure) {
+        if (CollectionUtils.isEmpty(segments) || StringUtils.isEmpty(currentStructure)) {
+            return -1;
+        }
+        for (int i = segments.size() - 1; i >= 0; i--) {
+            if (currentStructure.equals(segments.get(i).getStructureName())) {
+                return i;
+            }
+        }
+        // 前缀互匹配兜底：配置结构名可能带花纹后缀（如 275/70R22.5 与 275/70R22.5-12PR708F）
+        for (int i = segments.size() - 1; i >= 0; i--) {
+            String segmentStructure = segments.get(i).getStructureName();
+            if (StringUtils.isNotEmpty(segmentStructure)
+                    && (segmentStructure.startsWith(currentStructure)
+                    || currentStructure.startsWith(segmentStructure))) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * 机台结构配置段（结构配置时间线元素）。
+     */
+    static class StructureSegment {
+
+        /** 结构名称（T_MP_STRUCTURE_ALLOCATION.STRUCTURE_NAME） */
+        private final String structureName;
+
+        /** 段起点复合键：年*10000 + 月*100 + BEGIN_DAY，跨年跨月可直接比较先后 */
+        private final int beginComposite;
+
+        StructureSegment(String structureName, int beginComposite) {
+            this.structureName = structureName;
+            this.beginComposite = beginComposite;
+        }
+
+        String getStructureName() {
+            return structureName;
+        }
+
+        int getBeginComposite() {
+            return beginComposite;
+        }
+    }
+
+    /**
+     * 前结构已结束判定结果：已结束的前结构 + 这些结构下需强制收尾的胎胚。
+     */
+    static class PrevStructureEndedResult {
+
+        /** 已结束的前结构名称集合 */
+        private final Set<String> endedStructureSet;
+
+        /** 已结束前结构下的胎胚编码集合（强制收尾对象） */
+        private final Set<String> endedEmbryoCodeSet;
+
+        PrevStructureEndedResult(Set<String> endedStructureSet, Set<String> endedEmbryoCodeSet) {
+            this.endedStructureSet = endedStructureSet;
+            this.endedEmbryoCodeSet = endedEmbryoCodeSet;
+        }
+
+        Set<String> getEndedStructureSet() {
+            return endedStructureSet;
+        }
+
+        Set<String> getEndedEmbryoCodeSet() {
+            return endedEmbryoCodeSet;
+        }
     }
 
 

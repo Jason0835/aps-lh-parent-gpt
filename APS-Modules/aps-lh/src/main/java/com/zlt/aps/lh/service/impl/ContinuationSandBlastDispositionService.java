@@ -12,6 +12,7 @@ import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceAllocationResult;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceContext;
 import com.zlt.aps.lh.util.LhMouldCodeUtil;
+import com.zlt.aps.lh.util.CleaningDispositionResolver;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.MachineCleaningOverlapUtil;
@@ -128,6 +129,11 @@ public class ContinuationSandBlastDispositionService {
         }
         return machine.getCleaningWindowList().stream()
                 .filter(MachineCleaningOverlapUtil::isSandBlastCleaning)
+                .filter(window -> CleaningDispositionResolver.resolve(context, machine.getMachineCode(), window)
+                        .getDisposition() == CleaningDispositionResolver.Disposition.INDEPENDENT)
+                // 历史正规换模尚未提交时仍保留普通清洗；不能先执行离机喷砂改变其前料和模具。
+                .filter(window -> !CleaningDispositionResolver.hasPendingRegularChange(
+                        context, machine.getMachineCode(), window))
                 .filter(window -> Objects.nonNull(window.getCleanStartTime())
                         && Objects.nonNull(window.getCleanEndTime())
                         && window.getCleanStartTime().before(window.getCleanEndTime()))
@@ -180,6 +186,7 @@ public class ContinuationSandBlastDispositionService {
             event.setContinuationMaterialCode(materialCode);
             event.setContinuationProductStatus(sources.get(side).getProductStatus());
             event.setContinuationMaterialDesc(sources.get(side).getMaterialDesc());
+            event.setMouldReleaseTimeBeforeReplacement(new LinkedHashMap<>(originalReleaseTimes));
             // 始终保留 MES 实际原模具，不能拿替换模具填写清洗交替计划。
             event.setMouldCode(LhMouldCodeUtil.joinMouldCode(LhMouldCodeUtil.resolveInMachineMouldCodeSet(context, side)));
             if (replacement) {
@@ -230,7 +237,8 @@ public class ContinuationSandBlastDispositionService {
                     remaining, machine.getPlanStopStartTime(), machine.getPlanStopEndTime()));
         }
         for (String mouldCode : LhMouldCodeUtil.splitMouldCode(event.getMouldCode())) {
-            if (!event.isOffMachineCleaning()) {
+            if (!event.isOffMachineCleaning()
+                    && !event.getMouldReleaseTimeBeforeReplacement().containsKey(mouldCode)) {
                 event.getMouldReleaseTimeBeforeReplacement().put(mouldCode,
                         context.getPreScheduledMouldReleaseTimeMap().get(mouldCode));
             }
@@ -297,6 +305,54 @@ public class ContinuationSandBlastDispositionService {
     }
 
     /**
+     * 正式结果提交后解除已取消喷砂的模具清洗边界，保留来源事件供最终计划及回填追溯。
+     * 只恢复仍等于本事件清洗结束的边界，禁止覆盖后续合法事件；候选预演不得调用。
+     *
+     * @param context 已正式提交结果的当前批次上下文
+     */
+    public void reconcileCancelledEvents(LhScheduleContext context) {
+        boolean resourceChanged = false;
+        for (Map.Entry<String, MachineCleaningWindowDTO> entry : context.getContinuationSandBlastWindowMap().entrySet()) {
+            MachineCleaningWindowDTO event = entry.getValue();
+            CleaningDispositionResolver.Decision decision = CleaningDispositionResolver.resolve(
+                    context, entry.getKey(), event);
+            if (decision.getDisposition() == CleaningDispositionResolver.Disposition.INDEPENDENT) {
+                continue;
+            }
+            boolean changed = false;
+            for (Map.Entry<String, Date> original : event.getMouldReleaseTimeBeforeReplacement().entrySet()) {
+                if (!Objects.equals(context.getPreScheduledMouldReleaseTimeMap().get(original.getKey()),
+                        event.getCleanEndTime()) || Objects.equals(original.getValue(), event.getCleanEndTime())) {
+                    continue;
+                }
+                Date restoredTime = original.getValue();
+                if (Objects.nonNull(decision.getMouldChangeStartTime())
+                        && (Objects.isNull(restoredTime) || decision.getMouldChangeStartTime().after(restoredTime))) {
+                    // 取消清洗只解除清洗占用，原模具仍不能早于实际换模下模时刻被其他机台借用。
+                    restoredTime = decision.getMouldChangeStartTime();
+                }
+                if (Objects.isNull(restoredTime)) {
+                    context.getPreScheduledMouldReleaseTimeMap().remove(original.getKey());
+                } else {
+                    context.getPreScheduledMouldReleaseTimeMap().put(original.getKey(), restoredTime);
+                }
+                changed = true;
+            }
+            changed |= Objects.nonNull(context.getOnlySandBlastContinuationReleaseWindowMap().remove(entry.getKey()));
+            context.getOnlySandBlastContinuationRemainingQtyMap().remove(entry.getKey());
+            if (changed) {
+                log.info("取消喷砂并解除清洗模具占用, 工厂: {}, 批次: {}, 机台: {}, 来源计划: {}, 处置: {}",
+                        context.getFactoryCode(), context.getBatchNo(), entry.getKey(), event.getSourcePlanId(),
+                        decision.getDisposition());
+                resourceChanged = true;
+            }
+        }
+        if (resourceChanged) {
+            context.setMouldResourceContext(MouldResourceContext.from(context));
+        }
+    }
+
+    /**
      * 最终数量稳定后追加置换班次原因，不改续作身份、计划量或正常首检计数。
      * @param context 排程上下文
      */
@@ -304,6 +360,8 @@ public class ContinuationSandBlastDispositionService {
         for (LhScheduleResult result : context.getScheduleResultList()) {
             MachineCleaningWindowDTO event = context.getContinuationSandBlastWindowMap().get(result.getLhMachineCode());
             if (Objects.isNull(event) || StringUtils.isEmpty(event.getReplacementMouldCode())
+                    || CleaningDispositionResolver.resolve(context, result.getLhMachineCode(), event).getDisposition()
+                    != CleaningDispositionResolver.Disposition.INDEPENDENT
                     || !StringUtils.equals(ScheduleTypeEnum.CONTINUOUS.getCode(), result.getScheduleType())
                     || !StringUtils.equals(event.getContinuationMaterialCode(), result.getMaterialCode())
                     || !StringUtils.equals(event.getContinuationProductStatus(), result.getProductStatus())) {

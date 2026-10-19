@@ -4,15 +4,21 @@ import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
+import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
+import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
+import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
 import com.zlt.aps.lh.api.enums.SingleControlMachineModeEnum;
+import com.zlt.aps.lh.api.enums.SkuScheduleSourceTypeEnum;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * 单控机台工具类。
@@ -213,6 +219,89 @@ public final class LhSingleControlMachineUtil {
      */
     public static boolean isWholeMachineGranularitySku(LhScheduleContext context, SkuScheduleDTO sku) {
         return SingleControlMachineModeEnum.WHOLE_PAIR == resolveFrozenMode(context, sku);
+    }
+
+    /**
+     * 按冻结数量粒度及当前历史指定范围判断是否可使用单控整机。
+     * <p>独立历史试制量试必须同时具备本侧和配对侧的有效指定关系，不能因余量大于4条
+     * 将单侧指令扩散到另一侧；普通来源继续沿用冻结模式。</p>
+     *
+     * @param context 本批历史关系及模式快照
+     * @param sku 当前需求来源
+     * @param machineCode 当前运行态机台
+     * @return 冻结为整机且当前来源允许占用两侧时返回true
+     */
+    public static boolean isWholeMachineGranularitySku(LhScheduleContext context, SkuScheduleDTO sku,
+            String machineCode) {
+        if (!isWholeMachineGranularitySku(context, sku)) {
+            return false;
+        }
+        if (!StringUtils.equals(SkuScheduleSourceTypeEnum.PREVIOUS_ALTERNATE_TRIAL.getCode(), sku.getSourceType())) {
+            return true;
+        }
+        return context.getEligiblePreviousAlternatePlans().stream()
+                .filter(plan -> context.isEligiblePreviousAlternateCombination(sku, plan, machineCode))
+                .anyMatch(plan -> {
+                    LhMouldChangePlan pairPlan = resolvePairedPreviousAlternatePlan(context, sku, plan);
+                    return Objects.nonNull(pairPlan)
+                            && resolvePairedPreviousAlternatePlan(context, sku, pairPlan) == plan;
+                });
+    }
+
+    /**
+     * 判断结果对应的实际来源是否允许单控整机处理，覆盖来源登记前的首检与胶囊计算。
+     * <p>尚无来源对象的普通候选保留原有按物料状态读取冻结模式的口径。</p>
+     *
+     * @param context 本批来源及冻结模式
+     * @param result 当前候选或已提交结果
+     * @return 当前物料状态及历史范围均允许整机时返回true
+     */
+    public static boolean isWholeMachineGranularityResult(LhScheduleContext context, LhScheduleResult result) {
+        if (Objects.isNull(context) || Objects.isNull(result)) {
+            return false;
+        }
+        String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(result.getMaterialCode(), result.getProductStatus());
+        SkuScheduleDTO sourceSku = context.getScheduleResultSourceSkuMap().get(result);
+        if (Objects.isNull(sourceSku)) {
+            sourceSku = context.getAllSkuScheduleDtoMap().get(skuKey);
+        }
+        if (Objects.nonNull(sourceSku)) {
+            return isWholeMachineGranularitySku(context, sourceSku, result.getLhMachineCode());
+        }
+        return SingleControlMachineModeEnum.WHOLE_PAIR == context.getSingleControlModeSnapshotMap().get(skuKey);
+    }
+
+    /**
+     * 查找同一历史动作中唯一的配对侧指定关系，供整机声明和两侧正式来源登记共用。
+     *
+     * @param context 已按历史批次和日期过滤的有效关系
+     * @param sku 后物料及产品状态
+     * @param plan 当前侧历史指定关系
+     * @return 同批次、同计划日、同班次且后料状态一致的唯一配对侧关系；缺失或歧义时返回null
+     */
+    public static LhMouldChangePlan resolvePairedPreviousAlternatePlan(LhScheduleContext context,
+            SkuScheduleDTO sku, LhMouldChangePlan plan) {
+        if (Objects.isNull(context) || Objects.isNull(plan)
+                || !context.isEligiblePreviousAlternateCombination(sku, plan, plan.getLhMachineCode())
+                || !isConfiguredSingleControlMachine(context, plan.getLhMachineCode())
+                || StringUtils.isBlank(plan.getLhResultBatchNo()) || Objects.isNull(plan.getPlanDate())
+                || StringUtils.isBlank(plan.getBeforeMaterialCode())
+                || StringUtils.isBlank(plan.getClassIndex())
+                || !MouldChangeTypeEnum.containsAnyCode(plan.getChangeMouldType(),
+                        MouldChangeTypeEnum.REGULAR.getCode(), MouldChangeTypeEnum.TYPE_BLOCK.getCode())) {
+            return null;
+        }
+        String pairMachineCode = resolvePairMachineCode(plan.getLhMachineCode());
+        List<LhMouldChangePlan> pairPlans = context.getEligiblePreviousAlternatePlans().stream()
+                .filter(candidate -> context.isEligiblePreviousAlternateCombination(sku, candidate, pairMachineCode))
+                .filter(candidate -> StringUtils.equals(plan.getLhResultBatchNo(), candidate.getLhResultBatchNo()))
+                .filter(candidate -> Objects.nonNull(candidate.getPlanDate())
+                        && LhScheduleTimeUtil.isSameDay(plan.getPlanDate(), candidate.getPlanDate()))
+                .filter(candidate -> StringUtils.equals(plan.getClassIndex(), candidate.getClassIndex()))
+                .filter(candidate -> StringUtils.equals(plan.getChangeMouldType(), candidate.getChangeMouldType()))
+                .filter(candidate -> StringUtils.isNotBlank(candidate.getBeforeMaterialCode()))
+                .collect(Collectors.toList());
+        return pairPlans.size() == 1 ? pairPlans.get(0) : null;
     }
 
     /**

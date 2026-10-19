@@ -266,7 +266,11 @@ public final class NewSpecMachineAssignmentPlan {
                                              Integer targetShiftIndex) {
         String materialCode = Objects.isNull(sku) ? "" : StringUtils.defaultString(sku.getMaterialCode());
         String productStatus = Objects.isNull(sku) ? "" : StringUtils.defaultString(sku.getProductStatus());
-        return StringUtils.defaultString(machineResourceCode) + "|" + materialCode + "|" + productStatus
+        String assignmentKey = StringUtils.defaultString(machineResourceCode) + "|" + materialCode + "|" + productStatus
                 + "|class" + (Objects.isNull(targetShiftIndex) ? 0 : targetShiftIndex);
+        // 同SKU不同喷砂来源拥有不同模具和时间边界，失败不能屏蔽普通补机或其他迁移来源。
+        String sourceMachineCode = Objects.isNull(sku) ? null : sku.getOnlySandBlastRequeueSourceMachineCode();
+        return StringUtils.isEmpty(sourceMachineCode) ? assignmentKey
+                : assignmentKey + "|sandBlastSource=" + sourceMachineCode;
     }
 }

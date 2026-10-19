@@ -29,7 +29,7 @@ public class StructureSwitchPlan implements Serializable {
      */
     LhShiftConfigVO firstQuantityShift;
     /**
-     * 本候选首个普通生产班P0（仅首检时取首检班）；规则S0/S1由时间产能判定独立维护。
+     * 本候选首个普通生产班P0（仅首检时取首检班）；规则S0/S1由续作标识及供胚班判定独立维护。
      */
     LhShiftConfigVO firstBatchShift;
     /**
@@ -49,7 +49,7 @@ public class StructureSwitchPlan implements Serializable {
      */
     boolean largeTimeline;
     /**
-     * 供胚时间产能判定；为空时保留适用范围之外的原首班规则。
+     * 后结构续作标识及供胚班判定；为空时保留适用范围之外的原首班规则。
      */
     StructureSwitchFirstShiftDecision firstShiftDecision;
 

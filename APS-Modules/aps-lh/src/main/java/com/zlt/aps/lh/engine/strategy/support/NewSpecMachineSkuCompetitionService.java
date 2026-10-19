@@ -229,6 +229,10 @@ public class NewSpecMachineSkuCompetitionService {
                             poolDate, candidate, "CANDIDATE_STATE", executableFailure);
                     continue;
                 }
+                if (this.rejectCachedReadOnlyEligibility(context, dayContext, shift,
+                        machineResource, poolDate, candidate, roundCache)) {
+                    continue;
+                }
                 roundCache.recordEvaluatedPair();
                 MachineSkuMatchResult matchResult = machineMatch.matchSkuOnMachine(
                         context, machineResource.getMachine(), candidate.getSku());
@@ -261,6 +265,8 @@ public class NewSpecMachineSkuCompetitionService {
                 String eligibilityFailureReason = candidateAttemptService
                         .resolveReadOnlyEligibilityFailure(context, candidate, matchResult);
                 if (StringUtils.isNotEmpty(eligibilityFailureReason)) {
+                    roundCache.putReadOnlyFailure(candidate, machineResource.getMachine().getMachineCode(),
+                            poolDate, shift.getShiftIndex(), eligibilityFailureReason);
                     roundCache.recordEligibilityRejected();
                     this.recordCandidateBusinessGateFailure(
                             candidate, eligibilityFailureReason,
@@ -476,6 +482,10 @@ public class NewSpecMachineSkuCompetitionService {
                             poolDate, candidate, "CANDIDATE_STATE", executableFailure);
                     continue;
                 }
+                if (this.rejectCachedReadOnlyEligibility(context, dayContext, shift,
+                        machineResource, poolDate, candidate, roundCache)) {
+                    continue;
+                }
                 roundCache.recordEvaluatedPair();
                 MachineSkuMatchResult matchResult = machineMatch.matchSkuOnMachine(
                         context, machineResource.getMachine(), candidate.getSku());
@@ -508,6 +518,8 @@ public class NewSpecMachineSkuCompetitionService {
                 String eligibilityFailureReason = candidateAttemptService
                         .resolveReadOnlyEligibilityFailure(context, candidate, matchResult);
                 if (StringUtils.isNotEmpty(eligibilityFailureReason)) {
+                    roundCache.putReadOnlyFailure(candidate, machineResource.getMachine().getMachineCode(),
+                            poolDate, shift.getShiftIndex(), eligibilityFailureReason);
                     roundCache.recordEligibilityRejected();
                     this.recordCandidateBusinessGateFailure(
                             candidate, eligibilityFailureReason,
@@ -1069,11 +1081,38 @@ public class NewSpecMachineSkuCompetitionService {
     }
 
     /**
+     * 复用同一资源版本的只读拒绝原因，避免其他组合失败回滚后再次硬匹配同一已拒绝候选。
+     *
+     * @param context 当前排程上下文
+     * @param dayContext 当前业务日阶段
+     * @param shift 当前资源竞争班次
+     * @param machineResource 被扫描的机台资源
+     * @param poolDate 当前日期池
+     * @param candidate 当前候选对象
+     * @param roundCache 成功提交或设备版本变化时失效的阶段缓存
+     * @return 已有确定拒绝原因时返回true，未命中时继续原匹配链
+     */
+    private boolean rejectCachedReadOnlyEligibility(LhScheduleContext context, DayScheduleContext dayContext,
+            LhShiftConfigVO shift, MachineResource machineResource, LocalDate poolDate,
+            DailyNewSpecCandidate candidate, NewSpecProposalRoundCache roundCache) {
+        String reason = roundCache.getReadOnlyFailure(candidate, machineResource.getMachine().getMachineCode(),
+                poolDate, shift.getShiftIndex());
+        if (StringUtils.isEmpty(reason)) {
+            return false;
+        }
+        roundCache.recordReadOnlyFailureCacheHit();
+        this.recordCandidateBusinessGateFailure(candidate, reason, READ_ONLY_ELIGIBILITY_FAILURE_PRIORITY);
+        this.traceMachineSkuDecision(context, dayContext, shift, machineResource, poolDate,
+                candidate, "READ_ONLY_ELIGIBILITY_CACHE", reason);
+        return true;
+    }
+
+    /**
      * 判断候选是否仍有资格进入当前机台扫描。
      *
      * @param candidate 当前日期池候选
-     * @param pendingSkuIdentitySet 当前仍待排 SKU 对象身份集合
-     * @return true-可进入扫描；false-已阻断、无剩余机会或已出队
+     * @param pendingSkuIdentitySet 当前仍待排SKU对象身份集合
+     * @return 拒绝原因；仍可进入扫描时为空
      */
     private String resolveExecutableFailure(
             DailyNewSpecCandidate candidate,

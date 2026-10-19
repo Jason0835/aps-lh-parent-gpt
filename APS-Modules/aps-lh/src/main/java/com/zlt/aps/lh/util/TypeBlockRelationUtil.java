@@ -33,7 +33,8 @@ public final class TypeBlockRelationUtil {
     /**
      * 判断机台当前在机物料与候选SKU是否满足换活字块关系：只要同模具即可。
      *
-     * <p>机台当前物料为空、与候选物料相同，或两侧模具关系集合无交集时返回 false。</p>
+     * <p>机台当前物料为空、与候选物料相同，或两侧模具关系集合无交集时返回 false。
+     * 喷砂转机候选还要求机台实际模具与来源事件的原模具整组一致。</p>
      *
      * @param context 排程上下文
      * @param machine 当前机台
@@ -51,6 +52,18 @@ public final class TypeBlockRelationUtil {
                 || StringUtils.equals(machineMaterialCode, sku.getMaterialCode())) {
             // 机台没有在机物料或候选物料就是在机物料本身时，不属于换活字块切换。
             return false;
+        }
+        // 喷砂迁移必须携带该来源原模具；其他共用模具的关系交集不能代替实际模具交接。
+        if (!CollectionUtils.isEmpty(context.resolveOnlySandBlastRequeueEvents(sku))) {
+            Set<String> actualMouldCodes = LhMouldCodeUtil.resolveInMachineMouldCodeSet(
+                    context, machine.getMachineCode());
+            boolean originalMouldMatched = context.resolveOnlySandBlastRequeueEvents(sku).stream()
+                    .map(event -> LhMouldCodeUtil.splitMouldCode(event.getMouldCode()))
+                    .anyMatch(originalMouldCodes -> !originalMouldCodes.isEmpty()
+                            && originalMouldCodes.equals(actualMouldCodes));
+            if (!originalMouldMatched) {
+                return false;
+            }
         }
         Set<String> machineMouldCodeSet = resolveMouldCodeSet(context, machineMaterialCode);
         Set<String> skuMouldCodeSet = resolveMouldCodeSet(context, sku.getMaterialCode());

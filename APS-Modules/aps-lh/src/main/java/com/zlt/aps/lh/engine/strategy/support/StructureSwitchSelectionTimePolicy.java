@@ -93,7 +93,7 @@ public final class StructureSwitchSelectionTimePolicy {
     }
 
     /**
-     * 使用同一规则首班计算等待偏移，不以实际首产班替换时间产能判定。
+     * 使用同一规则首班计算等待偏移，不以实际首产班替换冻结的首班判定。
      *
      * @param context 本批上下文
      * @param source 有效供胚来源

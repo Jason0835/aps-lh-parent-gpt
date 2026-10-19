@@ -33,7 +33,9 @@ public class StructureEarlyProductionAdmission implements Serializable {
     private int currentPlanMachineCount;
     /** 参与最后班次生产或业务停机占用的物理机台 */
     private Set<String> rawScheduledPhysicalMachineCodes = new LinkedHashSet<String>(8);
-    /** 按统一在机口径计入最后班次的物理机台 */
+    /**
+     * 扣除成型胎胚收尾豁免后计入最后班次结构配额的物理机台。
+     */
     private Set<String> scheduledPhysicalMachineCodes = new LinkedHashSet<String>(8);
     /** 结构已排硫化机台数 */
     private int scheduledStructureCount;

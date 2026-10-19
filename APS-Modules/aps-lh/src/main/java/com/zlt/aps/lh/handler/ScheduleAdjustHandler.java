@@ -186,7 +186,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
 
         // S4.3.3 标注收尾SKU（3天内可收尾）
         markEndingSkus(context);
-        // 共用胎胚库存只有在不同SKU同一天收尾时才按标准产能分摊，依赖收尾标注结果统一刷新。
+        // 共用胎胚为收尾时按原始余量占比冻结份额，不依赖SKU收尾标签或T日同日条件。
         getTargetScheduleQtyResolver().refreshAllSharedEmbryoStockAllocations(context, "S4.3收尾标注完成");
 
         /*

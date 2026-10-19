@@ -13,6 +13,7 @@ import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.component.EmbryoEndingStructureMachineExemptionPolicy;
 import com.zlt.aps.lh.util.FirstInspectionQtyUtil;
 import com.zlt.aps.lh.util.FirstInspectionAllocationUtil;
 import com.zlt.aps.lh.util.FirstInspectionTimingMode;
@@ -206,6 +207,7 @@ public final class StructureSwitchSchedulingPolicy {
 
     /**
      * 在完整窗口内解析规则首班及分班名额允许的最早首检或生产时间，准备动作不随名额后移。
+     * 未进入独立切换的普通入口继续执行有效供胚来源的新增名额，不授予普通准入豁免。
      *
      * @param context 排程上下文
      * @param sku 候选SKU
@@ -217,7 +219,9 @@ public final class StructureSwitchSchedulingPolicy {
             String machineCode, Date requestedStart) {
         CxEmbryoLhTime source = resolveSource(context, sku);
         if (Objects.isNull(source) || Objects.isNull(requestedStart)) {
-            return requestedStart;
+            // 普通入口仍须执行供胚新增名额，但不因此取得独立切换或普通结构名额豁免。
+            return EmbryoSupplyNewMachineLimitPolicy.resolveEarliestOccupationTime(
+                    context, sku, machineCode, requestedStart);
         }
         StructureSwitchFirstShiftDecision firstDecision =
                 StructureSwitchFirstShiftPolicy.resolve(context, source, sku, machineCode);
@@ -285,15 +289,14 @@ public final class StructureSwitchSchedulingPolicy {
      * @param productionStart 正式生产起点
      * @param sku 当前候选SKU
      * @param machineCode 运行态机台编码
-     * @param runtimeCapacity 正式内核使用的运行态班产
      * @return 含首班判定的计划，无实际量落点时为空
      */
     public static StructureSwitchPlan createPlan(LhScheduleContext context, CxEmbryoLhTime source,
             FirstInspectionAllocationPlan inspection, LhShiftConfigVO formalShift, Date baseStart,
-            Date productionStart, SkuScheduleDTO sku, String machineCode, int runtimeCapacity) {
+            Date productionStart, SkuScheduleDTO sku, String machineCode) {
         StructureSwitchPlan plan = createPlan(context, source, inspection, formalShift, baseStart, productionStart);
         return Objects.isNull(plan) ? null : plan.withFirstShiftDecision(
-                StructureSwitchFirstShiftPolicy.resolve(context, source, sku, machineCode, runtimeCapacity));
+                StructureSwitchFirstShiftPolicy.resolve(context, source, sku, machineCode));
     }
 
     /**
@@ -391,7 +394,7 @@ public final class StructureSwitchSchedulingPolicy {
         LhShiftConfigVO formalShift = FirstInspectionQtyUtil.resolveAttributionShift(shifts, formalStart);
         LhShiftConfigVO occupationShift = FirstInspectionQtyUtil.resolveAttributionShift(shifts, inspectionStart);
         StructureSwitchPlan preliminary = createPlan(context, source, inspection, formalShift, baseStart, formalStart,
-                sku, machineCode, capacity);
+                sku, machineCode);
         LhShiftConfigVO firstShift = preliminary.getFirstQuantityShift();
         StructureSwitchPlan plan = new StructureSwitchPlan(source, firstShift, preliminary.getFirstBatchShift(),
                 baseStart, formalStart, inspection, true, preliminary.getFirstShiftDecision());
@@ -425,7 +428,7 @@ public final class StructureSwitchSchedulingPolicy {
         Date embryoTime = resolveSource(context, sku).getEarliestLhTime();
         for (LhShiftConfigVO shift : shifts) {
             if (!changeStart.before(shift.getShiftEndDateTime())
-                    || FirstInspectionQtyUtil.isTrialTimeBasedFirstInspection(sku, shift, scheduleType)) {
+                    || FirstInspectionQtyUtil.isTrialTimeBasedFirstInspection(context, sku, shift, scheduleType)) {
                 continue;
             }
             int sequence = FirstInspectionQtyUtil.resolveNextFirstInspectionSequence(context, shift);
@@ -544,7 +547,22 @@ public final class StructureSwitchSchedulingPolicy {
      */
     public static String validate(LhScheduleContext context, StructureSwitchPlan plan, String machineCode,
             Map<Integer, Integer> actualQuantities) {
-        StructureMachineLimitDecision decision = evaluate(context, plan, null, machineCode, actualQuantities);
+        return validate(context, plan, null, machineCode, actualQuantities);
+    }
+
+    /**
+     * 按完整SKU身份校验结构切换分班数量，供换活字块和正式结果复核共用。
+     *
+     * @param context 排程上下文
+     * @param plan 冻结切换计划
+     * @param sku 当前候选或实际结果的SKU身份
+     * @param machineCode 候选机台编码
+     * @param actualQuantities 实际数量；预演传null
+     * @return 拒绝原因；通过返回null
+     */
+    public static String validate(LhScheduleContext context, StructureSwitchPlan plan, SkuScheduleDTO sku,
+            String machineCode, Map<Integer, Integer> actualQuantities) {
+        StructureMachineLimitDecision decision = evaluate(context, plan, sku, machineCode, actualQuantities);
         return Objects.isNull(decision) ? null : decision.getReason();
     }
 
@@ -606,20 +624,28 @@ public final class StructureSwitchSchedulingPolicy {
             // 正式提交尚未刷新索引时，合并真实正量结果；仍按物理机台去重。
             context.getScheduleResultList().stream().filter(result -> StringUtils.equals(structure, result.getStructureName()))
                     .filter(result -> quantity(result, shift.getShiftIndex()) > 0)
+                    .filter(result -> !EmbryoEndingStructureMachineExemptionPolicy.isExempt(context, structure,
+                            result.getEmbryoCode(), result.getStructureName(), shift))
                     .map(result -> LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode()))
                     .forEach(machines::add);
             int scheduledCount = machines.size();
-            if (occupies) {
+            boolean candidateExempt = Objects.nonNull(sku)
+                    && EmbryoEndingStructureMachineExemptionPolicy.isExempt(context, structure,
+                    sku.getEmbryoCode(), sku.getStructureName(), shift);
+            if (occupies && !candidateExempt) {
                 machines.add(physical);
             }
-            boolean allowed = machines.size() <= limit;
+            // 成型收尾豁免仅作用于数量，不改变上方规则首班及首检/生产不得提前的约束。
+            boolean allowed = (occupies && candidateExempt) || machines.size() <= limit;
             log.info("结构切换分班准入, sourceId={}, structure={}, machine={}, waitNotify={}, largeInch={}, "
-                            + "S0={}, P0={}, targetShift={}, scheduledCount={}, limit={}, allowed={}",
+                            + "S0={}, P0={}, targetShift={}, scheduledCount={}, limit={}, allowed={}, "
+                            + "embryoCode={}, candidateExempt={}",
                     plan.getSource().getId(), structure, machineCode,
                     Objects.equals(YES, plan.getSource().getIsWaitNotify()) ? YES : 0,
                     isLargeInch(plan.getSource()) ? YES : 0, anchor,
                     Objects.isNull(plan.getFirstBatchShift()) ? null : plan.getFirstBatchShift().getShiftStartDateTime(),
-                    shift.getShiftIndex(), scheduledCount, limit, allowed);
+                    shift.getShiftIndex(), scheduledCount, limit, allowed,
+                    Objects.isNull(sku) ? null : sku.getEmbryoCode(), candidateExempt);
             if (!allowed) {
                 String reason = new StringBuilder(SHIFT_LIMIT_REJECTION_PREFIX).append("，结构=").append(structure)
                         .append("，班次=").append(shift.getShiftIndex()).append("，已排=").append(scheduledCount)
@@ -972,7 +998,8 @@ public final class StructureSwitchSchedulingPolicy {
     }
 
     /**
-     * 在实际余量、班次总量和产能限制之后收敛P0数量；单控整机先按物理组取偶再分侧。
+     * 在原结构数量约束之后统一限制实际换模首班增量，单控整机沿用物理组计量口径。
+     *
      * @param context 排程上下文
      * @param sku 当前SKU
      * @param result 当前结果
@@ -980,9 +1007,27 @@ public final class StructureSwitchSchedulingPolicy {
      * @param proposed 原分配数量
      * @param capacity 未向上补量的产能
      * @param remaining 当前真实剩余量
-     * @return 实际允许数量
+     * @return 同时满足原规则及换模首班上限的实际增量
      */
     public static int capQuantity(LhScheduleContext context, SkuScheduleDTO sku, LhScheduleResult result,
+            LhShiftConfigVO shift, int proposed, int capacity, int remaining) {
+        int quantity = capStructureQuantity(context, sku, result, shift, proposed, capacity, remaining);
+        return ChangeoverFirstShiftQuantityPolicy.capIncrement(context, result, shift, quantity);
+    }
+
+    /**
+     * 继续执行原结构切换数量约束，再由公共切换首班策略收紧总量。
+     *
+     * @param context 排程上下文
+     * @param sku 当前SKU
+     * @param result 当前结果
+     * @param shift 当前班次
+     * @param proposed 原候选生产增量
+     * @param capacity 原产能上限
+     * @param remaining 当前真实剩余量
+     * @return 原结构切换规则允许的生产增量
+     */
+    private static int capStructureQuantity(LhScheduleContext context, SkuScheduleDTO sku, LhScheduleResult result,
             LhShiftConfigVO shift, int proposed, int capacity, int remaining) {
         StructureSwitchPlan plan = context.getStructureSwitchResultPlanMap().get(result);
         if (!isFirstBatch(context, plan, shift)) {
@@ -1031,6 +1076,8 @@ public final class StructureSwitchSchedulingPolicy {
 
     /**
      * 提交阶段按结构去重复核，仅为本次新结果打印提交明细，避免重复打印历史结果。
+     * 普通入口未绑定独立切换计划的结果仍须通过供胚新增名额复核。
+     *
      * @param context 排程上下文
      * @param firstNewResultIndex 本次提交前的结果数量
      * @return 拒绝原因；通过为空
@@ -1039,6 +1086,11 @@ public final class StructureSwitchSchedulingPolicy {
         if (!isEnabled(context)) {
             return null;
         }
+        // 普通新增及换活字块不一定绑定切换计划，先按最终正量复核新增物理机台名额。
+        String supplyMachineFailure = EmbryoSupplyNewMachineLimitPolicy.validateResults(context);
+        if (StringUtils.isNotEmpty(supplyMachineFailure)) {
+            return supplyMachineFailure;
+        }
         // 在已提交结果上复核供胚首班共享额度，失败交回原提交快照完整回滚。
         String quantityFailure = StructureSwitchFirstShiftQuantityPolicy.validateResults(context);
         if (StringUtils.isNotEmpty(quantityFailure)) {
@@ -1046,7 +1098,7 @@ public final class StructureSwitchSchedulingPolicy {
                     context.getBatchNo(), quantityFailure);
             return quantityFailure;
         }
-        // 回裁更新实际首产状态；规则S0/S1继续使用首个成功组合的时间产能判定。
+        // 回裁更新实际首产状态；规则S0/S1继续使用首个成功组合冻结的续作标识及供胚班判定。
         rebuildCommittedState(context);
         Set<String> validatedStructures = new LinkedHashSet<>(16);
         int resultIndex = 0;
@@ -1072,8 +1124,15 @@ public final class StructureSwitchSchedulingPolicy {
             }
             boolean firstStructureResult = validatedStructures.add(plan.getSource().getNextStructureName());
             // 每行独立核对规则首班下限，不能因同结构已校验过另一行而漏掉回裁后的提前量。
+            SkuScheduleDTO resultSku = new SkuScheduleDTO();
+            resultSku.setMaterialCode(result.getMaterialCode());
+            resultSku.setProductStatus(result.getProductStatus());
+            resultSku.setEmbryoCode(result.getEmbryoCode());
+            resultSku.setStructureName(result.getStructureName());
+            // 同结构首行可能豁免，新增非豁免行仍须按自己的身份复核数量，不能借用首行结论。
             String failure = Objects.nonNull(plan.getFirstShiftDecision()) || firstStructureResult
-                    ? validate(context, plan, result.getLhMachineCode(), quantities) : null;
+                    || (newResult && !context.getCxEmbryoEndingShiftIndex().isEmpty())
+                    ? validate(context, plan, resultSku, result.getLhMachineCode(), quantities) : null;
             if (StringUtils.isNotEmpty(failure)) {
                 return failure;
             }

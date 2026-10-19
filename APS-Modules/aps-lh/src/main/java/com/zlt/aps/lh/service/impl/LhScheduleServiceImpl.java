@@ -3,7 +3,6 @@ package com.zlt.aps.lh.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.date.DateUtil;
-import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -38,6 +37,7 @@ import com.zlt.aps.lh.engine.observer.ScheduleEvent;
 import com.zlt.aps.lh.engine.observer.ScheduleEventPublisher;
 import com.zlt.aps.lh.exception.ScheduleException;
 import com.zlt.aps.lh.mapper.*;
+import com.zlt.aps.lh.service.ILhMouldChangePlanService;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
 import com.zlt.aps.lh.service.ILhScheduleService;
 import com.zlt.aps.lh.util.*;
@@ -172,6 +172,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     private ILhScheduleResultService lhScheduleResultService;
 
     @Resource
+    private ILhMouldChangePlanService lhMouldChangePlanService;
+
+    @Resource
     private MdmSkuMouldRelMapper mdmSkuMouldRelMapper;
 
 
@@ -283,9 +286,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         context.setMonthPlanVersion(StringUtils.isNotEmpty(request.getMonthPlanVersion())
                 ? request.getMonthPlanVersion().trim() : request.getMonthPlanVersion());
         context.setOperator(StringUtils.isNotEmpty(request.getOperator()) ? request.getOperator().trim() : request.getOperator());
-        // 是否更新结构切换时间：未传（如定时任务、内部调用）按"不更新"处理，与前端默认不勾选一致
-        context.setUpdateStructureLhTime(StringUtils.isNotEmpty(request.getUpdateStructureLhTime())
-                ? request.getUpdateStructureLhTime().trim() : "0");
+        // 更新结构最早可供硫化时间：勾选时胎胚最早可供硫化时间会合并「窗口中间日（目标日）」成型批次，
+        // 用今天刚排出的成型数据更新与窗口第一天批次的重叠结构
+        context.setUpdateStructureLhTimeEnabled("1".equals(request.getUpdateStructureLhTime()));
         // 工厂名称来源于工厂枚举：116=越南，117=泰国
         context.setFactoryName(FactoryCodeEnum.getFactoryNameByCode(factoryCode));
         // 请求日期为排程目标日
@@ -833,6 +836,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         //1.获取导出数据
         AppUtils.formatData(mouldChangePlanList, lhMouldChangePlanController.getQueryFormulas());
         List<LhMouldChangePlanVo> mouldChangePlanExportList = lhMouldChangePlanController.buildLhMouldChangePlanVoList(mouldChangePlanList, mouldChangePlan);
+        lhMouldChangePlanService.applyTimedOffShiftStartRemark(mouldChangePlanList, mouldChangePlanExportList);
 
         Map<String, Object> mouldChangePlanTableMap = lhMouldChangePlanController.buildExportTableMap(result.getScheduleDate());
         lhMouldChangePlanController.setExportTitleFieldName(mouldChangePlanTableMap);
@@ -1059,6 +1063,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         int startRowIndex = placeholderMap.getOrDefault("_templateRowIndex", 6);
         int startExcelRowNum = startRowIndex + 1;
         int endExcelRowNum = startRowIndex + dataRowCount;
+        Set<LhScheduleResult> embryoStockHighlightResultSet =
+                this.buildEmbryoStockHighlightResultSet(exportList);
 
         try (ByteArrayInputStream inputStream = new ByteArrayInputStream(exportBytes);
              XSSFWorkbook workbook = new XSSFWorkbook(inputStream);
@@ -1100,13 +1106,12 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                         setNumericCell(row, dailyPlanQtyCol, dailyPlanValue);
                     }
                     // 20260911+ 余量收尾只判断主字段 isEnd=1，命中时标记“合计余量”列；
-                    // 胎胚库存收尾只判断 isEmbryoEnding=1，命中时标记“胎胚库存”列。
-                    // 两个主字段同时为1时，两列都需要标记颜色。
+                    // 胎胚确认收尾或已收尾只在同组最后有量行标记库存；余量标色独立判断。
                     byte[] endingHighlightColor = new byte[]{(byte) 0xFC, (byte) 0xD5, (byte) 0xB4};
                     if (ApsConstant.APS_STRING_1.equals(rowResult.getIsEnd()) && dailyPlanQtyCol >= 0) {
                         this.applyRowForegroundColor(workbook, row, dailyPlanQtyCol, endingHighlightColor);
                     }
-                    if (ApsConstant.APS_STRING_1.equals(rowResult.getIsEmbryoEnding())) {
+                    if (embryoStockHighlightResultSet.contains(rowResult)) {
                         int embryoStockCol = this.resolveExportColorColumn(placeholderMap, "embryoStock",
                                 dailyPlanQtyCol);
                         if (embryoStockCol >= 0) {
@@ -2957,7 +2962,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     /**
      * 构建硫化计划导出备注。
      * <p>先追加新开规格，再处理胎胚多机台库存收尾，最后处理物料多机台余量收尾。
-     * 同一行命中胎胚收尾时不再追加“确认收尾”，原备注保留。</p>
+     * 同一行命中胎胚收尾时只追加“把胎胚干完”，不追加“确认收尾”，原备注保留。</p>
      *
      * @param sortedList   当前排程日结果
      * @param scheduleDate 排程日期
@@ -2977,9 +2982,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 mouldChangePlanList);
         this.appendNewSpecExportRemarks(sortedList, recentlyProducedMaterialCodeSet,
                 mouldChangeAfterMaterialKeySet, remarkMap);
-        Map<String, Set<String>> skuMachineCodeSetMap = this.buildSkuMachineCodeSetMap(sortedList);
-        this.appendEmbryoEndingExportRemarks(sortedList, skuMachineCodeSetMap, remarkMap);
-        this.appendMaterialEndingExportRemarks(sortedList, skuMachineCodeSetMap, remarkMap);
+        this.appendEndingExportRemarks(sortedList, remarkMap);
         return remarkMap;
     }
 
@@ -3080,87 +3083,98 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
     /**
-     * 追加同物料多机台余量收尾备注。
-     */
-    private void appendMaterialEndingExportRemarks(
-            List<LhScheduleResult> sortedList,
-            Map<String, Set<String>> skuMachineCodeSetMap,
-            Map<LhScheduleResult, LinkedHashSet<String>> remarkMap) {
-        Map<String, List<LhScheduleResult>> materialEndingResultMap = sortedList.stream()
-                .filter(LhScheduleServiceImpl::hasAnyPlanQty)
-                .filter(result -> ApsConstant.APS_STRING_1.equals(result.getIsEnd()))
-                .filter(result -> !ApsConstant.APS_STRING_1.equals(result.getIsEmbryoEnding()))
-                .filter(result -> StringUtils.isNotBlank(result.getMaterialCode()))
-                .collect(Collectors.groupingBy(LhScheduleResult::getMaterialCode));
-        materialEndingResultMap.values().forEach(resultList -> {
-            Set<String> machineCodeSet = this.collectMachineCodeSet(resultList);
-            String materialCode = resultList.get(0).getMaterialCode();
-            Set<String> skuMachineCodeSet = skuMachineCodeSetMap.getOrDefault(
-                    materialCode, Collections.emptySet());
-            String remark = this.buildEndingRemark(
-                    MATERIAL_ENDING_REMARK_KEY, machineCodeSet, skuMachineCodeSet.size());
-            resultList.forEach(result -> this.appendExportRemark(remarkMap, result, remark));
-        });
-    }
-
-    /**
-     * 追加同SKU多机台胎胚库存收尾备注。
-     */
-    private void appendEmbryoEndingExportRemarks(
-            List<LhScheduleResult> sortedList,
-            Map<String, Set<String>> skuMachineCodeSetMap,
-            Map<LhScheduleResult, LinkedHashSet<String>> remarkMap) {
-        Map<String, List<LhScheduleResult>> embryoEndingResultMap = sortedList.stream()
-                .filter(LhScheduleServiceImpl::hasAnyPlanQty)
-                .filter(result -> ApsConstant.APS_STRING_1.equals(result.getIsEmbryoEnding()))
-                .filter(result -> StringUtils.isNotBlank(result.getMaterialCode()))
-                .collect(Collectors.groupingBy(LhScheduleResult::getMaterialCode));
-        embryoEndingResultMap.values().forEach(resultList -> {
-            Set<String> machineCodeSet = this.collectMachineCodeSet(resultList);
-            String materialCode = resultList.get(0).getMaterialCode();
-            Set<String> skuMachineCodeSet = skuMachineCodeSetMap.getOrDefault(
-                    materialCode, Collections.emptySet());
-            String remark = this.buildEndingRemark(
-                    EMBRYO_ENDING_REMARK_KEY, machineCodeSet, skuMachineCodeSet.size());
-            resultList.forEach(result -> this.appendExportRemark(remarkMap, result, remark));
-        });
-    }
-
-    /**
-     * 按SKU汇总当前有计划量的物理硫化机台。
+     * 收尾说明按胎胚整体备注一次；机台编码按同胎胚下的各物料分别备注。
      *
-     * @param resultList 当前导出排程结果
-     * @return key=物料编码，value=物理机台展示编码集合
+     * @param sortedList 当前排程的真实结果行
+     * @param remarkMap 结果行对应的导出备注
      */
-    private Map<String, Set<String>> buildSkuMachineCodeSetMap(List<LhScheduleResult> resultList) {
-        return resultList.stream()
+    private void appendEndingExportRemarks(
+            List<LhScheduleResult> sortedList,
+            Map<LhScheduleResult, LinkedHashSet<String>> remarkMap) {
+        Comparator<LhScheduleResult> plannedShiftComparator = this.buildExportLastPlannedShiftComparator();
+        this.buildEmbryoEndingExportGroupMap(sortedList).values().forEach(embryoResultList -> {
+            boolean embryoEnded = embryoResultList.stream()
+                    .anyMatch(result -> ApsConstant.APS_STRING_1.equals(result.getIsEmbryoEnding()));
+            String remarkKey = embryoEnded ? EMBRYO_ENDING_REMARK_KEY : MATERIAL_ENDING_REMARK_KEY;
+            embryoResultList.stream().max(plannedShiftComparator).ifPresent(lastEmbryoResult ->
+                    this.appendExportRemark(remarkMap, lastEmbryoResult,
+                            StringUtils.stripEnd(I18nUtil.getMessage(remarkKey), "\r\n")));
+            Map<String, List<LhScheduleResult>> materialResultMap = embryoResultList.stream()
+                    .collect(Collectors.groupingBy(result -> StringUtils.trimToEmpty(result.getMaterialCode()),
+                            LinkedHashMap::new, Collectors.toList()));
+            materialResultMap.values().forEach(materialResultList -> {
+                Set<String> materialMachineCodes = this.collectMachineCodeSet(materialResultList);
+                if (materialMachineCodes.size() < ENDING_REMARK_MACHINE_CODE_MIN_COUNT) {
+                    return;
+                }
+                materialResultList.stream().max(plannedShiftComparator).ifPresent(lastMaterialResult ->
+                        materialResultList.stream()
+                                .filter(result -> result != lastMaterialResult)
+                                .findFirst().ifPresent(machineCodeResult ->
+                                        this.appendExportRemark(remarkMap, machineCodeResult,
+                                                String.join("/", materialMachineCodes))));
+            });
+        });
+    }
+
+    /**
+     * 按胎胚选择最后有量行，供收尾备注与库存标色共用。
+     * <p>不要求硫化班次标记为收尾；在有量行中比较最后有计划量的班次，
+     * 班次越晚越优先，同班次取该班计划量最大的一行，仍相同时沿用导出顺序首行。</p>
+     *
+     * @param resultList 当前真实排程行，Excel对齐列表中的参考行/占位行用null表示
+     * @return 最后有量行及其共用胎胚的全部有量结果
+     */
+    private Map<LhScheduleResult, List<LhScheduleResult>> buildEmbryoEndingExportGroupMap(
+            List<LhScheduleResult> resultList) {
+        Map<LhScheduleResult, List<LhScheduleResult>> endingGroupMap = new IdentityHashMap<>();
+        Map<List<String>, List<LhScheduleResult>> embryoGroupMap = resultList.stream()
+                .filter(Objects::nonNull)
                 .filter(LhScheduleServiceImpl::hasAnyPlanQty)
-                .filter(result -> StringUtils.isNotBlank(result.getMaterialCode()))
-                .collect(Collectors.groupingBy(LhScheduleResult::getMaterialCode))
+                .filter(result -> StringUtils.isNotBlank(result.getEmbryoCode()))
+                .collect(Collectors.groupingBy(result -> Arrays.asList(
+                        result.getFactoryCode(), result.getBatchNo(),
+                        Objects.nonNull(result.getScheduleDate()) ? DateUtil.formatDate(result.getScheduleDate()) : "",
+                        StringUtils.trimToEmpty(result.getEmbryoCode()))));
+        Comparator<LhScheduleResult> endingComparator = this.buildExportLastPlannedShiftComparator();
+        embryoGroupMap.values().forEach(group -> {
+            boolean embryoEnding = group.stream().anyMatch(result ->
+                    ApsConstant.APS_STRING_1.equals(result.getIsEmbryoEnding())
+                            || ApsConstant.APS_STRING_1.equals(result.getIsEmbryoConfirmEnding()));
+            if (embryoEnding) {
+                group.stream()
+                        .max(endingComparator)
+                        .ifPresent(result -> endingGroupMap.put(result, group));
+            }
+        });
+        return endingGroupMap;
+    }
+
+    /**
+     * 共用胎胚选收尾文案/库存标色行、各物料选机台编码行时统一比较最后有量班次和该班计划量。
+     *
+     * @return 同班次下计划量大的行优先的比较器
+     */
+    private Comparator<LhScheduleResult> buildExportLastPlannedShiftComparator() {
+        return Comparator.comparingInt(ShiftFieldUtil::resolveLastPlannedShiftIndex)
+                .thenComparingInt(result -> ShiftFieldUtil.getShiftPlanQty(
+                        result, ShiftFieldUtil.resolveLastPlannedShiftIndex(result)));
+    }
+
+    /**
+     * 胎胚已收尾或窗口期（T～T+2）确认收尾时，只标记同组最终有量行的库存。
+     *
+     * @param resultList 与Excel对齐的真实排程结果
+     * @return 需要标记库存淡橙色的结果行，使用对象身份匹配Excel行
+     */
+    private Set<LhScheduleResult> buildEmbryoStockHighlightResultSet(List<LhScheduleResult> resultList) {
+        return this.buildEmbryoEndingExportGroupMap(resultList)
                 .entrySet().stream()
-                .collect(Collectors.toMap(
-                        Map.Entry::getKey,
-                        entry -> this.collectMachineCodeSet(entry.getValue())));
-    }
-
-    /**
-     * 构建收尾备注。同一SKU只开一台物理机台时仅显示备注文字，
-     * 开两台及以上时换行追加本次收尾机台编码。
-     *
-     * @param remarkKey          收尾备注国际化Key
-     * @param endingMachineCodes 本次收尾机台编码
-     * @param skuMachineCount    当前SKU有计划量的物理机台数
-     * @return 收尾备注
-     */
-    private String buildEndingRemark(String remarkKey,
-                                     Set<String> endingMachineCodes,
-                                     int skuMachineCount) {
-        String remark = StringUtils.stripEnd(I18nUtil.getMessage(remarkKey), "\r\n");
-        if (skuMachineCount < ENDING_REMARK_MACHINE_CODE_MIN_COUNT
-                || CollUtil.isEmpty(endingMachineCodes)) {
-            return remark;
-        }
-        return remark + EXPORT_REMARK_SEPARATOR + String.join("/", endingMachineCodes);
+                .filter(entry -> entry.getValue().stream().anyMatch(result ->
+                        ApsConstant.APS_STRING_1.equals(result.getIsEmbryoConfirmEnding())
+                                || ApsConstant.APS_STRING_1.equals(result.getIsEmbryoEnding())))
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toCollection(() -> Collections.newSetFromMap(new IdentityHashMap<>())));
     }
 
     /**
@@ -3213,10 +3227,20 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
     /**
-     * 合并原备注和本次导出动态备注，已有相同文案时不重复追加。
+     * 合并导出备注，隐藏结构计划机台数片段，已有相同文案时不重复追加。
+     * <p>仅处理Excel展示文本，不回写原备注，不调整提前生产的结构机台数判断。</p>
+     * <p>新增SKU、换活字块两条提前生产链路已不再向结果备注写入该文案，
+     * 这里的剔除只用于兼容历史批次结果。</p>
      */
     private String mergeExportRemarks(String originalRemark, LinkedHashSet<String> exportRemarkSet) {
         String mergedRemark = StringUtils.trimToEmpty(originalRemark);
+        if (StringUtils.contains(mergedRemark, "结构计划硫化机台数")) {
+            // 同步去掉该片段所属的提前生产场景前缀及其后分隔符，保留其他备注内容。
+            mergedRemark = mergedRemark.replaceAll(
+                    "(?:\\[(?:结构切换|结构收尾)\\]\\s*)?结构计划硫化机台数[：:]\\s*\\d+"
+                            + "(?:\\s*[,，]\\s*\\d+)*(?:[；;]|\\r?\\n)?", "");
+            mergedRemark = StringUtils.stripEnd(mergedRemark, "；;\r\n \t");
+        }
         if (CollUtil.isEmpty(exportRemarkSet)) {
             return mergedRemark;
         }
@@ -4198,7 +4222,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * <p>规则：同一机台发生收尾后，后续再次排产的规格视为收尾后的新开规格或再生产，
      * 机台/物料号/物料描述列涂灰；同时把对应收尾行的机台列涂灰。</p>
      * <p>规则 3（已移至 exportData 方法）：主字段 isEnd=1 的余量收尾行，
-     * dailyPlanQty（合计余量）列涂淡橙；isEmbryoEnding=1 的胎胚收尾行改为胎胚库存列涂淡橙。</p>
+     * dailyPlanQty（合计余量）列涂淡橙；isEmbryoConfirmEnding=1 的行胎胚库存列涂淡橙。</p>
      *
      * @param row       导出行数据
      * @param styleFlag 导出行样式标记

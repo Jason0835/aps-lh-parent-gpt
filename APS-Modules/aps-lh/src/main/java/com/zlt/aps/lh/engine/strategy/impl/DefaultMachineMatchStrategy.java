@@ -258,7 +258,13 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                     context, sku, mouldResourceContext, skuInch,
                     specialMaterialMatchResult, machine);
             if (MachineAvailabilityReason.AVAILABLE != availabilityReason) {
-                trace.recordAvailabilityReason(machine, availabilityReason);
+                String sharedEmbryoRejection = machineSupplyStructureRule.getSharedEmbryoSupplyRejectionReason(
+                        context, machine.getMachineCode(), sku);
+                if (StringUtils.isNotEmpty(sharedEmbryoRejection)) {
+                    trace.recordFilteredMachine(machine, sharedEmbryoRejection);
+                } else {
+                    trace.recordAvailabilityReason(machine, availabilityReason);
+                }
                 continue;
             }
             // 长时间停机只在存在其他可用机台时才触发换机，避免唯一候选机台被提前误排除。
@@ -398,7 +404,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     }
 
     /**
-     * 校验结构去向和专供机承接范围，输出同年月版本的双向关系。
+     * 校验结构去向、专供机承接范围和共用胎胚原在机范围，输出真实拒绝原因。
      *
      * @param context 排程上下文
      * @param machine 当前候选硫化机
@@ -425,6 +431,12 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                 .append("，机台允许结构=").append(machineSupplyStructureRule
                         .getAllowedStructuresForMachine(context, machine.getMachineCode(), sku))
                 .toString();
+        String sharedEmbryoRejection = machineSupplyStructureRule.getSharedEmbryoSupplyRejectionReason(
+                context, machine.getMachineCode(), sku);
+        if (StringUtils.isNotEmpty(sharedEmbryoRejection)) {
+            // 结构允许但胎胚范围拒绝时保留真实原因，避免未排详情误报为结构不匹配。
+            failureReason = sharedEmbryoRejection;
+        }
         if (!context.isPriorityTraceMuted()) {
             log.info("[专供结构约束] 过滤SKU, factoryCode: {}, batchNo: {}, scheduleDate: {}, "
                             + "machineCode: {}, materialCode: {}, productStatus: {}, skuStructure: {}, "

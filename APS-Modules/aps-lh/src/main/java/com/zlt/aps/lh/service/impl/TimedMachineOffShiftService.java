@@ -142,7 +142,7 @@ public class TimedMachineOffShiftService {
             String reason = deferredDay ? "6.1.7 顺延日优先早班，逐班检查硬约束"
                     : this.resolveRuleReason(morning, middle, morningMax);
             String handoffReason = preferStructureHandoff && Objects.nonNull(preview)
-                    ? preview.structureHandoffReason(request.getProfile().getOriginals().stream()
+                    ? preview.structureHandoffCandidateReason(request.getProfile().getOriginals().stream()
                             .map(LhScheduleResult::getLhMachineCode).collect(Collectors.toList()), date) : null;
             if (preferStructureHandoff && (Objects.isNull(handoffReason) || morning >= morningMax)) {
                 continue;
@@ -252,15 +252,12 @@ public class TimedMachineOffShiftService {
             }
             List<String> machineCodes = request.getProfile().getOriginals().stream()
                     .map(LhScheduleResult::getLhMachineCode).collect(Collectors.toList());
-            if (!ledger.hasStructureHandoff(machineCodes)) {
+            if (!ledger.hasStructureHandoffCandidate(machineCodes)) {
                 continue;
             }
-            OffMachineDecision candidate = this.resolveOffMachineTime(context, request.getStartDate(),
-                    original.getLhMachineCode(), request.getSourceSku(), request, ledger, true);
-            if (Objects.nonNull(candidate.getOffMachineTime())
-                    && candidate.getOffMachineTime().before(current.getOccupancyEndTime())) {
-                candidate = this.applyProductionBoundary(context, request, candidate);
-                this.movePreviewActions(context, ledger, request, candidate);
+            TimedMachineOffLoadPreview accepted = this.tryStructureHandoff(context, request, current, ledger, machineCodes);
+            if (Objects.nonNull(accepted)) {
+                ledger = accepted;
                 adjustedCount++;
             }
         }
@@ -268,6 +265,73 @@ public class TimedMachineOffShiftService {
                 + ", 请求扫描轮数=2, 结构接替提前释放数=" + adjustedCount + ", 整批负荷预演=沿用一次结果, 额外选机次数=0, 固定后料复核=按事件执行, 正式次数账本=未修改";
         log.info("按时间下机联合决策完成, {}", detail);
         PriorityTraceLogHelper.appendProcessLog(context, "按时间下机联合决策完成", detail);
+    }
+
+    /**
+     * 在隔离候选状态提前释放当前普通降模机台，完整固定重放通过后才保留决定。
+     * 主预演证据仅用于形成试算节点，失败不能清零前料或搬动余量收尾。
+     *
+     * @param context 当前正式时间决定及冻结余量收尾结果
+     * @param request 当前可调整的普通时间下机请求
+     * @param current 已确认的首轮释放决定
+     * @param ledger 当前独立模拟负荷
+     * @param machineCodes 当前物理机台的运行态编码
+     * @return 完整复核通过的模拟账本，候选不成立时为空
+     */
+    private TimedMachineOffLoadPreview tryStructureHandoff(LhScheduleContext context, TimedMachineOffRequest request,
+            OffMachineDecision current, TimedMachineOffLoadPreview ledger, List<String> machineCodes) {
+        List<SkuScheduleDTO> sources = new ArrayList<>(context.getContinuousSkuList());
+        sources.addAll(context.getNewSpecSkuList());
+        sources.addAll(context.getPreviousAlternateNewSpecCandidates());
+        sources.addAll(context.getScheduleResultSourceSkuMap().values());
+        sources.add(request.getSourceSku());
+        TimedMachineOffPreviewSnapshot snapshot = new TimedMachineOffPreviewSnapshot(context, sources);
+        boolean accepted = false;
+        boolean attempted = false;
+        try {
+            OffMachineDecision candidate = this.resolveOffMachineTime(context, request.getStartDate(),
+                    request.getProfile().getOriginals().get(0).getLhMachineCode(),
+                    request.getSourceSku(), request, ledger, true);
+            if (Objects.isNull(candidate.getOffMachineTime())
+                    || !candidate.getOffMachineTime().before(current.getOccupancyEndTime())) {
+                return null;
+            }
+            attempted = true;
+            log.info("按时间下机结构接替隔离试算, 工厂={}, 批次={}, 机台={}, 首轮释放={}, 候选规则节点={}",
+                    context.getFactoryCode(), context.getBatchNo(), String.join(",", machineCodes),
+                    LhScheduleTimeUtil.formatDateTime(current.getOccupancyEndTime()),
+                    LhScheduleTimeUtil.formatDateTime(candidate.getRuleOffMachineTime()));
+            candidate = this.applyProductionBoundary(context, request, candidate);
+            TimedMachineOffLoadPreview candidateLedger = ledger.copyForDecision();
+            this.movePreviewActions(context, candidateLedger, request, candidate);
+            String movements = candidateLedger.refreshStructureHandoffs(context);
+            LocalDate date = candidate.getPlanDate();
+            int[] counts = candidateLedger.countsFor(date, machineCodes);
+            if (Objects.isNull(candidateLedger.structureHandoffReason(machineCodes, date))
+                    || counts[MORNING_INDEX] >= LhScheduleTimeUtil.getMorningMouldChangeLimit(context, date.toString())
+                    || (long) counts[MORNING_INDEX] + counts[AFTERNOON_INDEX]
+                    >= LhScheduleTimeUtil.getDailyMouldChangeLimit(context, date.toString())) {
+                return null;
+            }
+            String detail = "批次=" + context.getBatchNo() + ", 机台=" + String.join(",", machineCodes)
+                    + ", 事件=" + movements + ", 结构接替证据=已随固定动作重验，正式次数账本=未修改";
+            log.info("按时间下机结构接替负荷复核, {}", detail);
+            PriorityTraceLogHelper.appendProcessLog(context, "按时间下机结构接替负荷复核", detail);
+            accepted = true;
+            return candidateLedger;
+        } finally {
+            if (!accepted) {
+                snapshot.restore(context);
+                if (attempted) {
+                    String detail = "工厂=" + context.getFactoryCode() + ", 批次=" + context.getBatchNo()
+                            + ", 机台=" + String.join(",", machineCodes) + ", 恢复释放="
+                            + LhScheduleTimeUtil.formatDateTime(current.getOccupancyEndTime())
+                            + ", 结论=隔离试算未提交，前料数量和首次下机决定已恢复";
+                    log.info("按时间下机结构接替未采用, {}", detail);
+                    PriorityTraceLogHelper.appendProcessLog(context, "按时间下机结构接替未采用", detail);
+                }
+            }
+        }
     }
 
     /**
@@ -376,7 +440,8 @@ public class TimedMachineOffShiftService {
         int quantity = this.resolveProfileQuantity(context, request, productionStart, decision);
         Date completed = request.getProfile().completionTime(quantity);
         Date physicalReady = request.getProfile().physicalReadyTime(
-                Objects.nonNull(completed) ? completed : productionStart.getShiftStartDateTime());
+                Objects.nonNull(completed) ? completed : productionStart.getShiftStartDateTime(),
+                decision.getRuleOffMachineTime());
         return Objects.nonNull(physicalReady) && !physicalReady.after(decision.getOffMachineTime());
     }
 

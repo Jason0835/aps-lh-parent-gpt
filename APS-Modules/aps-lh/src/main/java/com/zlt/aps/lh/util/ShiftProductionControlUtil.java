@@ -5,6 +5,7 @@ import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.ConstructionStageEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.engine.strategy.support.PreviousAlternateNormalProductionPolicy;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
@@ -87,20 +88,23 @@ public final class ShiftProductionControlUtil {
      * <p>试制SKU特殊豁免：试制SKU的换模/换活字块必须在早班完成、开产在中班，
      * 换模属于开产前的准备动作，不受开产模式限制。传入sku为null或非试制SKU时，
      * 退回到不传sku的原有逻辑。</p>
+     * <p>精确有效历史指定的试制量试采用正规准备规则，最早从真实释放时间尝试。</p>
      *
      * @param context 排程上下文
      * @param requestedSwitchStartTime 请求切换开始时间
      * @param sku 当前排产SKU，用于判断是否试制SKU豁免开产模式限制
-     * @return 收口后的最早切换开始时间；试制SKU直接返回请求时间
+     * @return 普通试制按早班调整，精确历史指定试制量试按正规开产模式收口
      */
     public static Date resolveEarliestSwitchStartTime(LhScheduleContext context,
                                                        Date requestedSwitchStartTime,
                                                        SkuScheduleDTO sku) {
-        // 试制SKU换模需在早班完成、生产从中班开始。开产模式不限制试制换模开始时间，
+        // 普通试制SKU换模需在早班完成，历史指定组合共用后面的正规开产模式约束。
+        // 开产模式不限制普通试制换模开始时间，
         // 但如果请求时间不在早班时段，需顺延到下一个早班开始时间，
         // 确保换模在早班内完成、生产从中班开始。
         if (Objects.nonNull(sku)
-                && Objects.equals(ConstructionStageEnum.TRIAL.getCode(), sku.getConstructionStage())) {
+                && Objects.equals(ConstructionStageEnum.TRIAL.getCode(), sku.getConstructionStage())
+                && !PreviousAlternateNormalProductionPolicy.usesNormalRules(context, sku)) {
             if (LhScheduleTimeUtil.isMorningShift(context, requestedSwitchStartTime)) {
                 return requestedSwitchStartTime;
             }

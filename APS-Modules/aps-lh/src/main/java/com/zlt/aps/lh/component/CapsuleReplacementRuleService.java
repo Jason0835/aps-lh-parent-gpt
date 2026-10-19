@@ -10,7 +10,6 @@ import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
-import com.zlt.aps.lh.api.enums.SingleControlMachineModeEnum;
 import com.zlt.aps.lh.context.LhScheduleConfig;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
@@ -975,15 +974,19 @@ public class CapsuleReplacementRuleService {
         return Objects.isNull(timeWindow) ? null : timeWindow.getReplacementEndTime();
     }
 
+    /**
+     * 判断当前结果是否为允许共同承担胶囊损失的单控整机，历史单侧指令不扩散。
+     *
+     * @param context 冻结模式及历史来源
+     * @param result 当前候选或已提交结果
+     * @return 当前来源允许整机处理时返回true
+     */
     private boolean isWholeSingleControlPairResult(LhScheduleContext context, LhScheduleResult result) {
         if (Objects.isNull(context) || Objects.isNull(result)
                 || !LhSingleControlMachineUtil.isSingleMouldMachine(result.getLhMachineCode())) {
             return false;
         }
-        String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
-                result.getMaterialCode(), result.getProductStatus());
-        return SingleControlMachineModeEnum.WHOLE_PAIR
-                == context.getSingleControlModeSnapshotMap().get(skuKey);
+        return LhSingleControlMachineUtil.isWholeMachineGranularityResult(context, result);
     }
 
     private List<LhScheduleResult> collectCurrentResults(LhScheduleContext context,

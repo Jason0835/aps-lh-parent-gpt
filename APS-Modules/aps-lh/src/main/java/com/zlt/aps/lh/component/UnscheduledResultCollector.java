@@ -384,7 +384,7 @@ public class UnscheduledResultCollector {
      * @param context 即将持久化的最终八班上下文
      */
     public void finalizeBeforePersistence(LhScheduleContext context) {
-        // 指定试制量试不进入虚拟机，必须在全部后置裁量结束后按最终真实产量补齐未排。
+        // 指定试制量试完成实机和虚拟补量后，按最终全部产量补齐未排。
         this.reconcilePreviousAlternateTrials(context);
         this.finalizeResults(context, true);
         // 先归并已有原因，再按最终八班结果补齐或清除本批余量收尾需求的真实缺口。
@@ -393,6 +393,8 @@ public class UnscheduledResultCollector {
 
     /**
      * 对指定交替试制量试核对最终真实缺口；登记关系不代表已排成功。
+     * 最终产量包含虚拟补余量，容量不足诊断优先于早期实机失败证据。
+     *
      * @param context 已完成全部真实排产及后置裁量的上下文
      */
     private void reconcilePreviousAlternateTrials(LhScheduleContext context) {
@@ -417,6 +419,13 @@ public class UnscheduledResultCollector {
                 continue;
             }
             LhUnscheduledResult existing = this.find(context, sku);
+            if (Objects.nonNull(existing) && StringUtils.equals(
+                    UnscheduledReasonEnum.VIRTUAL_MACHINE_CAPACITY_INSUFFICIENT.getCode(),
+                    existing.getUnscheduledReasonCode())) {
+                // 虚拟补量后仍有缺口时保留容量不足的最终诊断，不能被早期实机失败覆盖。
+                existing.setUnscheduledQty(remainingQty);
+                continue;
+            }
             String failure = context.getPreviousAlternateTrialFailureMap().get(entry.getKey());
             UnscheduledReasonEnum reason = StringUtils.isNotEmpty(failure)
                     ? this.resolveReasonCode(failure) : UnscheduledReasonEnum.WINDOW_FINAL_UNSCHEDULED;
@@ -425,7 +434,7 @@ public class UnscheduledResultCollector {
                 failure = existing.getUnscheduledReason();
                 reason = this.ensureReasonMetadata(existing);
             }
-            String detail = String.format("前日指定交替试制量试不进入虚拟机, 工厂=%s, 批次=%s, "
+            String detail = String.format("前日指定交替试制量试实机及虚拟补量后缺口, 工厂=%s, 批次=%s, "
                             + "物料=%s, 状态=%s, 真实已排=%s, 未排=%s, 指定承接证据=%s",
                     context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(), sku.getProductStatus(),
                     scheduledQty, remainingQty, StringUtils.defaultIfEmpty(failure, "排程窗口结束仍有未完成需求"));
@@ -562,6 +571,11 @@ public class UnscheduledResultCollector {
         }
         String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
                 result.getMaterialCode(), result.getProductStatus());
+        if (context.getSharedEmbryoStockEndingIdentityMap().containsKey(skuKey)) {
+            int remainingQty = targetScheduleQtyResolver.resolveSharedEmbryoEndingUnscheduledQty(context, skuKey);
+            result.setUnscheduledQty(remainingQty);
+            return remainingQty == 0;
+        }
         Integer embryoTargetQty = this.resolveNonSharedEmbryoEndingDemandTarget(context, snapshot, skuKey);
         boolean continuationZeroPlan = snapshot.isContinuationZeroPlanObserved()
                 || StringUtils.equals(CONTINUATION_ZERO_PLAN_REASON, result.getUnscheduledReason());

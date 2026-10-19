@@ -4,6 +4,7 @@ import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
+import com.zlt.aps.lh.component.StructureEndingAlignmentService;
 import com.zlt.aps.lh.component.StructureMinMachineRetentionService;
 import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
@@ -62,6 +63,11 @@ public class TimedMachineOffLoadPreviewService {
     private NewSpecProductionStrategy newSpecProductionStrategy;
     @Resource
     private StructureMinMachineRetentionService structureMinMachineRetentionService;
+    /**
+     * 固定动作重放与正式承接共用的结构班次索引构建入口。
+     */
+    @Resource
+    private StructureEndingAlignmentService structureEndingAlignmentService;
 
     /**
      * 每批只模拟一次相关释放机台，候选池和正式时间轴均复用原链路。
@@ -77,8 +83,8 @@ public class TimedMachineOffLoadPreviewService {
         }
         long started = System.nanoTime();
         LocalDate lastDate = requests.stream().map(TimedMachineOffRequest::getStartDate).max(LocalDate::compareTo).get();
-        Date lastMorning = TimedMachineOffReleaseResolver.resolveProductionStartShift(
-                context.getScheduleWindowShifts(), lastDate).getShiftStartDateTime();
+        Date loadPreviewBoundary = TimedMachineOffReleaseResolver.resolveProductionStartShift(
+                context.getScheduleWindowShifts(), lastDate).getShiftEndDateTime();
         Set<String> sourceMachineCodes = context.getScheduleResultList().stream()
                 .map(LhScheduleResult::getLhMachineCode).collect(Collectors.toCollection(LinkedHashSet::new));
         sourceMachineCodes.addAll(context.getPreviousAlternateReleaseEventMap().keySet());
@@ -106,17 +112,17 @@ public class TimedMachineOffLoadPreviewService {
         int proposalCount = 0;
         try {
             context.setTimedMachineOffLoadPreview(true);
+            // 补充历史下机仅在正式时间决策后执行；预演恢复原先无释放事件的输入，避免新增负荷改变原决定。
+            context.getPreviousAlternateReleaseEventMap().entrySet()
+                    .removeIf(entry -> entry.getValue().isSupplementalReleasePending());
             context.setTimedMachineOffActionPreviewCapture(capture);
             context.setStructureShiftInMachineIndex(null);
             // 先在模拟账本发布现有释放事实，正式上下文仍保留清零前画像和未消费日计划。
             timedMachineOffShiftService.resolveAndApply(context);
             IProductionStrategy continuous = strategyFactory.getProductionStrategy(ScheduleTypeEnum.CONTINUOUS.getCode());
             continuous.finalizeContinuousProduction(context);
-            Set<String> scope = sourceMachineCodes.stream().filter(code -> {
-                MachineScheduleDTO machine = context.getMachineScheduleMap().get(code);
-                return Objects.nonNull(machine) && Objects.nonNull(machine.getEstimatedEndTime())
-                        && !machine.getEstimatedEndTime().after(lastMorning);
-            }).collect(Collectors.toCollection(LinkedHashSet::new));
+            // 收尾结果只提供既定释放事实；早班内及班末释放的后料也会竞争当天额度。
+            Set<String> scope = this.collectReleasedMachineScope(context, sourceMachineCodes, loadPreviewBoundary);
             scopeSize = (int) scope.stream().map(LhSingleControlMachineUtil::resolvePhysicalMachineCode).distinct().count();
             if (!scope.isEmpty()) {
                 context.setNewSpecMachineResourceScopeCodeSet(scope);
@@ -144,9 +150,10 @@ public class TimedMachineOffLoadPreviewService {
             context.setActivePreviousAlternateEvent(previousEvent);
             context.setTimedMachineOffActionPreviewCapture(previousCapture);
         }
-        String detail = String.format("批次=%s, 请求数=%s, 相关物理机台=%s, 有量交替预演数=%s, "
+        String detail = String.format("批次=%s, 请求数=%s, 相关物理机台=%s, 释放范围截止=%s, 有量交替预演数=%s, "
                         + "负荷=%s, 耗时毫秒=%s, 正式数量和次数账本=已恢复",
-                context.getBatchNo(), requests.size(), scopeSize, proposalCount,
+                context.getBatchNo(), requests.size(), scopeSize,
+                LhScheduleTimeUtil.formatDateTime(loadPreviewBoundary), proposalCount,
                 counts.entrySet().stream().map(entry -> entry.getKey() + "=" + Arrays.toString(entry.getValue()))
                         .collect(Collectors.joining(";")), (System.nanoTime() - started) / 1_000_000L);
         log.info("按时间下机负荷预演完成, {}", detail);
@@ -154,7 +161,32 @@ public class TimedMachineOffLoadPreviewService {
         List<TimedMachineOffActionPreviewCapture.PreparedAction> successfulOperations = new ArrayList<>(operations);
         return new TimedMachineOffLoadPreview(counts, events, structureHandoffs,
                 (event, release, simulatedCounts) -> this.revalidateAction(
-                        context, successfulOperations, event, release, simulatedCounts));
+                        context, successfulOperations, event, release, simulatedCounts),
+                (currentEvents, simulatedCounts) -> this.revalidateStructureHandoffs(
+                        context, successfulOperations, requests, currentEvents, simulatedCounts));
+    }
+
+    /**
+     * 按已经发布的真实释放时间限定后料预演范围，不重新计算余量收尾数量或下机时间。
+     *
+     * @param context 已完成隔离续作提交的上下文
+     * @param sourceMachineCodes 原有结果及历史交替涉及的运行态机台
+     * @param boundary 最后需求日首个配置生产班次的结束时刻，包含该节点
+     * @return 整台物理机释放事实完整且不晚于边界的运行态机台集合
+     */
+    private Set<String> collectReleasedMachineScope(LhScheduleContext context,
+            Set<String> sourceMachineCodes, Date boundary) {
+        Set<String> unavailablePhysicalCodes = context.getMachineScheduleMap().entrySet().stream()
+                .filter(entry -> Objects.isNull(entry.getValue())
+                        || Objects.isNull(entry.getValue().getEstimatedEndTime())
+                        || entry.getValue().getEstimatedEndTime().after(boundary))
+                .map(entry -> LhSingleControlMachineUtil.resolvePhysicalMachineCode(entry.getKey()))
+                .collect(Collectors.toSet());
+        // 任一侧尚未就绪或缺少释放事实时，整台物理机都不能进入后料竞争。
+        return sourceMachineCodes.stream().filter(context.getMachineScheduleMap()::containsKey)
+                .filter(code -> !unavailablePhysicalCodes.contains(
+                        LhSingleControlMachineUtil.resolvePhysicalMachineCode(code)))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     /**
@@ -236,22 +268,7 @@ public class TimedMachineOffLoadPreviewService {
             // 只重新提交已冻结组合；关闭捕获，防止固定前缀递归扩展成候选扫描。
             context.setTimedMachineOffActionPreviewCapture(null);
             context.setTimedMachineOffLoadPreview(true);
-            Map<String, int[]> formalCounts = this.copyCounts(context.getDailyMouldChangeCountMap());
-            IProductionStrategy continuous = strategyFactory.getProductionStrategy(ScheduleTypeEnum.CONTINUOUS.getCode());
-            continuous.finalizeContinuousProduction(context);
-            Map<String, int[]> replayCounts = this.copyCounts(simulatedCounts);
-            Set<String> dates = new LinkedHashSet<>(formalCounts.keySet());
-            dates.addAll(context.getDailyMouldChangeCountMap().keySet());
-            for (String date : dates) {
-                int[] before = formalCounts.getOrDefault(date, new int[2]);
-                int[] after = context.getDailyMouldChangeCountMap().getOrDefault(date, new int[2]);
-                int[] replay = replayCounts.computeIfAbsent(date, ignored -> new int[2]);
-                for (int slot = 0; slot < replay.length; slot++) {
-                    replay[slot] += after[slot] - before[slot];
-                }
-            }
-            // 未重放的后续预算从首个前缀开始生效；保留当前续作提交可能产生的真实次数增量。
-            context.setDailyMouldChangeCountMap(replayCounts);
+            this.prepareReplayContext(context, simulatedCounts);
             Set<SkuScheduleDTO> initialized = Collections.newSetFromMap(new IdentityHashMap<>());
             Map<TimedMachineOffActionPreviewCapture.PreparedAction, Date> prefixActionTimes = new IdentityHashMap<>();
             Map<TimedMachineOffActionPreviewCapture.PreparedAction, Date> prefixReleaseTimes = new IdentityHashMap<>();
@@ -274,6 +291,89 @@ public class TimedMachineOffLoadPreviewService {
             context.setActivePreviousAlternateEvent(previousEvent);
             context.setTimedMachineOffActionPreviewCapture(previousCapture);
         }
+    }
+
+    /**
+     * 在当前时间下机决定上重放全部既定成功组合，同时重验模拟次数和结构接替证据。
+     * 只调用已捕获的固定提交内核，不重新选机，也不重新分配余量收尾。
+     *
+     * @param context 正式续作尚未扣账的上下文
+     * @param successfulOperations 主预演捕获的固定成功操作，包含无换模续排
+     * @param requests 本批可调整的普通时间下机请求
+     * @param events 当前模拟动作，基线动作不重复提交
+     * @param simulatedCounts 已扣除全部待重放动作预算的独立计数
+     * @return 同一次隔离重放的动作时间、真实释放和结构接替证明
+     */
+    private TimedMachineOffLoadPreview.StructureHandoffRevalidationResult revalidateStructureHandoffs(
+            LhScheduleContext context, List<TimedMachineOffActionPreviewCapture.PreparedAction> successfulOperations,
+            List<TimedMachineOffRequest> requests, List<TimedMachineOffLoadPreview.ChangeoverEvent> events,
+            Map<String, int[]> simulatedCounts) {
+        List<SkuScheduleDTO> sources = new ArrayList<>(context.getContinuousSkuList());
+        sources.addAll(context.getNewSpecSkuList());
+        sources.addAll(context.getPreviousAlternateNewSpecCandidates());
+        sources.addAll(context.getScheduleResultSourceSkuMap().values());
+        successfulOperations.stream().map(TimedMachineOffActionPreviewCapture.PreparedAction::getSource)
+                .forEach(sources::add);
+        TimedMachineOffPreviewSnapshot snapshot = new TimedMachineOffPreviewSnapshot(context, sources);
+        TimedMachineOffActionPreviewCapture previousCapture = context.getTimedMachineOffActionPreviewCapture();
+        PreviousAlternatePlanReleaseEvent previousEvent = context.getActivePreviousAlternateEvent();
+        try {
+            context.setTimedMachineOffActionPreviewCapture(null);
+            context.setTimedMachineOffLoadPreview(true);
+            this.prepareReplayContext(context, simulatedCounts);
+            Set<SkuScheduleDTO> initialized = Collections.newSetFromMap(new IdentityHashMap<>());
+            Map<TimedMachineOffActionPreviewCapture.PreparedAction, Date> actionTimes = new IdentityHashMap<>();
+            Map<TimedMachineOffActionPreviewCapture.PreparedAction, Date> releaseTimes = new IdentityHashMap<>();
+            List<TimedMachineOffActionPreviewCapture.PreparedAction> orderedOperations = successfulOperations.stream()
+                    .sorted(Comparator.comparingLong(TimedMachineOffActionPreviewCapture.PreparedAction::getSequence))
+                    .collect(Collectors.toList());
+            for (TimedMachineOffActionPreviewCapture.PreparedAction operation : orderedOperations) {
+                Date release = this.resolveActionRelease(context, operation, null);
+                Date start = this.replayAction(context, operation, release, initialized, sources);
+                if (operation.isChangeover()) {
+                    actionTimes.put(operation, start);
+                    releaseTimes.put(operation, release);
+                }
+            }
+            List<TimedMachineOffLoadPreview.ChangeoverEvent> successfulEvents = events.stream()
+                    .filter(event -> Objects.isNull(event.getPreparedAction())
+                            || Objects.nonNull(actionTimes.get(event.getPreparedAction())))
+                    .collect(Collectors.toList());
+            Map<String, Map<LocalDate, String>> handoffs = this.collectStructureHandoffs(
+                    context, requests, successfulEvents);
+            return new TimedMachineOffLoadPreview.StructureHandoffRevalidationResult(
+                    actionTimes, releaseTimes, handoffs);
+        } finally {
+            snapshot.restore(context);
+            context.setActivePreviousAlternateEvent(previousEvent);
+            context.setTimedMachineOffActionPreviewCapture(previousCapture);
+        }
+    }
+
+    /**
+     * 从当前稳定续作结果准备隔离账本与结构索引，固定前缀和目标共用同一占用口径。
+     *
+     * @param context 已开启负荷预演的上下文
+     * @param simulatedCounts 已扣除本次待重放动作预算的独立计数
+     */
+    private void prepareReplayContext(LhScheduleContext context, Map<String, int[]> simulatedCounts) {
+        Map<String, int[]> formalCounts = this.copyCounts(context.getDailyMouldChangeCountMap());
+        IProductionStrategy continuous = strategyFactory.getProductionStrategy(ScheduleTypeEnum.CONTINUOUS.getCode());
+        continuous.finalizeContinuousProduction(context);
+        Map<String, int[]> replayCounts = this.copyCounts(simulatedCounts);
+        Set<String> dates = new LinkedHashSet<>(formalCounts.keySet());
+        dates.addAll(context.getDailyMouldChangeCountMap().keySet());
+        for (String date : dates) {
+            int[] before = formalCounts.getOrDefault(date, new int[2]);
+            int[] after = context.getDailyMouldChangeCountMap().getOrDefault(date, new int[2]);
+            int[] replay = replayCounts.computeIfAbsent(date, ignored -> new int[2]);
+            for (int slot = 0; slot < replay.length; slot++) {
+                replay[slot] += after[slot] - before[slot];
+            }
+        }
+        // 后续预算与续作真实计数增量同时生效，不能将索引缺失误判为后料业务失败。
+        context.setDailyMouldChangeCountMap(replayCounts);
+        structureEndingAlignmentService.prepareStructureEndingAlignmentIndex(context);
     }
 
     /**
@@ -341,7 +441,10 @@ public class TimedMachineOffLoadPreviewService {
     /**
      * 只从完整内核已经排出正量的后料提取接替证据。早班已到结构上限且释放机台不在其中时，
      * 恢复该机早班生产会阻断已验证后料；此时才允许结构接替优先于中位均衡偏好。
-     * @param context 完整预演上下文 @param requests 可调整请求 @param events 成功换模事件
+     *
+     * @param context 完整预演上下文
+     * @param requests 可调整请求
+     * @param events 成功换模事件
      * @return 请求物理机台到各日结构接替证据
      */
     private Map<String, Map<LocalDate, String>> collectStructureHandoffs(LhScheduleContext context,
@@ -375,7 +478,9 @@ public class TimedMachineOffLoadPreviewService {
                 Set<String> scheduled = structureMinMachineRetentionService
                         .resolveEffectiveStructureMachineStatistics(context, structure, shift).getScheduledPhysicalMachineCodes();
                 int limit = context.getStructurePlanMachineCount(date, structure);
-                if (limit > 0 && scheduled.size() == limit && !scheduled.contains(physical)) {
+                if (limit > 0 && scheduled.size() == limit
+                        && !structureMinMachineRetentionService.collectStructureInMachinePhysicalCodes(
+                        context, structure, shift.getShiftIndex()).contains(physical)) {
                     handoffs.computeIfAbsent(physical, key -> new LinkedHashMap<>()).put(date,
                             "结构=" + structure + ", 班次=" + shift.getShiftIndex() + ", 已排=" + scheduled.size()
                                     + ", 上限=" + limit + ", 接替机台=" + String.join(",", successors));

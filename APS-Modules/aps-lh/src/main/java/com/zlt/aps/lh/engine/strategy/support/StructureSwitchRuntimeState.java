@@ -44,7 +44,7 @@ public class StructureSwitchRuntimeState implements Serializable {
      */
     String embryoCode;
     /**
-     * 首个成功组合冻结的时间产能判定，回裁不通过实际正量改写此依据。
+     * 首个成功组合冻结的续作标识及供胚班判定，回裁不通过实际正量改写此依据。
      */
     StructureSwitchFirstShiftDecision firstShiftDecision;
     /**

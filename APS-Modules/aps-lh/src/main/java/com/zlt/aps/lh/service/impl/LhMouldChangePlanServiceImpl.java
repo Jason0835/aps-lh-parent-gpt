@@ -8,6 +8,7 @@ import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.domain.RowStateEnum;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.redis.service.RedisService;
 import com.ruoyi.common.utils.StringUtils;
@@ -18,17 +19,20 @@ import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.lh.api.domain.vo.LhMouldChangePlanVo;
+import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
 import com.zlt.aps.lh.api.enums.ShiftEnum;
 import com.zlt.aps.lh.api.enums.TrialStatusEnum;
+import com.zlt.aps.lh.api.util.ShiftTimeParseUtil;
+import com.zlt.aps.lh.api.util.ShiftTypeParseUtil;
+import com.zlt.aps.lh.component.LhScheduleConfigResolver;
 import com.zlt.aps.lh.component.OrderNoGenerator;
-import com.zlt.aps.lh.mapper.LhMachineOnlineInfoMapper;
-import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
-import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
-import com.zlt.aps.lh.mapper.LhSharedMouldPatEntityMapper;
+import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.mapper.*;
 import com.zlt.aps.lh.service.ILhMouldChangePlanService;
 import com.zlt.aps.lh.service.ILhParamsService;
 import com.zlt.aps.lh.util.LhMouldCodeUtil;
+import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.maindata.mapper.LhMachineInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
@@ -134,6 +138,12 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
     @Resource
     private LhSharedMouldPatEntityMapper lhSharedMouldPatEntityMapper;
 
+    @Resource
+    private LhShiftConfigMapper lhShiftConfigMapper;
+
+    @Resource
+    private LhScheduleConfigResolver lhScheduleConfigResolver;
+
     @Autowired
     private ILhParamsService lhParamsService;
 
@@ -152,6 +162,218 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
 
     @Autowired
     private OrderNoGenerator orderNoGenerator;
+
+    /**
+     * 按时间下机且包含正规换模的计划，在导出备注中显示实际配置的班次开始时分。
+     *
+     * @param sourceList 原始计划列表，提供工厂、排程日期、计划日期及数据库主键
+     * @param exportList 导出视图列表，仅更新其备注字段
+     */
+    @Override
+    @Transactional(readOnly = true, rollbackFor = Exception.class)
+    public void applyTimedOffShiftStartRemark(List<LhMouldChangePlan> sourceList,
+                                              List<LhMouldChangePlanVo> exportList) {
+        if (CollectionUtils.isEmpty(sourceList) || CollectionUtils.isEmpty(exportList)
+                || lhShiftConfigMapper == null || lhScheduleConfigResolver == null) {
+            return;
+        }
+
+        Map<Long, LhMouldChangePlanVo> exportById = exportList.stream()
+                .filter(Objects::nonNull)
+                .filter(exportPlan -> exportPlan.getId() != null)
+                .collect(Collectors.toMap(LhMouldChangePlanVo::getId, exportPlan -> exportPlan,
+                        (firstPlan, duplicatePlan) -> firstPlan));
+        List<LhMouldChangePlan> timedOffPlanList = sourceList.stream()
+                .filter(Objects::nonNull)
+                .filter(plan -> plan.getId() != null && exportById.containsKey(plan.getId()))
+                .filter(plan -> YesOrNoEnum.YES.getCode().equals(plan.getEndType()))
+                .filter(plan -> MouldChangeTypeEnum.containsCode(plan.getChangeMouldType(),
+                        MouldChangeTypeEnum.REGULAR.getCode()))
+                .collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(timedOffPlanList)) {
+            return;
+        }
+
+        Set<String> factoryCodeSet = timedOffPlanList.stream()
+                .map(LhMouldChangePlan::getFactoryCode)
+                .filter(StringUtils::isNotBlank)
+                .map(StringUtils::trim)
+                .collect(Collectors.toSet());
+        if (CollectionUtils.isEmpty(factoryCodeSet)) {
+            log.warn("按时间下机计划导出备注未回填，计划缺少工厂编号");
+            return;
+        }
+
+        List<LhShiftConfig> shiftConfigList = lhShiftConfigMapper.selectList(
+                new LambdaQueryWrapper<LhShiftConfig>()
+                        .in(LhShiftConfig::getFactoryCode, factoryCodeSet)
+                        .orderByAsc(LhShiftConfig::getFactoryCode)
+                        .orderByAsc(LhShiftConfig::getShiftIndex));
+        if (CollectionUtils.isEmpty(shiftConfigList)) {
+            log.warn("按时间下机计划导出备注未回填，工厂未配置班次, factoryCodes: {}", factoryCodeSet);
+            return;
+        }
+        Map<String, List<LhShiftConfig>> shiftConfigByFactory = shiftConfigList.stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.groupingBy(LhShiftConfig::getFactoryCode));
+
+        Map<String, Integer> scheduleDaysByFactory = new HashMap<>();
+        for (String factoryCode : factoryCodeSet) {
+            LhScheduleContext scheduleContext = new LhScheduleContext();
+            scheduleContext.setFactoryCode(factoryCode);
+            lhScheduleConfigResolver.resolveAndAttach(scheduleContext);
+            scheduleDaysByFactory.put(factoryCode, LhScheduleTimeUtil.getScheduleDays(scheduleContext));
+        }
+
+        for (LhMouldChangePlan plan : timedOffPlanList) {
+            String factoryCode = StringUtils.trim(plan.getFactoryCode());
+            List<LhShiftConfig> factoryShiftConfigList = shiftConfigByFactory.get(factoryCode);
+            Integer scheduleDays = scheduleDaysByFactory.get(factoryCode);
+            if (plan.getScheduleDate() == null || plan.getPlanDate() == null
+                    || StringUtils.isBlank(plan.getClassIndex())
+                    || CollectionUtils.isEmpty(factoryShiftConfigList) || scheduleDays == null) {
+                log.warn("按时间下机计划导出备注未回填，计划数据或班次配置不完整, planId: {}, factoryCode: {}",
+                        plan.getId(), plan.getFactoryCode());
+                continue;
+            }
+
+            ShiftEnum planShiftType = ShiftEnum.getByMouldChangePlanStoredCode(plan.getClassIndex());
+            if (planShiftType == null) {
+                log.warn("按时间下机计划导出备注未回填，班次编码无法识别, planId: {}, classIndex: {}",
+                        plan.getId(), plan.getClassIndex());
+                continue;
+            }
+
+            int offsetDays = Math.max(0, scheduleDays - 2);
+            Date scheduleStartDate = DateUtil.offsetDay(DateUtil.beginOfDay(plan.getScheduleDate()), -offsetDays);
+            List<String> matchingStartTimes = factoryShiftConfigList.stream()
+                    .filter(Objects::nonNull)
+                    .filter(shiftConfig -> shiftConfig.getDateOffset() != null
+                            && shiftConfig.getDateOffset() >= 0
+                            && shiftConfig.getDateOffset() < scheduleDays)
+                    .filter(shiftConfig -> Objects.equals(planShiftType,
+                            ShiftTypeParseUtil.parse(shiftConfig.getShiftType())))
+                    .map(shiftConfig -> this.resolveShiftStartTimeOnPlanDate(
+                            shiftConfig, scheduleStartDate, plan.getPlanDate()))
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .collect(Collectors.toList());
+
+            if (matchingStartTimes.size() != 1) {
+                log.warn("按时间下机计划导出备注未回填，班次开始时间{}匹配, planId: {}, factoryCode: {}, "
+                                + "scheduleDate: {}, planDate: {}, classIndex: {}",
+                        matchingStartTimes.isEmpty() ? "未" : "存在冲突",
+                        plan.getId(), plan.getFactoryCode(), plan.getScheduleDate(),
+                        plan.getPlanDate(), plan.getClassIndex());
+                continue;
+            }
+
+            exportById.get(plan.getId()).setRemark(matchingStartTimes.get(0));
+        }
+    }
+
+    /**
+     * 按排程起始日、配置偏移和班次解析绝对开始时刻，并检查其自然日是否与计划日期一致。
+     *
+     * @param shiftConfig       工厂班次配置
+     * @param scheduleStartDate 排程窗口起始日 T 日
+     * @param planDate          模具交替计划日期
+     * @return 班次开始时分；配置无效或日期不匹配时返回null
+     */
+    private String resolveShiftStartTimeOnPlanDate(LhShiftConfig shiftConfig,
+                                                   Date scheduleStartDate,
+                                                   Date planDate) {
+        if (shiftConfig.getDateOffset() == null || StringUtils.isBlank(shiftConfig.getStartTime())
+                || StringUtils.isBlank(shiftConfig.getEndTime())) {
+            return null;
+        }
+        ShiftEnum shiftType = ShiftTypeParseUtil.parse(shiftConfig.getShiftType());
+        if (shiftType == null) {
+            return null;
+        }
+        try {
+            int[] startTimeParts = ShiftTimeParseUtil.parseToHms(shiftConfig.getStartTime());
+            ShiftTimeParseUtil.parseToHms(shiftConfig.getEndTime());
+            LhShiftConfigVO shiftConfigVO = new LhShiftConfigVO();
+            shiftConfigVO.setDateOffset(shiftConfig.getDateOffset());
+            shiftConfigVO.setShiftType(shiftType.getCode());
+            shiftConfigVO.setStartTime(shiftConfig.getStartTime().trim());
+            shiftConfigVO.setEndTime(shiftConfig.getEndTime().trim());
+            shiftConfigVO.setScheduleBaseDate(scheduleStartDate);
+            Date shiftStartDateTime = shiftConfigVO.getShiftStartDateTime();
+            if (shiftStartDateTime == null || !DateUtil.isSameDay(shiftStartDateTime, planDate)) {
+                return null;
+            }
+            return String.format("%02d:%02d", startTimeParts[0], startTimeParts[1]);
+        } catch (IllegalArgumentException exception) {
+            log.warn("班次配置时刻无效, factoryCode: {}, shiftIndex: {}",
+                    shiftConfig.getFactoryCode(), shiftConfig.getShiftIndex());
+            return null;
+        }
+    }
+
+    /**
+     * 保存页面维护的模具交替计划，校验清洗类型并处理显式清空。
+     *
+     * @param entity 待保存的计划；清洗类型为null表示未传，空字符串表示清空
+     * @return 框架保存的影响行数
+     * @throws ServiceException 清洗类型无效、同时选择两种清洗或清空字段失败时抛出
+     */
+    @Override
+    public int save(LhMouldChangePlan entity) {
+        boolean clearCleanType = entity.getId() != null && entity.getCleanType() != null
+                && StringUtils.isBlank(entity.getCleanType());
+        if (entity.getCleanType() == null && entity.getId() != null) {
+            // 旧调用方未提交字段时保留原值，历史多值不在本次保存中隐式修改。
+            LhMouldChangePlan origin = lhMouldChangePlanMapper.selectById(entity.getId());
+            if (origin != null) {
+                entity.setCleanType(origin.getCleanType());
+            }
+        } else {
+            entity.setCleanType(this.normalizeManualCleanType(entity.getCleanType()));
+        }
+        int savedRows = super.save(entity);
+        if (savedRows > 0 && clearCleanType) {
+            // 与普通保存共用服务事务，避免实体更新策略忽略null造成清空无效。
+            LambdaUpdateWrapper<LhMouldChangePlan> updateWrapper = new LambdaUpdateWrapper<>();
+            updateWrapper.eq(LhMouldChangePlan::getId, entity.getId())
+                    .set(LhMouldChangePlan::getCleanType, null);
+            if (lhMouldChangePlanMapper.update(null, updateWrapper) <= 0) {
+                // 兼容驱动仅返回实际变更行数：原字段已经为null时，清空目标已达成。
+                LhMouldChangePlan clearedPlan = lhMouldChangePlanMapper.selectById(entity.getId());
+                if (clearedPlan == null || clearedPlan.getCleanType() != null) {
+                    throw new ServiceException(I18nUtil.getMessage(
+                            "ui.data.alert.lhMouldChangePlan.cleanTypeClearFailed"));
+                }
+            }
+        }
+        return savedRows;
+    }
+
+    /**
+     * 校验页面提交的清洗类型，只允许空值、喷砂或干冰单选。
+     *
+     * @param cleanType 页面提交的清洗类型编码
+     * @return 去除首尾空格的有效编码，空值返回null
+     * @throws ServiceException 同时选择两种清洗或编码无效时抛出
+     */
+    private String normalizeManualCleanType(String cleanType) {
+        if (StringUtils.isBlank(cleanType)) {
+            return null;
+        }
+        String normalizedCleanType = cleanType.trim();
+        if (MouldChangeTypeEnum.containsCode(normalizedCleanType, MouldChangeTypeEnum.SAND_BLAST.getCode())
+                && MouldChangeTypeEnum.containsCode(normalizedCleanType, MouldChangeTypeEnum.DRY_ICE.getCode())) {
+            throw new ServiceException(I18nUtil.getMessage(
+                    "ui.data.alert.lhMouldChangePlan.cleanTypeSaveConflict"));
+        }
+        if (!MouldChangeTypeEnum.SAND_BLAST.getCode().equals(normalizedCleanType)
+                && !MouldChangeTypeEnum.DRY_ICE.getCode().equals(normalizedCleanType)) {
+            throw new ServiceException(I18nUtil.getMessage(
+                    "ui.data.alert.lhMouldChangePlan.cleanTypeSaveInvalid"));
+        }
+        return normalizedCleanType;
+    }
 
     @Override
     public String[] getQueryFormulas() {
@@ -407,11 +629,12 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
         if (plan == null) {
             return 2;
         }
-        String changeMouldType = plan.getChangeMouldType();
-        if (MouldChangeTypeEnum.containsAnyCode(changeMouldType,
+        String cleanType = plan.getCleanType();
+        if (MouldChangeTypeEnum.containsAnyCode(cleanType,
                 MouldChangeTypeEnum.SAND_BLAST.getCode(), MouldChangeTypeEnum.DRY_ICE.getCode())) {
             return 0;
         }
+        String changeMouldType = plan.getChangeMouldType();
         return MouldChangeTypeEnum.containsAnyCode(changeMouldType,
                 MouldChangeTypeEnum.REGULAR.getCode(), MouldChangeTypeEnum.TYPE_BLOCK.getCode()) ? 1 : 2;
     }
@@ -419,11 +642,13 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
     /**
      * 解析模具交替计划最终使用的模具号。
      *
-     * <p>换活字块计划取在机模具号后按原值优先的顺序合并：单控机台（编码以 L/R 结尾）只取
-     * 本侧在机模具号，双模机台按物理机台整机口径取，并按原值优先的顺序合并；
+     * <p>换活字块计划优先直接使用匹配到的在机模具号：单控机台（编码以 L/R 结尾）只取
+     * 本侧在机模具号，双模机台按物理机台整机口径取；未匹配到有效在机模具号时，保留并
+     * 归一化计划原模具号作为兜底；
      * 正规换模计划从后物料对应的共享模具配置中排除在机模具号后，稳定随机选择最多两副
      * 模具并直接覆盖原模具号；喷砂清洗和干冰清洗计划不填写模具号，其他类型继续沿用共享
-     * 模具配置和原有合并逻辑。</p>
+     * 模具配置和原有合并逻辑；交替类型为空且清洗类型为03/04的纯清洗计划跳过模具匹配，
+     * 并仅生成清洗备注。</p>
      *
      * <p>按计划记录的分厂和排程日期分组匹配来源数据，最终结果回填至原列表，供自动排程
      * 保存和模具号刷新使用；模具号解析完成后同步按业务规则重建备注。</p>
@@ -437,10 +662,24 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
             return planList == null ? Collections.emptyList() : planList;
         }
 
-        Map<String, Map<String, List<LhMouldChangePlan>>> previousPlanMap =
-                this.buildPreviousPlanMap(planList);
+        List<LhMouldChangePlan> mouldResolutionPlanList = planList.stream()
+                .filter(Objects::nonNull)
+                .filter(plan -> !this.isPureCleaningPlan(plan))
+                .collect(Collectors.toList());
+        planList.stream()
+                .filter(this::isPureCleaningPlan)
+                .forEach(plan -> {
+                    plan.setMouldCode("");
+                    plan.setRemark(this.buildMouldChangeRemark(plan, Collections.emptyMap()));
+                });
+        if (CollectionUtils.isEmpty(mouldResolutionPlanList)) {
+            return planList;
+        }
 
-        Map<String, Map<String, List<LhMouldChangePlan>>> factorySchedulePlanMap = planList.stream()
+        Map<String, Map<String, List<LhMouldChangePlan>>> previousPlanMap =
+                this.buildPreviousPlanMap(mouldResolutionPlanList);
+
+        Map<String, Map<String, List<LhMouldChangePlan>>> factorySchedulePlanMap = mouldResolutionPlanList.stream()
                 .filter(Objects::nonNull)
                 .collect(Collectors.groupingBy(plan -> StringUtils.defaultIfBlank(plan.getFactoryCode(), ""),
                         LinkedHashMap::new, Collectors.groupingBy(plan -> plan.getScheduleDate() == null
@@ -459,10 +698,19 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
                     String changeMouldType = plan.getChangeMouldType();
                     if (MouldChangeTypeEnum.containsCode(changeMouldType,
                             MouldChangeTypeEnum.TYPE_BLOCK.getCode())) {
-                        // 换活字块沿用在机模具号，单控机台只取本侧，不与配对侧拼接。
+                        // 命中在机同步时以同步模具号为准；单控机台仍只匹配本侧，不与配对侧拼接。
                         String matchedMouldCode = this.resolveSingleSideOnlineMouldCode(plan, onlineInfoMap);
-                        plan.setMouldCode(this.mergeMouldCode(plan.getMouldCode(), matchedMouldCode,
-                                changeMouldType));
+                        String normalizedMatchedMouldCode = LhMouldCodeUtil.joinMouldCode(
+                                LhMouldCodeUtil.splitMouldCode(matchedMouldCode));
+                        if (StringUtils.isNotBlank(normalizedMatchedMouldCode)) {
+                            plan.setMouldCode(normalizedMatchedMouldCode);
+                        } else {
+                            // 无有效同步数据时保留原模具号兜底，并沿用原组套格式归一化规则。
+                            plan.setMouldCode(this.mergeMouldCode(plan.getMouldCode(), "", changeMouldType));
+                            log.warn("换活字块计划未匹配到有效在机模具号，保留原模具号兜底，工厂：{}，排程日期：{}，批次：{}，机台：{}",
+                                    plan.getFactoryCode(), plan.getScheduleDate(), plan.getLhResultBatchNo(),
+                                    plan.getLhMachineCode());
+                        }
                     } else if (MouldChangeTypeEnum.containsCode(changeMouldType,
                             MouldChangeTypeEnum.REGULAR.getCode())) {
                         plan.setMouldCode(this.resolveRegularMouldCode(plan, onlineInfoMap, sharedMouldPatMap));
@@ -532,8 +780,9 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
 
     /**
      * 根据类型、下机方式、模具号和前日计划差异重建备注。
+     * 交替类型为空且清洗类型为03/04时，仅返回对应清洗文案，不判断下机方式或前日计划变化。
      * 按余量收尾文案仅在 END_TYPE=0 且 CHANGE_MOULD_TYPE 包含 01（正规换模）时生成；
-     * 按时间下机文案仅在 END_TYPE=1 且 CHANGE_MOULD_TYPE 包含 01（正规换模）时生成。
+     * 按时间下机文案仅在 CHANGE_MOULD_TYPE 非空、END_TYPE=1 且其包含01（正规换模）时生成。
      *
      * @param plan              已完成模具号解析的当前计划
      * @param previousPlanByKey 前日计划业务匹配键映射
@@ -541,17 +790,31 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
      */
     private String buildMouldChangeRemark(LhMouldChangePlan plan,
                                           Map<String, List<LhMouldChangePlan>> previousPlanByKey) {
+        if (this.isPureCleaningPlan(plan)) {
+            List<String> cleaningRemarkParts = new ArrayList<>();
+            if (MouldChangeTypeEnum.containsCode(plan.getCleanType(), MouldChangeTypeEnum.DRY_ICE.getCode())) {
+                cleaningRemarkParts.add(I18nUtil.getMessage(REMARK_DRY_ICE_KEY));
+            }
+            if (MouldChangeTypeEnum.containsCode(plan.getCleanType(), MouldChangeTypeEnum.SAND_BLAST.getCode())) {
+                cleaningRemarkParts.add(I18nUtil.getMessage(REMARK_SAND_BLAST_KEY));
+            }
+            return String.join("；", cleaningRemarkParts);
+        }
+
         List<String> remarkParts = new ArrayList<>();
-        // 只有正规换模（01）且下机类型为按余量收尾（0）时，才追加按余量收尾文案。
-        if (YesOrNoEnum.NO.getCode().equals(plan.getEndType())
-                && MouldChangeTypeEnum.containsCode(plan.getChangeMouldType(),
-                MouldChangeTypeEnum.REGULAR.getCode())) {
-            remarkParts.add(I18nUtil.getMessage(REMARK_BY_REMAINDER_KEY));
-        // 只有正规换模（01）且下机类型为按时间（1）时，才追加按时间下机文案。
-        } else if (YesOrNoEnum.YES.getCode().equals(plan.getEndType())
-                && MouldChangeTypeEnum.containsCode(plan.getChangeMouldType(),
-                MouldChangeTypeEnum.REGULAR.getCode())) {
-            remarkParts.add(I18nUtil.getMessage(REMARK_BY_TIME_KEY));
+        String changeMouldType = plan.getChangeMouldType();
+        if (StringUtils.isNotBlank(changeMouldType)) {
+            // 只有正规换模（01）且下机类型为按余量收尾（0）时，才追加按余量收尾文案。
+            if (YesOrNoEnum.NO.getCode().equals(plan.getEndType())
+                    && MouldChangeTypeEnum.containsCode(changeMouldType,
+                    MouldChangeTypeEnum.REGULAR.getCode())) {
+                remarkParts.add(I18nUtil.getMessage(REMARK_BY_REMAINDER_KEY));
+                // 只有非空交替类型中的正规换模（01）且下机类型为按时间（1）时，才追加按时间下机文案。
+            } else if (YesOrNoEnum.YES.getCode().equals(plan.getEndType())
+                    && MouldChangeTypeEnum.containsCode(changeMouldType,
+                    MouldChangeTypeEnum.REGULAR.getCode())) {
+                remarkParts.add(I18nUtil.getMessage(REMARK_BY_TIME_KEY));
+            }
         }
         if (MouldChangeTypeEnum.containsCode(plan.getChangeMouldType(),
                 MouldChangeTypeEnum.DRY_ICE.getCode())) {
@@ -573,6 +836,19 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
             remarkParts.add(scheduleChangeRemark);
         }
         return String.join("；", remarkParts);
+    }
+
+    /**
+     * 判断交替类型为空且清洗类型为喷砂或干冰的纯清洗计划。
+     *
+     * @param plan 待判断的模具交替计划
+     * @return true-纯清洗计划；false-其他计划
+     */
+    private boolean isPureCleaningPlan(LhMouldChangePlan plan) {
+        return Objects.nonNull(plan)
+                && StringUtils.isBlank(plan.getChangeMouldType())
+                && MouldChangeTypeEnum.containsAnyCode(plan.getCleanType(),
+                MouldChangeTypeEnum.SAND_BLAST.getCode(), MouldChangeTypeEnum.DRY_ICE.getCode());
     }
 
     /**
@@ -1539,7 +1815,7 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
 
     @Override
     protected List<String> getCheckUniqueFields() {
-        return Arrays.asList("factoryCode", "scheduleDate", "planDate", "lhMachineCode", "leftRightMould");
+        return Arrays.asList("factoryCode", "scheduleDate", "planDate", "lhMachineCode", "leftRightMould", "classIndex", "changeMouldType", "cleanType");
     }
 
     /**

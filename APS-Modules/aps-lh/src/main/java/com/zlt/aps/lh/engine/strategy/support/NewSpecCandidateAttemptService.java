@@ -237,6 +237,12 @@ public class NewSpecCandidateAttemptService {
         // 历史指定、独立结构竞争及普通提案复核共用冻结的准备后最早首检时间。
         String selectionFailure = StructureSwitchSelectionTimePolicy.validate(
                 context, candidate.getSku(), availabilityPlan);
+        if (StringUtils.isEmpty(selectionFailure)) {
+            // 普通新增也检查供胚新增名额，正式开产在中班不能掩盖早班首检正量。
+            selectionFailure = EmbryoSupplyNewMachineLimitPolicy.validatePlan(
+                    context, candidate.getSku(), matchResult.getMachine().getMachineCode(),
+                    availabilityPlan.getFirstInspectionPlan(), availabilityPlan.getFormalAvailableProductionTime());
+        }
         if (StringUtils.isNotEmpty(selectionFailure)) {
             return new StructureMachineLimitDecision(true, false, dayContext.getCurrentPhase(),
                     dayContext.getScheduleDate(), productionOccupationShift.getShiftIndex(),

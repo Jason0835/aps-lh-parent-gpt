@@ -9,6 +9,7 @@ import com.zlt.aps.lh.api.enums.ConstructionStageEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.context.LhScheduleConfig;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.engine.strategy.support.PreviousAlternateNormalProductionPolicy;
 import com.zlt.aps.lh.engine.strategy.support.FirstInspectionAllocationPlan;
 import com.zlt.aps.lh.engine.strategy.support.FirstInspectionShiftAllocation;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchFirstShiftQuantityPolicy;
@@ -292,6 +293,20 @@ public final class FirstInspectionQtyUtil {
     }
 
     /**
+     * 仅在本次构建实际推进序号后回滚，避免首班上限提前拒绝时误减已提交的其他首检计数。
+     *
+     * @param context 排程上下文
+     * @param attributionShift 原首检计数班次
+     * @param nextSequenceBeforeBuild 本次构建前的下一首检序号
+     */
+    public static void rollbackFirstInspectionSequence(LhScheduleContext context,
+            LhShiftConfigVO attributionShift, int nextSequenceBeforeBuild) {
+        if (resolveNextFirstInspectionSequence(context, attributionShift) > nextSequenceBeforeBuild) {
+            rollbackFirstInspectionSequence(context, attributionShift);
+        }
+    }
+
+    /**
      * 解析当前首检顺序使用的参数编码。
      *
      * @param sequence 当前班次首检顺序
@@ -371,6 +386,8 @@ public final class FirstInspectionQtyUtil {
      * 也不会读取 SYS0303002、SYS0303003 或推进当班首检数量顺序。量试、正规和小批量
      * SKU 继续沿用现有首检条数参数及单控折半规则。</p>
      *
+     * 精确有效历史指定试制量试按正规计件与产能规则执行，普通试制规则保持不变。
+     *
      * @param context 排程上下文
      * @param sku SKU排程信息，传null时保持原有非试制逻辑
      * @param attributionShift 首检归属班次
@@ -387,7 +404,7 @@ public final class FirstInspectionQtyUtil {
                                                        int remainingQty,
                                                        String scheduleType,
                                                        String machineCode) {
-        if (isTrialTimeBasedFirstInspection(sku, attributionShift, scheduleType)) {
+        if (isTrialTimeBasedFirstInspection(context, sku, attributionShift, scheduleType)) {
             return 0;
         }
         int sequence = resolveNextFirstInspectionSequence(context, attributionShift);
@@ -403,6 +420,8 @@ public final class FirstInspectionQtyUtil {
      * {@link #resolvePreviewFirstInspectionQty(LhScheduleContext, SkuScheduleDTO, LhShiftConfigVO, int,
      * int, String, String)}，会错误读取“下一台”首检参数。例如当前结果是班次内第2台首检，
      * 实际应使用 SYS0303002，但二次预演会按第3台读取 SYS0303003。</p>
+     *
+     * 精确有效历史指定试制量试按正规计件与产能规则执行，普通试制规则保持不变。
      *
      * @param context 排程上下文
      * @param sku 当前 SKU
@@ -421,7 +440,7 @@ public final class FirstInspectionQtyUtil {
             int remainingQty,
             String scheduleType,
             String machineCode) {
-        if (isTrialTimeBasedFirstInspection(sku, attributionShift, scheduleType)) {
+        if (isTrialTimeBasedFirstInspection(context, sku, attributionShift, scheduleType)) {
             return 0;
         }
         int recordedSequence = resolveNextFirstInspectionSequence(
@@ -520,6 +539,8 @@ public final class FirstInspectionQtyUtil {
      * <p>试制 SKU 的首检只以固定2小时方式压缩中班最大生产量，不写首检条数；
      * 其他 SKU 继续写入参数首检条数，并登记当班首检数量顺序。</p>
      *
+     * 精确有效历史指定试制量试按正规计件与产能规则执行，普通试制规则保持不变。
+     *
      * @param context 排程上下文
      * @param sku SKU排程信息，传null时保持原有非试制逻辑
      * @param result 排程结果
@@ -538,7 +559,7 @@ public final class FirstInspectionQtyUtil {
                                                     int shiftCapacity,
                                                     int remainingQty,
                                                     String scheduleType) {
-        if (isTrialTimeBasedFirstInspection(sku, attributionShift, scheduleType)) {
+        if (isTrialTimeBasedFirstInspection(context, sku, attributionShift, scheduleType)) {
             return 0;
         }
         int firstInspectionSequence = resolveNextFirstInspectionSequence(context, attributionShift);
@@ -1015,6 +1036,8 @@ public final class FirstInspectionQtyUtil {
      * <p>试制 SKU 不补首检条数，仅把中班正常生产上限压缩到实际中班班产的75%；
      * 非试制 SKU 继续把首检条数与正常生产量合并，并共享现有班产上限。</p>
      *
+     * 精确有效历史指定试制量试按正规计件与产能规则执行，普通试制规则保持不变。
+     *
      * @param context 排程上下文
      * @param sku SKU排程信息，传null时保持原有非试制逻辑
      * @param shifts 排程窗口班次
@@ -1052,7 +1075,7 @@ public final class FirstInspectionQtyUtil {
             if (Objects.nonNull(originalCapacity)
                     && Objects.nonNull(attributionShift)
                     && Objects.equals(shift.getShiftIndex(), attributionShift.getShiftIndex())
-                    && isTrialTimeBasedFirstInspection(sku, attributionShift, scheduleType)) {
+                    && isTrialTimeBasedFirstInspection(context, sku, attributionShift, scheduleType)) {
                 adjustedMap.put(shift.getShiftIndex(), resolveTrialCapacityAfterFirstInspection(
                         context, sku, shift, originalCapacity, shiftCapacity, scheduleType, machineCode));
                 continue;
@@ -1133,6 +1156,8 @@ public final class FirstInspectionQtyUtil {
     /**
      * 解析胎胚时间所在部分班次扣除首检后的可用总产能。
      *
+     * 精确有效历史指定试制量试按正规计件与产能规则执行，普通试制规则保持不变。
+     *
      * @param context 排程上下文
      * @param sku 当前待排 SKU
      * @param shift 首检归属班次
@@ -1153,7 +1178,7 @@ public final class FirstInspectionQtyUtil {
             String scheduleType,
             String machineCode) {
         int currentCapacity = Math.max(0, partialShiftCapacity);
-        if (isTrialTimeBasedFirstInspection(sku, shift, scheduleType)) {
+        if (isTrialTimeBasedFirstInspection(context, sku, shift, scheduleType)) {
             int actualShiftCapacity = resolveShiftCapacityCap(context, shift, shiftCapacity, scheduleType);
             int inspectionCapacity = (int) ((long) actualShiftCapacity * TRIAL_FIRST_INSPECTION_HOURS
                     / TRIAL_SHIFT_DURATION_HOURS);
@@ -1204,6 +1229,8 @@ public final class FirstInspectionQtyUtil {
      * 非试制 SKU 仍按首检条数占用班产。调用方继续在该上限之外叠加停机、清洗、保养、
      * 日标准产量和剩余目标量约束，最终自然取各类上限的最小值。</p>
      *
+     * 精确有效历史指定试制量试按正规计件与产能规则执行，普通试制规则保持不变。
+     *
      * @param context 排程上下文
      * @param sku SKU排程信息，传null时保持原有非试制逻辑
      * @param shift 当前班次
@@ -1228,7 +1255,7 @@ public final class FirstInspectionQtyUtil {
         if (Objects.isNull(shift) || !Objects.equals(shift.getShiftIndex(), firstInspectionShiftIndex)) {
             return Math.max(0, shiftMaxQty);
         }
-        if (isTrialTimeBasedFirstInspection(sku, shift, scheduleType)) {
+        if (isTrialTimeBasedFirstInspection(context, sku, shift, scheduleType)) {
             return resolveTrialCapacityAfterFirstInspection(
                     context, sku, shift, shiftMaxQty, shiftCapacity, scheduleType, machineCode);
         }
@@ -1246,6 +1273,8 @@ public final class FirstInspectionQtyUtil {
      * 传入的 shiftMaxQty 已是从实际开始时间到班次结束的物理产能，普通 SKU 需直接
      * 从该产能扣除首检条数；试制 SKU 需直接扣除固定两小时产能。未启用时完整复用
      * 原方法，其他排程入口不受影响。</p>
+     *
+     * 精确有效历史指定试制量试按正规计件与产能规则执行，普通试制规则保持不变。
      *
      * @param context 排程上下文
      * @param sku 当前待排 SKU
@@ -1280,7 +1309,7 @@ public final class FirstInspectionQtyUtil {
         int availableCapacity = resolveEmbryoAvailableShiftCapacity(
                 context, sku, shift, shiftMaxQty, firstInspectionQty,
                 shiftCapacity, scheduleType, machineCode);
-        if (isTrialTimeBasedFirstInspection(sku, shift, scheduleType)) {
+        if (isTrialTimeBasedFirstInspection(context, sku, shift, scheduleType)) {
             return availableCapacity;
         }
         return Math.max(0, availableCapacity - Math.max(0, firstInspectionQty));
@@ -1298,6 +1327,21 @@ public final class FirstInspectionQtyUtil {
         return shift == null || shift.getShiftIndex() == null ? -1 : shift.getShiftIndex();
     }
 
+    /**
+     * 按当前首检规则、单控折算、物理班产和剩余目标共同确定有效首检量。
+     * 精确历史指定试制量试使用正规计件，普通试制继续保留固定时长分支。
+     *
+     * @param context 当前排程规则和首检计数
+     * @param sku 当前来源对象
+     * @param attributionShift 首检归属班次
+     * @param shiftCapacity 运行态班产
+     * @param remainingQty 当前机台剩余目标
+     * @param scheduleType 排程类型
+     * @param machineCode 精确运行态机台
+     * @param sequence 当班首检顺序
+     * @param logOddSingleControlParam 是否记录单控参数奇数诊断
+     * @return 不超过班产和剩余目标的首检数量
+     */
     private static int resolveEffectiveFirstInspectionQty(LhScheduleContext context,
                                                           SkuScheduleDTO sku,
                                                           LhShiftConfigVO attributionShift,
@@ -1310,7 +1354,7 @@ public final class FirstInspectionQtyUtil {
         if (Objects.isNull(attributionShift) || remainingQty <= 0) {
             return 0;
         }
-        if (isTrialTimeBasedFirstInspection(sku, attributionShift, scheduleType)) {
+        if (isTrialTimeBasedFirstInspection(context, sku, attributionShift, scheduleType)) {
             return 0;
         }
         // 按机台类型折算首检数量：单控机台（L/R）按参数折半向下取整
@@ -1408,6 +1452,21 @@ public final class FirstInspectionQtyUtil {
     }
 
     /**
+     * 在精确历史指定承接或当前原机续排作用域中，统一采用正规计件首检。
+     *
+     * @param context 当前有效历史关系及绑定作用域
+     * @param sku 当前来源对象
+     * @param attributionShift 首检归属班次
+     * @param scheduleType 排程类型
+     * @return 普通试制中班仍采用固定时长，历史指定试制返回false
+     */
+    public static boolean isTrialTimeBasedFirstInspection(LhScheduleContext context,
+            SkuScheduleDTO sku, LhShiftConfigVO attributionShift, String scheduleType) {
+        return !PreviousAlternateNormalProductionPolicy.usesNormalRules(context, sku)
+                && isTrialTimeBasedFirstInspection(sku, attributionShift, scheduleType);
+    }
+
+    /**
      * 判断当前首检是否采用试制 SKU 固定2小时的时间扣减规则。
      *
      * @param sku SKU排程信息
@@ -1475,6 +1534,27 @@ public final class FirstInspectionQtyUtil {
         }
         return Objects.equals(productionNotBeforeTime, preparationReadyTime)
                 && isMassTrialQuantityFirstInspection(sku, scheduleType);
+    }
+
+    /**
+     * 历史指定试制量试按正规规则比较生产门禁，等于准备完成时不额外推迟首检。
+     * 严格晚于准备完成的供胚等硬门禁仍然生效。
+     *
+     * @param context 当前有效历史承接作用域
+     * @param sku 当前来源对象
+     * @param productionNotBeforeTime 生产硬门禁
+     * @param preparationReadyTime 准备完成时间
+     * @param scheduleType 排程类型
+     * @return 硬门禁需要推迟首检时返回true
+     */
+    public static boolean isProductionGateConstrainingFirstInspection(LhScheduleContext context,
+            SkuScheduleDTO sku, Date productionNotBeforeTime, Date preparationReadyTime, String scheduleType) {
+        if (PreviousAlternateNormalProductionPolicy.usesNormalRules(context, sku)) {
+            return Objects.nonNull(productionNotBeforeTime) && Objects.nonNull(preparationReadyTime)
+                    && productionNotBeforeTime.after(preparationReadyTime);
+        }
+        return isProductionGateConstrainingFirstInspection(
+                sku, productionNotBeforeTime, preparationReadyTime, scheduleType);
     }
 
     /**

@@ -936,7 +936,7 @@ public class EarlyProductionRuntimePlanService {
         entry.setAdmissionShiftIndex(Objects.isNull(admission)
                 ? null : admission.getAdmissionShiftIndex());
         entry.setScheduledStructureCount(Objects.isNull(admission)
-                ? context.getStructureScheduledMachineCount(businessDate, sku.getStructureName())
+                ? context.getEffectiveStructureScheduledMachineCount(businessDate, sku.getStructureName())
                 : admission.getScheduledStructureCount());
         entry.setStructureAdmission(Objects.isNull(admission)
                 ? null : admission.isAllowed());

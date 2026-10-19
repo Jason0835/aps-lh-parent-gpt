@@ -237,6 +237,7 @@ public final class StructureSwitchShiftAudit {
     public static void appendFinalSummary(LhScheduleContext context) {
         if (enabled(context)) {
             append(context, StructureSwitchSchedulingPolicy.orderedShifts(context), "保存前最终结果");
+            EmbryoSupplyNewMachineLimitPolicy.appendFinalAudit(context);
         }
     }
 
@@ -259,10 +260,14 @@ public final class StructureSwitchShiftAudit {
             if (Objects.isNull(actualFirst)) {
                 if (context.getStructureSwitchShiftAuditMap().values().stream()
                         .anyMatch(entry -> Objects.equals(entry.getSourceId(), source.getId()))) {
+                    SkuScheduleDTO ordinarySku = new SkuScheduleDTO();
+                    ordinarySku.setStructureName(source.getNextStructureName());
+                    boolean ordinarySupply = Objects.nonNull(EmbryoSupplyNewMachineLimitPolicy.resolveSource(context, ordinarySku));
                     String detail = new StringBuilder(128).append("batchNo=").append(context.getBatchNo())
                             .append("，时点=").append(phase).append("，sourceId=").append(source.getId())
                             .append("，结构=").append(source.getNextStructureName())
-                            .append("，无最终正量，不建立S0/S1；试算或回裁为零不计上机").toString();
+                            .append(ordinarySupply ? "，无独立结构切换正量；普通入口正量由供胚新增名额规则核对"
+                                    : "，无最终正量，不建立S0/S1；试算或回裁为零不计上机").toString();
                     PriorityTraceLogHelper.appendProcessLog(context, "结构切换逐班审计", detail);
                     log.info("结构切换逐班审计, {}", detail);
                 }
@@ -274,10 +279,10 @@ public final class StructureSwitchShiftAudit {
             StructureSwitchPlan firstPlan = context.getStructureSwitchResultPlanMap().get(firstResult);
             StructureSwitchRuntimeState state = context.getStructureSwitchRuntimeMap()
                     .get(source.getNextStructureName());
-            boolean capacityFirst = Objects.nonNull(firstPlan.getFirstShiftDecision())
+            boolean ruleFirst = Objects.nonNull(firstPlan.getFirstShiftDecision())
                     || (Objects.nonNull(state) && Objects.equals(state.getSourceId(), source.getId())
                     && Objects.nonNull(state.getFirstShiftDecision()));
-            LhShiftConfigVO first = capacityFirst
+            LhShiftConfigVO first = ruleFirst
                     ? StructureSwitchSchedulingPolicy.resolveFirstShift(context, firstPlan) : actualFirst;
             if (Objects.isNull(first)) {
                 continue;

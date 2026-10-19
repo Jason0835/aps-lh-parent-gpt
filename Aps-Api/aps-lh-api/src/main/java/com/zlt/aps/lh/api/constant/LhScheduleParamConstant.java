@@ -1,0 +1,279 @@
+package com.zlt.aps.lh.api.constant;
+
+/**
+ * 硫化排程参数编码常量
+ *
+ * @author APS
+ *
+ * 编码规则：SYS03 + 分组码(2位) + 流水码(3位)
+ * 分组码说明：
+ *   01 - 班次基础参数
+ *   02 - 换模相关参数（含禁止换模时间窗口、模具交替计划）
+ *   03 - 首检相关参数
+ *   04 - 排程控制参数（含收尾判定、满排、局部搜索、定点机台、优先级日志）
+ *   05 - 干冰清洗参数
+ *   06 - 喷砂清洗参数
+ *   07 - 设备保养参数
+ *   08 - 停机与模具清洗参数
+ *   09 - 胶囊管理参数
+ *   10 - 开停产参数
+ *   11 - 试制与小批量参数
+ *   12 - 量试充抵正规参数
+ */
+public final class LhScheduleParamConstant {
+
+    private LhScheduleParamConstant() {
+    }
+
+    /** 常规结构最低硫化机台数，来源于月计划工厂参数表 */
+    public static final String REGULAR_STRUCTURE_MIN_VULCANIZING_MACHINE = "SYS0204012";
+
+    /** 夜班开始小时 */
+    public static final String NIGHT_START_HOUR = "SYS0301001";
+    /** 早班开始小时 */
+    public static final String MORNING_START_HOUR = "SYS0301002";
+    /** 中班开始小时 */
+    public static final String AFTERNOON_START_HOUR = "SYS0301003";
+    /** 每班时长（小时） */
+    public static final String SHIFT_DURATION_HOURS = "SYS0301004";
+    /** 禁止换模开始小时 */
+    public static final String NO_MOULD_CHANGE_START_HOUR = "SYS0302001";
+    /** 禁止换模结束小时 */
+    public static final String NO_MOULD_CHANGE_END_HOUR = "SYS0302002";
+    /** 每日换模总上限 */
+    public static final String DAILY_MOULD_CHANGE_LIMIT = "SYS0302003";
+    /** 早班换模上限 */
+    public static final String MORNING_MOULD_CHANGE_LIMIT = "SYS0302004";
+    /** 中班换模上限 */
+    public static final String AFTERNOON_MOULD_CHANGE_LIMIT = "SYS0302005";
+    /** 夜班换模上限 */
+    public static final String NIGHT_MOULD_CHANGE_LIMIT = "SYS0302006";
+    /** 换模预热时间（小时） */
+    public static final String MOULD_CHANGE_PREHEAT_HOURS = "SYS0302007";
+    /** 换模其他作业时间（小时） */
+    public static final String MOULD_CHANGE_OTHER_HOURS = "SYS0302008";
+    /** 换模总耗时（小时） */
+    public static final String MOULD_CHANGE_TOTAL_HOURS = "SYS0302009";
+    /** 换活字块总耗时（小时） */
+    public static final String TYPE_BLOCK_CHANGE_TOTAL_HOURS = "SYS0302010";
+    /** 首检时间（小时） */
+    public static final String FIRST_INSPECTION_HOURS = "SYS0303001";
+    /** 大换英寸首个批量生产班延迟小时数。 */
+    public static final String LARGE_INCH_FIRST_BATCH_DELAY_HOURS = "SYS0303005";
+    /** 结构切换特殊排程规则总开关：1开启，0沿用改造前逻辑。 */
+    public static final String STRUCTURE_SWITCH_SCHEDULING_ENABLED = "SYS0303006";
+    /**
+     * 换模或换活字块首班含首检计划量上限，空值或-1关闭限制。
+     */
+    public static final String FIRST_SHIFT_PLAN_QTY_LIMIT = "SYS0303007";
+    /** 同班次前2台首检计划量 */
+    public static final String FIRST_TWO_FIRST_INSPECTION_QTY = "SYS0303002";
+    /** 每班最大首检次数 */
+    public static final String MAX_FIRST_INSPECTION_PER_SHIFT = "SYS0303099";
+    /** 同班次非前2台首检计划量 */
+    public static final String FIRST_INSPECTION_QTY = "SYS0303003";
+    /** 同班次总计划量上限阈值，单位：条 */
+    public static final String CLASS_TOTAL_QTY_UP_LIMIT = "SYS0303004";
+    /** 收尾判定天数 */
+    public static final String ENDING_DETECT_DAYS = "SYS0304001";
+    /** 结构收尾判定天数 */
+    public static final String STRUCTURE_ENDING_DAYS = "SYS0304002";
+    /** 机台收尾时间容差（分钟） */
+    public static final String ENDING_TIME_TOLERANCE_MINUTES = "SYS0304003";
+    /** 干冰清洗间隔天数 */
+    public static final String DRY_ICE_INTERVAL_DAYS = "SYS0305001";
+    /** 干冰清洗预警天数 */
+    public static final String DRY_ICE_WARNING_DAYS = "SYS0305002";
+    /** 干冰清洗提前天数 */
+    public static final String DRY_ICE_ADVANCE_DAYS = "SYS0305003";
+    /** 干冰清洗耗时（小时） */
+    public static final String DRY_ICE_DURATION_HOURS = "SYS0305004";
+    /** 干冰清洗损失数量 */
+    public static final String DRY_ICE_LOSS_QTY = "SYS0305005";
+    /** 每日干冰清洗上限 */
+    public static final String DRY_ICE_DAILY_LIMIT = "SYS0305006";
+    /** 干冰清洗早班上限 */
+    public static final String DRY_ICE_MORNING_SHIFT_LIMIT = "SYS0305007";
+    /** 干冰清洗中班上限 */
+    public static final String DRY_ICE_AFTERNOON_SHIFT_LIMIT = "SYS0305008";
+    /** 干冰清洗允许开始时间 */
+    public static final String DRY_ICE_WORK_START_TIME = "SYS0305009";
+    /** 干冰清洗允许结束时间 */
+    public static final String DRY_ICE_WORK_END_TIME = "SYS0305010";
+    /** 喷砂清洗耗时（小时） */
+    public static final String SAND_BLAST_DURATION_HOURS = "SYS0306001";
+    /** 喷砂清洗含首检耗时（小时） */
+    public static final String SAND_BLAST_WITH_INSPECTION_HOURS = "SYS0306002";
+    /** 每日喷砂清洗上限 */
+    public static final String SAND_BLAST_DAILY_LIMIT = "SYS0306003";
+    /** 喷砂清洗预警天数 */
+    public static final String SAND_BLAST_WARNING_DAYS = "SYS0306004";
+    /** 喷砂清洗提前天数 */
+    public static final String SAND_BLAST_ADVANCE_DAYS = "SYS0306005";
+    /** 喷砂是否跳过周日 */
+    public static final String SAND_BLAST_SKIP_SUNDAY_ENABLED = "SYS0306006";
+    /** 喷砂是否跳过节假日 */
+    public static final String SAND_BLAST_SKIP_HOLIDAY_ENABLED = "SYS0306007";
+    /** 喷砂机维保日期 */
+    public static final String SAND_BLAST_MAINTENANCE_DATES = "SYS0306008";
+    /** 喷砂机维保日是否允许安排 */
+    public static final String SAND_BLAST_ALLOW_ON_MAINTENANCE_DATE = "SYS0306009";
+    /** 是否允许手工周日喷砂 */
+    public static final String SAND_BLAST_ALLOW_SUNDAY_MANUAL_ENABLED = "SYS0306010";
+    /** 周日允许喷砂的最小交替计划条数阈值 */
+    public static final String SAND_BLAST_SUNDAY_MIN_ALTERNATE_PLAN_COUNT = "SYS0306011";
+    /** 喷砂保养月中日期 */
+    public static final String SAND_BLAST_MAINTENANCE_DAY_MID = "SYS0306012";
+    /** 喷砂保养月末日期 */
+    public static final String SAND_BLAST_MAINTENANCE_DAY_END = "SYS0306013";
+    /** 喷砂首检耗时（小时） */
+    public static final String SAND_BLAST_FIRST_INSPECTION_HOURS = "SYS0306014";
+    /** 同一次物理喷砂事件的首检总条数 */
+    public static final String SAND_BLAST_FIRST_INSPECTION_QTY = "SYS0306015";
+    /** 当天第一台喷砂开始时刻（HH:mm） */
+    public static final String SAND_BLAST_FIRST_START_TIME = "SYS0306016";
+    /** 当天第二台喷砂开始时刻（HH:mm） */
+    public static final String SAND_BLAST_SECOND_START_TIME = "SYS0306017";
+
+    /** 保养耗时（小时） */
+    public static final String MAINTENANCE_DURATION_HOURS = "SYS0307001";
+    /** 保养开始小时 */
+    public static final String MAINTENANCE_START_HOUR = "SYS0307002";
+    /** 保养预警天数 */
+    public static final String MAINTENANCE_WARNING_DAYS = "SYS0307003";
+    /** 每日最大保养台数 */
+    public static final String MAINTENANCE_DAILY_LIMIT = "SYS0307004";
+    /** 是否允许周日安排保养 */
+    public static final String ALLOW_MAINTENANCE_ON_SUNDAY = "SYS0307005";
+    /** 节假日前N天不排保养 */
+    public static final String MAINTENANCE_HOLIDAY_BLOCK_DAYS = "SYS0307006";
+    /** 长期在机提前检查天数 */
+    public static final String MAINTENANCE_FORCE_CHECK_DAYS = "SYS0307007";
+    /** 是否允许盘点日安排保养 */
+    public static final String ALLOW_MAINTENANCE_ON_INVENTORY_DAY = "SYS0307008";
+    /** 胶囊预热时间（小时） */
+    public static final String CAPSULE_PREHEAT_HOURS = "SYS0307009";
+    /** 维保重叠切换耗时（小时） */
+    public static final String MAINTENANCE_OVERLAP_SWITCH_HOURS = "SYS0307010";
+    /** 精度计划执行日前允许插排的SKU最大完整待排量 */
+    public static final String PRECISION_PRE_INSERT_MAX_QTY = "SYS0307011";
+    /** 排程天数 */
+    public static final String SCHEDULE_DAYS = "SYS0304004";
+    /** 是否按产能满排 */
+    public static final String ENABLE_FULL_CAPACITY_SCHEDULING = "SYS0304005";
+    /** 满排模式是否按余量命中收尾规则2 */
+    public static final String ENABLE_ENDING_BY_SURPLUS_IN_FULL_MODE = "SYS0304006";
+    /** MES在机信息往前追溯天数 */
+    public static final String MACHINE_ONLINE_LOOKBACK_DAYS = "SYS0304008";
+    /** 停机超时阈值（小时） */
+    public static final String MACHINE_STOP_TIMEOUT_HOURS = "SYS0308001";
+    /** 硫化定点机台规则开关（0-关闭，1-开启） */
+    public static final String ENABLE_SPECIFY_MACHINE_RULE = "SYS0304009";
+    /** 模具清洗提前天数 */
+    public static final String MOULD_CLEANING_ADVANCE_DAYS = "SYS0308002";
+    /** 清洗跳过近收尾天数阈值（机台当前物料剩余天数 <= 该值时跳过清洗） */
+    public static final String CLEANING_SKIP_ENDING_DAY_THRESHOLD = "SYS0308003";
+    /**
+     * 清洗在机模具一致性校验开关，0关闭、1开启。
+     */
+    public static final String CLEANING_ONLINE_MOULD_CHECK_ENABLED = "SYS0308005";
+
+    /** 计划性维修固定排产量（条），维修开始班次固定只排该数量，不按时间折算 */
+    public static final String PLANNED_REPAIR_FIXED_QTY = "SYS0308010";
+    /** 计划性维修独立开始时刻（HH:mm），不联动精度保养开始小时。 */
+    public static final String PLANNED_REPAIR_START_TIME = "SYS0308011";
+    /** 胶囊预警次数 */
+    public static final String CAPSULE_WARNING_COUNT = "SYS0309001";
+    /** 胶囊使用次数上限；本批按左右最大值初始化，仅首次严格跨限时触发扣量 */
+    public static final String CAPSULE_FORCE_DOWN_COUNT = "SYS0309002";
+    /** 本批首次严格跨限且班次满产时的固定扣减计划量，默认2条 */
+    public static final String CAPSULE_CHANGE_LOSS_QTY = "SYS0309003";
+    /** 本批首次严格跨限且班次未满产时的换胶囊时长（小时） */
+    public static final String CAPSULE_REPLACEMENT_DURATION_HOURS = "SYS0309004";
+    /** 停产前第3天产能比例 */
+    public static final String SHUTDOWN_DAY_MINUS_3_RATE = "SYS0310001";
+    /** 停产前第2天产能比例 */
+    public static final String SHUTDOWN_DAY_MINUS_2_RATE = "SYS0310002";
+    /** 停产前第1天产能比例 */
+    public static final String SHUTDOWN_DAY_MINUS_1_RATE = "SYS0310003";
+    /** 开产首日产能比例 */
+    public static final String STARTUP_FIRST_DAY_RATE = "SYS0310004";
+    /** 开停产管控开关（0-关闭，1-开启） */
+    public static final String ENABLE_OPEN_STOP_PRODUCTION_CONTROL = "SYS0310005";
+    /** 硫化开模时间 */
+    public static final String CURING_OPEN_MOLD_TIME = "SYS0310006";
+    /** 硫化停锅时间 */
+    public static final String CURING_STOP_POT_TIME = "SYS0310007";
+    /** 开产欠产阈值比例 */
+    public static final String OPEN_PRODUCTION_SHORTAGE_THRESHOLD_RATE = "SYS0310008";
+    /** 开产雪地胎关键词 */
+    public static final String OPEN_PRODUCTION_WINTER_TIRE_KEYWORDS = "SYS0310009";
+    /** 试制量试每日上限 */
+    public static final String TRIAL_DAILY_LIMIT = "SYS0311001";
+    /** 单控基准机台编码 */
+    public static final String SINGLE_CONTROL_MACHINE_CODES = "SYS0311002";
+    /** 小批量验证SKU阈值 */
+    public static final String SMALL_BATCH_SKU_THRESHOLD = "SYS0311003";
+    /** 试制量试是否参与新增排产（0-新增排产不参与，1-参与；续作排产不受该参数影响） */
+    public static final String TRIAL_MASS_TRIAL_SCHEDULING_ENABLED = "SYS0311004";
+    /** 模具交替计划天数 */
+    public static final String MOULD_CHANGE_PLAN_DAYS = "SYS0302011";
+    /** 模具交替计划导出模具号往前追溯天数（机台在机信息取排程日期前N天内最近一条） */
+    public static final String MOULD_CHANGE_PLAN_LOOKBACK_DAYS = "SYS0302012";
+    /** 局部搜索开关（0-关闭，1-开启） */
+    public static final String ENABLE_LOCAL_SEARCH = "SYS0304010";
+    /** 局部搜索候选机台阈值（小于该值时启用） */
+    public static final String LOCAL_SEARCH_MACHINE_THRESHOLD = "SYS0304011";
+    /** 局部搜索深度（包含当前SKU） */
+    public static final String LOCAL_SEARCH_DEPTH = "SYS0304012";
+    /** 局部搜索单次耗时预算（毫秒） */
+    public static final String LOCAL_SEARCH_TIME_BUDGET_MS = "SYS0304013";
+    /** 优先级跟踪日志开关（0-关闭，1-开启） */
+    public static final String ENABLE_PRIORITY_TRACE_LOG = "SYS0304014";
+    /** 新增排产欠产追补判断天数 */
+    public static final String NEW_SPEC_SHORTAGE_LOOK_AHEAD_DAYS = "SYS0304015";
+    /** 硫化精排计划间隔年数 */
+    public static final String PRECISION_PLAN_INTERVAL_YEARS = "SYS0304016";
+    /** 芯片编码库存更新配置 */
+    public static final String CHIP_CODE_STOCK_UPDATE = "SYS0304017";
+    /** 模具清洗间隔天数 */
+    public static final String MOULD_CLEAN_DAYS = "SYS0308004";
+    /** 新增排产欠产增机台阈值 */
+    public static final String NEW_SPEC_SHORTAGE_ADD_MACHINE_THRESHOLD = "SYS0304022";
+    /** 收尾小余量允许欠产偏差值 */
+    public static final String CONTINUOUS_ENDING_SURPLUS_TOLERANCE_QTY = "SYS0304023";
+    /** 奇数班产计划量加一班别（1-晚班，2-早班，3-中班；空值不启用） */
+    public static final String ODD_SHIFT_CAPACITY_PLUS_SHIFT_TYPE = "SYS0304024";
+    /** 日标准产量剩余班次（1-晚班，2-早班，3-中班） */
+    public static final String DAILY_STANDARD_CAPACITY_REMAIN_SHIFT_TYPE = "SYS0304026";
+    /** 是否开启换模均衡（0-关闭，1-开启） */
+    public static final String ENABLE_CHANGEOVER_BALANCE = "SYS0304021";
+    /** 续作欠产追补判断天数 */
+    public static final String CONTINUOUS_SHORTAGE_LOOK_AHEAD_DAYS = "SYS0304019";
+    /** 是否追加本月历史欠产量（0-关闭，1-开启） */
+    public static final String ENABLE_CARRY_FORWARD_QTY = "SYS0304020";
+    /** 硫化示方历史保护开关（0-关闭，1-开启） */
+    public static final String ENABLE_CURE_FORMULA_HISTORY_PROTECT = "SYS0304018";
+    /** 全量SKU排序日志月计划起产日(beginDay)筛选阈值；仅输出月计划beginDay<=该值的SKU */
+    public static final String FULL_SKU_SORT_LOG_BEGIN_DAY_THRESHOLD = "SYS0304027";
+    /** SKU提前生产天数阈值 */
+    public static final String EARLY_PRODUCTION_DAYS_THRESHOLD = "SYS0304028";
+    /** 收尾落在夜班或错开模具交替是否自动补量（0-关闭，1-开启） */
+    public static final String ENDING_AUTO_FILL_ENABLED = "SYS0304029";
+    /** 量试充抵正规开关（0-关闭，1-开启）；控制同步硫化排程日完成量时，量试(T)与正规(S)同时存在是否额外插入正规充抵记录 */
+    public static final String ENABLE_MASS_TRIAL_TO_FORMAL = "SYS0312001";
+    /** 在机模具下机时前后计划校验天数 */
+    public static final String CONTINUOUS_MOULD_OFFLINE_CHECK_DAYS = "SYS0304030";
+    /** 按日标准量排产结构清单，多个结构名称使用英文逗号分隔 */
+    public static final String DAILY_STANDARD_CAPACITY_STRUCTURE_LIST = "SYS0304031";
+    /** 新增排产机台资源归属班次口径（1-实际可开产时间，0-机台收尾时间） */
+    public static final String NEW_SPEC_MACHINE_RESOURCE_SHIFT_MODE = "SYS0304032";
+    /** 收尾小余量不忽略比例阈值（百分比） */
+    public static final String SMALL_ENDING_SURPLUS_KEEP_RATIO_PERCENT = "SYS0304033";
+    /** 优先续作硫化机台前缀，多个前缀使用英文逗号分隔 */
+    public static final String PRIORITY_CONTINUATION_MACHINE_PREFIXES = "SYS0304034";
+    /** 续作月计划降模停产保机的胎胚可供硫化时长豁免阈值（小时），小于0表示不启用 */
+    public static final String CONTINUOUS_STOP_HOLD_EMBRYO_AVAILABLE_HOURS_THRESHOLD = "SYS0304035";
+    /** 胎胚最早可供时间距机台首检开始时间的最大允许差值（小时） */
+    public static final String MACHINE_SKU_EMBRYO_MAX_WAIT_HOURS = "SYS0304036";
+}

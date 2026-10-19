@@ -13,6 +13,7 @@ import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.api.enums.UnscheduledGroupTypeEnum;
+import com.zlt.aps.lh.component.EmbryoEndingStructureMachineExemptionPolicy;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationEndingAllocationSnapshot;
@@ -79,11 +80,21 @@ public class SchedulePersistenceService {
 
     private static final String NO_FLAG = "0";
 
+    /**
+     * 成型收尾快照中归属日期与班次编码的分隔符。
+     */
+    private static final String EMBRYO_ENDING_SHIFT_KEY_SEPARATOR = "|";
+
     /** 胎胚收尾标识：1-收尾 */
     private static final int EMBRYO_ENDING_FLAG_YES = 1;
 
     /** 胎胚收尾班次原因分析备注 */
     private static final String EMBRYO_ENDING_ANALYSIS = "胎胚收尾";
+
+    /**
+     * 命中后结构续作时，实际首产班追加的原因分析。
+     */
+    private static final String STRUCTURE_CONTINUATION_ANALYSIS = "结构续作";
 
     /** 结果备注追加分隔符，与提前生产备注追加口径一致 */
     private static final String REMARK_SEPARATOR = "；";
@@ -184,6 +195,8 @@ public class SchedulePersistenceService {
             fillClassEndFlags(context, context.getScheduleResultList());
             // 胎胚收尾结果行的最后有计划量班次追加"胎胚收尾"备注
             fillEmbryoEndingAnalysis(context, context.getScheduleResultList());
+            // 确认收尾信息只消费初始化快照，与硫化余量收尾判定保持独立。
+            this.fillEmbryoConfirmEndingInfo(context, context.getScheduleResultList());
             fillDayNRange(context, context.getScheduleResultList());
             fillShortageQty(context, context.getScheduleResultList());
             // 回填 SKU 排序名次/描述（来源 sortByPriority 回写到 sourceSku）
@@ -196,7 +209,7 @@ public class SchedulePersistenceService {
             fillProductionType(context, context.getScheduleResultList());
             // 为新增排产SKU结果行追加月计划定稿"模具号"开头备注
             fillNewSpecMonthPlanRemark(context, context.getScheduleResultList());
-            // 回填前段欠产余量标识、结构切换标识及结构切换实际首班描述，只读上下文运行态，不改变排程结果
+            // 回填结构切换规则首班描述，并按最终正计划量在实际首产班追加结构续作原因。
             fillStructureSwitchInfo(context, context.getScheduleResultList());
             scheduleResultMapper.insertBatch(context.getScheduleResultList());
         }
@@ -377,6 +390,37 @@ public class SchedulePersistenceService {
                     oneZero(multiMachine), oneZero(skuEnding), oneZero(endingMachine),
                     oneZero(currentMachineLastPlan), oneZero(windowEndShift),
                     lastPlannedShift > 0 ? lastPlannedShift : 0, ShiftFieldUtil.buildShiftIsEndSummary(result));
+        }
+    }
+
+    /**
+     * 保存前按成型收尾快照统一回填胎胚确认收尾标识及班次编码。
+     * <p>索引已按本工厂T至T+2过滤，包含已排程与预测来源。同胎胚的不同产品状态共用收尾信息，多条记录按归属日期、
+     * 夜早中班顺序取最晚记录，无匹配时显式复位，防止复制结果携带旧值。</p>
+     *
+     * @param context 含不可变成型胎胚收尾索引的排程上下文
+     * @param scheduleResults 本次最终保存的硫化排程结果
+     */
+    private void fillEmbryoConfirmEndingInfo(LhScheduleContext context, List<LhScheduleResult> scheduleResults) {
+        if (Objects.isNull(context) || CollectionUtils.isEmpty(scheduleResults)) {
+            return;
+        }
+        for (LhScheduleResult result : scheduleResults) {
+            if (Objects.isNull(result)) {
+                continue;
+            }
+            String endingClass = null;
+            Set<String> endingShifts = EmbryoEndingStructureMachineExemptionPolicy.resolveEndingShifts(
+                    context, result.getEmbryoCode());
+            if (!endingShifts.isEmpty()) {
+                // 班次键固定为yyyy-MM-dd|01/02/03，完整键比较才能保持同胎胚跨产品状态记录的跨日顺序。
+                endingClass = endingShifts.stream().max(String::compareTo)
+                        .map(shiftKey -> StringUtils.substringAfterLast(
+                                shiftKey, EMBRYO_ENDING_SHIFT_KEY_SEPARATOR))
+                        .orElse(null);
+            }
+            result.setIsEmbryoConfirmEnding(Objects.nonNull(endingClass) ? YES_FLAG : NO_FLAG);
+            result.setEmbryoEndingClass(endingClass);
         }
     }
 
@@ -688,7 +732,7 @@ public class SchedulePersistenceService {
     }
 
     /**
-     * 保存前统一回填前段欠产余量标识、结构切换标识及结构切换实际首班描述。
+     * 保存前统一回填前段欠产余量标识、结构切换标识、规则首班描述及实际首产班原因。
      *
      * <p>只读排程上下文既有运行态，不重新计算、不影响排程流程：</p>
      * <ul>
@@ -698,6 +742,8 @@ public class SchedulePersistenceService {
      *       （{@code structureSwitchResultPlanMap}）时为 1，含单控 L/R 两侧与滚动继承结果；</li>
      *   <li>结构切换描述：本次结构切换规则首班班次名称（含日期，如：T日早班、T+1日夜班），
      *       优先取同结构已提交的规则首班，取不到时回退冻结提案判定。</li>
+     *   <li>结构续作原因：冻结计划来源的后结构命中切换完成后结构集合时，
+     *       按最终正计划量在窗口内实际首产班追加“结构续作”，不替代规则首班。</li>
      * </ul>
      *
      * @param context 排程上下文
@@ -725,6 +771,18 @@ public class SchedulePersistenceService {
             }
             result.setIsStructureSwitch(YES_FLAG);
             result.setStructureSwitchDesc(this.resolveStructureSwitchFirstShiftName(context, result, switchPlan));
+            if (Objects.nonNull(switchPlan.getSource()) && context.getSwitchedNextStructureNameSet()
+                    .contains(switchPlan.getSource().getNextStructureName())) {
+                // 回裁可能移除原首产班数量，备注必须按本行最终正量定位，L/R两侧分别处理。
+                StructureSwitchSchedulingPolicy.orderedShifts(context).stream()
+                        .filter(shift -> {
+                            Integer planQty = ShiftFieldUtil.getShiftPlanQty(result, shift.getShiftIndex());
+                            return Objects.nonNull(planQty) && planQty > 0;
+                        })
+                        .findFirst()
+                        .ifPresent(shift -> ShiftFieldUtil.appendShiftAnalysis(result,
+                                shift.getShiftIndex(), STRUCTURE_CONTINUATION_ANALYSIS));
+            }
         }
     }
 

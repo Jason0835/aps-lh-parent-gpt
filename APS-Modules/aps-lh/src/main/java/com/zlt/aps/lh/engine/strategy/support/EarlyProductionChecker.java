@@ -9,6 +9,7 @@ import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.api.enums.SkuScheduleSourceTypeEnum;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.component.EmbryoEndingStructureMachineExemptionPolicy;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -105,7 +106,7 @@ public final class EarlyProductionChecker {
                 && firstFuturePlanDate.isAfter(earlyProductionMaxDate)) {
             String outOfRangeReason = "续作首次增机日超出提前生产范围";
             logEarlyProductionDecision(context, sku, currentDate, firstFuturePlanDate, 0,
-                    context.getStructureScheduledMachineCount(currentDate, sku.getStructureName()),
+                    context.getEffectiveStructureScheduledMachineCount(currentDate, sku.getStructureName()),
                     context.getSkuScheduledMachineCount(
                             currentDate, sku.getMaterialCode(), sku.getProductStatus()),
                     shortageThreshold, earlyProductionDaysThreshold,
@@ -118,7 +119,7 @@ public final class EarlyProductionChecker {
             String noFuturePlanReason = "排程窗口外额外" + earlyProductionDaysThreshold
                     + "天范围内无日计划量";
             logEarlyProductionDecision(context, sku, currentDate, null, 0,
-                    context.getStructureScheduledMachineCount(currentDate, sku.getStructureName()),
+                    context.getEffectiveStructureScheduledMachineCount(currentDate, sku.getStructureName()),
                     context.getSkuScheduledMachineCount(currentDate, sku.getMaterialCode(), sku.getProductStatus()),
                     shortageThreshold, earlyProductionDaysThreshold, 0, 0, false,
                     noFuturePlanReason);
@@ -128,7 +129,7 @@ public final class EarlyProductionChecker {
         if (continuationAddMachineEarlyProduction && futurePlanQty <= 0) {
             String noAddMachineDayPlanReason = "续作首次增机日无有效原始日计划量";
             logEarlyProductionDecision(context, sku, currentDate, firstFuturePlanDate, 0,
-                    context.getStructureScheduledMachineCount(currentDate, sku.getStructureName()),
+                    context.getEffectiveStructureScheduledMachineCount(currentDate, sku.getStructureName()),
                     context.getSkuScheduledMachineCount(
                             currentDate, sku.getMaterialCode(), sku.getProductStatus()),
                     shortageThreshold, earlyProductionDaysThreshold,
@@ -145,7 +146,7 @@ public final class EarlyProductionChecker {
                 firstFuturePlanDate, sku.getStructureName());
         int planMachineCount = resolveEffectiveStructurePlanMachineCount(
                 context, sku, currentDate, firstFuturePlanDate);
-        int scheduledStructureCount = context.getStructureScheduledMachineCount(
+        int scheduledStructureCount = context.getEffectiveStructureScheduledMachineCount(
                 currentDate, sku.getStructureName());
         int scheduledSkuCount = context.getSkuScheduledMachineCount(
                 currentDate, sku.getMaterialCode(), sku.getProductStatus());
@@ -718,7 +719,8 @@ public final class EarlyProductionChecker {
      * 按目标班次和候选物理机台校验提前生产是否可以使用当前机台。
      *
      * <p>候选机台已经计入同结构、同班次时允许复用；否则只有当前实时物理机台数严格小于
-     * 有效计划机台数时才允许新增。单控L/R由结构在机索引统一按物理整机去重。</p>
+     * 有效计划机台数时才允许新增。同胎胚同结构成型收尾后的候选不占配额，
+     * 仍须取得原提前生产资格。单控L/R由结构在机索引统一按物理整机去重。</p>
      *
      * @param context 排程上下文
      * @param sku 当前SKU
@@ -745,6 +747,12 @@ public final class EarlyProductionChecker {
                 context, sku, currentDate, futurePlanDate);
         if (planMachineCount <= 0) {
             return false;
+        }
+        if (context.getScheduleWindowShifts().stream()
+                .filter(shift -> Objects.equals(shift.getShiftIndex(), shiftIndex))
+                .anyMatch(shift -> EmbryoEndingStructureMachineExemptionPolicy.isExempt(context,
+                        sku.getStructureName(), sku.getEmbryoCode(), sku.getStructureName(), shift))) {
+            return true;
         }
         if (context.getStructureShiftInMachineIndex().containsPhysicalMachine(
                 sku.getStructureName(), shiftIndex, machineCode)) {

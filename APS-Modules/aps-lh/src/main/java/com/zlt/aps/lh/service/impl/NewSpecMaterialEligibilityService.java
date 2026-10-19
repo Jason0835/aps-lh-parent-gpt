@@ -17,6 +17,7 @@ import com.zlt.aps.lh.engine.strategy.IEndingJudgmentStrategy;
 import com.zlt.aps.lh.engine.strategy.support.DailyCandidateReason;
 import com.zlt.aps.lh.engine.strategy.support.DailyMachineExpansionPlanner;
 import com.zlt.aps.lh.engine.strategy.support.DailyNewSpecCandidate;
+import com.zlt.aps.lh.engine.strategy.support.PreviousAlternateTrialQuotaPolicy;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionChecker;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionRuntimePlan;
 import com.zlt.aps.lh.engine.strategy.support.PendingSkuUnscheduledRule;
@@ -49,12 +50,17 @@ public class NewSpecMaterialEligibilityService {
     private SkuDecrementChecker skuDecrementChecker;
 
     /**
-     * 在实际业务日资源竞争前统一处理未来需求到期，不在只读候选预演中改写账本。
+     * 在实际业务日编排中处理未来需求到期和指定试验未消费额度迁移。
+     *
      * @param context 排程上下文
      * @param sku 原需求对象
      * @param date 实际业务日期
      */
     public void prepareNormalPlanOnDueDate(LhScheduleContext context, SkuScheduleDTO sku, LocalDate date) {
+        if (StringUtils.equals(SkuScheduleSourceTypeEnum.PREVIOUS_ALTERNATE_TRIAL.getCode(), sku.getSourceType())) {
+            PreviousAlternateTrialQuotaPolicy.prepareBusinessDate(context, sku, date);
+            return;
+        }
         earlyProductionRuntimePlanService.prepareNormalPlanOnDueDate(context, sku, date);
     }
 
@@ -142,7 +148,7 @@ public class NewSpecMaterialEligibilityService {
             rejected.setLastFailure("未匹配本批有效前日指定交替组合");
             return rejected;
         }
-        // 登记发生在预演前，指定承接受阻也不能转成虚拟机排产。
+        // 登记原始身份用于最终对账；虚拟补余量统一留到真实机台阶段结束后执行。
         context.registerPreviousAlternateTrialSku(sku);
         boolean trial = PendingSkuUnscheduledRule.isTrialOrMassTrialSku(sku);
         if (trial && !PendingSkuUnscheduledRule.isTrialMassTrialSchedulingEnabled(context)) {

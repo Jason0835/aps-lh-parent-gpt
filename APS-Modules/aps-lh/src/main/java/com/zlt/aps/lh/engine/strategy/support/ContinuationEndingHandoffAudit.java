@@ -242,15 +242,20 @@ public final class ContinuationEndingHandoffAudit {
             ContinuationEndingAllocationSnapshot snapshot, Set<LhScheduleResult> finalResults) {
         ContinuationTDayFinishConstraint constraint = snapshot.getTDayFinishConstraint();
         if (Objects.isNull(constraint)) {
-            // 历史T日角色必须携带业务输入；缺失快照不能被解释成无需校验节点。
+            // 普通T日角色独立于历史交替，也必须携带分配前输入；兼容已有历史快照的缺失校验。
+            boolean tDayRole = StringUtils.equals(snapshot.getFinishRule(),
+                    ContinuationTDayFinishConstraint.MORNING_RULE_NAME)
+                    || StringUtils.equals(snapshot.getFinishRule(), ContinuationTDayFinishConstraint.AFTERNOON_RULE_NAME);
             LhMouldChangePlan historicalPlan = context.getPreviousAlternateMachineOrder()
                     .uniquePlan(original.getLhMachineCode(), original.getMaterialCode());
-            if (Objects.nonNull(snapshot.getHistoricalFinishPlanId()) && Objects.nonNull(historicalPlan)
+            boolean historicalTDayRole = Objects.nonNull(snapshot.getHistoricalFinishPlanId())
+                    && Objects.nonNull(historicalPlan)
                     && Objects.equals(snapshot.getHistoricalFinishPlanId(), historicalPlan.getId())
                     && Objects.equals(LhScheduleTimeUtil.clearTime(historicalPlan.getPlanDate()),
-                            LhScheduleTimeUtil.clearTime(context.getScheduleDate()))) {
+                            LhScheduleTimeUtil.clearTime(context.getScheduleDate()));
+            if (tDayRole || historicalTDayRole) {
                 String detail = String.format("工厂=%s, 批次=%s, 物料=%s, 状态=%s, 机台=%s, 历史计划=%s, "
-                                + "业务规则满足=false, 原因=历史T日释放角色缺少分配前节点约束",
+                                + "业务规则满足=false, 原因=T日释放角色缺少分配前节点约束",
                         context.getFactoryCode(), context.getBatchNo(), original.getMaterialCode(),
                         original.getProductStatus(), original.getLhMachineCode(), snapshot.getHistoricalFinishPlanId());
                 PriorityTraceLogHelper.appendProcessLog(context, "续作T日收尾业务规则复核", detail);

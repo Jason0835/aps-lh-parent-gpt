@@ -73,7 +73,10 @@ public final class PreviousAlternateActionPlan implements Serializable {
         Set<String> originalMoulds = event.getOriginalMouldCodes().stream()
                 .filter(StringUtils::isNotBlank).map(String::trim)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
-        boolean sameMaterial = StringUtils.equals(event.getMaterialCode(), event.getPlan().getAfterMaterialCode());
+        // 只有历史关系本身同料且实际在机仍是该料，才保留有意指定的同料动作。
+        // 历史异料但MES已显示后料时，仍须按完整装机模具关系确定本次01/02。
+        boolean sameMaterial = event.resolveProductionRole()
+                == PreviousAlternatePlanReleaseEvent.ProductionRole.SAME_MATERIAL_ACTION;
         boolean typeBlock;
         String reason;
         if (sameMaterial) {
