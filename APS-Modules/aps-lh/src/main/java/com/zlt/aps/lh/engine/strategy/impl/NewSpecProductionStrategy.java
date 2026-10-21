@@ -43,6 +43,7 @@ import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.component.UnscheduledResultCollector;
 import com.zlt.aps.lh.context.LhScheduleConfig;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.service.impl.LhCleaningScheduleService;
 import com.zlt.aps.lh.service.impl.ContinuationSandBlastDispositionService;
 import com.zlt.aps.lh.service.impl.NewSpecMaterialEligibilityService;
 import com.zlt.aps.lh.service.impl.PreviousAlternatePlanEligibilityService;
@@ -61,6 +62,8 @@ import com.zlt.aps.lh.engine.strategy.ITrialProductionStrategy;
 import com.zlt.aps.lh.engine.strategy.ITypeBlockProductionStrategy;
 import com.zlt.aps.lh.engine.strategy.support.ActiveMachineBinding;
 import com.zlt.aps.lh.engine.strategy.support.PreviousAlternateNormalProductionPolicy;
+import com.zlt.aps.lh.engine.strategy.support.PreviousAlternateHandoffPolicy;
+import com.zlt.aps.lh.engine.strategy.support.PreviousAlternateAdditionalMachineDemand;
 import com.zlt.aps.lh.engine.strategy.support.DailyCandidateReason;
 import com.zlt.aps.lh.engine.strategy.support.DailyMachineExpansionPlanner;
 import com.zlt.aps.lh.engine.strategy.support.StructureInternalEarlyExpansionPlanner;
@@ -200,6 +203,12 @@ import java.util.stream.Collectors;
 @Slf4j
 @Component("newSpecProductionStrategy")
 public class NewSpecProductionStrategy implements IProductionStrategy {
+
+    /**
+     * 清洗公共编排，原策略只应用窗口和时间结果。
+     */
+    @Resource
+    private LhCleaningScheduleService cleaningScheduleService = new LhCleaningScheduleService();
 
     private static final String NEW_SPEC_SCHEDULE_TYPE = "02";
     private static final String AUTO_DATA_SOURCE = "0";
@@ -536,11 +545,20 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             DayScheduleContext day = new DayScheduleContext(entry.getKey(), entry.getValue(),
                     entry.getKey().equals(days.firstKey()), entry.getKey().equals(days.lastKey()));
             PreviousAlternatePlanReleaseEvent historicalEvent = context.getActivePreviousAlternateEvent();
+            PreviousAlternateAdditionalMachineDemand additionalDemand =
+                    context.resolvePreviousAlternateAdditionalMachineDemand(source);
+            if (Objects.nonNull(additionalDemand)
+                    && !entry.getKey().isBefore(additionalDemand.getProductionDate())) {
+                this.getTargetScheduleQtyResolver().applyProductionTargetState(context, source,
+                        source.getSurplusQty(), "时间下机固定重放恢复历史指定增机真实需求");
+            }
             DailyNewSpecCandidate candidate = historicalEvent == null
                     ? materialEligibilityService.resolveCandidate(context, source, entry.getKey())
                     : materialEligibilityService.resolvePreviousAlternateCandidate(context, source, entry.getKey(),
                             historicalEvent.getPlan(), machineCode);
             if (candidate.getReasons().isEmpty()) {
+                this.logTimedOffActionRejection(context, source, machineCode, entry.getKey(),
+                        "当前业务日没有可用候选资格");
                 continue;
             }
             if (historicalEvent != null) {
@@ -554,6 +572,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                     context.getMachineScheduleMap().get(machineCode), machineMatch, mouldChange, inspection,
                     capacity, null, fixedMachine, new NewSpecProposalRoundCache(1));
             if (replay == null) {
+                this.logTimedOffActionRejection(context, source, machineCode, entry.getKey(), candidate.getLastFailure());
                 continue;
             }
             if (context.getNewSpecSkuList().stream().noneMatch(sku -> sku == source)) {
@@ -564,6 +583,23 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             }
         }
         return null;
+    }
+
+    /**
+     * 记录固定组合未形成正量提案的真实阶段原因，供预演负荷与正式承接差异核对。
+     *
+     * @param context 当前隔离重放上下文
+     * @param source 原需求来源
+     * @param machineCode 冻结机台编码
+     * @param businessDate 本次尝试业务日
+     * @param reason 原准入或时间轴拒绝原因
+     */
+    private void logTimedOffActionRejection(LhScheduleContext context, SkuScheduleDTO source,
+            String machineCode, LocalDate businessDate, String reason) {
+        log.info("时间下机固定组合重放拒绝, 工厂={}, 批次={}, 物料={}, 状态={}, 机台={}, 业务日={}, 中心剩余={}, 原因={}",
+                context.getFactoryCode(), context.getBatchNo(), source.getMaterialCode(), source.getProductStatus(),
+                machineCode, businessDate, this.getTargetScheduleQtyResolver().previewProductionRemainingQty(context, source),
+                reason);
     }
 
     /**
@@ -2652,7 +2688,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 从已完成前料的释放事实或原始正常需求解析历史生产下限。
+     * 从结构后料待准备、已完成前料释放事实或原始正常需求解析历史生产下限。
      *
      * @param context 排程上下文
      * @param demandStart 本轮需求首班开始时刻
@@ -2662,6 +2698,12 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      */
     private Date resolvePreviousAlternateProductionNotBeforeTime(LhScheduleContext context,
             Date demandStart, SkuScheduleDTO sku, String machineCode) {
+        Date structureRelease = PreviousAlternateHandoffPolicy.resolveStructureProductionStart(
+                context, sku, machineCode);
+        if (Objects.nonNull(structureRelease)) {
+            // 结构提前生产已经由候选准入确认，不能再次用未来正计划日截断历史承接。
+            return structureRelease;
+        }
         if (!context.isPreviousAlternateAction(sku, machineCode)
                 || context.isFutureOnlyEarlyProductionCandidate(sku)) {
             return demandStart;
@@ -4677,7 +4719,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         while (true) {
             this.equipmentPlanScheduleService.reviewConfirmedEndings(context);
             if (proposalRoundCache.invalidateEquipmentPlanVersion(
-                    context.getEquipmentPlanRuntimeState().getConstraintVersion())) {
+                    context.getEquipmentPlanRuntimeState().getConstraintVersion())
+                    | proposalRoundCache.invalidateCleaningPlanVersion(
+                            context.getCleaningPlanRuntimeState().getConstraintVersion())) {
                 failedAssignmentKeySet.clear();
             }
             if (this.isTimedMachineOffPreviewMorningFull(context, dayContext)) {
@@ -6132,7 +6176,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             LhShiftConfigVO lastAttemptTargetShift = null;
             while (true) {
                 if (candidateCache.invalidateEquipmentPlanVersion(
-                        context.getEquipmentPlanRuntimeState().getConstraintVersion())) {
+                        context.getEquipmentPlanRuntimeState().getConstraintVersion())
+                        | candidateCache.invalidateCleaningPlanVersion(
+                                context.getCleaningPlanRuntimeState().getConstraintVersion())) {
                     candidateAvailabilityPlanMap.clear();
                 }
                 LocalDate currentAddMachineProductionDate = resolveCurrentAddMachineProductionDate(
@@ -7188,10 +7234,13 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                         shifts, firstProductionStartTime);
                         firstInspectionAttributionTime = firstProductionStartTime;
                         /*
-                         * 防守兼容非机台驱动旧入口：若生产门禁晚于已有首检计划，清空旧计划，
-                         * 让下游按真实生产班次重新处理，禁止首检写入开产前班次。
+                         * 旧入口没有匹配冻结提案时，门禁晚于首检则按真实生产班次重新处理。
+                         * 已准入历史结构承接的完整首检由预演验证，正式生产晚于首检不代表首检失效。
                          */
                         if (Objects.nonNull(firstInspectionAllocationPlan)
+                                && !(selectedInspectionTimelineMatched
+                                && Objects.nonNull(PreviousAlternateHandoffPolicy.resolveStructureProductionStart(
+                                context, sku, machineCode)))
                                 && !this.isPrecisionInspection(firstInspectionAllocationPlan)
                                 && Objects.nonNull(firstInspectionAllocationPlan.getInspectionEndTime())
                                 && Objects.nonNull(firstProductionStartTime)
@@ -8162,7 +8211,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                  * 单控整机两侧登记为同一个绑定，跨日续排时按整组口径只消费一次 SKU 账本。
                  */
                 // 两侧结果已提交，撤销被正规换模覆盖的清洗模具边界，供下一次候选竞争读取。
-                this.continuationSandBlastDispositionService.reconcileCancelledEvents(context);
+                this.cleaningScheduleService.reviewCommittedResults(context);
                 ActiveMachineBinding activeBinding = new ActiveMachineBinding(
                         MonthPlanDateResolver.buildMaterialStatusKey(
                                 sku.getMaterialCode(), sku.getProductStatus()),
@@ -14640,6 +14689,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      * @param totalScheduledQty 当前 SKU 累计已排量
      * @param addMachineProductionDate dayN 模拟确定的当前增机生效日
      * @param isEnding 是否收尾
+     * @param phase 当前已准入排程阶段
      * @return 对齐后的换模就绪时间
      */
     private Date alignSwitchReadyTimeByAddMachineDate(LhScheduleContext context,
@@ -14650,6 +14700,12 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                                        LocalDate addMachineProductionDate,
                                                        boolean isEnding,
                                                        DailySchedulePhase phase) {
+        if (Objects.nonNull(context.getActivePreviousAlternateEvent())
+                && PreviousAlternateHandoffPolicy.isEligibleAction(context, sku,
+                context.getActivePreviousAlternateEvent().getMachineCode())) {
+            // 历史准备窗口与需求日期分别约束，真实释放、禁换模、配额及历史截止继续由分配器复核。
+            return switchReadyTime;
+        }
         EarlyProductionDecision earlyProductionDecision = resolveEarlyProductionDecision(
                 context, sku, switchReadyTime, shifts, isEnding, phase);
         /*
@@ -14722,6 +14778,13 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                                            EarlyProductionDecision earlyProductionDecision) {
         PreviousAlternatePlanReleaseEvent historicalEvent = Objects.isNull(context)
                 ? null : context.getActivePreviousAlternateEvent();
+        Date structureRelease = Objects.isNull(historicalEvent) ? null
+                : PreviousAlternateHandoffPolicy.resolveStructureProductionStart(
+                context, sku, historicalEvent.getMachineCode());
+        if (Objects.nonNull(structureRelease) && Objects.nonNull(productionStartTime)) {
+            // 仍由外层应用供胚及结构生产下限，不以未来dayN日期抹掉已准入的当前班首检和产能。
+            return this.resolveLaterTime(productionStartTime, structureRelease);
+        }
         if (Objects.nonNull(historicalEvent) && Objects.nonNull(addMachineProductionDate)
                 && Objects.nonNull(productionStartTime)) {
             Date demandStart = this.resolveFirstShiftStartTime(
@@ -21571,12 +21634,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      * @return 仍参与产能和摘要计算的清洗窗口
      */
     private List<MachineCleaningWindowDTO> resolveMachineCleaningWindowList(LhScheduleContext context, String machineCode) {
-        MachineScheduleDTO machine = context.getMachineScheduleMap().get(machineCode);
-        if (machine == null || CollectionUtils.isEmpty(machine.getCleaningWindowList())) {
-            return new ArrayList<>();
-        }
-        return CleaningDispositionResolver.resolveEffectiveWindows(
-                context, machineCode, machine.getCleaningWindowList());
+        return cleaningScheduleService.resolveMachineCleaningWindowList(context, machineCode);
     }
 
     private List<MachineMaintenanceWindowDTO> resolveMachineMaintenanceWindowList(LhScheduleContext context, String machineCode) {
@@ -21658,12 +21716,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                                                               SkuScheduleDTO sku,
                                                                               Date switchStartTime,
                                                                               Date firstProductionStartTime) {
-        List<MachineCleaningWindowDTO> cleaningWindowList = resolveMachineCleaningWindowList(context, machineCode);
-        if (CleaningScheduleRuleUtil.shouldSkipCleaningBySkuEnding(context, sku)) {
-            return new ArrayList<>(0);
-        }
-        return new ArrayList<>(MachineCleaningOverlapUtil.excludeOverlapWindows(
-                cleaningWindowList, switchStartTime, firstProductionStartTime));
+        return cleaningScheduleService.resolveForScheduling(context, machineCode, sku,
+                switchStartTime, firstProductionStartTime).getEffectiveWindows();
     }
 
     /**
@@ -21677,38 +21731,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     private List<MachineCleaningWindowDTO> resolveEffectiveCleaningWindowList(LhScheduleContext context,
                                                                               LhScheduleResult result,
                                                                               Date firstProductionStartTime) {
-        if (Objects.isNull(result)) {
-            return new ArrayList<>(0);
-        }
-        List<MachineCleaningWindowDTO> cleaningWindowList = resolveMachineCleaningWindowList(
-                context, result.getLhMachineCode());
-        if (CleaningScheduleRuleUtil.shouldSkipCleaningByResultEnding(result)) {
-            return new ArrayList<>(0);
-        }
-        Date switchEndTime = resolveCleaningSwitchEndTime(context, result, firstProductionStartTime);
-        return new ArrayList<>(MachineCleaningOverlapUtil.excludeOverlapWindows(
-                cleaningWindowList, result.getMouldChangeStartTime(), switchEndTime));
-    }
-
-    /**
-     * 解析清洗与切换重叠过滤使用的切换结束时间。
-     *
-     * <p>新增换模首检可能落在换模开始班次，导致首个有计划量班次早于真实换模完成时间；
-     * 清洗+换模只能按真实 8 小时换模窗口判断，不能用首检班次开始时间截断。</p>
-     *
-     * @param context 排程上下文
-     * @param result 排程结果
-     * @param firstProductionStartTime 首个有计划量班次开始时间
-     * @return 清洗重叠过滤使用的切换结束时间
-     */
-    private Date resolveCleaningSwitchEndTime(LhScheduleContext context,
-                                              LhScheduleResult result,
-                                              Date firstProductionStartTime) {
-        if (Objects.nonNull(result) && Objects.nonNull(result.getMouldChangeStartTime())) {
-            return LhScheduleTimeUtil.addHours(result.getMouldChangeStartTime(),
-                    LhScheduleTimeUtil.getMouldChangeTotalHours(context));
-        }
-        return firstProductionStartTime;
+        return cleaningScheduleService.resolveForScheduling(context, result,
+                firstProductionStartTime, false).getEffectiveWindows();
     }
 
     /**

@@ -51,6 +51,7 @@ public final class ResultDowntimeSummaryUtil {
      * @param maintenanceWindowList 保养窗口
      * @param cleaningWindowList 清洗窗口
      * @param devicePlanShutList 设备停机窗口
+     * @param scheduleWindowShifts 完整排程班次窗口
      */
     public static void fillDowntimeSummary(LhScheduleResult result,
                                            List<MachineMaintenanceWindowDTO> maintenanceWindowList,
@@ -72,6 +73,11 @@ public final class ResultDowntimeSummaryUtil {
         // 避免同一机台多个结果在反复重算时残留重复原因。
         // 清洗摘要是机台级口径：只要该机台存在有效清洗窗口就回填，不按结果生产时段截断，
         // 避免清洗恰好从完工时刻开始时被边界判定漏掉。
+        // 离机喷砂的置换容量投影只表达新模具准备，不属于机台实际清洗摘要或清洗原因。
+        if (!CollectionUtils.isEmpty(cleaningWindowList)) {
+            cleaningWindowList = cleaningWindowList.stream().filter(Objects::nonNull)
+                    .filter(window -> !window.isOffMachineCleaning()).collect(java.util.stream.Collectors.toList());
+        }
         fillCleaningSummary(result, cleaningWindowList);
         fillShutdownSummary(result, devicePlanShutList, productionStartTime, productionEndTime);
         // 喷砂清洗与精度/维修实际重叠时，才在对应的最后一个重叠班次追加固定原因。
@@ -482,6 +488,9 @@ public final class ResultDowntimeSummaryUtil {
         }
         int fallbackShiftIndex = resolveFirstPlannedShiftIndex(result);
         for (MachineCleaningWindowDTO cleaningWindow : cleaningWindowList) {
+            if (cleaningWindow != null && cleaningWindow.isOffMachineCleaning()) {
+                continue;
+            }
             String analysis = resolveCleaningMouldChangeAnalysis(cleaningWindow);
             if (Objects.isNull(analysis)) {
                 continue;
@@ -521,6 +530,9 @@ public final class ResultDowntimeSummaryUtil {
             return;
         }
         for (MachineCleaningWindowDTO cleaningWindow : cleaningWindowList) {
+            if (cleaningWindow != null && cleaningWindow.isOffMachineCleaning()) {
+                continue;
+            }
             String analysis = resolveStandaloneCleaningAnalysis(cleaningWindow);
             if (Objects.isNull(analysis) || isCleaningOverlapOtherDowntime(cleaningWindow,
                     maintenanceWindowList, devicePlanShutList, mouldChangeStartTime, productionStartTime)) {

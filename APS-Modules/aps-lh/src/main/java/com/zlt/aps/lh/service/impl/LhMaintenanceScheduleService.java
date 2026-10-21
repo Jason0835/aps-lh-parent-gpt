@@ -2596,12 +2596,15 @@ public class LhMaintenanceScheduleService {
         }
         // 处理条件1：前SKU须在保养开始（默认08:00）前收尾；晚于08:00收尾的从下一自然日开始找候选。
         Date candidateDate = this.resolveJudgeCandidateDate(context, endingTime);
+        boolean ordinaryPrecision = daysToDue > Math.max(forceCheckDays,
+                LhScheduleConstant.MAINTENANCE_FORCE_CHECK_DAYS);
         Date executeDate = this.searchAvailableJudgeDate(context, candidateDate, plan, machineCode,
-                batchAllocatedMachineMap);
+                batchAllocatedMachineMap, ordinaryPrecision);
         if (Objects.isNull(executeDate)) {
             this.appendMaintenanceProcessLog(context, MAINTENANCE_PROCESS_LOG_TITLE, machineCode, plan,
-                    candidateDate, "到计划日期前不存在满足每日台数、周日、盘点日、节假日约束的合规执行日",
-                    "超期舍去，返回0");
+                    candidateDate, ordinaryPrecision ? "普通精度本次收尾机会无可用额度或计划日前无合规日"
+                            : "到计划日期前不存在满足每日台数、周日、盘点日、节假日约束的合规执行日",
+                    ordinaryPrecision ? "本次不挂窗，等待真实收尾或额度变化后复评，返回0" : "超期舍去，返回0");
             return judgeDTO;
         }
         return this.buildSuccessJudgeDTO(context, machine, plan, executeDate, false, batchAllocatedMachineMap);
@@ -2634,7 +2637,7 @@ public class LhMaintenanceScheduleService {
         // 候选日从排程T日开始搜索；到计划日期仍无合规执行日则舍去，禁止延后执行。
         Date executeDate = this.searchAvailableJudgeDate(context,
                 LhScheduleTimeUtil.clearTime(context.getScheduleDate()), plan, machineCode,
-                batchAllocatedMachineMap);
+                batchAllocatedMachineMap, false);
         if (Objects.isNull(executeDate)) {
             this.appendMaintenanceProcessLog(context, MAINTENANCE_PROCESS_LOG_TITLE, machineCode, plan,
                     null, "长期在机强制检查期内到计划日期前无合规执行日", "超期舍去，返回0");
@@ -2661,30 +2664,42 @@ public class LhMaintenanceScheduleService {
     /**
      * 从候选日开始逐日搜索第一个满足判定约束的精度执行日。
      *
-     * <p>约束包含每日保养台数（含批内记账）、周日、月末盘点日、节假日前限制天数；与换模、
-     * 清洗、停机的重叠由排程主流程判断，本方法不校验。搜索上限定为精度计划日期，体现
-     * "精度只能提前、不能延后"，到计划日期仍无合规日返回null（舍去）。</p>
+     * <p>普通精度在额度满时结束本次机会，不得预约次日；硬优先和强制检查可以继续搜索。
+     * 周日、盘点日和节假日继续按既有日历规则跳过，搜索上限仍是计划日期。
+     * 与换模、清洗、停机的重叠由排程主流程判断。</p>
      *
      * @param context 排程上下文
      * @param candidateDate 搜索起始候选日
      * @param plan 精度计划
      * @param machineCode 运行态机台编码
      * @param batchAllocatedMachineMap 批内每日台数额度记账；单机调用传null
-     * @return 合规执行日；计划日期前无合规日返回null
+     * @param waitOnQuotaExhaustion 普通精度额度满时是否等待新事实复评
+     * @return 合规执行日；普通精度错过额度或计划日期前无合规日返回null
      */
     private Date searchAvailableJudgeDate(LhScheduleContext context,
                                           Date candidateDate,
                                           LhPrecisionPlan plan,
                                           String machineCode,
-                                          Map<String, Set<String>> batchAllocatedMachineMap) {
+                                          Map<String, Set<String>> batchAllocatedMachineMap,
+                                          boolean waitOnQuotaExhaustion) {
         if (Objects.isNull(candidateDate) || Objects.isNull(plan) || Objects.isNull(plan.getPlanDate())) {
             return null;
         }
         Date cursorDate = LhScheduleTimeUtil.clearTime(candidateDate);
         Date planDateLimit = LhScheduleTimeUtil.clearTime(plan.getPlanDate());
         while (!cursorDate.after(planDateLimit)) {
-            String unavailableReason = this.resolveJudgeDateUnavailableReason(
+            String quotaReason = this.resolveJudgeQuotaUnavailableReason(
                     context, cursorDate, machineCode, batchAllocatedMachineMap);
+            if (waitOnQuotaExhaustion && StringUtils.isNotEmpty(quotaReason)) {
+                this.appendMaintenanceProcessLog(context, MAINTENANCE_PROCESS_LOG_TITLE, machineCode, plan,
+                        cursorDate, quotaReason, "普通精度错过本次机会，不顺延预约，等待复评");
+                log.info("普通精度等待下次触发机会, 工厂: {}, 批次: {}, 机台: {}, 距到期天数: {}, 候选日: {}, 原因: {}",
+                        context.getFactoryCode(), context.getBatchNo(), machineCode, this.resolveDaysToDue(plan),
+                        LhScheduleTimeUtil.formatDate(cursorDate), quotaReason);
+                return null;
+            }
+            String unavailableReason = StringUtils.isNotEmpty(quotaReason) ? quotaReason
+                    : this.resolveJudgeCalendarUnavailableReason(context, cursorDate);
             if (StringUtils.isEmpty(unavailableReason)) {
                 return cursorDate;
             }
@@ -2694,19 +2709,17 @@ public class LhMaintenanceScheduleService {
     }
 
     /**
-     * 解析判定口径下候选日期不可用的原因。
+     * 解析候选日期的每日保养额度是否不足。
      *
-     * <p>每日保养台数取参数SYS0307004（保底1台），占用数=上下文既有额度+本批已分配额度；
-     * 周日受SYS0307005控制（0=不安排）；月末盘点日（每月最后一天）受SYS0307008开关控制
-     * （0=不安排）；节假日当天及前SYS0307006天不安排。与换模、清洗、停机的重叠不在此校验。</p>
+     * <p>占用按物理机台取上下文与本批分配集合的并集，保留旧调用仅提供计数的匿名占用。</p>
      *
      * @param context 排程上下文
      * @param targetDate 候选执行日
      * @param machineCode 运行态机台编码
      * @param batchAllocatedMachineMap 批内每日台数额度记账；单机调用传null
-     * @return 不可用原因；可用返回null
+     * @return 额度不足原因；额度可用返回null
      */
-    private String resolveJudgeDateUnavailableReason(LhScheduleContext context,
+    private String resolveJudgeQuotaUnavailableReason(LhScheduleContext context,
                                                      Date targetDate,
                                                      String machineCode,
                                                      Map<String, Set<String>> batchAllocatedMachineMap) {
@@ -2733,6 +2746,17 @@ public class LhMaintenanceScheduleService {
                 && usedCount >= dailyLimit) {
             return "当天保养台数已达上限(" + usedCount + "/" + dailyLimit + ")";
         }
+        return null;
+    }
+
+    /**
+     * 校验候选精度日的周日、盘点日和节假日限制。
+     *
+     * @param context 排程上下文
+     * @param targetDate 待检查的精度执行日
+     * @return 日历不可用原因；可用返回null
+     */
+    private String resolveJudgeCalendarUnavailableReason(LhScheduleContext context, Date targetDate) {
         if (!this.isSundayAllowed(context) && this.isSunday(targetDate)) {
             return "周日不安排保养";
         }

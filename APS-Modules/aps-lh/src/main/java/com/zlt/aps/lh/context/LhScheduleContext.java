@@ -258,19 +258,12 @@ public class LhScheduleContext {
             new LinkedHashMap<String, ContinuationTemporaryFaultTransferEvent>(4);
     /**
      * 本次排程已加载的清洗类设备停机候选列表。
-     * <p>仅保存计划开始时间不早于排程日期 T 日、尚未实际完成且未删除的干冰/喷砂清洗候选。
+     * <p>仅保存计划开始时间位于本次排程窗口、尚未实际完成的干冰/喷砂清洗候选。
      * 清洗候选转换为运行态清洗窗口后会从 {@link #devicePlanShutList} 剥离，但该只读快照仍供续作降模
      * 判断“机台是否存在有效清洗计划”使用，不参与普通停机产能扣减，也不改变清洗每日上限和班次安排。</p>
      */
     private List<MdmDevicePlanShut> loadedCleaningPlanShutList = new ArrayList<>();
-    /**
-     * 清洗计划排程日期回填项列表。
-     * <p>清洗实际安排成功时记录实际清洗开始时间；因 SKU 3 天内收尾跳过清洗时记录收尾日期。
-     * 该列表在排程结果落库事务（{@code replaceScheduleAtomically}）内统一回填到
-     * {@code T_MDM_DEVICE_PLAN_SHUT.SCHEDULE_DATE}，按设备停机计划主键 id 去重更新。
-     * 配对侧派生窗口、超窗口上限、配置非法、最晚日期超限等未安排场景不收集回填项。</p>
-     */
-    private List<CleaningScheduleDateFillItem> cleaningScheduleDateFillList = new ArrayList<>();
+
     /**
      * SKU与模具关系Map, key=materialCode
      */
@@ -504,6 +497,11 @@ public class LhScheduleContext {
 
     /** 本批设备计划判定、候选时间约束、待复评及最终安排，与预演快照同步回滚。 */
     private EquipmentPlanRuntimeState equipmentPlanRuntimeState = new EquipmentPlanRuntimeState();
+
+    /**
+     * 独立清洗运行态，接管清洗事件、回填和喷砂关联状态。
+     */
+    private CleaningPlanRuntimeState cleaningPlanRuntimeState = new CleaningPlanRuntimeState();
 
     /** 每条续作实际消费记录，仅用于精度晚阶段受控撤销与重算，按结果身份关联。 */
     private Map<LhScheduleResult, ContinuousProductionConsumption> continuousProductionConsumptionMap = new IdentityHashMap<>();
@@ -1054,19 +1052,7 @@ public class LhScheduleContext {
      * 续作首日/窗口无计划释放的机台集合，仅用于S4.5选机降优先级，不代表禁止生产
      */
     private Set<String> releasedContinuousMachineCodeSet = new LinkedHashSet<>();
-    /**
-     * 续作阶段因“仅喷砂清洗”主动下机的实际清洗窗口，key=运行态机台编码。
-     * <p>该快照同时承载三项运行态事实：旧SKU及机台从cleanStartTime释放、原模具到cleanEndTime后
-     * 才能重新参与资源匹配、剩余需求必须转入后续换活字块/新增排产。喷砂与其他停机重叠时禁止写入。</p>
-     */
-    private Map<String, MachineCleaningWindowDTO> onlySandBlastContinuationReleaseWindowMap =
-            new LinkedHashMap<String, MachineCleaningWindowDTO>(4);
-    /** 续作仅喷砂统一处置事件，保留从机台有效停机窗口移出的清洗事实。 */
-    private Map<String, MachineCleaningWindowDTO> continuationSandBlastWindowMap =
-            new LinkedHashMap<String, MachineCleaningWindowDTO>(4);
-    /** 仅喷砂实际下机时仍需转入后续排产的真实余量，key=运行态机台编码。 */
-    private Map<String, Integer> onlySandBlastContinuationRemainingQtyMap =
-            new LinkedHashMap<String, Integer>(4);
+
     /**
      * 已按降模规则释放过续作机台的物料集合，避免后续补偿链路把降模机台重新补回
      */
@@ -1234,6 +1220,10 @@ public class LhScheduleContext {
     /** 本批一次性时间下机负荷预演标记，仅限制预演扫描，不改变正式排程。 */
     private boolean timedMachineOffLoadPreview;
     /**
+     * 时间下机决定形成后的隔离承接预演，模拟正式补充释放及历史准备窗口并在退出时恢复。
+     */
+    private boolean timedMachineOffHandoffPreview;
+    /**
      * 历史正规换模与喷砂联合尝试的精确节点，离开尝试作用域后恢复为空。
      */
     private Map<String, Date> timedMachineOffCleaningCandidateMap = new LinkedHashMap<>();
@@ -1378,6 +1368,11 @@ public class LhScheduleContext {
     private Map<String, SkuScheduleDTO> allSkuScheduleDtoMap = new LinkedHashMap<>();
     /** S4.3清理待排SKU之前按物料汇总的硫化余量，避免历史计划后料状态误当作前料状态。 */
     private Map<String, Integer> initialMaterialSurplusQtyMap = new LinkedHashMap<>();
+
+    /**
+     * 准入过滤前按物料及产品状态冻结的原始硫化余量，仅供历史前料下机事实核对。
+     */
+    private Map<String, Integer> initialMaterialStatusSurplusQtyMap = new LinkedHashMap<>();
     /**
      * SKU减量清单四维索引，key=year|month|materialCode|productStatus。
      * 年月取自来源月计划，文本归一化后匹配；S4.2批量加载，S4.3统一过滤。
@@ -2340,7 +2335,7 @@ public class LhScheduleContext {
     public Set<String> resolveOnlySandBlastReleasedPhysicalMachineCodes(SkuScheduleDTO sku) {
         Set<String> physicalMachineCodeSet = new LinkedHashSet<String>(2);
         if (Objects.isNull(sku) || CollectionUtils.isEmpty(continuousSkuList)
-                || CollectionUtils.isEmpty(onlySandBlastContinuationReleaseWindowMap)) {
+                || CollectionUtils.isEmpty(this.getOnlySandBlastContinuationReleaseWindowMap())) {
             return physicalMachineCodeSet;
         }
         for (SkuScheduleDTO continuousSku : continuousSkuList) {
@@ -2349,7 +2344,7 @@ public class LhScheduleContext {
                     || !StringUtils.equals(StringUtils.trimToEmpty(continuousSku.getProductStatus()),
                     StringUtils.trimToEmpty(sku.getProductStatus()))
                     || StringUtils.isEmpty(continuousSku.getContinuousMachineCode())
-                    || !onlySandBlastContinuationReleaseWindowMap.containsKey(
+                    || !this.getOnlySandBlastContinuationReleaseWindowMap().containsKey(
                     continuousSku.getContinuousMachineCode())) {
                 continue;
             }
@@ -2394,7 +2389,7 @@ public class LhScheduleContext {
         if (Objects.isNull(sku) || Objects.isNull(businessDate)) {
             return machines;
         }
-        onlySandBlastContinuationReleaseWindowMap.forEach((machineCode, event) -> {
+        this.getOnlySandBlastContinuationReleaseWindowMap().forEach((machineCode, event) -> {
             if (Objects.nonNull(event) && Objects.nonNull(event.getCleanStartTime())
                     && !this.isTemporaryFaultOriginalMachine(sku, machineCode)
                     && this.hasPreviousAlternateReplacementResult(sku, machineCode,
@@ -2435,14 +2430,14 @@ public class LhScheduleContext {
      */
     public List<MachineCleaningWindowDTO> resolveOnlySandBlastRequeueEvents(SkuScheduleDTO sku) {
         if (Objects.isNull(sku)
-                || CollectionUtils.isEmpty(onlySandBlastContinuationReleaseWindowMap)) {
+                || CollectionUtils.isEmpty(this.getOnlySandBlastContinuationReleaseWindowMap())) {
             return Collections.emptyList();
         }
         String sourceMachineCode = sku.getOnlySandBlastRequeueSourceMachineCode();
         if (StringUtils.isEmpty(sourceMachineCode)) {
             sourceMachineCode = sku.getContinuousMachineCode();
         }
-        MachineCleaningWindowDTO event = onlySandBlastContinuationReleaseWindowMap.get(sourceMachineCode);
+        MachineCleaningWindowDTO event = this.getOnlySandBlastContinuationReleaseWindowMap().get(sourceMachineCode);
         if (Objects.isNull(event) || !event.isOffMachineCleaning()
                 || StringUtils.isNotEmpty(event.getReplacementMouldCode())
                 || !StringUtils.equals(event.getContinuationMaterialCode(), sku.getMaterialCode())
@@ -3236,4 +3231,75 @@ public class LhScheduleContext {
         return false;
     }
 
+    /**
+     * 获取清洗运行态中的日期回填容器，兼容既有消费者。
+     *
+     * @return 当前批次唯一容器
+     */
+    public List<CleaningScheduleDateFillItem> getCleaningScheduleDateFillList() {
+        return cleaningPlanRuntimeState.getScheduleDateFillList();
+    }
+
+    /**
+     * 恢复清洗运行态中的日期回填容器。
+     *
+     * @param value 待恢复容器
+     */
+    public void setCleaningScheduleDateFillList(List<CleaningScheduleDateFillItem> value) {
+        cleaningPlanRuntimeState.setScheduleDateFillList(value);
+    }
+
+    /**
+     * 获取清洗运行态中的仅喷砂释放事件容器，兼容既有消费者。
+     *
+     * @return 当前批次唯一容器
+     */
+    public Map<String, MachineCleaningWindowDTO> getOnlySandBlastContinuationReleaseWindowMap() {
+        return cleaningPlanRuntimeState.getReleaseWindowMap();
+    }
+
+    /**
+     * 恢复清洗运行态中的仅喷砂释放事件容器。
+     *
+     * @param value 待恢复容器
+     */
+    public void setOnlySandBlastContinuationReleaseWindowMap(Map<String, MachineCleaningWindowDTO> value) {
+        cleaningPlanRuntimeState.setReleaseWindowMap(value);
+    }
+
+    /**
+     * 获取清洗运行态中的喷砂交接事件容器，兼容既有消费者。
+     *
+     * @return 当前批次唯一容器
+     */
+    public Map<String, MachineCleaningWindowDTO> getContinuationSandBlastWindowMap() {
+        return cleaningPlanRuntimeState.getSandBlastWindowMap();
+    }
+
+    /**
+     * 恢复清洗运行态中的喷砂交接事件容器。
+     *
+     * @param value 待恢复容器
+     */
+    public void setContinuationSandBlastWindowMap(Map<String, MachineCleaningWindowDTO> value) {
+        cleaningPlanRuntimeState.setSandBlastWindowMap(value);
+    }
+
+    /**
+     * 获取清洗运行态中的喷砂回流余量容器，兼容既有消费者。
+     *
+     * @return 当前批次唯一容器
+     */
+    public Map<String, Integer> getOnlySandBlastContinuationRemainingQtyMap() {
+        return cleaningPlanRuntimeState.getRemainingQtyMap();
+    }
+
+    /**
+     * 恢复清洗运行态中的喷砂回流余量容器。
+     *
+     * @param value 待恢复容器
+     */
+    public void setOnlySandBlastContinuationRemainingQtyMap(Map<String, Integer> value) {
+        cleaningPlanRuntimeState.setRemainingQtyMap(value);
+    }
 }

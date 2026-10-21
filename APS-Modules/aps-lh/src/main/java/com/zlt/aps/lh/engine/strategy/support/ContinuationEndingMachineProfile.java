@@ -496,7 +496,9 @@ public final class ContinuationEndingMachineProfile {
     }
 
     /**
-     * 将已经通过整组校验的数量写入传入的结果副本；原结果由调用方统一提交。
+     * 将已校验数量写入结果副本，并将置换首检班次起点对齐到真实首检开始。
+     * 原结果由调用方统一提交，普通未命中置换的画像保持原写入规则。
+     *
      * @param proposed 各侧结果副本
      * @param quantity 物理机台合计排量
      */
@@ -509,6 +511,13 @@ public final class ContinuationEndingMachineProfile {
             for (int side = 0; side < originals.size(); side++) {
                 Date start = sideQty > 0 ? ShiftFieldUtil.getShiftStartTime(rawProfiles.get(side), shiftIndex) : null;
                 Date end = sideQty > 0 ? this.sideEndTime(side, position, sideQty) : null;
+                if (sideQty > 0 && cleaningWindows.get(side).stream()
+                        .anyMatch(MachineCleaningWindowDTO::isOffMachineCleaning)) {
+                    start = ShiftCapacityResolverUtil.resolveSandBlastShiftPlanStartTime(deviceStops,
+                            cleaningWindows.get(side), maintenanceWindows.get(side),
+                            rawProfiles.get(side).getLhMachineCode(), start,
+                            shifts.get(position).getShiftEndDateTime(), end);
+                }
                 ShiftFieldUtil.setShiftPlanQty(proposed.get(side), shiftIndex, sideQty, start, end);
             }
             remaining -= allocated;

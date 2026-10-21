@@ -34,6 +34,7 @@ import com.zlt.aps.lh.component.StructureEndingAlignmentService;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.component.UnscheduledResultCollector;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.service.impl.LhCleaningScheduleService;
 import com.zlt.aps.lh.engine.strategy.support.TimedMachineOffActionPreviewCapture;
 import com.zlt.aps.lh.component.LhMachineSupplyStructureRule;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
@@ -139,6 +140,12 @@ import java.util.stream.Collectors;
 @Slf4j
 @Component("typeBlockProductionStrategy")
 public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy {
+
+    /**
+     * 清洗公共编排，原策略只应用窗口和时间结果。
+     */
+    @Resource
+    private LhCleaningScheduleService cleaningScheduleService = new LhCleaningScheduleService();
 
     private static final String CONTINUOUS_SCHEDULE_TYPE = ScheduleTypeEnum.CONTINUOUS.getCode();
     private static final String TYPE_BLOCK_DRY_ICE_CLEANING_ANALYSIS = "干冰清洗+换活字块";
@@ -1634,32 +1641,8 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                                                            MachineScheduleDTO machine,
                                                            Date switchStartTime,
                                                            Date productionStartTime) {
-        if (Objects.isNull(machine)
-                || Objects.isNull(switchStartTime)
-                || Objects.isNull(productionStartTime)
-                || !switchStartTime.before(productionStartTime)) {
-            return productionStartTime;
-        }
-        List<MachineCleaningWindowDTO> effectiveCleaningWindows =
-                this.resolveMachineCleaningWindowList(context, machine.getMachineCode());
-        Date resolvedStartTime = productionStartTime;
-        for (MachineCleaningWindowDTO cleaningWindow : effectiveCleaningWindows) {
-            Date cleaningOccupationEndTime = MachineCleaningOverlapUtil
-                    .resolveEffectiveCleanEndTime(cleaningWindow);
-            if (Objects.isNull(cleaningWindow)
-                    || Objects.isNull(cleaningWindow.getCleanStartTime())
-                    || Objects.isNull(cleaningOccupationEndTime)
-                    || !cleaningWindow.getCleanStartTime().before(cleaningOccupationEndTime)) {
-                continue;
-            }
-            // 只有清洗与换活字块实际相交时才并行取最大结束时间，未重叠场景不改变原开产时间。
-            if (cleaningWindow.getCleanStartTime().before(productionStartTime)
-                    && cleaningOccupationEndTime.after(switchStartTime)
-                    && cleaningOccupationEndTime.after(resolvedStartTime)) {
-                resolvedStartTime = cleaningOccupationEndTime;
-            }
-        }
-        return resolvedStartTime;
+        return cleaningScheduleService.resolveTypeBlockProductionStartTime(
+                context, machine, switchStartTime, productionStartTime);
     }
 
     /**
@@ -5408,40 +5391,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
     private void applyTypeBlockCleaningAnalysis(LhScheduleContext context,
                                                 LhScheduleResult result,
                                                 List<LhShiftConfigVO> shifts) {
-        if (context == null || result == null || CollectionUtils.isEmpty(shifts)) {
-            return;
-        }
-        Date switchStartTime = result.getMouldChangeStartTime();
-        Date productionStartTime = resolveFirstPlannedShiftStartTime(result);
-        if (switchStartTime == null || productionStartTime == null) {
-            return;
-        }
-        int firstPlannedShiftIndex = resolveFirstPlannedShiftIndex(result);
-        if (firstPlannedShiftIndex <= 0) {
-            return;
-        }
-        // 换活字块完成时间 = 切换开始 + 换活字块总时长；取完成时间与首个生产班次开始时间的较大者
-        // 作为重叠判定上界，避免切换开始时间与生产开始时间相同时（零时长区间）重叠检测失效。
-        Date switchCompleteTime = LhScheduleTimeUtil.addHours(switchStartTime,
-                LhScheduleTimeUtil.getTypeBlockChangeTotalHours(context));
-        Date overlapEndTime = switchCompleteTime.after(productionStartTime)
-                ? switchCompleteTime : productionStartTime;
-        List<MachineCleaningWindowDTO> cleaningWindowList =
-                resolveMachineCleaningWindowList(context, result.getLhMachineCode());
-        int analysisShiftIndex = MachineCleaningOverlapUtil.resolveLastOverlapShiftIndex(
-                shifts, switchStartTime, overlapEndTime);
-        if (analysisShiftIndex <= 0) {
-            analysisShiftIndex = firstPlannedShiftIndex;
-        }
-        // 换活字块调用处只写清洗固定枚举原因，不再沿用旧“模具清洗+换活字块”泛化文案。
-        if (MachineCleaningOverlapUtil.hasCleaningTypeBlockingOverlap(
-                cleaningWindowList, CleaningTypeEnum.DRY_ICE.getCode(), switchStartTime, overlapEndTime)) {
-            ShiftFieldUtil.appendShiftAnalysis(result, analysisShiftIndex, TYPE_BLOCK_DRY_ICE_CLEANING_ANALYSIS);
-        }
-        if (MachineCleaningOverlapUtil.hasCleaningTypeBlockingOverlap(
-                cleaningWindowList, CleaningTypeEnum.SAND_BLAST.getCode(), switchStartTime, overlapEndTime)) {
-            ShiftFieldUtil.appendShiftAnalysis(result, analysisShiftIndex, TYPE_BLOCK_SAND_BLAST_CLEANING_ANALYSIS);
-        }
+        cleaningScheduleService.applyTypeBlockCleaningAnalysis(context, result, shifts);
     }
 
     /**
@@ -5499,12 +5449,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
      * @return 仍参与产能和摘要计算的清洗窗口
      */
     private List<MachineCleaningWindowDTO> resolveMachineCleaningWindowList(LhScheduleContext context, String machineCode) {
-        MachineScheduleDTO machine = context.getMachineScheduleMap().get(machineCode);
-        if (machine == null || CollectionUtils.isEmpty(machine.getCleaningWindowList())) {
-            return new ArrayList<>();
-        }
-        return CleaningDispositionResolver.resolveEffectiveWindows(
-                context, machineCode, machine.getCleaningWindowList());
+        return cleaningScheduleService.resolveMachineCleaningWindowList(context, machineCode);
     }
 
     /**
@@ -5594,35 +5539,8 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
     private List<MachineCleaningWindowDTO> resolveEffectiveCleaningWindowList(LhScheduleContext context,
                                                                               LhScheduleResult result,
                                                                               Date firstProductionStartTime) {
-        if (result == null) {
-            return new ArrayList<>(0);
-        }
-        List<MachineCleaningWindowDTO> cleaningWindowList = resolveMachineCleaningWindowList(
-                context, result.getLhMachineCode());
-        if (CleaningScheduleRuleUtil.shouldSkipCleaningByResultEnding(result)) {
-            return new ArrayList<>(0);
-        }
-        Date switchEndTime = resolveCleaningSwitchEndTime(context, result, firstProductionStartTime);
-        return new ArrayList<>(MachineCleaningOverlapUtil.excludeOverlapWindows(
-                cleaningWindowList, result.getMouldChangeStartTime(), switchEndTime));
-    }
-
-    /**
-     * 解析清洗与换活字块重叠过滤使用的切换结束时间。
-     *
-     * @param context 排程上下文
-     * @param result 排程结果
-     * @param firstProductionStartTime 首个有计划量班次开始时间
-     * @return 清洗重叠过滤使用的切换结束时间
-     */
-    private Date resolveCleaningSwitchEndTime(LhScheduleContext context,
-                                              LhScheduleResult result,
-                                              Date firstProductionStartTime) {
-        if (Objects.nonNull(result) && Objects.nonNull(result.getMouldChangeStartTime())) {
-            return LhScheduleTimeUtil.addHours(result.getMouldChangeStartTime(),
-                    LhScheduleTimeUtil.getTypeBlockChangeTotalHours(context));
-        }
-        return firstProductionStartTime;
+        return cleaningScheduleService.resolveForScheduling(context, result,
+                firstProductionStartTime, true).getEffectiveWindows();
     }
 
     /**

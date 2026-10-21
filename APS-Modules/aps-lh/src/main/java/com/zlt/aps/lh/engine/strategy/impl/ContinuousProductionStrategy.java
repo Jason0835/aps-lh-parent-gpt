@@ -33,6 +33,7 @@ import com.zlt.aps.lh.component.OrderNoGenerator;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.component.UnscheduledResultCollector;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.service.impl.LhCleaningScheduleService;
 import com.zlt.aps.lh.component.LhMachineSupplyStructureRule;
 import com.zlt.aps.lh.service.impl.ContinuationSandBlastDispositionService;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
@@ -143,6 +144,12 @@ import java.util.stream.Stream;
 public class ContinuousProductionStrategy implements IProductionStrategy {
 
     /**
+     * 清洗公共编排，原策略只应用窗口和时间结果。
+     */
+    @Resource
+    private LhCleaningScheduleService cleaningScheduleService = new LhCleaningScheduleService();
+
+    /**
      * 独立胎胚收尾完整流程入口，原策略仅保留兼容委托。
      */
     private final SharedEmbryoEndingScheduleService sharedEmbryoEndingScheduleService;
@@ -183,10 +190,6 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
 
     /** 无跨批次状态，仅在统一扣账完成后发布已确定的按时间下机事实。 */
     private final TimedMachineOffShiftService timedMachineOffShiftService = new TimedMachineOffShiftService();
-
-    /** 仅喷砂模具交接与机台释放统一处置。 */
-    private final ContinuationSandBlastDispositionService continuationSandBlastDispositionService =
-            new ContinuationSandBlastDispositionService();
 
     /** 续作临时故障达到两班阈值后的独立迁移事件入口。 */
     @Resource
@@ -312,7 +315,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         // 续作产能计算前冻结故障事件；普通短时故障仍只走原有时间产能扣减。
         continuationTemporaryFaultTransferService.prepare(context);
         // 班次产能计算前优先落实同 SKU 模具置换，避免把离机清洗继续作为机台停机扣量。
-        continuationSandBlastDispositionService.prepare(context);
+        cleaningScheduleService.prepareBeforeContinuous(context);
         // continuationGroupMachineCountMap 用于区分同一物料/账本是否多机台续作，决定单机满排还是交给降模分摊。
         List<SkuScheduleDTO> continuousCandidates = this.resolveContinuousProductionCandidates(context);
         Map<String, Integer> continuationGroupMachineCountMap = this.buildContinuationGroupMachineCountMap(
@@ -1057,7 +1060,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
          * 前置登记仅喷砂的强制下机事实；新余量计算将该边界转换为硬产能上限，
          * 最终统一扣账只消费边界内的真实生产量。
          */
-        continuationSandBlastDispositionService.cancelUnreachedReplacements(context);
+        cleaningScheduleService.cancelUnreachedReplacements(context);
         this.applyOnlySandBlastContinuationRelease(context, shifts);
         // 达到连续两班禁产阈值的故障续作必须先退出旧机台，再由后续历史复用和正常候选池承接。
         this.applyTemporaryFaultContinuationRelease(context, shifts);
@@ -1073,7 +1076,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     @Override
     public void finalizeContinuousProduction(LhScheduleContext context) {
         List<LhShiftConfigVO> shifts = LhScheduleTimeUtil.getScheduleShifts(context, context.getScheduleDate());
-        // 新增历史强制下机不参与原时间负荷预演；正式两类下机决定完成后再裁量，仍只扣账一次。
+        // 两类下机决定完成后沿原规则补充释放；联合承接预演只修改隔离状态，退出后恢复全部数量和资源。
         this.applySupplementalPreviousAlternateRelease(context, shifts);
         // 全部续作准备、裁量及按时间下机已经完成；先确定强制精度再进入唯一扣账入口。
         this.equipmentPlanScheduleService.prepareBeforeContinuousCommit(context);
@@ -1092,7 +1095,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         // 最终扣账汇总会按最后生产时刻重算SPEC_END_TIME；仅喷砂结果必须恢复为实际下机时刻。
         this.restoreOnlySandBlastResultReleaseBoundary(context);
         this.restoreTemporaryFaultResultReleaseBoundary(context);
-        continuationSandBlastDispositionService.cancelUnreachedReplacements(context);
+        cleaningScheduleService.cancelUnreachedReplacements(context);
         retainMultiMachineEmbryoStock(context);
         syncMachineStateAfterContinuousAdjust(context);
         this.publishSharedEmbryoEndingMachineRelease(context);
@@ -8254,35 +8257,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                                                    List<LhShiftConfigVO> shifts,
                                                    List<MachineCleaningWindowDTO> cleaningWindowList,
                                                    boolean isEnding) {
-        if (!isEnding || Objects.isNull(result) || CollectionUtils.isEmpty(cleaningWindowList)) {
-            return;
-        }
-        Date productionStartTime = resolveFirstPlannedShiftStartTime(result);
-        Date productionEndTime = result.getSpecEndTime();
-        if (Objects.isNull(productionStartTime)
-                || Objects.isNull(productionEndTime)
-                || !productionStartTime.before(productionEndTime)) {
-            return;
-        }
-        for (MachineCleaningWindowDTO cleaningWindow : cleaningWindowList) {
-            if (!MachineCleaningOverlapUtil.isDryIceCleaning(cleaningWindow)
-                    || Objects.isNull(cleaningWindow.getCleanStartTime())
-                    || Objects.isNull(cleaningWindow.getCleanEndTime())
-                    || !cleaningWindow.getCleanStartTime().before(cleaningWindow.getCleanEndTime())) {
-                continue;
-            }
-            Date overlapStartTime = later(cleaningWindow.getCleanStartTime(), productionStartTime);
-            Date overlapEndTime = earlier(cleaningWindow.getCleanEndTime(), productionEndTime);
-            if (!overlapStartTime.before(overlapEndTime)) {
-                continue;
-            }
-            int shiftIndex = MachineCleaningOverlapUtil.resolveLastOverlapShiftIndex(
-                    shifts, overlapStartTime, overlapEndTime);
-            if (shiftIndex <= 0) {
-                continue;
-            }
-            ShiftFieldUtil.appendShiftAnalysis(result, shiftIndex, DRY_ICE_ENDING_ANALYSIS);
-        }
+        cleaningScheduleService.applyDryIceCleaningEndingAnalysis(
+                result, shifts, cleaningWindowList, isEnding);
     }
 
     /**
@@ -10321,13 +10297,13 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 正式时间决策之后补充无既有下机安排的历史强制释放，负荷预演不得执行该数量修改。
+     * 时间决策之后补充无既有下机安排的历史强制释放，联合承接预演仅在完整快照内模拟同一规则。
      *
      * @param context 已完成原有余量及时间下机、尚未统一扣账的上下文
      * @param shifts 本次班次窗口
      */
     private void applySupplementalPreviousAlternateRelease(LhScheduleContext context, List<LhShiftConfigVO> shifts) {
-        if (context.isTimedMachineOffLoadPreview()) {
+        if (context.isTimedMachineOffLoadPreview() && !context.isTimedMachineOffHandoffPreview()) {
             return;
         }
         for (PreviousAlternatePlanReleaseEvent event : context.getPreviousAlternateReleaseEventMap().values()) {
@@ -12774,7 +12750,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             releaseWindow.setContinuationMaterialDesc(sourceSku.getMaterialDesc());
             releaseWindow.setMouldCode(LhMouldCodeUtil.joinMouldCode(
                     LhMouldCodeUtil.resolveInMachineMouldCodeSet(context, machineCode)));
-            continuationSandBlastDispositionService.detach(context, machine, releaseWindow, releaseWindow);
+            cleaningScheduleService.detach(context, machine, releaseWindow, releaseWindow);
             context.getContinuationSandBlastWindowMap().put(machineCode, releaseWindow);
             this.registerReleasedContinuousMachine(
                     context, machineCode, sourceSku.getMaterialCode(), "续作机台仅命中喷砂清洗");
@@ -13461,20 +13437,6 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                                                                               LhScheduleResult result,
                                                                               Date firstProductionStartTime) {
         return capacitySupport.resolveEffectiveCleaningWindowList(context, result, firstProductionStartTime);
-    }
-
-    /**
-     * 解析清洗与切换重叠过滤使用的切换结束时间。
-     *
-     * @param context 排程上下文
-     * @param result 排程结果
-     * @param firstProductionStartTime 首个有计划量班次开始时间
-     * @return 清洗重叠过滤使用的切换结束时间
-     */
-    private Date resolveCleaningSwitchEndTime(LhScheduleContext context,
-                                              LhScheduleResult result,
-                                              Date firstProductionStartTime) {
-        return capacitySupport.resolveCleaningSwitchEndTime(context, result, firstProductionStartTime);
     }
 
     private String resolveMachineEmbryoCode(LhScheduleContext context, MachineScheduleDTO machine) {

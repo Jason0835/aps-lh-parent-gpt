@@ -31,6 +31,11 @@ import java.util.stream.Collectors;
 @Component
 public class LhEquipmentPlanTimelineResolver {
 
+    /**
+     * 复用无状态清洗组合解析器。
+     */
+    private final LhCleaningOverlapResolver cleaningOverlapResolver = new LhCleaningOverlapResolver();
+
     /** @param context 排程上下文 @param decision 有效判定 @param inputVersion 输入指纹 @return 候选时间约束 */
     public EquipmentPlanTimeline resolvePrecision(LhScheduleContext context,
                                                   PrecisionMaintenanceJudgeDTO decision, String inputVersion) {
@@ -182,10 +187,8 @@ public class LhEquipmentPlanTimelineResolver {
             if (Objects.isNull(side) || !this.samePhysicalMachine(physical, side.getMachineCode())) {
                 continue;
             }
-            for (MachineCleaningWindowDTO cleaning : side.getCleaningWindowList()) {
-                if (Objects.nonNull(cleaning) && this.overlaps(start, end, cleaning.getCleanStartTime(), cleaning.getReadyTime())) {
-                    return "精度并行与清洗组合尚未接入";
-                }
+            if (!cleaningOverlapResolver.resolveWithPrecisionForSide(side, start, end).isEmpty()) {
+                return "精度并行与清洗组合尚未接入";
             }
             for (MachineMaintenanceWindowDTO window : side.getMaintenanceWindowList()) {
                 if (Objects.nonNull(window) && !Objects.equals(timeline.getPrecisionPlanId(), window.getPrecisionPlanId())

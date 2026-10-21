@@ -12,6 +12,7 @@ import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceAllocationResult;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceContext;
 import com.zlt.aps.lh.util.LhMouldCodeUtil;
+import com.zlt.aps.lh.util.FirstInspectionAllocationUtil;
 import com.zlt.aps.lh.util.CleaningDispositionResolver;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
@@ -151,7 +152,9 @@ public class ContinuationSandBlastDispositionService {
     }
 
     /**
-     * 整组预占替换模具；没有足量模具时只记录决策，截断和扣账仍由续作主链完成。
+     * 整组预占替换模具并冻结新模具的准备和计件首检时间。
+     * 没有足量模具时只记录原处置，截断和扣账仍由续作主链完成。
+     *
      * @param context 排程上下文
      * @param resources 共享模具资源
      * @param sources 续作来源
@@ -176,7 +179,26 @@ public class ContinuationSandBlastDispositionService {
         }
         List<String> freeMoulds = resources.resolveFreeValidMouldCodes(materialCode, oldMoulds, startTime);
         boolean replacement = freeMoulds.size() >= requiredQty;
+        Date readyTime = LhScheduleTimeUtil.addHours(startTime,
+                LhScheduleTimeUtil.getMouldChangeTotalHours(context));
+        LhShiftConfigVO inspectionShift = LhScheduleTimeUtil.resolveShiftByTime(
+                context.getScheduleWindowShifts(), new Date(readyTime.getTime() - 1L));
+        int inspectionQty = LhScheduleTimeUtil.getFirstInspectionQty(context);
+        int physicalCapacity = inspectionShift == null ? 0 : sides.stream().mapToInt(side ->
+                ShiftCapacityResolverUtil.resolveActualShiftPlanQty(sources.get(side).getShiftCapacity(),
+                        inspectionShift, ShiftCapacityResolverUtil.resolveOddShiftCapacityPlusShiftType(context),
+                        ScheduleTypeEnum.CONTINUOUS.getCode())).sum();
+        long inspectionSeconds = replacement && inspectionShift != null
+                ? FirstInspectionAllocationUtil.resolveInspectionDurationSeconds(inspectionQty,
+                ShiftCapacityResolverUtil.resolveShiftDurationSeconds(inspectionShift), physicalCapacity) : 0L;
+        Date inspectionStart = new Date(readyTime.getTime() - inspectionSeconds * 1000L);
+        if (replacement && inspectionShift != null && (inspectionSeconds <= 0L || inspectionStart.before(startTime))) {
+            log.error("续作置换首检时间配置无效, 工厂: {}, 批次: {}, 机台: {}, 物料: {}, 班产: {}, 首检条数: {}",
+                    context.getFactoryCode(), context.getBatchNo(), sides, materialCode, physicalCapacity, inspectionQty);
+            throw new IllegalStateException(I18nUtil.getMessage("ui.data.column.lhScheduleResult.errorCode.systemError"));
+        }
         int offset = 0;
+        int sideIndex = 0;
         // 同源左右侧可能共用原模具集合，恢复边界必须统一取整组交接前快照。
         Map<String, Date> originalReleaseTimes = new LinkedHashMap<>(oldMoulds.size());
         oldMoulds.forEach(code -> originalReleaseTimes.put(code, context.getPreScheduledMouldReleaseTimeMap().get(code)));
@@ -199,12 +221,20 @@ public class ContinuationSandBlastDispositionService {
                 }
                 offset += mouldQty;
                 event.setReplacementMouldCode(LhMouldCodeUtil.joinMouldCode(selected));
+                // 换模总时长已经包含首检，按物理事件分摊条数，避免左右侧各新增一次首检。
+                event.setReplacementInspectionStartTime(inspectionStart);
+                event.setReplacementReadyTime(readyTime);
+                event.setReplacementFirstInspectionQty(inspectionQty / sides.size()
+                        + (sideIndex < inspectionQty % sides.size() ? 1 : 0));
+                event.setReplacementInspectionShiftStartTime(inspectionShift == null ? null
+                        : inspectionShift.getShiftStartDateTime());
                 event.setRemark(StringUtils.isEmpty(event.getRemark()) ? REPLACEMENT_ANALYSIS
                         : event.getRemark() + "；" + REPLACEMENT_ANALYSIS);
                 // 只解除原模具对机台的占用；清洗事件另存，供最终计划与回填消费。
                 this.detach(context, machine, candidates.get(side), event);
                 event.getMouldReleaseTimeBeforeReplacement().replaceAll((code, time) -> originalReleaseTimes.get(code));
             }
+            sideIndex++;
             context.getContinuationSandBlastWindowMap().put(side, event);
             log.info("续作仅喷砂处置, 机台: {}, SKU: {}, 产品状态: {}, 喷砂开始: {}, 是否仅喷砂: true, "
                             + "是否找到闲置可用模具: {}, 原模具: {}, 替换模具: {}, 处理方式: {}",
@@ -249,7 +279,8 @@ public class ContinuationSandBlastDispositionService {
     }
 
     /**
-     * 最终续作未跨过触发时刻时取消预占；禁止为已经提前结束的 SKU 生成置换事件。
+     * 最终续作未跨过触发时刻时取消预占及置换时间，恢复原清洗窗口。
+     *
      * @param context 排程上下文
      */
     public void cancelUnreachedReplacements(LhScheduleContext context) {
@@ -291,6 +322,10 @@ public class ContinuationSandBlastDispositionService {
             MachineCleaningWindowDTO original = BeanUtil.copyProperties(event, MachineCleaningWindowDTO.class);
             original.setOffMachineCleaning(false);
             original.setReplacementMouldCode(null);
+            original.setReplacementInspectionStartTime(null);
+            original.setReplacementReadyTime(null);
+            original.setReplacementFirstInspectionQty(null);
+            original.setReplacementInspectionShiftStartTime(null);
             original.setRemark(StringUtils.removeEnd(StringUtils.removeEnd(event.getRemark(), REPLACEMENT_ANALYSIS), "；"));
             List<MachineCleaningWindowDTO> windows = new ArrayList<>(machine.getCleaningWindowList());
             windows.add(original);
@@ -353,7 +388,8 @@ public class ContinuationSandBlastDispositionService {
     }
 
     /**
-     * 最终数量稳定后追加置换班次原因，不改续作身份、计划量或正常首检计数。
+     * 最终数量稳定后绑定主链已分配的置换首检和原因，不追加数量或普通换模计数。
+     *
      * @param context 排程上下文
      */
     public void appendReplacementAnalysis(LhScheduleContext context) {
@@ -371,6 +407,28 @@ public class ContinuationSandBlastDispositionService {
             if (Objects.nonNull(shift) && Objects.nonNull(result.getSpecEndTime())
                     && result.getSpecEndTime().after(event.getCleanStartTime())) {
                 ShiftFieldUtil.appendShiftAnalysis(result, shift.getShiftIndex(), REPLACEMENT_ANALYSIS);
+            }
+            if (event.getReplacementReadyTime() == null || event.getReplacementInspectionShiftStartTime() == null) {
+                continue;
+            }
+            LhShiftConfigVO inspectionShift = LhScheduleTimeUtil.resolveShiftByTime(
+                    context.getScheduleWindowShifts(), event.getReplacementInspectionShiftStartTime());
+            if (inspectionShift == null) {
+                continue;
+            }
+            Integer quantity = ShiftFieldUtil.getShiftPlanQty(result, inspectionShift.getShiftIndex());
+            Date actualEnd = ShiftFieldUtil.getShiftEndTime(result, inspectionShift.getShiftIndex());
+            if (quantity != null && quantity > 0 && actualEnd != null
+                    && event.getReplacementFirstInspectionQty() != null && event.getReplacementFirstInspectionQty() > 0
+                    && !actualEnd.before(event.getReplacementReadyTime())) {
+                ShiftFieldUtil.appendShiftAnalysis(result, inspectionShift.getShiftIndex(), "首检");
+                ShiftFieldUtil.appendShiftAnalysis(result, inspectionShift.getShiftIndex(), REPLACEMENT_ANALYSIS);
+                log.info("续作置换首检核验, 工厂: {}, 批次: {}, 机台: {}, 物料: {}, 状态: {}, "
+                                + "准备开始: {}, 首检开始: {}, 首检结束: {}, 首检条数: {}, 班次: {}, 班次计划量: {}",
+                        context.getFactoryCode(), context.getBatchNo(), result.getLhMachineCode(),
+                        result.getMaterialCode(), result.getProductStatus(), event.getCleanStartTime(),
+                        event.getReplacementInspectionStartTime(), event.getReplacementReadyTime(),
+                        Math.min(quantity, event.getReplacementFirstInspectionQty()), inspectionShift.getShiftIndex(), quantity);
             }
         }
     }

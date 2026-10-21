@@ -120,6 +120,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     /** 胎胚库存收尾导出备注国际化Key。 */
     private static final String EMBRYO_ENDING_REMARK_KEY = "ui.data.column.lhScheduleResult.remark.embryoEnding";
 
+    /** 收尾备注中机台编码说明国际化Key。 */
+    private static final String MACHINE_CODE_REMARK_KEY = "ui.data.column.lhScheduleResult.remark.sameSpecMachine";
+
     @Resource
     private IScheduleExecutor scheduleExecutor;
 
@@ -836,7 +839,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         //1.获取导出数据
         AppUtils.formatData(mouldChangePlanList, lhMouldChangePlanController.getQueryFormulas());
         List<LhMouldChangePlanVo> mouldChangePlanExportList = lhMouldChangePlanController.buildLhMouldChangePlanVoList(mouldChangePlanList, mouldChangePlan);
-        lhMouldChangePlanService.applyTimedOffShiftStartRemark(mouldChangePlanList, mouldChangePlanExportList);
+        lhMouldChangePlanService.prepareExportDisplayFields(mouldChangePlanList, mouldChangePlanExportList);
 
         Map<String, Object> mouldChangePlanTableMap = lhMouldChangePlanController.buildExportTableMap(result.getScheduleDate());
         lhMouldChangePlanController.setExportTitleFieldName(mouldChangePlanTableMap);
@@ -1114,7 +1117,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                     if (embryoStockHighlightResultSet.contains(rowResult)) {
                         int embryoStockCol = this.resolveExportColorColumn(placeholderMap, "embryoStock",
                                 dailyPlanQtyCol);
-                        if (embryoStockCol >= 0) {
+                        // 胎胚库存为空（0按空导出）时不标色，避免出现没有内容的橙色格。
+                        if (embryoStockCol >= 0 && hasExportCellValue(row.getCell(embryoStockCol))) {
                             this.applyRowForegroundColor(workbook, row, embryoStockCol, endingHighlightColor);
                         }
                     }
@@ -1463,6 +1467,18 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         style.setFillForegroundColor(color);
         style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
         cell.setCellStyle(style);
+    }
+
+    /**
+     * 判断导出单元格是否存在可展示数值。
+     * <p>胎胚库存按 0 导出为空字符串，最终写盘前再转成空白单元格，
+     * 因此空单元格与 0 都视为“空”，不参与着色。</p>
+     *
+     * @param cell 目标单元格
+     * @return true 表示单元格存在非 0 数值
+     */
+    private boolean hasExportCellValue(Cell cell) {
+        return readNumericCell(cell).compareTo(BigDecimal.ZERO) != 0;
     }
 
     /**
@@ -3084,6 +3100,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
     /**
      * 收尾说明按胎胚整体备注一次；机台编码按同胎胚下的各物料分别备注。
+     * <p>只处理硫化收尾（主字段 {@code isEnd=1}）的行：胎胚已收尾备注“把胎胚干完”，
+     * 窗口期确认收尾备注“确认收尾”。机台编码备注在编码后追加中越双语“同规格机台”提示。</p>
      *
      * @param sortedList 当前排程的真实结果行
      * @param remarkMap 结果行对应的导出备注
@@ -3112,18 +3130,33 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                                 .filter(result -> result != lastMaterialResult)
                                 .findFirst().ifPresent(machineCodeResult ->
                                         this.appendExportRemark(remarkMap, machineCodeResult,
-                                                String.join("/", materialMachineCodes))));
+                                                this.buildEndingMachineCodeRemark(
+                                                        String.join("/", materialMachineCodes)))));
             });
         });
     }
 
     /**
+     * 构建收尾备注中的机台编码说明：机台编码 + 中越双语“同规格机台”提示。
+     *
+     * @param machineCodeText 已按物理机台去重排序的机台编码文本
+     * @return 导出备注文本
+     */
+    private String buildEndingMachineCodeRemark(String machineCodeText) {
+        String machineCodeRemarkSuffix = StringUtils.stripEnd(
+                "Chạy cùng quy cách", "\r\n");
+        return StringUtils.isBlank(machineCodeRemarkSuffix)
+                ? machineCodeText : machineCodeText + " " + machineCodeRemarkSuffix;
+    }
+
+    /**
      * 按胎胚选择最后有量行，供收尾备注与库存标色共用。
-     * <p>不要求硫化班次标记为收尾；在有量行中比较最后有计划量的班次，
+     * <p>只纳入硫化收尾（主字段 {@code isEnd=1}）且胎胚已收尾或窗口期确认收尾的行，
+     * 不要求硫化班次标记为收尾；在这些行中比较最后有计划量的班次，
      * 班次越晚越优先，同班次取该班计划量最大的一行，仍相同时沿用导出顺序首行。</p>
      *
      * @param resultList 当前真实排程行，Excel对齐列表中的参考行/占位行用null表示
-     * @return 最后有量行及其共用胎胚的全部有量结果
+     * @return 最后有量行及其共用胎胚的硫化收尾结果
      */
     private Map<LhScheduleResult, List<LhScheduleResult>> buildEmbryoEndingExportGroupMap(
             List<LhScheduleResult> resultList) {
@@ -3131,6 +3164,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         Map<List<String>, List<LhScheduleResult>> embryoGroupMap = resultList.stream()
                 .filter(Objects::nonNull)
                 .filter(LhScheduleServiceImpl::hasAnyPlanQty)
+                .filter(LhScheduleServiceImpl::isCureEndingRow)
                 .filter(result -> StringUtils.isNotBlank(result.getEmbryoCode()))
                 .collect(Collectors.groupingBy(result -> Arrays.asList(
                         result.getFactoryCode(), result.getBatchNo(),
@@ -3151,6 +3185,16 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
     /**
+     * 判断结果行是否为硫化收尾：主字段 {@code isEnd=1}。
+     *
+     * @param result 排程结果
+     * @return true 表示该行硫化收尾
+     */
+    private static boolean isCureEndingRow(LhScheduleResult result) {
+        return Objects.nonNull(result) && ApsConstant.APS_STRING_1.equals(result.getIsEnd());
+    }
+
+    /**
      * 共用胎胚选收尾文案/库存标色行、各物料选机台编码行时统一比较最后有量班次和该班计划量。
      *
      * @return 同班次下计划量大的行优先的比较器
@@ -3162,7 +3206,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
     /**
-     * 胎胚已收尾或窗口期（T～T+2）确认收尾时，只标记同组最终有量行的库存。
+     * 硫化收尾且胎胚已收尾或窗口期（T～T+2）确认收尾时，只标记同组最终有量行的库存；
+     * 胎胚库存本身为空（0按空导出）的行不标色。
      *
      * @param resultList 与Excel对齐的真实排程结果
      * @return 需要标记库存淡橙色的结果行，使用对象身份匹配Excel行

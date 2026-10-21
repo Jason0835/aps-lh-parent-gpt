@@ -15,6 +15,7 @@ import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.api.enums.UnscheduledGroupTypeEnum;
 import com.zlt.aps.lh.component.EmbryoEndingStructureMachineExemptionPolicy;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
+import com.zlt.aps.lh.component.PrecisionArrangementReplacementPolicy;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationEndingAllocationSnapshot;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationMachineFinishPlan;
@@ -164,6 +165,10 @@ public class SchedulePersistenceService {
                 .filter(StringUtils::isNotBlank)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
 
+        // 旧日志随结果一起软删除，须在删除前固定正式安排归属；不能按机台和日期范围清空计划。
+        Map<Long, Date> replacedPrecisionDates = this.resolveReplacedPrecisionDates(
+                factoryCode, oldBatchNos, precisionScheduleDates);
+
         int deletedResultCount = scheduleResultMapper.delete(
                 new LambdaQueryWrapper<LhScheduleResult>()
                         .eq(LhScheduleResult::getFactoryCode, factoryCode)
@@ -239,6 +244,9 @@ public class SchedulePersistenceService {
         deviceStopPlanScheduleService.batchFillCleaningScheduleDate(context.getCleaningScheduleDateFillList());
         // 05/06使用实际执行日期回填，与结果落库同事务，不提前写入未来计划。
         deviceStopPlanScheduleService.batchFillStopScheduleDates(context);
+        if (!replacedPrecisionDates.isEmpty()) {
+            precisionPlanService.clearReplacedScheduleDates(factoryCode, replacedPrecisionDates);
+        }
         if (!precisionScheduleDates.isEmpty()) {
             precisionPlanService.fillArrangedScheduleDates(factoryCode, precisionScheduleDates);
         }
@@ -248,6 +256,47 @@ public class SchedulePersistenceService {
                 deletedResultCount, deletedUnscheduledCount, deletedMouldPlanCount, deletedLogCount,
                 context.getScheduleResultList().size(), context.getUnscheduledResultList().size(),
                 context.getMouldChangePlanList().size(), context.getScheduleLogList().size());
+    }
+
+    /**
+     * 固定被替换批次的精度日期证据，并排除本轮及其他有效批次仍保留的安排。
+     *
+     * @param factoryCode 当前工厂
+     * @param oldBatchNos 同工厂同目标日被替换的旧结果批次
+     * @param finalDates 本轮最终有效安排日期
+     * @return 可按主键和旧日期条件撤销的安排；无可靠归属时返回空Map
+     */
+    private Map<Long, Date> resolveReplacedPrecisionDates(String factoryCode, Set<String> oldBatchNos,
+                                                        Map<Long, Date> finalDates) {
+        if (oldBatchNos.isEmpty()) {
+            return new LinkedHashMap<>();
+        }
+        PrecisionArrangementReplacementPolicy policy = new PrecisionArrangementReplacementPolicy();
+        long startedNanos = System.nanoTime();
+        // 同工厂正式安排和撤销日志一次读取，避免按候选主键逐条查库或重复扫描长日志。
+        List<LhScheduleProcessLog> arrangementLogs = processLogMapper.selectList(
+                new LambdaQueryWrapper<LhScheduleProcessLog>()
+                        .select(LhScheduleProcessLog::getId, LhScheduleProcessLog::getBatchNo,
+                                LhScheduleProcessLog::getBusiCode, LhScheduleProcessLog::getTitle,
+                                LhScheduleProcessLog::getLogDetail)
+                        .eq(LhScheduleProcessLog::getBusiCode, factoryCode)
+                        .in(LhScheduleProcessLog::getTitle, PrecisionArrangementReplacementPolicy.ARRANGED_LOG_TITLE,
+                                PrecisionArrangementReplacementPolicy.REVOKED_LOG_TITLE));
+        Map<String, Map<Long, Date>> effectiveDates = policy.resolveEffectiveDates(factoryCode, arrangementLogs);
+        Map<String, Map<Long, Date>> replacedDates = new LinkedHashMap<>();
+        Map<String, Map<Long, Date>> retainedDates = new LinkedHashMap<>();
+        effectiveDates.forEach((batchNo, dates) -> {
+            if (oldBatchNos.contains(batchNo)) {
+                replacedDates.put(batchNo, dates);
+            } else {
+                retainedDates.put(batchNo, dates);
+            }
+        });
+        Map<Long, Date> clearableDates = policy.resolveClearableDates(replacedDates, retainedDates, finalDates);
+        log.info("被替换批次精度安排归属核对完成, 工厂: {}, 旧批次: {}, 正式日志条数: {}, 待撤销计划数: {}, 耗时毫秒: {}",
+                factoryCode, oldBatchNos, arrangementLogs.size(), clearableDates.size(),
+                (System.nanoTime() - startedNanos) / 1000000L);
+        return clearableDates;
     }
 
     /**

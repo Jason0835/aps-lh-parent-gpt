@@ -283,10 +283,11 @@ public class PreviousAlternatePlanReuseService {
     /**
      * 正式时间下机发布后放行指定后料的剩余窗口承接，历史班次及前料释放决定保持原事实。
      *
-     * @param context 已发布正式释放的上下文，时间负荷预演不得取得新增顺延资格
+     * @param context 已发布释放的上下文，联合承接预演在隔离状态校验同一窗口资格
      */
     private void prepareConfirmedTimedHandoffs(LhScheduleContext context) {
-        if (context.isTimedMachineOffLoadPreview() || context.getScheduleWindowShifts().isEmpty()) {
+        if ((context.isTimedMachineOffLoadPreview() && !context.isTimedMachineOffHandoffPreview())
+                || context.getScheduleWindowShifts().isEmpty()) {
             return;
         }
         Date windowEnd = context.getScheduleWindowShifts().stream()
@@ -800,7 +801,7 @@ public class PreviousAlternatePlanReuseService {
                         || context.getNewSpecMachineResourceScopeCodeSet().contains(event.getMachineCode()))
                 .filter(event -> !completed.contains(event.getMachineCode()))
                 .filter(event -> event.getOfflineTime().before(day.getDayEndTime()))
-                .sorted(Comparator.comparing(event -> event.getPlan(), PreviousAlternatePlanEligibilityService.planOrder()))
+                .sorted(this.resolveReleasedHandoffOrder(context))
                 .collect(Collectors.toList());
         if (events.isEmpty()) {
             return;
@@ -847,6 +848,41 @@ public class PreviousAlternatePlanReuseService {
         } finally {
             context.getPreviousAlternatePlannedMouldMap().clear();
         }
+    }
+
+    /**
+     * 保留历史业务日优先级，同日固定后料按真实释放先后申请资源，普通时间下机后料随后承接。
+     *
+     * @param context 当前已确认的释放状态
+     * @return 预演及正式提交共用的稳定比较器
+     */
+    private Comparator<PreviousAlternatePlanReleaseEvent> resolveReleasedHandoffOrder(LhScheduleContext context) {
+        return Comparator.comparing((PreviousAlternatePlanReleaseEvent event) ->
+                        LhScheduleTimeUtil.clearTime(event.getPlan().getPlanDate()))
+                .thenComparingInt(event -> this.resolveReleasedHandoffPriority(context, event))
+                .thenComparing(event -> this.resolveReleasedHandoffPriority(context, event) == 0
+                                ? event.getOfflineTime() : null,
+                        Comparator.nullsLast(Comparator.<Date>naturalOrder()))
+                .thenComparing(PreviousAlternatePlanReleaseEvent::getPlan,
+                        PreviousAlternatePlanEligibilityService.planOrder());
+    }
+
+    /**
+     * 同一历史业务日内，已固定释放的后料先申请资源，可继续前料生产的普通时间下机后料随后承接。
+     * 预演和正式提交共用此分组，固定组按真实释放时刻排序，同刻及时间请求组继续使用历史顺序。
+     *
+     * @param context 已选时间下机请求及固定余量收尾结果
+     * @param event 当前历史承接关系
+     * @return 普通可调整时间下机后料为 1，其他已释放后料为 0
+     */
+    private int resolveReleasedHandoffPriority(LhScheduleContext context, PreviousAlternatePlanReleaseEvent event) {
+        String physicalCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(event.getMachineCode());
+        return context.getTimedMachineOffRequests().stream()
+                .flatMap(request -> request.getProfile().getOriginals().stream())
+                .filter(result -> !context.getContinuationSurplusEndingAllocatedResults().contains(result))
+                .anyMatch(result -> StringUtils.equals(physicalCode,
+                        LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode()))
+                        && context.getTimedMachineOffDecisionMap().containsKey(result)) ? 1 : 0;
     }
 
     /**

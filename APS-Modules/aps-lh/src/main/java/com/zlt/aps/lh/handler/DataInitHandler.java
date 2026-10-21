@@ -171,7 +171,7 @@ public class DataInitHandler extends AbsScheduleStepHandler {
         // 先从设备停机计划中过滤干冰/喷砂清洗并生成运行态清洗窗口；
         // 方法内部会把清洗类停机从普通停机列表剥离，避免未纳入清洗上限的记录仍按维修停机扣产能。
         Map<String, List<MachineCleaningWindowDTO>> scheduledCleaningWindowMap =
-                getCleaningScheduleService().buildScheduledCleaningWindowMap(context);
+                getCleaningScheduleService().initializePlans(context);
 
         for (Map.Entry<String, LhMachineInfo> entry : context.getMachineInfoMap().entrySet()) {
             String machineCode = entry.getKey();

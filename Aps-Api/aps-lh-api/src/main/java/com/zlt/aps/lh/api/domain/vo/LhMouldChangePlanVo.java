@@ -49,6 +49,14 @@ public class LhMouldChangePlanVo extends BaseEntity implements Serializable {
     @TableField(exist = false)
     private String lhResultBatchNo;
 
+    /**
+     * 排程日期，仅用于导出视图与原计划匹配，不作为导出列展示。
+     */
+    @ApiModelProperty(value = "排程日期")
+    @JsonIgnore
+    @TableField(exist = false)
+    private Date scheduleDate;
+
     @ApiModelProperty(value = "序号")
     @Excel(name = "ui.data.column.facMonthPlanProdResult.planSeq", cellType = Excel.ColumnType.NUMERIC)
     @TableField(exist = false)

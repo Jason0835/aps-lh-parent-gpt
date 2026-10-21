@@ -62,6 +62,22 @@ public class MachineCleaningWindowDTO implements Serializable {
     private String continuationProductStatus;
     /** 同 SKU 置换后接替生产的精确模具号；为空表示没有可用替换模具。 */
     private String replacementMouldCode;
+    /**
+     * 同 SKU 置换的新模具首检开始时间，与原模具离机清洗结束时间分离。
+     */
+    private Date replacementInspectionStartTime;
+    /**
+     * 同 SKU 置换含首检的准备结束时间，也是正常生产恢复时间。
+     */
+    private Date replacementReadyTime;
+    /**
+     * 当前运行侧分摊的置换首检条数，同一物理事件合计只分配一次。
+     */
+    private Integer replacementFirstInspectionQty;
+    /**
+     * 置换首检完成所归属的标准班次起点，结束恰好在班次边界时归前班。
+     */
+    private Date replacementInspectionShiftStartTime;
     /** 预占前的原模具可用边界，续作提前结束取消置换时精确恢复。 */
     private Map<String, Date> mouldReleaseTimeBeforeReplacement = new LinkedHashMap<>(4);
     /** 已确认模具离机清洗，不再占用原机台或承接原机台喷砂首检。 */

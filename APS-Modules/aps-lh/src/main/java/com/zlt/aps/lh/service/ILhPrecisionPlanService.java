@@ -151,6 +151,15 @@ public interface ILhPrecisionPlanService extends IDocService<LhPrecisionPlan> {
     int fillArrangedScheduleDates(String factoryCode, java.util.Map<Long, java.util.Date> scheduleDates);
 
     /**
+     * 在排程替换事务内撤销有明确旧批次归属、尚未实际执行且日期未被其他操作改变的安排。
+     *
+     * @param factoryCode 当前工厂
+     * @param replacedScheduleDates 已排除新批及其他有效批次占用的计划主键和旧日期
+     * @return 实际撤销数量；已执行、已完成或日期变化的计划不更新
+     */
+    int clearReplacedScheduleDates(String factoryCode, java.util.Map<Long, java.util.Date> replacedScheduleDates);
+
+    /**
      * MES回填实际精度执行日期
      * 匹配最接近的计划排程精度日期且实际执行时间为空的硫化精度计划
      * 回填后立马推算生成下一次硫化精度计划

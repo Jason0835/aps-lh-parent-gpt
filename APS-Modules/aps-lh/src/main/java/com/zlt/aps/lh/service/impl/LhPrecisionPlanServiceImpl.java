@@ -1860,6 +1860,37 @@ public class LhPrecisionPlanServiceImpl extends AbstractDocService<LhPrecisionPl
         return updated;
     }
 
+    /**
+     * 按计划主键及旧日期条件撤销已被替换的精度安排，与结果替换共同提交或回滚。
+     *
+     * @param factoryCode 当前工厂
+     * @param replacedScheduleDates 具有可靠旧批次归属且无其他有效安排的主键和旧日期
+     * @return 实际撤销行数；已执行、已完成或日期已变化时保留原值
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class, propagation = Propagation.MANDATORY)
+    public int clearReplacedScheduleDates(String factoryCode, Map<Long, Date> replacedScheduleDates) {
+        int cleared = 0;
+        for (Map.Entry<Long, Date> entry : replacedScheduleDates.entrySet()) {
+            if (Objects.isNull(entry.getKey()) || Objects.isNull(entry.getValue())) {
+                throw new IllegalStateException(I18nUtil.getMessage("ui.data.excut.error"));
+            }
+            // 同步实际执行或其他排程改变日期后，不得用旧批次证据覆盖新状态。
+            int affected = lhPrecisionPlanMapper.update(null,
+                    new LambdaUpdateWrapper<LhPrecisionPlan>()
+                            .eq(LhPrecisionPlan::getId, entry.getKey())
+                            .eq(LhPrecisionPlan::getFactoryCode, factoryCode)
+                            .eq(LhPrecisionPlan::getCompletionStatus, COMPLETION_STATUS_PENDING)
+                            .isNull(LhPrecisionPlan::getActualDate)
+                            .eq(LhPrecisionPlan::getScheduleDate, LhScheduleTimeUtil.clearTime(entry.getValue()))
+                            .set(LhPrecisionPlan::getScheduleDate, null));
+            cleared += affected;
+            log.info("被替换批次精度安排日期条件撤销, 工厂: {}, 计划主键: {}, 旧安排日期: {}, 更新条数: {}",
+                    factoryCode, entry.getKey(), LhScheduleTimeUtil.formatDate(entry.getValue()), affected);
+        }
+        return cleared;
+    }
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean fillActualDateAndGenerateNext(String machineCode, String factoryCode, Date actualDate) {

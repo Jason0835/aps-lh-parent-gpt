@@ -419,25 +419,33 @@ public class LhEquipmentPlanScheduleService {
     /**
      * 只有有效释放事件、确认收尾快照或最终正量收尾结果才能提供确认事实。
      * 运行态ending和初始化estimatedEndTime本身不能证明在机SKU已经收尾。
+     * 已重新开产的物料必须先核对自己的最终结果，历史续作释放标记不得越过该门禁。
+     *
      * @param context 当前已提交上下文
      * @param machine 任一物理侧
      * @return 全部活跃侧均被证明后的最晚释放时间
      */
     private Date resolveConfirmedPhysicalEnding(LhScheduleContext context, MachineScheduleDTO machine) {
         for (MachineScheduleDTO side : this.physicalMachines(context, machine.getMachineCode())) {
-            if (StringUtils.isBlank(side.getCurrentMaterialCode())
-                    || context.getReleasedContinuousMachineCodeSet().contains(side.getMachineCode())) {
+            if (StringUtils.isBlank(side.getCurrentMaterialCode())) {
                 continue;
             }
-            boolean completed = context.getScheduleResultList().stream()
+            List<LhScheduleResult> currentResults = context.getScheduleResultList().stream()
                     .filter(result -> StringUtils.equals(side.getMachineCode(), result.getLhMachineCode()))
                     .filter(result -> StringUtils.equals(side.getCurrentMaterialCode(), result.getMaterialCode()))
                     .filter(result -> ShiftFieldUtil.resolveScheduledQty(result) > 0)
-                    .anyMatch(result -> "1".equals(result.getIsEnd())
-                            && Objects.nonNull(side.getEstimatedEndTime())
-                            && Objects.nonNull(result.getSpecEndTime())
-                            && !result.getSpecEndTime().after(side.getEstimatedEndTime()));
-            if (!completed) {
+                    .collect(Collectors.toList());
+            if (currentResults.isEmpty()) {
+                if (context.getReleasedContinuousMachineCodeSet().contains(side.getMachineCode())) {
+                    continue;
+                }
+                return null;
+            }
+            // 同一物料再次上机时，任一在产结果未完成都不能借旧结果的收尾触发精度。
+            if (Objects.isNull(side.getEstimatedEndTime())
+                    || currentResults.stream().anyMatch(result -> !"1".equals(result.getIsEnd())
+                            || Objects.isNull(result.getSpecEndTime())
+                            || result.getSpecEndTime().after(side.getEstimatedEndTime()))) {
                 return null;
             }
         }

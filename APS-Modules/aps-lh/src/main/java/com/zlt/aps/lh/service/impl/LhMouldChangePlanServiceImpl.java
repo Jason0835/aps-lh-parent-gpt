@@ -107,6 +107,25 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
             "ui.data.column.lhMouldChangePlan.remark.scheduleChange";
 
     /**
+     * 导出下机列按余量收尾文案国际化键。
+     */
+    private static final String EXPORT_BY_REMAINDER_KEY =
+            "ui.data.column.lhMouldChangePlan.export.endType.remainder";
+
+    /**
+     * 导出首检备注中英文和越南语模板国际化键。
+     */
+    private static final String EXPORT_FIRST_INSPECTION_ZH_KEY =
+            "ui.data.column.lhMouldChangePlan.export.remark.firstInspection.zh";
+    private static final String EXPORT_FIRST_INSPECTION_VI_KEY =
+            "ui.data.column.lhMouldChangePlan.export.remark.firstInspection.vi";
+
+    /**
+     * 硫化排程结果分析字段的动态字段名模板。
+     */
+    private static final String CLASS_ANALYSIS_FIELD_TEMPLATE = "class%dAnalysis";
+
+    /**
      * 班次备注国际化键前缀。
      */
     private static final String REMARK_SHIFT_KEY_PREFIX = "ui.data.column.lhMouldChangePlan.remark.shift.";
@@ -164,126 +183,314 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
     private OrderNoGenerator orderNoGenerator;
 
     /**
-     * 按时间下机且包含正规换模的计划，在导出备注中显示实际配置的班次开始时分。
+     * 根据关联排程结果生成导出下机方式及首检备注，不修改原计划实体。
      *
-     * @param sourceList 原始计划列表，提供工厂、排程日期、计划日期及数据库主键
-     * @param exportList 导出视图列表，仅更新其备注字段
+     * @param sourceList 原始换模计划列表
+     * @param exportList 待回填导出字段的视图列表
      */
     @Override
     @Transactional(readOnly = true, rollbackFor = Exception.class)
-    public void applyTimedOffShiftStartRemark(List<LhMouldChangePlan> sourceList,
-                                              List<LhMouldChangePlanVo> exportList) {
-        if (CollectionUtils.isEmpty(sourceList) || CollectionUtils.isEmpty(exportList)
-                || lhShiftConfigMapper == null || lhScheduleConfigResolver == null) {
+    public void prepareExportDisplayFields(List<LhMouldChangePlan> sourceList,
+                                           List<LhMouldChangePlanVo> exportList) {
+        if (CollectionUtils.isEmpty(sourceList) || CollectionUtils.isEmpty(exportList)) {
             return;
         }
-
         Map<Long, LhMouldChangePlanVo> exportById = exportList.stream()
                 .filter(Objects::nonNull)
                 .filter(exportPlan -> exportPlan.getId() != null)
                 .collect(Collectors.toMap(LhMouldChangePlanVo::getId, exportPlan -> exportPlan,
                         (firstPlan, duplicatePlan) -> firstPlan));
-        List<LhMouldChangePlan> timedOffPlanList = sourceList.stream()
+        Map<String, LhMouldChangePlanVo> exportByPlanKey = exportList.stream()
                 .filter(Objects::nonNull)
-                .filter(plan -> plan.getId() != null && exportById.containsKey(plan.getId()))
-                .filter(plan -> YesOrNoEnum.YES.getCode().equals(plan.getEndType()))
-                .filter(plan -> MouldChangeTypeEnum.containsCode(plan.getChangeMouldType(),
-                        MouldChangeTypeEnum.REGULAR.getCode()))
+                .collect(Collectors.toMap(this::buildExportPlanKey, exportPlan -> exportPlan,
+                        (firstPlan, duplicatePlan) -> firstPlan));
+        List<LhMouldChangePlan> matchedPlanList = sourceList.stream()
+                .filter(Objects::nonNull)
+                .filter(plan -> this.findExportPlan(plan, exportById, exportByPlanKey) != null)
                 .collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(timedOffPlanList)) {
+        if (CollectionUtils.isEmpty(matchedPlanList)) {
             return;
         }
+        matchedPlanList.forEach(plan -> {
+            LhMouldChangePlanVo exportPlan = this.findExportPlan(plan, exportById, exportByPlanKey);
+            exportPlan.setEndType(this.resolveExportEndType(plan));
+            exportPlan.setRemark("");
+        });
 
-        Set<String> factoryCodeSet = timedOffPlanList.stream()
-                .map(LhMouldChangePlan::getFactoryCode)
-                .filter(StringUtils::isNotBlank)
-                .map(StringUtils::trim)
+        List<LhMouldChangePlan> inspectionPlanList = matchedPlanList.stream()
+                .filter(this::hasInspectionJoinKey)
+                .collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(inspectionPlanList) || lhScheduleResultMapper == null) {
+            return;
+        }
+        Set<String> factoryCodes = inspectionPlanList.stream().map(LhMouldChangePlan::getFactoryCode)
+                .map(StringUtils::trim).collect(Collectors.toSet());
+        Set<String> batchNumbers = inspectionPlanList.stream().map(LhMouldChangePlan::getLhResultBatchNo)
+                .map(StringUtils::trim).collect(Collectors.toSet());
+        Set<String> machineCodes = inspectionPlanList.stream().map(LhMouldChangePlan::getLhMachineCode)
+                .map(StringUtils::trim).collect(Collectors.toSet());
+        Set<String> materialCodes = inspectionPlanList.stream().map(LhMouldChangePlan::getAfterMaterialCode)
+                .map(StringUtils::trim).collect(Collectors.toSet());
+        Set<String> productStatuses = inspectionPlanList.stream().map(LhMouldChangePlan::getProductStatus)
+                .map(StringUtils::trim).collect(Collectors.toSet());
+        Set<Date> scheduleDates = inspectionPlanList.stream().map(LhMouldChangePlan::getScheduleDate)
+                .map(scheduleDate -> (Date) DateUtil.beginOfDay(scheduleDate))
                 .collect(Collectors.toSet());
-        if (CollectionUtils.isEmpty(factoryCodeSet)) {
-            log.warn("按时间下机计划导出备注未回填，计划缺少工厂编号");
+        List<LhScheduleResult> resultList = lhScheduleResultMapper.selectList(
+                new LambdaQueryWrapper<LhScheduleResult>()
+                        .in(LhScheduleResult::getFactoryCode, factoryCodes)
+                        .in(LhScheduleResult::getBatchNo, batchNumbers)
+                        .in(LhScheduleResult::getScheduleDate, scheduleDates)
+                        .in(LhScheduleResult::getLhMachineCode, machineCodes)
+                        .in(LhScheduleResult::getMaterialCode, materialCodes)
+                        .in(LhScheduleResult::getProductStatus, productStatuses));
+        if (CollectionUtils.isEmpty(resultList)) {
             return;
         }
 
-        List<LhShiftConfig> shiftConfigList = lhShiftConfigMapper.selectList(
-                new LambdaQueryWrapper<LhShiftConfig>()
-                        .in(LhShiftConfig::getFactoryCode, factoryCodeSet)
-                        .orderByAsc(LhShiftConfig::getFactoryCode)
-                        .orderByAsc(LhShiftConfig::getShiftIndex));
-        if (CollectionUtils.isEmpty(shiftConfigList)) {
-            log.warn("按时间下机计划导出备注未回填，工厂未配置班次, factoryCodes: {}", factoryCodeSet);
-            return;
-        }
-        Map<String, List<LhShiftConfig>> shiftConfigByFactory = shiftConfigList.stream()
-                .filter(Objects::nonNull)
-                .collect(Collectors.groupingBy(LhShiftConfig::getFactoryCode));
-
-        Map<String, Integer> scheduleDaysByFactory = new HashMap<>();
-        for (String factoryCode : factoryCodeSet) {
-            LhScheduleContext scheduleContext = new LhScheduleContext();
-            scheduleContext.setFactoryCode(factoryCode);
-            lhScheduleConfigResolver.resolveAndAttach(scheduleContext);
-            scheduleDaysByFactory.put(factoryCode, LhScheduleTimeUtil.getScheduleDays(scheduleContext));
-        }
-
-        for (LhMouldChangePlan plan : timedOffPlanList) {
-            String factoryCode = StringUtils.trim(plan.getFactoryCode());
-            List<LhShiftConfig> factoryShiftConfigList = shiftConfigByFactory.get(factoryCode);
-            Integer scheduleDays = scheduleDaysByFactory.get(factoryCode);
-            if (plan.getScheduleDate() == null || plan.getPlanDate() == null
-                    || StringUtils.isBlank(plan.getClassIndex())
-                    || CollectionUtils.isEmpty(factoryShiftConfigList) || scheduleDays == null) {
-                log.warn("按时间下机计划导出备注未回填，计划数据或班次配置不完整, planId: {}, factoryCode: {}",
-                        plan.getId(), plan.getFactoryCode());
-                continue;
+        Map<String, List<LhShiftConfig>> shiftConfigsByFactory = this.loadExportShiftConfigs(factoryCodes);
+        Map<String, Date> scheduleStartByFactoryDate = this.resolveExportScheduleStarts(inspectionPlanList);
+        Set<String> allowedResultKeys = inspectionPlanList.stream()
+                .map(this::buildResultJoinKey).collect(Collectors.toSet());
+        Map<String, Map<String, String>> inspectionLinesByResultKey = this.buildFirstInspectionLines(
+                resultList, shiftConfigsByFactory, scheduleStartByFactoryDate, allowedResultKeys);
+        matchedPlanList.stream().filter(this::hasInspectionJoinKey).forEach(plan -> {
+            String resultKey = this.buildResultJoinKey(plan);
+            Map<String, String> inspectionLines = inspectionLinesByResultKey.get(resultKey);
+            if (inspectionLines != null && !inspectionLines.isEmpty()) {
+                String remark = inspectionLines.values().stream().collect(Collectors.joining("\n"));
+                this.findExportPlan(plan, exportById, exportByPlanKey).setRemark(remark);
             }
-
-            ShiftEnum planShiftType = ShiftEnum.getByMouldChangePlanStoredCode(plan.getClassIndex());
-            if (planShiftType == null) {
-                log.warn("按时间下机计划导出备注未回填，班次编码无法识别, planId: {}, classIndex: {}",
-                        plan.getId(), plan.getClassIndex());
-                continue;
-            }
-
-            int offsetDays = Math.max(0, scheduleDays - 2);
-            Date scheduleStartDate = DateUtil.offsetDay(DateUtil.beginOfDay(plan.getScheduleDate()), -offsetDays);
-            List<String> matchingStartTimes = factoryShiftConfigList.stream()
-                    .filter(Objects::nonNull)
-                    .filter(shiftConfig -> shiftConfig.getDateOffset() != null
-                            && shiftConfig.getDateOffset() >= 0
-                            && shiftConfig.getDateOffset() < scheduleDays)
-                    .filter(shiftConfig -> Objects.equals(planShiftType,
-                            ShiftTypeParseUtil.parse(shiftConfig.getShiftType())))
-                    .map(shiftConfig -> this.resolveShiftStartTimeOnPlanDate(
-                            shiftConfig, scheduleStartDate, plan.getPlanDate()))
-                    .filter(Objects::nonNull)
-                    .distinct()
-                    .collect(Collectors.toList());
-
-            if (matchingStartTimes.size() != 1) {
-                log.warn("按时间下机计划导出备注未回填，班次开始时间{}匹配, planId: {}, factoryCode: {}, "
-                                + "scheduleDate: {}, planDate: {}, classIndex: {}",
-                        matchingStartTimes.isEmpty() ? "未" : "存在冲突",
-                        plan.getId(), plan.getFactoryCode(), plan.getScheduleDate(),
-                        plan.getPlanDate(), plan.getClassIndex());
-                continue;
-            }
-
-            exportById.get(plan.getId()).setRemark(matchingStartTimes.get(0));
-        }
+        });
     }
 
     /**
-     * 按排程起始日、配置偏移和班次解析绝对开始时刻，并检查其自然日是否与计划日期一致。
+     * 查找与原计划对应的导出视图。
      *
-     * @param shiftConfig       工厂班次配置
-     * @param scheduleStartDate 排程窗口起始日 T 日
-     * @param planDate          模具交替计划日期
-     * @return 班次开始时分；配置无效或日期不匹配时返回null
+     * @param plan            原始计划
+     * @param exportById      按数据库主键索引的导出视图
+     * @param exportByPlanKey 按计划字段索引的导出视图
+     * @return 匹配视图；找不到时返回null
      */
-    private String resolveShiftStartTimeOnPlanDate(LhShiftConfig shiftConfig,
-                                                   Date scheduleStartDate,
-                                                   Date planDate) {
-        if (shiftConfig.getDateOffset() == null || StringUtils.isBlank(shiftConfig.getStartTime())
+    private LhMouldChangePlanVo findExportPlan(LhMouldChangePlan plan,
+                                               Map<Long, LhMouldChangePlanVo> exportById,
+                                               Map<String, LhMouldChangePlanVo> exportByPlanKey) {
+        if (plan.getId() != null && exportById.containsKey(plan.getId())) {
+            return exportById.get(plan.getId());
+        }
+        return exportByPlanKey.get(this.buildExportPlanKey(plan));
+    }
+
+    /**
+     * 生成计划导出视图匹配键。
+     *
+     * @param plan 计划或导出视图
+     * @return 可稳定匹配源记录和导出视图的键
+     */
+    private String buildExportPlanKey(LhMouldChangePlan plan) {
+        return String.join("|", StringUtils.defaultString(plan.getFactoryCode()),
+                StringUtils.defaultString(plan.getLhResultBatchNo()),
+                plan.getScheduleDate() == null ? "" : DateUtil.formatDate(plan.getScheduleDate()),
+                StringUtils.defaultString(plan.getLhMachineCode()),
+                StringUtils.defaultString(plan.getAfterMaterialCode()),
+                StringUtils.defaultString(plan.getProductStatus()),
+                plan.getPlanDate() == null ? "" : DateUtil.formatDateTime(plan.getPlanDate()),
+                StringUtils.defaultString(plan.getClassIndex()));
+    }
+
+    /**
+     * 生成导出视图计划字段匹配键。
+     *
+     * @param plan 导出视图
+     * @return 可与原始计划匹配的键
+     */
+    private String buildExportPlanKey(LhMouldChangePlanVo plan) {
+        return String.join("|", StringUtils.defaultString(plan.getFactoryCode()),
+                StringUtils.defaultString(plan.getLhResultBatchNo()),
+                plan.getScheduleDate() == null ? "" : DateUtil.formatDate(plan.getScheduleDate()),
+                StringUtils.defaultString(plan.getLhMachineCode()),
+                StringUtils.defaultString(plan.getAfterMaterialCode()),
+                StringUtils.defaultString(plan.getProductStatus()),
+                plan.getPlanDate() == null ? "" : DateUtil.formatDateTime(plan.getPlanDate()),
+                StringUtils.defaultString(plan.getClassIndex()));
+    }
+
+    /**
+     * 解析导出下机列的固定展示内容。
+     *
+     * @param plan 原始换模计划
+     * @return 下机方式、时间或清洗标记
+     */
+    private String resolveExportEndType(LhMouldChangePlan plan) {
+        if (MouldChangeTypeEnum.containsAnyCode(plan.getCleanType(),
+                MouldChangeTypeEnum.SAND_BLAST.getCode(), MouldChangeTypeEnum.DRY_ICE.getCode())) {
+            return "/";
+        }
+        if (YesOrNoEnum.NO.getCode().equals(plan.getEndType())) {
+            return I18nUtil.getMessage(EXPORT_BY_REMAINDER_KEY);
+        }
+        if (!YesOrNoEnum.YES.getCode().equals(plan.getEndType())) {
+            return "";
+        }
+        ShiftEnum shiftEnum = ShiftEnum.getByMouldChangePlanStoredCode(plan.getClassIndex());
+        if (shiftEnum == null) {
+            return "";
+        }
+        String startTime = shiftEnum.getStartTime();
+        return StringUtils.startsWith(startTime, "0") ? startTime.substring(1) : startTime;
+    }
+
+    /**
+     * 判断计划是否具备精确关联硫化结果所需的全部字段。
+     *
+     * @param plan 待检查计划
+     * @return 字段齐全时返回true
+     */
+    private boolean hasInspectionJoinKey(LhMouldChangePlan plan) {
+        return StringUtils.isNotBlank(plan.getFactoryCode())
+                && StringUtils.isNotBlank(plan.getLhResultBatchNo())
+                && plan.getScheduleDate() != null
+                && StringUtils.isNotBlank(plan.getLhMachineCode())
+                && StringUtils.isNotBlank(plan.getAfterMaterialCode())
+                && StringUtils.isNotBlank(plan.getProductStatus());
+    }
+
+    /**
+     * 加载各工厂班次配置，供CLASS序号定位实际班次和业务日期。
+     *
+     * @param factoryCodes 需要加载配置的工厂编码集合
+     * @return 按工厂归集的班次配置
+     */
+    private Map<String, List<LhShiftConfig>> loadExportShiftConfigs(Set<String> factoryCodes) {
+        if (lhShiftConfigMapper == null || CollectionUtils.isEmpty(factoryCodes)) {
+            return Collections.emptyMap();
+        }
+        List<LhShiftConfig> configList = lhShiftConfigMapper.selectList(
+                new LambdaQueryWrapper<LhShiftConfig>()
+                        .in(LhShiftConfig::getFactoryCode, factoryCodes)
+                        .orderByAsc(LhShiftConfig::getFactoryCode)
+                        .orderByAsc(LhShiftConfig::getShiftIndex));
+        if (CollectionUtils.isEmpty(configList)) {
+            return Collections.emptyMap();
+        }
+        return configList.stream().filter(Objects::nonNull)
+                .collect(Collectors.groupingBy(config -> StringUtils.trim(config.getFactoryCode())));
+    }
+
+    /**
+     * 计算每个工厂和排程日期对应的排程窗口起始日。
+     *
+     * @param planList 已具备排程日期和工厂的计划列表
+     * @return 工厂及排程日期到窗口起始日的映射
+     */
+    private Map<String, Date> resolveExportScheduleStarts(List<LhMouldChangePlan> planList) {
+        Map<String, Date> scheduleStarts = new HashMap<>();
+        planList.stream().filter(Objects::nonNull).filter(plan -> plan.getScheduleDate() != null)
+                .collect(Collectors.groupingBy(plan -> this.buildFactoryDateKey(
+                        plan.getFactoryCode(), plan.getScheduleDate())))
+                .forEach((factoryDateKey, plans) -> {
+                    String factoryCode = StringUtils.trim(plans.get(0).getFactoryCode());
+                    Date scheduleDate = plans.get(0).getScheduleDate();
+                    LhScheduleContext context = new LhScheduleContext();
+                    context.setFactoryCode(factoryCode);
+                    if (lhScheduleConfigResolver != null) {
+                        lhScheduleConfigResolver.resolveAndAttach(context);
+                    }
+                    int offsetDays = Math.max(0, LhScheduleTimeUtil.getScheduleDays(context) - 2);
+                    scheduleStarts.put(factoryDateKey,
+                            DateUtil.offsetDay(DateUtil.beginOfDay(scheduleDate), -offsetDays));
+                });
+        return scheduleStarts;
+    }
+
+    /**
+     * 从硫化排程结果动态读取各班次首检并生成为导出双语行。
+     *
+     * @param resultList            精确条件查询到的硫化排程结果
+     * @param shiftConfigsByFactory 工厂班次配置
+     * @param scheduleStarts        工厂及排程日期对应的窗口起始日
+     * @param allowedResultKeys     允许参与回填的换模计划关联键
+     * @return 结果关联键到有序首检备注行的映射
+     */
+    private Map<String, Map<String, String>> buildFirstInspectionLines(
+            List<LhScheduleResult> resultList,
+            Map<String, List<LhShiftConfig>> shiftConfigsByFactory,
+            Map<String, Date> scheduleStarts,
+            Set<String> allowedResultKeys) {
+        Map<String, Map<String, String>> linesByResult = new HashMap<>();
+        for (LhScheduleResult result : resultList) {
+            if (result == null) {
+                continue;
+            }
+            String resultKey = this.buildResultJoinKey(result);
+            if (!allowedResultKeys.contains(resultKey)) {
+                continue;
+            }
+            Date scheduleStart = scheduleStarts.get(this.buildFactoryDateKey(
+                    result.getFactoryCode(), result.getScheduleDate()));
+            List<LhShiftConfig> factoryConfigs = shiftConfigsByFactory.get(
+                    StringUtils.trim(result.getFactoryCode()));
+            if (scheduleStart == null || CollectionUtils.isEmpty(factoryConfigs)) {
+                log.warn("首检备注未生成，缺少排程窗口或班次配置, factoryCode: {}, batchNo: {}, "
+                                + "scheduleDate: {}, machineCode: {}",
+                        result.getFactoryCode(), result.getBatchNo(), result.getScheduleDate(),
+                        result.getLhMachineCode());
+                continue;
+            }
+            for (int classIndex = 1; classIndex <= 8; classIndex++) {
+                int currentClassIndex = classIndex;
+                Object analysisValue = result.getFieldValueByFieldName(
+                        String.format(CLASS_ANALYSIS_FIELD_TEMPLATE, currentClassIndex));
+                if (!(analysisValue instanceof String)
+                        || !StringUtils.contains((String) analysisValue, "首检")) {
+                    continue;
+                }
+                LhShiftConfig shiftConfig = factoryConfigs.stream().filter(Objects::nonNull)
+                        .filter(config -> Objects.equals(config.getShiftIndex(), currentClassIndex))
+                        .findFirst().orElse(null);
+                LhShiftConfigVO shift = this.resolveInspectionShift(shiftConfig, scheduleStart);
+                if (shift == null || ShiftTypeParseUtil.parse(shift.getShiftType()) == null) {
+                    log.warn("首检备注未生成，CLASS班次无法解析, factoryCode: {}, batchNo: {}, machineCode: {}, "
+                                    + "scheduleDate: {}, classIndex: {}",
+                            result.getFactoryCode(), result.getBatchNo(), result.getLhMachineCode(),
+                            result.getScheduleDate(), classIndex);
+                    continue;
+                }
+                ShiftEnum shiftEnum = ShiftTypeParseUtil.parse(shift.getShiftType());
+                String workDate = DateUtil.formatDate(shift.getWorkDate());
+                String zhDate = DateUtil.format(shift.getWorkDate(), REMARK_CHINESE_DATE_PATTERN);
+                String viDate = DateUtil.format(shift.getWorkDate(), "dd.MM");
+                String zhLine = MessageFormat.format(I18nUtil.getMessage(
+                                EXPORT_FIRST_INSPECTION_ZH_KEY, Locale.SIMPLIFIED_CHINESE), zhDate,
+                        this.resolveShiftDisplayName(shiftEnum.getCode(), Locale.SIMPLIFIED_CHINESE));
+                String viShiftName = this.resolveShiftDisplayName(shiftEnum.getCode(), REMARK_VIETNAMESE_LOCALE);
+                if (StringUtils.isNotBlank(viShiftName)) {
+                    viShiftName = Character.toUpperCase(viShiftName.charAt(0)) + viShiftName.substring(1);
+                }
+                String viLine = MessageFormat.format(I18nUtil.getMessage(
+                        EXPORT_FIRST_INSPECTION_VI_KEY, REMARK_VIETNAMESE_LOCALE), viShiftName, viDate);
+                String dedupeKey = workDate + "|" + shiftEnum.getCode();
+                Map<String, String> lineMap = linesByResult.computeIfAbsent(resultKey, key -> new TreeMap<>());
+                if (lineMap.keySet().stream().noneMatch(key -> key.endsWith("|" + dedupeKey))) {
+                    String orderKey = DateUtil.format(shift.getShiftStartDateTime(), "yyyyMMddHHmmss")
+                            + "|" + dedupeKey;
+                    lineMap.put(orderKey, zhLine + "\n" + viLine);
+                }
+            }
+        }
+        return linesByResult;
+    }
+
+    /**
+     * 依据班次序号配置解析CLASS班次及其业务日期。
+     *
+     * @param shiftConfig 班次配置
+     * @param scheduleStartDate 排程窗口起始日
+     * @return 可解析的班次配置视图；数据不完整时返回null
+     */
+    private LhShiftConfigVO resolveInspectionShift(LhShiftConfig shiftConfig, Date scheduleStartDate) {
+        if (shiftConfig == null || shiftConfig.getDateOffset() == null
+                || StringUtils.isBlank(shiftConfig.getStartTime())
                 || StringUtils.isBlank(shiftConfig.getEndTime())) {
             return null;
         }
@@ -292,24 +499,63 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
             return null;
         }
         try {
-            int[] startTimeParts = ShiftTimeParseUtil.parseToHms(shiftConfig.getStartTime());
+            ShiftTimeParseUtil.parseToHms(shiftConfig.getStartTime());
             ShiftTimeParseUtil.parseToHms(shiftConfig.getEndTime());
-            LhShiftConfigVO shiftConfigVO = new LhShiftConfigVO();
-            shiftConfigVO.setDateOffset(shiftConfig.getDateOffset());
-            shiftConfigVO.setShiftType(shiftType.getCode());
-            shiftConfigVO.setStartTime(shiftConfig.getStartTime().trim());
-            shiftConfigVO.setEndTime(shiftConfig.getEndTime().trim());
-            shiftConfigVO.setScheduleBaseDate(scheduleStartDate);
-            Date shiftStartDateTime = shiftConfigVO.getShiftStartDateTime();
-            if (shiftStartDateTime == null || !DateUtil.isSameDay(shiftStartDateTime, planDate)) {
-                return null;
-            }
-            return String.format("%02d:%02d", startTimeParts[0], startTimeParts[1]);
+            LhShiftConfigVO shift = new LhShiftConfigVO();
+            shift.setShiftIndex(shiftConfig.getShiftIndex());
+            shift.setDateOffset(shiftConfig.getDateOffset());
+            shift.setShiftType(shiftType.getCode());
+            shift.setStartTime(shiftConfig.getStartTime().trim());
+            shift.setEndTime(shiftConfig.getEndTime().trim());
+            shift.setScheduleBaseDate(scheduleStartDate);
+            return shift.getWorkDate() == null || shift.getShiftStartDateTime() == null ? null : shift;
         } catch (IllegalArgumentException exception) {
-            log.warn("班次配置时刻无效, factoryCode: {}, shiftIndex: {}",
+            log.warn("首检备注未生成，班次配置时刻无效, factoryCode: {}, shiftIndex: {}",
                     shiftConfig.getFactoryCode(), shiftConfig.getShiftIndex());
             return null;
         }
+    }
+
+    /**
+     * 构造硫化排程结果与换模计划关联键。
+     *
+     * @param plan 换模计划
+     * @return 精确匹配结果所需字段组成的键
+     */
+    private String buildResultJoinKey(LhMouldChangePlan plan) {
+        return String.join("|", StringUtils.defaultString(StringUtils.trim(plan.getFactoryCode())),
+                StringUtils.defaultString(StringUtils.trim(plan.getLhResultBatchNo())),
+                plan.getScheduleDate() == null ? "" : DateUtil.formatDate(plan.getScheduleDate()),
+                StringUtils.defaultString(StringUtils.trim(plan.getLhMachineCode())),
+                StringUtils.defaultString(StringUtils.trim(plan.getAfterMaterialCode())),
+                StringUtils.defaultString(StringUtils.trim(plan.getProductStatus())));
+    }
+
+    /**
+     * 构造硫化排程结果与换模计划关联键。
+     *
+     * @param result 硫化排程结果
+     * @return 精确匹配结果所需字段组成的键
+     */
+    private String buildResultJoinKey(LhScheduleResult result) {
+        return String.join("|", StringUtils.defaultString(StringUtils.trim(result.getFactoryCode())),
+                StringUtils.defaultString(StringUtils.trim(result.getBatchNo())),
+                result.getScheduleDate() == null ? "" : DateUtil.formatDate(result.getScheduleDate()),
+                StringUtils.defaultString(StringUtils.trim(result.getLhMachineCode())),
+                StringUtils.defaultString(StringUtils.trim(result.getMaterialCode())),
+                StringUtils.defaultString(StringUtils.trim(result.getProductStatus())));
+    }
+
+    /**
+     * 构造工厂与排程日期组合键。
+     *
+     * @param factoryCode  工厂编码
+     * @param scheduleDate 排程日期
+     * @return 工厂与排程日期组合键
+     */
+    private String buildFactoryDateKey(String factoryCode, Date scheduleDate) {
+        return StringUtils.defaultString(StringUtils.trim(factoryCode)) + "|"
+                + (scheduleDate == null ? "" : DateUtil.formatDate(scheduleDate));
     }
 
     /**
@@ -1716,8 +1962,15 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
         } else {
             plan.setCleanType(null);
         }
-        plan.setChangeMouldType(Boolean.TRUE.equals(this.parseCleaningImportOption(plan.getIsReplaceBlock()))
-                ? MouldChangeTypeEnum.TYPE_BLOCK.getCode() : MouldChangeTypeEnum.REGULAR.getCode());
+        Boolean replaceBlock = this.parseCleaningImportOption(plan.getIsReplaceBlock());
+        boolean changeMouldTypeBlank = StringUtils.isBlank(plan.getChangeMouldType());
+        boolean cleaningSelected = sandBlastingSelected || dryIceSelected;
+        if (changeMouldTypeBlank && cleaningSelected && !Boolean.TRUE.equals(replaceBlock)) {
+            plan.setChangeMouldType(null);
+        } else {
+            plan.setChangeMouldType(Boolean.TRUE.equals(replaceBlock)
+                    ? MouldChangeTypeEnum.TYPE_BLOCK.getCode() : MouldChangeTypeEnum.REGULAR.getCode());
+        }
         return invalid;
     }
 
@@ -1761,16 +2014,21 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
     }
 
     /**
-     * 更新导入的模具交替计划，并在清洗类型为空时显式清空数据库字段。
+     * 更新导入的模具交替计划，并显式清空导入值为空的清洗类型或交替类型字段。
      *
      * @param plan 待更新的模具交替计划
      */
     private void updateImportedMouldChangePlan(LhMouldChangePlan plan) {
         lhMouldChangePlanMapper.updateById(plan);
-        if (plan.getCleanType() == null) {
+        if (plan.getCleanType() == null || plan.getChangeMouldType() == null) {
             LambdaUpdateWrapper<LhMouldChangePlan> updateWrapper = new LambdaUpdateWrapper<>();
-            updateWrapper.eq(LhMouldChangePlan::getId, plan.getId())
-                    .set(LhMouldChangePlan::getCleanType, null);
+            updateWrapper.eq(LhMouldChangePlan::getId, plan.getId());
+            if (plan.getCleanType() == null) {
+                updateWrapper.set(LhMouldChangePlan::getCleanType, null);
+            }
+            if (plan.getChangeMouldType() == null) {
+                updateWrapper.set(LhMouldChangePlan::getChangeMouldType, null);
+            }
             lhMouldChangePlanMapper.update(null, updateWrapper);
         }
     }

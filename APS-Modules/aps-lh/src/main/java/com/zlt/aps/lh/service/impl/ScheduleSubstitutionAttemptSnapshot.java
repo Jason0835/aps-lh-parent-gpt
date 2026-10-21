@@ -34,6 +34,7 @@ import com.zlt.aps.lh.engine.strategy.support.UnscheduledResultRuntime;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchPlan;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchRuntimeState;
 import com.zlt.aps.lh.engine.strategy.support.EquipmentPlanRuntimeState;
+import com.zlt.aps.lh.engine.strategy.support.CleaningPlanRuntimeState;
 import com.zlt.aps.lh.engine.strategy.support.ContinuousProductionConsumption;
 
 import java.time.LocalDate;
@@ -64,6 +65,10 @@ final class ScheduleSubstitutionAttemptSnapshot {
 
     /** 公共设备计划全部状态，包含0判定缓存、待复评、候选时间计划、安排记录和版本。 */
     private EquipmentPlanRuntimeState equipmentPlanRuntimeState;
+    /**
+     * 清洗完整状态及约束版本快照。
+     */
+    private CleaningPlanRuntimeState cleaningPlanRuntimeState;
     /** 不可变实际消费记录随结果及账本一起恢复。 */
     private Map<LhScheduleResult, ContinuousProductionConsumption> continuousProductionConsumptionMap;
     /** 旧公共状态仍需与设备计划一起回滚，避免嵌套预演污染。 */
@@ -157,8 +162,6 @@ final class ScheduleSubstitutionAttemptSnapshot {
     private Map<String, Set<String>> dailyMaintenancePhysicalMachineSetMap;
     /** 置换前保养顺延日志去重键 */
     private Set<String> maintenanceResumeDelayLogKeySet;
-    /** 置换前清洗安排日期回填清单 */
-    private List<CleaningScheduleDateFillItem> cleaningScheduleDateFillList;
     /** 置换前换模上限阻塞原因 */
     private Map<String, String> mouldChangeLimitBlockedReasonMap;
     /** 置换前新增选机日志序号 */
@@ -207,12 +210,6 @@ final class ScheduleSubstitutionAttemptSnapshot {
     /** 前置组合的绑定及未来模具释放记录随失败尝试一起恢复。 */
     private List<ActiveMachineBinding> preScheduledMachineBindingList;
     private Map<String, Date> preScheduledMouldReleaseTimeMap;
-    /** 置换前仅喷砂续作下机窗口，失败回滚后仍需保持旧SKU及模具释放事实。 */
-    private Map<String, MachineCleaningWindowDTO> onlySandBlastContinuationReleaseWindowMap;
-    /** 置换前续作喷砂统一处置事件。 */
-    private Map<String, MachineCleaningWindowDTO> continuationSandBlastWindowMap;
-    /** 置换前仅喷砂下机真实余量。 */
-    private Map<String, Integer> onlySandBlastContinuationRemainingQtyMap;
     /** 置换前持久化过程日志；预演日志必须随快照回滚。 */
     private List<LhScheduleProcessLog> scheduleLogList;
     /** 按天换活字块反选及结构待排视图 */
@@ -394,6 +391,7 @@ final class ScheduleSubstitutionAttemptSnapshot {
         snapshot.dailyMaintenanceCountMap =
                 new LinkedHashMap<String, Integer>(context.getDailyMaintenanceCountMap());
         snapshot.equipmentPlanRuntimeState = context.getEquipmentPlanRuntimeState().copy();
+        snapshot.cleaningPlanRuntimeState = context.getCleaningPlanRuntimeState().copy();
         snapshot.continuousProductionConsumptionMap = new IdentityHashMap<>(context.getContinuousProductionConsumptionMap());
         snapshot.maintenanceDeferredPhysicalMachineCodeSet =
                 new LinkedHashSet<>(context.getMaintenanceDeferredPhysicalMachineCodeSet());
@@ -403,8 +401,6 @@ final class ScheduleSubstitutionAttemptSnapshot {
                 copyStringSetMap(context.getDailyMaintenancePhysicalMachineSetMap());
         snapshot.maintenanceResumeDelayLogKeySet =
                 new LinkedHashSet<String>(context.getMaintenanceResumeDelayLogKeySet());
-        snapshot.cleaningScheduleDateFillList =
-                new ArrayList<CleaningScheduleDateFillItem>(context.getCleaningScheduleDateFillList());
         snapshot.mouldChangeLimitBlockedReasonMap =
                 new LinkedHashMap<String, String>(context.getMouldChangeLimitBlockedReasonMap());
         snapshot.newSpecMachineSelectionCountMap =
@@ -549,11 +545,6 @@ final class ScheduleSubstitutionAttemptSnapshot {
         }
         snapshot.preScheduledMachineBindingList = new ArrayList<>(context.getPreScheduledMachineBindingList());
         snapshot.preScheduledMouldReleaseTimeMap = new LinkedHashMap<>(context.getPreScheduledMouldReleaseTimeMap());
-        snapshot.continuationSandBlastWindowMap = new LinkedHashMap<>(context.getContinuationSandBlastWindowMap());
-        snapshot.onlySandBlastContinuationReleaseWindowMap = new LinkedHashMap<>(
-                context.getOnlySandBlastContinuationReleaseWindowMap());
-        snapshot.onlySandBlastContinuationRemainingQtyMap = new LinkedHashMap<>(
-                context.getOnlySandBlastContinuationRemainingQtyMap());
         return snapshot;
     }
 
@@ -592,11 +583,6 @@ final class ScheduleSubstitutionAttemptSnapshot {
 
         context.setPreScheduledMachineBindingList(new ArrayList<>(preScheduledMachineBindingList));
         context.setPreScheduledMouldReleaseTimeMap(new LinkedHashMap<>(preScheduledMouldReleaseTimeMap));
-        context.setContinuationSandBlastWindowMap(new LinkedHashMap<>(continuationSandBlastWindowMap));
-        context.setOnlySandBlastContinuationReleaseWindowMap(new LinkedHashMap<>(
-                onlySandBlastContinuationReleaseWindowMap));
-        context.setOnlySandBlastContinuationRemainingQtyMap(new LinkedHashMap<>(
-                onlySandBlastContinuationRemainingQtyMap));
         if (restoreSourceObjects) {
             for (Map.Entry<LhScheduleResult, LhScheduleResult> entry : scheduleResultStateMap.entrySet()) {
                 BeanUtil.copyProperties(entry.getValue(), entry.getKey());
@@ -648,6 +634,7 @@ final class ScheduleSubstitutionAttemptSnapshot {
         context.setDailyMaintenanceCountMap(
                 new LinkedHashMap<String, Integer>(dailyMaintenanceCountMap));
         context.setEquipmentPlanRuntimeState(equipmentPlanRuntimeState.copy());
+        context.setCleaningPlanRuntimeState(cleaningPlanRuntimeState.copy());
         context.setContinuousProductionConsumptionMap(new IdentityHashMap<>(continuousProductionConsumptionMap));
         context.setMaintenanceDeferredPhysicalMachineCodeSet(new LinkedHashSet<>(maintenanceDeferredPhysicalMachineCodeSet));
         context.setMaintenancePreDecisionCompleted(maintenancePreDecisionCompleted);
@@ -656,8 +643,6 @@ final class ScheduleSubstitutionAttemptSnapshot {
                 copyStringSetMap(dailyMaintenancePhysicalMachineSetMap));
         context.setMaintenanceResumeDelayLogKeySet(
                 new LinkedHashSet<String>(maintenanceResumeDelayLogKeySet));
-        context.setCleaningScheduleDateFillList(
-                new ArrayList<CleaningScheduleDateFillItem>(cleaningScheduleDateFillList));
         context.setMouldChangeLimitBlockedReasonMap(
                 new LinkedHashMap<String, String>(mouldChangeLimitBlockedReasonMap));
         context.setNewSpecMachineSelectionCountMap(
@@ -814,8 +799,7 @@ final class ScheduleSubstitutionAttemptSnapshot {
                 ? null : source.getShiftRemainingCapacity().clone());
         target.setShiftAvailable(source.getShiftAvailable() == null
                 ? null : source.getShiftAvailable().clone());
-        target.setCleaningWindowList(source.getCleaningWindowList() == null
-                ? new ArrayList<>(0) : new ArrayList<>(source.getCleaningWindowList()));
+        target.setCleaningWindowList(CleaningPlanRuntimeState.copyWindows(source.getCleaningWindowList()));
         target.setMaintenanceWindowList(source.getMaintenanceWindowList() == null
                 ? new ArrayList<>(0) : source.getMaintenanceWindowList().stream()
                 .map(window -> window == null ? null : window.copy()).collect(Collectors.toList()));

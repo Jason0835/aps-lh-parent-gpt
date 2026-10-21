@@ -156,6 +156,8 @@ public final class DailyMachineExpansionPlanner {
 
     /**
      * 前置复用已经满足目标时统一阻止其他入口新开机台，保留原绑定的跨日生产。
+     * 正式时间决定后的精确历史动作使用已登记且生效的指定目标，时间负荷预演及普通候选沿用原目标。
+     *
      * @param service 统一目标机台查询服务
      * @param context 排程上下文
      * @param sku 当前候选
@@ -176,17 +178,25 @@ public final class DailyMachineExpansionPlanner {
         }
         LocalDate requiredDate = EarlyProductionQuantityCalculator.resolveRequiredMachineCountDate(
                 context, sku, null, productionDate);
-        int targetCount = service.getRequiredMachineCount(
+        int ordinaryTargetCount = service.getRequiredMachineCount(
                 context, sku.getMaterialCode(), sku.getProductStatus(), requiredDate);
+        int targetCount = ordinaryTargetCount;
+        // 时间负荷预演保持原扩机口径，新增指定后料不能反向改变既有时间下机决定。
+        // 额外份数留到正式时间决定后的承接阶段消费，仍按实际生产日判断生效及复核资源配额。
+        if (!context.isTimedMachineOffLoadPreview()) {
+            targetCount = context.resolvePreviousAlternateMachineCount(sku, productionDate, ordinaryTargetCount);
+        }
         int committedCount = countCommittedMachineDemand(context, sku, productionDate);
         boolean satisfied = targetCount > 0 && committedCount >= targetCount;
         if (satisfied) {
             log.info("前置复用已落实目标机台需求，停止新开机台, factoryCode: {}, batchNo: {}, "
                             + "businessDate: {}, requiredDate: {}, materialCode: {}, productStatus: {}, "
-                            + "targetMachineCount: {}, dailyScheduledCount: {}, committedMachines: {}, "
+                            + "timedLoadPreview: {}, ordinaryTargetMachineCount: {}, targetMachineCount: {}, "
+                            + "dailyScheduledCount: {}, committedMachines: {}, "
                             + "committedMachineCount: {}, remainingMachineCount: 0",
                     context.getFactoryCode(), context.getBatchNo(), productionDate, requiredDate,
-                    sku.getMaterialCode(), sku.getProductStatus(), targetCount,
+                    sku.getMaterialCode(), sku.getProductStatus(), context.isTimedMachineOffLoadPreview(),
+                    ordinaryTargetCount, targetCount,
                     countScheduledPhysicalMachines(context, sku, productionDate), committedMachines, committedCount);
         }
         return satisfied;

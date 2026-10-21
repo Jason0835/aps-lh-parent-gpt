@@ -40,6 +40,10 @@ final class TimedMachineOffPreviewSnapshot {
     /** 正式续作只能扣账一次，模拟扣账后必须恢复该标记。 */
     private final boolean dailyQuotaSynced;
     private final boolean loadPreview;
+    /**
+     * 联合承接预演作用域随整个阶段恢复，不能使普通预演取得补充释放资格。
+     */
+    private final boolean handoffPreview;
     private final boolean alternateGroupPreview;
     private final String currentStep;
     /** 原机台扫描范围及续作释放状态。 */
@@ -92,6 +96,7 @@ final class TimedMachineOffPreviewSnapshot {
         decisions = new IdentityHashMap<>(context.getTimedMachineOffDecisionMap());
         dailyQuotaSynced = context.isContinuousDailyQuotaSynced();
         loadPreview = context.isTimedMachineOffLoadPreview();
+        handoffPreview = context.isTimedMachineOffHandoffPreview();
         alternateGroupPreview = context.isPreviousAlternateGroupPreview();
         currentStep = context.getCurrentStep();
         machineScope = new LinkedHashSet<>(context.getNewSpecMachineResourceScopeCodeSet());
@@ -130,6 +135,7 @@ final class TimedMachineOffPreviewSnapshot {
         context.setTimedMachineOffDecisionMap(new IdentityHashMap<>(decisions));
         context.setContinuousDailyQuotaSynced(dailyQuotaSynced);
         context.setTimedMachineOffLoadPreview(loadPreview);
+        context.setTimedMachineOffHandoffPreview(handoffPreview);
         context.setPreviousAlternateGroupPreview(alternateGroupPreview);
         context.setCurrentStep(currentStep);
         context.setNewSpecMachineResourceScopeCodeSet(new LinkedHashSet<>(machineScope));

@@ -34,6 +34,10 @@ public class NewSpecCandidateCache {
     private String preferredMachineCode;
     /** 本SKU临时容量缓存对应的设备约束版本。 */
     private long equipmentPlanConstraintVersion = -1L;
+    /**
+     * 当前候选对应的独立清洗约束版本。
+     */
+    private long cleaningPlanConstraintVersion = -1L;
 
     private NewSpecCandidateCache(List<MachineScheduleDTO> singleControlCandidates,
                                   List<MachineScheduleDTO> normalCandidates,
@@ -91,6 +95,21 @@ public class NewSpecCandidateCache {
      */
     public void clearCapacityCache() {
         candidateWindowCapacityMap.clear();
+    }
+
+    /**
+     * 清洗正式约束变化时失效本轮缓存，未变化时直接返回。
+     *
+     * @param version 清洗约束版本
+     * @return 是否失效缓存
+     */
+    public boolean invalidateCleaningPlanVersion(long version) {
+        if (cleaningPlanConstraintVersion == version) {
+            return false;
+        }
+        cleaningPlanConstraintVersion = version;
+        this.clearCapacityCache();
+        return true;
     }
 
     /** @param version 当前设备约束版本 @return 是否需要同步清空候选时间计划 */

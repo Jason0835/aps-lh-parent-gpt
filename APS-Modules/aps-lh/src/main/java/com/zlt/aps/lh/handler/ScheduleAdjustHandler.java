@@ -1395,6 +1395,10 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
          * 一份账本，再在后续排产阶段按正式状态懒加载出第二份账本。
          */
         dto.setProductStatus(targetMonthPlan.getProductStatus());
+        // 零余量SKU随后可能退出待排池，历史前料下机类型仍需保留精确状态的原始数量。
+        context.getInitialMaterialStatusSurplusQtyMap().merge(
+                MonthPlanDateResolver.buildMaterialStatusKey(dto.getMaterialCode(), dto.getProductStatus()),
+                dto.getSurplusQty(), Integer::sum);
         dto.setConstructionStage(targetMonthPlan.getConstructionStage());
         dto.setTrialDemandQty(safeInt(targetMonthPlan.getTrialQty()));
         dto.setTrial(isTrialStage(targetMonthPlan.getConstructionStage()));

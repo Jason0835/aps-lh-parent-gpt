@@ -431,7 +431,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         setExportTitleFieldName(tableMap);
         if (CollectionUtils.isNotEmpty(list)) {
             List<LhMouldChangePlanVo> exportList = this.buildLhMouldChangePlanVoList(list, queryVO);
-            lhMouldChangePlanService.applyTimedOffShiftStartRemark(list, exportList);
+            lhMouldChangePlanService.prepareExportDisplayFields(list, exportList);
             // listExportData 已完成默认全量排序，模板组装阶段直接复用该顺序，避免重复查询计划量。
             excelDataList.add(buildExportDataList(exportList, queryVO, previousDayPlanKeySet, true));
         }
@@ -706,24 +706,16 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             String productStatus = StringUtils.defaultIfBlank(item.getProductStatus(), "");
             TrialStatusEnum statusEnum = TrialStatusEnum.getByCode(productStatus);
             row.put("afterMaterialType", statusEnum == null ? "" : statusEnum.getMouldChangePlanExcelText());
-            // 按时间下机
-            String endType = item.getEndType();
-            if (YesOrNoEnum.YES.getCode().equals(endType)) {
-                row.put("endType", "是Có");
-            } else {
-                row.put("endType", "");
-            }
+            row.put("endType", StringUtils.defaultString(item.getEndType(), ""));
             String isDryIceClean = item.getIsDryIceClean();
             if (YesOrNoEnum.YES.getCode().equals(isDryIceClean)) {
                 row.put("isDryIceClean", "是Có");
-                row.put("endType", "");
             } else {
                 row.put("isDryIceClean", "");
             }
             String isSandblastingClean = item.getIsSandblastingClean();
             if (YesOrNoEnum.YES.getCode().equals(isSandblastingClean)) {
                 row.put("isSandblastingClean", "是Có");
-                row.put("endType", "");
             } else {
                 row.put("isSandblastingClean", "");
             }
@@ -733,7 +725,6 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             String isReplaceBlock = item.getIsReplaceBlock();
             if (YesOrNoEnum.YES.getCode().equals(isReplaceBlock)) {
                 row.put("isReplaceBlock", "是Có");
-                row.put("endType", "");
             } else {
                 row.put("isReplaceBlock", "");
 
@@ -747,7 +738,12 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
 
             row.put("mouldCode", this.resolveDisplayMouldCode(item));
 
-            row.put("remark", item.getRemark());
+            String remark = StringUtils.defaultString(item.getRemark(), "");
+            row.put("remark", remark);
+            if (StringUtils.isNotBlank(remark)) {
+                int remarkLineCount = remark.split("\\R", -1).length;
+                row.put("height", Math.max(30, remarkLineCount * 15));
+            }
 
             // 当前交替计划在前日不存在且计划日期处于排程日-1日时，仅将后物料描述字体标红。
             if (previousDayPlanKeySet != null

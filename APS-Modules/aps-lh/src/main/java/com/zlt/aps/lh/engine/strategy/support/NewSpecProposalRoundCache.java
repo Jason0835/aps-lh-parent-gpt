@@ -63,6 +63,10 @@ public final class NewSpecProposalRoundCache {
     private int maxRetainedBestProposalCount;
     /** 本轮缓存对应的设备约束版本，回滚或重新安排后必须重新比较候选。 */
     private long equipmentPlanConstraintVersion = -1L;
+    /**
+     * 当前候选对应的独立清洗约束版本。
+     */
+    private long cleaningPlanConstraintVersion = -1L;
 
     /**
      * 创建业务日阶段缓存。
@@ -156,6 +160,21 @@ public final class NewSpecProposalRoundCache {
      */
     public int getReadOnlyFailureCacheHitCount() {
         return readOnlyFailureCacheHitCount;
+    }
+
+    /**
+     * 清洗正式约束变化时失效本轮缓存，未变化时直接返回。
+     *
+     * @param version 清洗约束版本
+     * @return 是否失效缓存
+     */
+    public boolean invalidateCleaningPlanVersion(long version) {
+        if (cleaningPlanConstraintVersion == version) {
+            return false;
+        }
+        cleaningPlanConstraintVersion = version;
+        this.clearAfterStateChanged();
+        return true;
     }
 
     /** @param version 当前设备约束版本 @return 是否已失效旧提案缓存 */

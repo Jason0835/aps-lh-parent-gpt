@@ -112,13 +112,12 @@ public class TimedMachineOffLoadPreviewService {
         int proposalCount = 0;
         try {
             context.setTimedMachineOffLoadPreview(true);
-            // 补充历史下机仅在正式时间决策后执行；预演恢复原先无释放事件的输入，避免新增负荷改变原决定。
-            context.getPreviousAlternateReleaseEventMap().entrySet()
-                    .removeIf(entry -> entry.getValue().isSupplementalReleasePending());
             context.setTimedMachineOffActionPreviewCapture(capture);
             context.setStructureShiftInMachineIndex(null);
             // 先在模拟账本发布现有释放事实，正式上下文仍保留清零前画像和未消费日计划。
             timedMachineOffShiftService.resolveAndApply(context);
+            // 时间决定已在隔离状态形成，随后按正式链模拟已登记的补充释放和指定后料准备窗口。
+            context.setTimedMachineOffHandoffPreview(true);
             IProductionStrategy continuous = strategyFactory.getProductionStrategy(ScheduleTypeEnum.CONTINUOUS.getCode());
             continuous.finalizeContinuousProduction(context);
             // 收尾结果只提供既定释放事实；早班内及班末释放的后料也会竞争当天额度。
@@ -359,6 +358,7 @@ public class TimedMachineOffLoadPreviewService {
     private void prepareReplayContext(LhScheduleContext context, Map<String, int[]> simulatedCounts) {
         Map<String, int[]> formalCounts = this.copyCounts(context.getDailyMouldChangeCountMap());
         IProductionStrategy continuous = strategyFactory.getProductionStrategy(ScheduleTypeEnum.CONTINUOUS.getCode());
+        context.setTimedMachineOffHandoffPreview(true);
         continuous.finalizeContinuousProduction(context);
         Map<String, int[]> replayCounts = this.copyCounts(simulatedCounts);
         Set<String> dates = new LinkedHashSet<>(formalCounts.keySet());

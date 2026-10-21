@@ -16,11 +16,14 @@ import com.zlt.aps.lh.api.domain.entity.LhShiftConfig;
 import com.zlt.aps.lh.api.domain.vo.ScheduleSummaryReportVO;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
+import com.zlt.aps.lh.api.enums.ShiftEnum;
 import com.zlt.aps.lh.mapper.*;
 import com.zlt.aps.lh.service.IScheduleSummaryReportService;
+import com.zlt.aps.lh.util.FirstInspectionQtyUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.MachineStatusUtil;
+import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.maindata.mapper.FactoryParamMapper;
 import com.zlt.aps.maindata.mapper.LhMachineInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
@@ -241,8 +244,9 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         tableMap.putAll(tableMapT2);
 
         // 模具交替/清洗信息：一次性查询排程窗口（T+1 ~ T+2）数据，按 planDate 分组到 T+1/T+2 栏位，不含T日
+        // （方法内同时构建"首检及模具交替清洗小结"，复用同一份计划查询与排程结果，不新增SQL）
         Map<String, Object> mouldChangeAndCleanMap = this.buildMouldChangeAndCleanInfo(
-                scheduleDate, scheduleDateT2, factoryCode);
+                scheduleDate, scheduleDateT2, factoryCode, lhResults, classShiftTypeMap, machineMaxMouldMap);
         tableMap.putAll(mouldChangeAndCleanMap);
 
         // 精度计划备注：从排程结果表取数，按班次分析原因含"精度"标记分组
@@ -619,12 +623,18 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
      *   <li>PLAN_DATE：真实换模执行时间，按排程窗口分布在 T+1、T+2 两天</li>
      * </ul>
      *
-     * @param scheduleDateT1 排程目标日 T+1（如7月2日）
-     * @param scheduleDateT2 T+2（如7月3日）
-     * @param factoryCode    分厂编码
-     * @return 包含 mouldChangeInfo/mouldChangeInfo2/mouldCleanDate/mouldCleanDate2/mouldCleanInfo/mouldCleanInfo2 的Map
+     * @param scheduleDateT1     排程目标日 T+1（如7月2日）
+     * @param scheduleDateT2     T+2（如7月3日）
+     * @param factoryCode        分厂编码
+     * @param lhResults          硫化排程结果（用于首检机台小结统计）
+     * @param classShiftTypeMap  班次序号→班次类型映射（用于首检机台按夜/早/中分桶）
+     * @param machineMaxMouldMap 硫化机台单双模映射（用于单控机台归并计数）
+     * @return 包含 mouldChangeInfo/mouldChangeInfo2/mouldCleanDate/mouldCleanDate2/mouldCleanInfo/mouldCleanInfo2
+     *         及首检模具交替清洗小结 mouldSummaryTitle/firstInspectStat/changePlanStat/sandBlastStat/dryIceStat（后缀2同义）的Map
      */
-    private Map<String, Object> buildMouldChangeAndCleanInfo(Date scheduleDateT1, Date scheduleDateT2, String factoryCode) {
+    private Map<String, Object> buildMouldChangeAndCleanInfo(Date scheduleDateT1, Date scheduleDateT2, String factoryCode,
+            List<LhScheduleResult> lhResults, Map<Integer, String> classShiftTypeMap,
+            Map<String, Integer> machineMaxMouldMap) {
         Map<String, Object> map = new HashMap<>(8);
 
         // 一次查出本次排程批次窗口内所有模具交替/清洗计划（按真实执行时间 PLAN_DATE 过滤，范围 T+1 ~ T+2）
@@ -714,6 +724,12 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         map.put("mouldCleanDate2", mouldCleanDateT2);
         map.put("mouldCleanInfo", mouldCleanInfoT1);
         map.put("mouldCleanInfo2", mouldCleanInfoT2);
+
+        // 首检及模具交替清洗小结：首检从硫化日计划班次原因分析统计，
+        // 交替/喷砂/干冰复用本次查询的模具交替计划（allPlans），按计划日期+班次归属，不新增SQL
+        Map<String, Object> summaryMap = this.buildMouldSummaryInfo(
+                scheduleDateT1, scheduleDateT2, allPlans, lhResults, classShiftTypeMap, machineMaxMouldMap);
+        map.putAll(summaryMap);
         return map;
     }
 
@@ -730,6 +746,226 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             return false;
         }
         return !plan.getPlanDate().before(start) && !plan.getPlanDate().after(end);
+    }
+
+    /**
+     * 构建"首检及模具交替清洗小结"数据（T+1/T+2各一套，T+2的key带后缀2）。
+     *
+     * <p>小结共5行：</p>
+     * <ol>
+     *   <li>标题行：日期 + "首检及模具交替清洗小结:"（如"10/21日 首检及模具交替清洗小结:"）</li>
+     *   <li>首检机台：统计硫化日计划各班次原因分析含"首检"的机台，有多台单控机台算1台</li>
+     *   <li>交替计划统计：取模具交替计划 CHANGE_MOULD_TYPE 含01(正规)/02(更换活字块)的记录，空值不统计</li>
+     *   <li>喷砂清洗统计：取 CLEAN_TYPE 含03(喷砂清洗)的机台</li>
+     *   <li>干冰清洗统计：取 CLEAN_TYPE 含04(干冰清洗)的机台</li>
+     * </ol>
+     *
+     * <p>行文案格式："1 首检机台:2台  夜班1台, 早班1台, 中班0台;"，
+     * 开头总台数为夜/早/中三班机台去重并集（同一机台跨班只算1台）。</p>
+     *
+     * <p>归属规则：</p>
+     * <ul>
+     *   <li>首检按班次序号归属：T+1取class3/4/5，T+2取class6/7/8，班次类型由班次配置映射</li>
+     *   <li>交替/喷砂/干冰按计划日期(PLAN_DATE)+班次(CLASS_INDEX，01夜/02早/03中)归属</li>
+     *   <li>CLEAN_TYPE 支持英文逗号多值（如"03,04"），喷砂和干冰分别独立判定，多值时两行都计</li>
+     *   <li>单控机台(K1501L/K1501R)在单双模=1时归并为物理机台K1501，与硫化开动机台统计口径一致</li>
+     * </ul>
+     *
+     * @param scheduleDateT1     排程目标日 T+1
+     * @param scheduleDateT2     T+2（排程日期+1天）
+     * @param allPlans           模具交替/清洗计划（复用buildMouldChangeAndCleanInfo已查数据，不新增SQL）
+     * @param lhResults          硫化排程结果
+     * @param classShiftTypeMap  班次序号→班次类型映射
+     * @param machineMaxMouldMap 硫化机台单双模映射，用于单控机台归并
+     * @return 包含 mouldSummary/mouldSummary2 的Map，值为标题行+4行统计文案用换行符拼接的整段文本
+     */
+    private Map<String, Object> buildMouldSummaryInfo(Date scheduleDateT1, Date scheduleDateT2,
+            List<LhMouldChangePlan> allPlans, List<LhScheduleResult> lhResults,
+            Map<Integer, String> classShiftTypeMap, Map<String, Integer> machineMaxMouldMap) {
+        Map<String, Object> map = new HashMap<>(8);
+
+        // 首检机台统计：key=班次类型(01夜/02早/03中)，value=该班首检机台计数标识集合
+        Map<String, Set<String>> firstInspectT1 = new LinkedHashMap<>();
+        Map<String, Set<String>> firstInspectT2 = new LinkedHashMap<>();
+        for (LhScheduleResult result : lhResults) {
+            // 防御性排除V开头的虚拟机台：仅存在于排程内部聚合，不在机台主数据中，统计必须排除
+            if (StringUtils.isBlank(result.getLhMachineCode())
+                    || LhSingleControlMachineUtil.isVirtualMachineCode(result.getLhMachineCode())) {
+                continue;
+            }
+            // T+1取class3/4/5（排程日期当天夜/早/中），T+2取class6/7/8（排程日期+1天夜/早/中）
+            this.collectFirstInspectMachines(result, 3, 5, classShiftTypeMap, machineMaxMouldMap, firstInspectT1);
+            this.collectFirstInspectMachines(result, 6, 8, classShiftTypeMap, machineMaxMouldMap, firstInspectT2);
+        }
+
+        Date t1Start = LhScheduleTimeUtil.clearTime(scheduleDateT1);
+        Date t1End = LhScheduleTimeUtil.getEndTime(scheduleDateT1);
+        Date t2Start = LhScheduleTimeUtil.clearTime(scheduleDateT2);
+        Date t2End = LhScheduleTimeUtil.getEndTime(scheduleDateT2);
+
+        // 交替/喷砂/干冰机台统计：与首检同样按班次类型分桶，取数复用本次已查出的模具交替计划
+        Map<String, Set<String>> changePlanT1 = new LinkedHashMap<>();
+        Map<String, Set<String>> changePlanT2 = new LinkedHashMap<>();
+        Map<String, Set<String>> sandBlastT1 = new LinkedHashMap<>();
+        Map<String, Set<String>> sandBlastT2 = new LinkedHashMap<>();
+        Map<String, Set<String>> dryIceT1 = new LinkedHashMap<>();
+        Map<String, Set<String>> dryIceT2 = new LinkedHashMap<>();
+        for (LhMouldChangePlan plan : allPlans) {
+            String machineCode = plan.getLhMachineCode();
+            if (StringUtils.isBlank(machineCode) || LhSingleControlMachineUtil.isVirtualMachineCode(machineCode)) {
+                continue;
+            }
+            // 班次字段为空或非法时无法归属到具体班次，跳过（正常由引擎生成的计划均有班次）
+            ShiftEnum planShift = ShiftEnum.getByCode(StringUtils.trimToEmpty(plan.getClassIndex()));
+            if (planShift == null) {
+                continue;
+            }
+            String countKey = this.resolveMachineCountKey(machineCode, machineMaxMouldMap);
+            if (StringUtils.isBlank(countKey)) {
+                continue;
+            }
+            boolean inT1 = this.isPlanDateInRange(plan, t1Start, t1End);
+            boolean inT2 = this.isPlanDateInRange(plan, t2Start, t2End);
+            if (!inT1 && !inT2) {
+                continue;
+            }
+            // 交替计划：CHANGE_MOULD_TYPE 含01(正规)/02(更换活字块)才统计，空值不统计
+            if (MouldChangeTypeEnum.containsAnyCode(plan.getChangeMouldType(),
+                    MouldChangeTypeEnum.REGULAR.getCode(), MouldChangeTypeEnum.TYPE_BLOCK.getCode())) {
+                if (inT1) {
+                    changePlanT1.computeIfAbsent(planShift.getCode(), k -> new LinkedHashSet<>()).add(countKey);
+                }
+                if (inT2) {
+                    changePlanT2.computeIfAbsent(planShift.getCode(), k -> new LinkedHashSet<>()).add(countKey);
+                }
+            }
+            // 喷砂/干冰：按 CLEAN_TYPE 判定（支持英文逗号多值，如"03,04"两行都计）
+            if (MouldChangeTypeEnum.containsCode(plan.getCleanType(), MouldChangeTypeEnum.SAND_BLAST.getCode())) {
+                if (inT1) {
+                    sandBlastT1.computeIfAbsent(planShift.getCode(), k -> new LinkedHashSet<>()).add(countKey);
+                }
+                if (inT2) {
+                    sandBlastT2.computeIfAbsent(planShift.getCode(), k -> new LinkedHashSet<>()).add(countKey);
+                }
+            }
+            if (MouldChangeTypeEnum.containsCode(plan.getCleanType(), MouldChangeTypeEnum.DRY_ICE.getCode())) {
+                if (inT1) {
+                    dryIceT1.computeIfAbsent(planShift.getCode(), k -> new LinkedHashSet<>()).add(countKey);
+                }
+                if (inT2) {
+                    dryIceT2.computeIfAbsent(planShift.getCode(), k -> new LinkedHashSet<>()).add(countKey);
+                }
+            }
+        }
+
+        // 按模板文本域样式组装小结：标题行+4行统计文案，用换行符拼接为整段文本填入同一单元格
+        String summaryT1 = String.join("\n",
+                DateUtil.format(scheduleDateT1, "MM.dd") + "日首检及模具交替清洗小结:",
+                this.buildMouldSummaryRow("1 首检计划", firstInspectT1),
+                this.buildMouldSummaryRow("2 交替计划", changePlanT1),
+                this.buildMouldSummaryRow("3 喷砂清洗计划", sandBlastT1),
+                this.buildMouldSummaryRow("4 干冰清洗计划", dryIceT1));
+        String summaryT2 = String.join("\n",
+                DateUtil.format(scheduleDateT2, "MM.dd") + "日首检及模具交替清洗小结:",
+                this.buildMouldSummaryRow("1 首检计划", firstInspectT2),
+                this.buildMouldSummaryRow("2 交替计划", changePlanT2),
+                this.buildMouldSummaryRow("3 喷砂清洗计划", sandBlastT2),
+                this.buildMouldSummaryRow("4 干冰清洗计划", dryIceT2));
+        map.put("mouldSummary", summaryT1);
+        map.put("mouldSummary2", summaryT2);
+
+        log.info("首检及模具交替清洗小结 - T+1: [{}]", summaryT1.replace("\n", "\\n"));
+        log.info("首检及模具交替清洗小结 - T+2: [{}]", summaryT2.replace("\n", "\\n"));
+        return map;
+    }
+
+    /**
+     * 收集单个硫化排程结果在指定班次序号范围内的首检机台（按班次类型分桶）。
+     *
+     * <p>判定口径：班次原因分析文本含"首检"字样即计为该班首检机台，
+     * 覆盖独立原因项"首检"和组合写法"喷砂清洗首检"等。</p>
+     *
+     * @param result             硫化排程结果
+     * @param shiftIndexMin      班次序号下限（含）
+     * @param shiftIndexMax      班次序号上限（含）
+     * @param classShiftTypeMap  班次序号→班次类型映射
+     * @param machineMaxMouldMap 硫化机台单双模映射
+     * @param buckets            首检机台分桶（key=班次类型，value=机台计数标识集合）
+     */
+    private void collectFirstInspectMachines(LhScheduleResult result, int shiftIndexMin, int shiftIndexMax,
+            Map<Integer, String> classShiftTypeMap, Map<String, Integer> machineMaxMouldMap,
+            Map<String, Set<String>> buckets) {
+        String countKey = this.resolveMachineCountKey(result.getLhMachineCode(), machineMaxMouldMap);
+        if (StringUtils.isBlank(countKey)) {
+            return;
+        }
+        for (Map.Entry<Integer, String> entry : classShiftTypeMap.entrySet()) {
+            int shiftIndex = entry.getKey();
+            if (shiftIndex < shiftIndexMin || shiftIndex > shiftIndexMax) {
+                continue;
+            }
+            String analysis = ShiftFieldUtil.getShiftAnalysis(result, shiftIndex);
+            if (StringUtils.isNotBlank(analysis) && analysis.contains(FirstInspectionQtyUtil.FIRST_INSPECTION_ANALYSIS)) {
+                buckets.computeIfAbsent(entry.getValue(), k -> new LinkedHashSet<>()).add(countKey);
+            }
+        }
+    }
+
+    /**
+     * 将运行态机台编码归并为统计用计数标识。
+     *
+     * <p>归并口径与硫化开动机台统计一致：单控机台（编码以L/R结尾）且机台主数据单双模=1时，
+     * 归并为物理机台编码（K1501L/K1501R→K1501），使多台单控机台只算1台；
+     * 其余机台原样返回（统一大写并去除首尾空格）。</p>
+     *
+     * @param machineCode        运行态机台编码
+     * @param machineMaxMouldMap 硫化机台单双模(模台数)映射
+     * @return 统计用计数标识；机台编码为空时返回空字符串
+     */
+    private String resolveMachineCountKey(String machineCode, Map<String, Integer> machineMaxMouldMap) {
+        String normalizedCode = StringUtils.trimToEmpty(machineCode).toUpperCase(Locale.ROOT);
+        if (StringUtils.isBlank(normalizedCode)) {
+            return "";
+        }
+        Integer maxMoldNum = machineMaxMouldMap.get(normalizedCode);
+        if (LhSingleControlMachineUtil.isSingleMouldMachine(normalizedCode)
+                && maxMoldNum != null && maxMoldNum == 1) {
+            String physicalCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(normalizedCode);
+            if (StringUtils.isNotBlank(physicalCode)) {
+                return physicalCode;
+            }
+        }
+        return normalizedCode;
+    }
+
+    /**
+     * 构建小结行文案。
+     *
+     * <p>格式："1 首检计划14台: 夜班2台, 早班5台, 中班6台;"。
+     * 开头总台数为夜/早/中三班机台计数标识的去重并集（同一机台跨班只算1台）；
+     * 夜班有机台时输出"夜班X台, 早班Y台, 中班Z台"，无夜班机台时仅输出"早班Y台, 中班Z台"。</p>
+     *
+     * @param label   行标签（如"1 首检计划"）
+     * @param buckets 机台分桶（key=班次类型01/02/03，value=机台计数标识集合）
+     * @return 小结行文案
+     */
+    private String buildMouldSummaryRow(String label, Map<String, Set<String>> buckets) {
+        // 总台数=三班机台去重并集，同一机台跨班只算1台
+        Set<String> unionMachines = new LinkedHashSet<>();
+        for (Set<String> machines : buckets.values()) {
+            unionMachines.addAll(machines);
+        }
+        // 夜班有机台才输出夜班段，否则仅输出早/中班段
+        List<String> shiftSegments = new ArrayList<>();
+        Set<String> nightMachines = buckets.get(ShiftEnum.NIGHT_SHIFT.getCode());
+        if (nightMachines != null && !nightMachines.isEmpty()) {
+            shiftSegments.add(ShiftEnum.NIGHT_SHIFT.getDescription() + nightMachines.size() + "台");
+        }
+        for (ShiftEnum shift : Arrays.asList(ShiftEnum.MORNING_SHIFT, ShiftEnum.AFTERNOON_SHIFT)) {
+            Set<String> machines = buckets.get(shift.getCode());
+            shiftSegments.add(shift.getDescription() + (machines == null ? 0 : machines.size()) + "台");
+        }
+        return label + unionMachines.size() + "台: " + String.join(", ", shiftSegments) + ";";
     }
 
     /**
@@ -1352,20 +1588,12 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             return 0;
         }
 
-        // 步骤2: 为每个机台号生成"计数标识"
-        //   - 单控(L/R结尾)且单双模=1 → 用物理机台号(去L/R后缀), 使K1501L/K1501R归并为K1501
-        //   - 其余 → 用原机台号
+        // 步骤2: 为每个机台号生成"计数标识"（单控机台按单双模=1归并为物理机台，详见resolveMachineCountKey）
         Set<String> countKeys = new HashSet<>(activeMachineCodes.size());
         for (String code : activeMachineCodes) {
-            Integer maxMoldNum = machineMaxMouldMap.get(code);
-            if (LhSingleControlMachineUtil.isSingleMouldMachine(code)
-                    && maxMoldNum != null && maxMoldNum == 1) {
-                String physicalCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(code);
-                if (StringUtils.isNotBlank(physicalCode)) {
-                    countKeys.add(physicalCode);
-                }
-            } else {
-                countKeys.add(code);
+            String countKey = this.resolveMachineCountKey(code, machineMaxMouldMap);
+            if (StringUtils.isNotBlank(countKey)) {
+                countKeys.add(countKey);
             }
         }
 

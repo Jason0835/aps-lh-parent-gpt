@@ -13,6 +13,7 @@ import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.component.CapsuleReplacementRuleService;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.service.impl.LhCleaningScheduleService;
 import com.zlt.aps.lh.service.impl.LhMaintenanceScheduleService;
 import com.zlt.aps.lh.util.CleaningDispositionResolver;
 import com.zlt.aps.lh.util.CleaningScheduleRuleUtil;
@@ -27,6 +28,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
+import javax.annotation.Resource;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -47,6 +49,12 @@ import java.util.stream.Collectors;
 @Slf4j
 @Component
 public class ContinuationMachineCapacitySupport {
+
+    /**
+     * 清洗公共编排，原策略只应用窗口和时间结果。
+     */
+    @Resource
+    private LhCleaningScheduleService cleaningScheduleService = new LhCleaningScheduleService();
 
     /**
      * 统一目标及数量单位解析入口。
@@ -570,19 +578,14 @@ public class ContinuationMachineCapacitySupport {
     }
 
     /**
-     * 解析尚须执行的机台清洗窗口，共用收尾和已提交正规换模取消结论。
+     * 解析机台容量窗口，共用清洗处置并加入新模具置换准备和首检。
      *
      * @param context 当前批次上下文
      * @param machineCode 当前运行侧机台
-     * @return 仍参与产能和摘要计算的清洗窗口
+     * @return 参与产能计算的清洗及置换准备窗口，实际清洗摘要另行过滤
      */
     public List<MachineCleaningWindowDTO> resolveMachineCleaningWindowList(LhScheduleContext context, String machineCode) {
-        MachineScheduleDTO machine = context.getMachineScheduleMap().get(machineCode);
-        if (machine == null || CollectionUtils.isEmpty(machine.getCleaningWindowList())) {
-            return new ArrayList<>();
-        }
-        return CleaningDispositionResolver.resolveEffectiveWindows(
-                context, machineCode, machine.getCleaningWindowList());
+        return cleaningScheduleService.resolveMachineCapacityWindowList(context, machineCode);
     }
 
     /**
@@ -613,34 +616,8 @@ public class ContinuationMachineCapacitySupport {
     public List<MachineCleaningWindowDTO> resolveEffectiveCleaningWindowList(LhScheduleContext context,
             LhScheduleResult result,
             Date firstProductionStartTime) {
-        if (result == null) {
-            return new ArrayList<>(0);
-        }
-        List<MachineCleaningWindowDTO> cleaningWindowList = this.resolveMachineCleaningWindowList(
-                context, result.getLhMachineCode());
-        if (CleaningScheduleRuleUtil.shouldSkipCleaningByResultEnding(result)) {
-            return new ArrayList<>(0);
-        }
-        Date switchEndTime = this.resolveCleaningSwitchEndTime(context, result, firstProductionStartTime);
-        return new ArrayList<>(MachineCleaningOverlapUtil.excludeOverlapWindows(
-                cleaningWindowList, result.getMouldChangeStartTime(), switchEndTime));
+        return cleaningScheduleService.resolveForScheduling(context, result,
+                firstProductionStartTime, false).getEffectiveWindows();
     }
 
-    /**
-     * 解析清洗与切换重叠过滤使用的切换结束时间。
-     *
-     * @param context 排程上下文
-     * @param result 排程结果
-     * @param firstProductionStartTime 首个有计划量班次开始时间
-     * @return 清洗重叠过滤使用的切换结束时间
-     */
-    public Date resolveCleaningSwitchEndTime(LhScheduleContext context,
-            LhScheduleResult result,
-            Date firstProductionStartTime) {
-        if (Objects.nonNull(result) && Objects.nonNull(result.getMouldChangeStartTime())) {
-            return LhScheduleTimeUtil.addHours(result.getMouldChangeStartTime(),
-                    LhScheduleTimeUtil.getMouldChangeTotalHours(context));
-        }
-        return firstProductionStartTime;
-    }
 }

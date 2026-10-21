@@ -18,6 +18,7 @@ import com.zlt.aps.lh.api.enums.SkuTagEnum;
 import com.zlt.aps.lh.context.EmbryoStockConsumeLedger;
 import com.zlt.aps.lh.context.LhScheduleConfig;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.service.impl.LhCleaningOverlapResolver;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionRuntimePlan;
 import com.zlt.aps.lh.engine.strategy.IMachineMatchStrategy;
 import com.zlt.aps.lh.engine.strategy.IMouldChangeBalanceStrategy;
@@ -78,6 +79,11 @@ import java.util.Set;
 @Slf4j
 @Component
 public class TargetScheduleQtyResolver {
+
+    /**
+     * 回裁时间计算复用置换容量解析器，无实例运行态。
+     */
+    private final LhCleaningOverlapResolver cleaningOverlapResolver = new LhCleaningOverlapResolver();
 
     /** 目标量预演与正式切换共用精度重叠时间解析，不登记维护或生产资源。 */
     @Resource
@@ -1474,6 +1480,8 @@ public class TargetScheduleQtyResolver {
                         : ShiftCapacityResolverUtil.resolveCapacityMaintenanceWindowList(
                                 context, context.getDevicePlanShutList(), result.getLhMachineCode(),
                                 machine.getMaintenanceWindowList());
+        cleaningWindowList = cleaningOverlapResolver.appendReplacementCapacityWindow(context,
+                result.getLhMachineCode(), result.getMaterialCode(), result.getProductStatus(), cleaningWindowList);
         Date calculationEndTime = Objects.nonNull(originalShiftEndTime)
                 ? originalShiftEndTime : shift.getShiftEndDateTime();
         return ShiftCapacityResolverUtil.resolveShiftPlanEndTime(
@@ -2310,14 +2318,17 @@ public class TargetScheduleQtyResolver {
                                                                               SkuScheduleDTO sku,
                                                                               Date switchStartTime,
                                                                               Date firstProductionStartTime) {
-        if (Objects.isNull(machine) || CollectionUtils.isEmpty(machine.getCleaningWindowList())) {
+        if (Objects.isNull(machine)) {
             return new ArrayList<>(0);
         }
-        if (CleaningScheduleRuleUtil.shouldSkipCleaningBySkuEnding(context, sku)) {
-            return new ArrayList<>(0);
+        List<MachineCleaningWindowDTO> windows = new ArrayList<>(0);
+        if (!CollectionUtils.isEmpty(machine.getCleaningWindowList())
+                && !CleaningScheduleRuleUtil.shouldSkipCleaningBySkuEnding(context, sku)) {
+            windows.addAll(MachineCleaningOverlapUtil.excludeOverlapWindows(
+                    machine.getCleaningWindowList(), switchStartTime, firstProductionStartTime));
         }
-        return new ArrayList<>(MachineCleaningOverlapUtil.excludeOverlapWindows(
-                machine.getCleaningWindowList(), switchStartTime, firstProductionStartTime));
+        return cleaningOverlapResolver.appendReplacementCapacityWindow(context, machine.getMachineCode(),
+                sku.getMaterialCode(), sku.getProductStatus(), windows);
     }
 
     /**
