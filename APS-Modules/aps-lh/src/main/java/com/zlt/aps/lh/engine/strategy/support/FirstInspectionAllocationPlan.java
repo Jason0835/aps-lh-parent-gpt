@@ -50,6 +50,16 @@ public class FirstInspectionAllocationPlan {
     /** 按真实时间重叠形成的各班次首检分摊。 */
     private final List<FirstInspectionShiftAllocation> shiftAllocations;
 
+    /**
+     * 首检条数的计量明细；真实资源占用仍读取原时间分摊。
+     */
+    private final List<FirstInspectionShiftAllocation> quantityAllocations;
+
+    /**
+     * 是否按实际切换的单班计量规则构建，独立设备计划保持原规则。
+     */
+    private final boolean singleShiftQuantity;
+
     /** 首检已包含在精度及预热完整时长内，不再另排首检量或追加时长。 */
     private final boolean includedInMaintenance;
 
@@ -75,6 +85,33 @@ public class FirstInspectionAllocationPlan {
             BigDecimal hourlyOutput, long inspectionDurationSeconds, Date inspectionStartTime,
             Date inspectionEndTime, LhShiftConfigVO countingShift,
             List<FirstInspectionShiftAllocation> shiftAllocations, boolean includedInMaintenance, Long equipmentPlanId) {
+        this(valid, invalidReason, sequence, inspectionQty, hourlyOutput, inspectionDurationSeconds,
+                inspectionStartTime, inspectionEndTime, countingShift, shiftAllocations,
+                includedInMaintenance, equipmentPlanId, shiftAllocations);
+    }
+
+    /**
+     * 冻结真实首检占用及独立的计划条数归属。
+     *
+     * @param valid 计划是否有效
+     * @param invalidReason 无效原因
+     * @param sequence 当班首检顺序
+     * @param inspectionQty 首检总条数
+     * @param hourlyOutput 小时产量
+     * @param inspectionDurationSeconds 首检实际秒数
+     * @param inspectionStartTime 实际开始时间
+     * @param inspectionEndTime 实际结束时间
+     * @param countingShift 首检计数班次
+     * @param shiftAllocations 真实时间占用明细
+     * @param includedInMaintenance 是否包含在维护时长内
+     * @param equipmentPlanId 独立设备计划主键
+     * @param quantityAllocations 计划条数归属明细
+     */
+    private FirstInspectionAllocationPlan(boolean valid, String invalidReason, int sequence, int inspectionQty,
+            BigDecimal hourlyOutput, long inspectionDurationSeconds, Date inspectionStartTime, Date inspectionEndTime,
+            LhShiftConfigVO countingShift, List<FirstInspectionShiftAllocation> shiftAllocations,
+            boolean includedInMaintenance, Long equipmentPlanId,
+            List<FirstInspectionShiftAllocation> quantityAllocations) {
         this.valid = valid;
         this.invalidReason = invalidReason;
         this.sequence = sequence;
@@ -86,6 +123,9 @@ public class FirstInspectionAllocationPlan {
         this.countingShift = countingShift;
         this.shiftAllocations = Collections.unmodifiableList(
                 new ArrayList<FirstInspectionShiftAllocation>(shiftAllocations));
+        this.quantityAllocations = Collections.unmodifiableList(new ArrayList<>(quantityAllocations));
+        // 默认构造共用同一明细；单班归集显式传入独立数量明细，资源明细始终保留。
+        this.singleShiftQuantity = quantityAllocations != shiftAllocations;
         this.includedInMaintenance = includedInMaintenance;
         this.equipmentPlanId = equipmentPlanId;
     }
@@ -201,16 +241,16 @@ public class FirstInspectionAllocationPlan {
      */
     public boolean hasPositiveQuantityInShifts(List<LhShiftConfigVO> shifts) {
         if (!valid || inspectionQty <= 0 || CollectionUtils.isEmpty(shifts)
-                || CollectionUtils.isEmpty(shiftAllocations)) {
+                || CollectionUtils.isEmpty(quantityAllocations)) {
             return false;
         }
-        return shiftAllocations.stream().allMatch(allocation ->
+        return quantityAllocations.stream().allMatch(allocation ->
                 Objects.nonNull(allocation) && shifts.stream().anyMatch(shift ->
                         Objects.nonNull(shift)
                                 && Objects.equals(shift.getShiftIndex(), allocation.getShift().getShiftIndex())
                                 && !allocation.getOverlapStartTime().before(shift.getShiftStartDateTime())
                                 && !allocation.getOverlapEndTime().after(shift.getShiftEndDateTime())))
-                && shiftAllocations.stream().mapToInt(FirstInspectionShiftAllocation::getQuantity).sum()
+                && quantityAllocations.stream().mapToInt(FirstInspectionShiftAllocation::getQuantity).sum()
                 == inspectionQty;
     }
 
@@ -232,5 +272,55 @@ public class FirstInspectionAllocationPlan {
 
     public List<FirstInspectionShiftAllocation> getShiftAllocations() {
         return shiftAllocations;
+    }
+
+    /**
+     * 获取用于落量、总量限制和账本回裁的首检明细，不能用于推断真实资源占用。
+     *
+     * @return 只读的计划条数归属明细
+     */
+    public List<FirstInspectionShiftAllocation> getQuantityAllocations() {
+        return quantityAllocations;
+    }
+
+    /**
+     * 判断是否启用实际切换的单班计量规则。
+     *
+     * @return 独立计量与真实占用时返回真
+     */
+    public boolean isSingleShiftQuantity() {
+        return singleShiftQuantity;
+    }
+
+    /**
+     * 判断指定班次是否保留真实首检占用，不使用归集后的计划条数推断。
+     *
+     * @param shiftIndex 班次索引
+     * @return 实际首检在该班形成产出时返回真
+     */
+    public boolean hasActualOccupation(int shiftIndex) {
+        return valid && shiftAllocations.stream().anyMatch(allocation -> allocation.getQuantity() > 0
+                && Objects.equals(allocation.getShift().getShiftIndex(), shiftIndex));
+    }
+
+    /**
+     * 将完整首检条数归集到指定计量班次，参数计数、真实区间与逐班占用保持不变。
+     *
+     * @param attributionShift 独立于原参数计数的计划条数归属班次
+     * @return 保留真实占用、仅在一个班次记量的首检计划
+     */
+    public FirstInspectionAllocationPlan withSingleShiftQuantity(LhShiftConfigVO attributionShift) {
+        if (!valid || Objects.isNull(attributionShift)) {
+            return this;
+        }
+        Date start = inspectionStartTime.before(attributionShift.getShiftStartDateTime())
+                ? attributionShift.getShiftStartDateTime() : inspectionStartTime;
+        Date end = inspectionEndTime.after(attributionShift.getShiftEndDateTime())
+                ? attributionShift.getShiftEndDateTime() : inspectionEndTime;
+        FirstInspectionShiftAllocation quantity = new FirstInspectionShiftAllocation(attributionShift,
+                start, end, Math.max(0L, end.getTime() - start.getTime()), 0L, inspectionQty, inspectionQty);
+        return new FirstInspectionAllocationPlan(valid, invalidReason, sequence, inspectionQty, hourlyOutput,
+                inspectionDurationSeconds, inspectionStartTime, inspectionEndTime, countingShift, shiftAllocations,
+                includedInMaintenance, equipmentPlanId, Collections.singletonList(quantity));
     }
 }

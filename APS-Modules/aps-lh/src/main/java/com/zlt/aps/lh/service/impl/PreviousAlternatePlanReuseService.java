@@ -33,6 +33,7 @@ import com.zlt.aps.lh.engine.strategy.support.ContinuationTemporaryFaultTransfer
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceAllocationResult;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceContext;
 import com.zlt.aps.lh.engine.strategy.support.PreviousAlternatePlanReleaseEvent;
+import com.zlt.aps.lh.engine.strategy.support.PreviousAlternateStructureLimitExemptionPolicy;
 import com.zlt.aps.lh.engine.strategy.support.PreviousAlternateTrialSideAdmissionPolicy;
 import com.zlt.aps.lh.engine.strategy.support.PreviousAlternateActionPlan;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchCandidateScope;
@@ -616,11 +617,7 @@ public class PreviousAlternatePlanReuseService {
             day.setCurrentPhase(candidate.hasReason(DailyCandidateReason.EARLY_PRODUCTION)
                     ? DailySchedulePhase.EARLY_PRODUCTION
                     : DailySchedulePhase.NORMAL_RESOURCE_COMPETITION);
-            boolean success = newSpecProductionStrategy.executeSpecifiedMachine(
-                    context, day, candidate, machine,
-                    strategyFactory.getMachineMatchStrategy(), strategyFactory.getMouldChangeBalanceStrategy(),
-                    strategyFactory.getFirstInspectionBalanceStrategy(),
-                    strategyFactory.getCapacityCalculateStrategy());
+            boolean success = this.executeHistoricalCombination(context, day, candidate, machine, plan);
             LhScheduleResult transferResult = context.getScheduleResultList().stream()
                     .filter(result -> !beforeResultSet.contains(result))
                     .filter(result -> StringUtils.equals(sku.getMaterialCode(), result.getMaterialCode()))
@@ -756,9 +753,7 @@ public class PreviousAlternatePlanReuseService {
                             && context.getNewSpecSkuList().stream().noneMatch(pending -> pending == sku)) {
                         context.getNewSpecSkuList().add(sku);
                     }
-                    success = newSpecProductionStrategy.executeSpecifiedMachine(context, day, candidate, machine,
-                            strategyFactory.getMachineMatchStrategy(), strategyFactory.getMouldChangeBalanceStrategy(),
-                            strategyFactory.getFirstInspectionBalanceStrategy(), strategyFactory.getCapacityCalculateStrategy());
+                    success = this.executeHistoricalCombination(context, day, candidate, machine, plan);
                     rejection = success ? "无" : StringUtils.defaultIfEmpty(candidate.getLastFailure(), "本次时间轴或计划量无法落地");
                     if (success) {
                         // 普通历史复用与强制承接使用同一来源登记，失败尝试不留关联。
@@ -905,9 +900,34 @@ public class PreviousAlternatePlanReuseService {
                 .filter(result -> StringUtils.equals(machineCode, result.getLhMachineCode())
                         || (wholeMachine && StringUtils.equals(machineCode,
                         LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode()))))
-                .forEach(result -> context.getPreviousAlternateResultPlanMap().put(result, plan));
+                .forEach(result -> {
+                    context.getPreviousAlternateResultPlanMap().put(result, plan);
+                    PreviousAlternateStructureLimitExemptionPolicy.logCommittedStatistics(context, plan, result);
+                });
         this.bindPairedBeforeMaterialSources(context, plan, beforeResults);
         this.bindPairedTrialResults(context, plan, beforeResults);
+    }
+
+    /**
+     * 为没有活动释放事件的历史组合传递普通结构上限身份，预演与提交使用同一源计划。
+     * 失败或异常时只恢复调用身份，资源与结果仍由原提交快照负责恢复。
+     *
+     * @param context 当前排程上下文
+     * @param day 当前业务日
+     * @param candidate 已通过历史资格的后料候选
+     * @param machine 历史计划指定的机台
+     * @param plan 本轮有效历史源计划
+     * @return 是否形成有效排产结果
+     */
+    private boolean executeHistoricalCombination(LhScheduleContext context, DayScheduleContext day,
+            DailyNewSpecCandidate candidate, MachineScheduleDTO machine, LhMouldChangePlan plan) {
+        try (PreviousAlternateStructureLimitExemptionPolicy.Scope scope =
+                     PreviousAlternateStructureLimitExemptionPolicy.openScope(
+                             context, candidate.getSku(), plan, machine.getMachineCode())) {
+            return newSpecProductionStrategy.executeSpecifiedMachine(context, day, candidate, machine,
+                    strategyFactory.getMachineMatchStrategy(), strategyFactory.getMouldChangeBalanceStrategy(),
+                    strategyFactory.getFirstInspectionBalanceStrategy(), strategyFactory.getCapacityCalculateStrategy());
+        }
     }
 
     /**

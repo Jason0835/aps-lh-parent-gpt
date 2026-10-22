@@ -285,6 +285,10 @@ public final class FirstInspectionTimelinePlan {
             appendValue(source, allocationPlan.getInspectionStartTime());
             appendValue(source, allocationPlan.getInspectionEndTime());
             appendValue(source, allocationPlan.getCountingShift());
+            allocationPlan.getQuantityAllocations().forEach(allocation -> {
+                appendValue(source, allocation.getShift());
+                appendValue(source, allocation.getQuantity());
+            });
             allocationPlan.getShiftAllocations().forEach(allocation -> {
                 appendValue(source, allocation.getShift());
                 appendValue(source, allocation.getOverlapStartTime());

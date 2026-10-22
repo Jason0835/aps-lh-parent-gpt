@@ -3,6 +3,8 @@
  */
 package com.zlt.aps.lh.engine.strategy.impl;
 
+import com.zlt.aps.lh.engine.strategy.support.RepairPlanResult;
+import com.zlt.aps.lh.service.impl.LhRepairPlanScheduleService;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 
 import cn.hutool.core.bean.BeanUtil;
@@ -1592,10 +1594,11 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         }
         int switchDurationHours = LhScheduleTimeUtil.getTypeBlockChangeTotalHours(context);
         Date switchCompleteTime = LhScheduleTimeUtil.addHours(switchStartTime, switchDurationHours);
-        boolean plannedRepairAffectingSwitch = Objects.nonNull(machine)
-                && ShiftCapacityResolverUtil.isPlannedRepairAffectingSwitch(
-                context, context.getDevicePlanShutList(), machine.getMachineCode(), estimatedEndTime,
+        RepairPlanResult repairPlanResult = LhRepairPlanScheduleService.resolveForScheduling(
+                context, (machine == null ? null : machine.getMachineCode()), estimatedEndTime,
                 switchStartTime, switchCompleteTime);
+        boolean plannedRepairAffectingSwitch = Objects.nonNull(machine)
+                && repairPlanResult.isPlannedRepairAffectingSwitch();
         Date productionStartTime;
         if (plannedRepairAffectingSwitch) {
             /*
@@ -1603,9 +1606,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
              * 预热完成时刻只作为正式生产下限；首检时间区间仍以真实换活字块完成点为终点
              * 向前倒推，不再沿用精度保养重叠的额外1小时等待。
              */
-            productionStartTime = ShiftCapacityResolverUtil.resolvePlannedRepairProductionReadyTime(
-                    context, context.getDevicePlanShutList(), machine.getMachineCode(), estimatedEndTime,
-                    switchStartTime, switchCompleteTime);
+            productionStartTime = repairPlanResult.getProductionNotBefore();
             log.info("换活字块计划性维修时间轴生效, machineCode: {}, switchStartTime: {}, "
                             + "switchEndTime: {}, preheatMinutes: {}, productionReadyTime: {}, "
                             + "firstInspectionExtraHours: 0",
@@ -1694,15 +1695,14 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                                                          Date estimatedEndTime,
                                                          Date switchStartTime,
                                                          Date switchCompleteTime) {
+        RepairPlanResult repairPlanResult = LhRepairPlanScheduleService.resolveForScheduling(
+                context, (machine == null ? null : machine.getMachineCode()), estimatedEndTime,
+                switchStartTime, switchCompleteTime);
         if (Objects.isNull(machine)
-                || !ShiftCapacityResolverUtil.isPlannedRepairAffectingSwitch(
-                context, context.getDevicePlanShutList(), machine.getMachineCode(), estimatedEndTime,
-                switchStartTime, switchCompleteTime)) {
+                || !repairPlanResult.isPlannedRepairAffectingSwitch()) {
             return switchCompleteTime;
         }
-        return ShiftCapacityResolverUtil.resolvePlannedRepairProductionReadyTime(
-                context, context.getDevicePlanShutList(), machine.getMachineCode(), estimatedEndTime,
-                switchStartTime, switchCompleteTime);
+        return repairPlanResult.getProductionNotBefore();
     }
 
     /**
@@ -2164,13 +2164,12 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         }
         Date switchCompleteTime = resolveTypeBlockSwitchCompleteTime(
                 context, machine, switchStartTime, startTime);
-        if (ShiftCapacityResolverUtil.isPlannedRepairAffectingSwitch(
-                context, context.getDevicePlanShutList(), machine.getMachineCode(),
-                machine.getEstimatedEndTime(), switchStartTime, switchCompleteTime)) {
+        RepairPlanResult repairPlanResult = LhRepairPlanScheduleService.resolveForScheduling(
+                context, machine.getMachineCode(), sku, "换活字块结果", machine.getEstimatedEndTime(),
+                switchStartTime, switchCompleteTime);
+        if (repairPlanResult.isPlannedRepairAffectingSwitch()) {
             // 换活字块结果已通过数量和账本校验后再写过程日志，确保记录对应最终落地时间轴。
-            Date repairProductionReadyTime = ShiftCapacityResolverUtil.resolvePlannedRepairProductionReadyTime(
-                    context, context.getDevicePlanShutList(), machine.getMachineCode(),
-                    machine.getEstimatedEndTime(), switchStartTime, switchCompleteTime);
+            Date repairProductionReadyTime = repairPlanResult.getProductionNotBefore();
             StringBuilder repairTimelineDetail = new StringBuilder(256);
             PriorityTraceLogHelper.appendLine(repairTimelineDetail,
                     "机台=" + machine.getMachineCode() + ", SKU=" + sku.getMaterialCode()
@@ -3709,13 +3708,12 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         Date inspectionTime = null;
         try {
             Date mouldChangeCompleteTime = LhScheduleTimeUtil.addHours(mouldChangeStartTime, switchDurationHours);
-            boolean plannedRepairAffectingSwitch = ShiftCapacityResolverUtil.isPlannedRepairAffectingSwitch(
-                    context, context.getDevicePlanShutList(), machine.getMachineCode(), endingTime,
+            RepairPlanResult repairPlanResult = LhRepairPlanScheduleService.resolveForScheduling(
+                    context, (machine == null ? null : machine.getMachineCode()), specifySku, "换活字块定点预演", endingTime,
                     mouldChangeStartTime, mouldChangeCompleteTime);
+            boolean plannedRepairAffectingSwitch = repairPlanResult.isPlannedRepairAffectingSwitch();
             Date firstInspectionBaseTime = plannedRepairAffectingSwitch
-                    ? ShiftCapacityResolverUtil.resolvePlannedRepairProductionReadyTime(
-                    context, context.getDevicePlanShutList(), machine.getMachineCode(), endingTime,
-                    mouldChangeStartTime, mouldChangeCompleteTime)
+                    ? repairPlanResult.getProductionNotBefore()
                     : mouldChangeCompleteTime;
             /*
              * 首检计数班次必须由真实换模完成时刻决定。维修结束和预热仅抬高正式生产下限，
@@ -4853,16 +4851,12 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             if (crossShiftInspection) {
                 int currentShiftInspectionQty = Math.max(
                         0, firstInspectionQtyMap.getOrDefault(shift.getShiftIndex(), 0));
-                int shiftCapacityCap = ShiftCapacityResolverUtil.resolveActualShiftPlanQty(
-                        shiftCapacity, shift, configPlusShiftType,
-                        ScheduleTypeEnum.TYPE_BLOCK.getCode());
                 /*
                  * 首检和正式生产使用互不重叠的真实时间区间，因此正式生产容量不直接再减
                  * 首检条数；但两者班次合计仍不得突破班产上限。
                  */
-                capacityAfterSwitch = Math.min(
-                        Math.max(0, shiftMaxQty),
-                        Math.max(0, shiftCapacityCap - currentShiftInspectionQty));
+                capacityAfterSwitch = FirstInspectionQtyUtil.resolveNormalCapacityForQuantityPlan(context, shift,
+                        shiftCapacity, currentShiftInspectionQty, shiftMaxQty, ScheduleTypeEnum.TYPE_BLOCK.getCode());
                 shiftMaxQty = capacityAfterSwitch;
             } else {
                 // 试制继续沿用中班固定2小时首检产能规则，不生成首检条数。

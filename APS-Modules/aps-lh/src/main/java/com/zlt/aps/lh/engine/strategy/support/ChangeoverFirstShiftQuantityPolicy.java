@@ -73,7 +73,7 @@ public final class ChangeoverFirstShiftQuantityPolicy {
         result.setChangeoverFirstShiftStartTime(firstShift.getShiftStartDateTime());
         result.setChangeoverFirstShiftQtyLimit(limit / sides);
         if (Objects.nonNull(inspectionPlan)) {
-            for (FirstInspectionShiftAllocation allocation : inspectionPlan.getShiftAllocations()) {
+            for (FirstInspectionShiftAllocation allocation : inspectionPlan.getQuantityAllocations()) {
                 if (!canRetainInspection(context, result, allocation.getShift(), allocation.getQuantity())) {
                     return false;
                 }
@@ -88,7 +88,7 @@ public final class ChangeoverFirstShiftQuantityPolicy {
     }
 
     /**
-     * 沿用原首检实际分摊首班；无计件首检时沿用原归属班次，未提供归属时按原开产时间定位。
+     * 按冻结的单班首检计量定位首班；无计件首检时沿用归属班次，未提供归属时按开产时间定位。
      *
      * @param shifts 原排产班次
      * @param inspectionShift 原首检归属班次
@@ -99,7 +99,10 @@ public final class ChangeoverFirstShiftQuantityPolicy {
     private static LhShiftConfigVO resolveFirstShift(List<LhShiftConfigVO> shifts,
             LhShiftConfigVO inspectionShift, FirstInspectionAllocationPlan inspectionPlan, Date startTime) {
         if (Objects.nonNull(inspectionPlan)) {
-            LhShiftConfigVO first = inspectionPlan.getShiftAllocations().stream()
+            if (inspectionPlan.isSingleShiftQuantity() && !inspectionPlan.getQuantityAllocations().isEmpty()) {
+                return inspectionPlan.getQuantityAllocations().get(0).getShift();
+            }
+            LhShiftConfigVO first = inspectionPlan.getQuantityAllocations().stream()
                     .filter(allocation -> allocation.getQuantity() > 0)
                     .map(FirstInspectionShiftAllocation::getShift)
                     .min(Comparator.comparing(LhShiftConfigVO::getShiftStartDateTime)).orElse(null);

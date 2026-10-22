@@ -3,6 +3,8 @@
  */
 package com.zlt.aps.lh.engine.strategy.impl;
 
+import com.zlt.aps.lh.engine.strategy.support.RepairPlanResult;
+import com.zlt.aps.lh.service.impl.LhRepairPlanScheduleService;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
@@ -337,13 +339,12 @@ public class LocalSearchMachineAllocatorStrategy {
             }
             mouldChangeCompleteTime = LhScheduleTimeUtil.addHours(
                     mouldChangeStartTime, LhScheduleTimeUtil.getMouldChangeTotalHours(context));
-            plannedRepairAffectingSwitch = ShiftCapacityResolverUtil.isPlannedRepairAffectingSwitch(
-                    context, context.getDevicePlanShutList(), machineCode, machineEndTime,
+            RepairPlanResult repairPlanResult = LhRepairPlanScheduleService.resolveForScheduling(
+                    context, machineCode, sku, "局部搜索预占", machineEndTime,
                     mouldChangeStartTime, mouldChangeCompleteTime);
+            plannedRepairAffectingSwitch = repairPlanResult.isPlannedRepairAffectingSwitch();
             plannedRepairReadyTime = plannedRepairAffectingSwitch
-                    ? ShiftCapacityResolverUtil.resolvePlannedRepairProductionReadyTime(
-                    context, context.getDevicePlanShutList(), machineCode, machineEndTime,
-                    mouldChangeStartTime, mouldChangeCompleteTime)
+                    ? repairPlanResult.getProductionNotBefore()
                     : mouldChangeCompleteTime;
             // 局部搜索预占与正式新增一致：首检均衡从维修预热完成时刻开始登记。
             inspectionTime = inspectionBalance.allocateInspection(context, machineCode, plannedRepairReadyTime);
@@ -451,13 +452,12 @@ public class LocalSearchMachineAllocatorStrategy {
         }
         Date mouldChangeCompleteTime = mouldChangeStartTime == null ? null
                 : LhScheduleTimeUtil.addHours(mouldChangeStartTime, LhScheduleTimeUtil.getMouldChangeTotalHours(context));
-        boolean plannedRepairAffectingSwitch = ShiftCapacityResolverUtil.isPlannedRepairAffectingSwitch(
-                context, context.getDevicePlanShutList(), machine.getMachineCode(), machine.getEstimatedEndTime(),
+        RepairPlanResult repairPlanResult = LhRepairPlanScheduleService.resolveForScheduling(
+                context, machine.getMachineCode(), sku, "局部搜索容量预演", machine.getEstimatedEndTime(),
                 mouldChangeStartTime, mouldChangeCompleteTime);
+        boolean plannedRepairAffectingSwitch = repairPlanResult.isPlannedRepairAffectingSwitch();
         Date firstInspectionBaseTime = plannedRepairAffectingSwitch
-                ? ShiftCapacityResolverUtil.resolvePlannedRepairProductionReadyTime(
-                context, context.getDevicePlanShutList(), machine.getMachineCode(), machine.getEstimatedEndTime(),
-                mouldChangeStartTime, mouldChangeCompleteTime)
+                ? repairPlanResult.getProductionNotBefore()
                 : mouldChangeCompleteTime;
         /*
          * 局部搜索不仅要把首检归属放在维修预热之后，还必须显式抬高正规、小批量SKU的开产时间；

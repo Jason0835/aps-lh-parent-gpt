@@ -21,8 +21,8 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /**
- * 在既定逐班数量之间整组匹配真实机台，使前料可交替时间贴近前日交替班次。
- * 只调整计算计划，不交换结果身份、不扣账、不预占后料资源。
+ * 在均有可靠历史关系的机台之间匹配既定收尾方案，使交接时间贴近历史班次。
+ * 无历史机台及固定角色保持原方案；只调整计算计划，实际后料资源由正式承接链隔离复核。
  *
  * @author Codex
  * @date 2026/10/13
@@ -30,7 +30,7 @@ import java.util.stream.IntStream;
 @Slf4j
 public final class ContinuationFinishPlanMatcher {
     /**
-     * 按命中班次、距离、等待及对调数量依次择优，完成整组映射后一次更新计算结果。
+     * 在历史机台内部按命中班次、距离、等待及对调数量择优，一次更新完整映射。
      *
      * @param context 已冻结历史资格与物理资源的上下文
      * @param sku 当前前物料及产品状态
@@ -49,14 +49,15 @@ public final class ContinuationFinishPlanMatcher {
         List<LhShiftConfigVO> targets = profiles.stream()
                 .map(profile -> this.resolveHistoricalShift(context, sku, profile, shifts))
                 .collect(Collectors.toList());
-        if (targets.stream().noneMatch(Objects::nonNull)) {
+        if (targets.stream().filter(Objects::nonNull).count() < 2) {
             return;
         }
         List<ContinuationMachineFinishPlan> baseline = calculated.getMachinePlans();
         boolean[] fixed = new boolean[count];
         for (int position = 0; position < count; position++) {
-            fixed[position] = this.isFixed(context, profiles.get(position), baseline.get(position),
-                    stopHoldResults, shifts.get(shifts.size() - 1).getShiftEndDateTime());
+            fixed[position] = Objects.isNull(targets.get(position))
+                    || this.isFixed(context, profiles.get(position), baseline.get(position),
+                            stopHoldResults, shifts.get(shifts.size() - 1).getShiftEndDateTime());
         }
         ContinuationMachineFinishPlan[][] candidates = new ContinuationMachineFinishPlan[count][count];
         long[][][] scores = new long[count][count][];
@@ -106,7 +107,7 @@ public final class ContinuationFinishPlanMatcher {
         }).collect(Collectors.joining(";"));
         // 原对象、来源SKU、模具及各类机台索引保持不变，统一提交入口按目标机台时间轴写回。
         calculated.setMachinePlans(selected);
-        this.record(context, sku, "整组匹配完成", detail + ";排除=" + rejected);
+        this.record(context, sku, "整组候选匹配完成，待承接资源复核", detail + ";排除=" + rejected);
     }
 
     /**
@@ -161,11 +162,13 @@ public final class ContinuationFinishPlanMatcher {
         return plan.getFinishState() != ContinuationMachineFinishPlan.FinishState.SURPLUS_COMPLETED
                 || Objects.nonNull(plan.getHistoricalFinishPlanId()) || Objects.nonNull(plan.getTDayFinishConstraint())
                 || Objects.nonNull(plan.getNightFinishConstraint())
+                || StringUtils.isNotEmpty(plan.getFinishRoleMachineCode())
                 || (Objects.nonNull(profile.getReleaseDeadline()) && profile.getReleaseDeadline().before(windowEnd))
                 || profile.getOriginals().stream().anyMatch(result -> held.contains(result)
                 || context.isContinuousStopHoldMachine(result.getLhMachineCode())
                 || context.getOnlySandBlastContinuationReleaseWindowMap().containsKey(result.getLhMachineCode())
                 || context.getContinuationTemporaryFaultTransferEventMap().containsKey(result.getLhMachineCode())
+                || context.hasTimedMachineOffRequest(result)
                 || context.getTimedMachineOffDecisionMap().containsKey(result));
     }
 

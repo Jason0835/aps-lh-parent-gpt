@@ -598,9 +598,15 @@ public final class StructureSwitchSchedulingPolicy {
         LhShiftConfigVO secondShift = Objects.nonNull(state) && Objects.equals(anchor, state.getFirstShiftStart())
                 ? state.getSecondShift() : nextShift(context, anchor);
         String physical = LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode);
+        boolean hasActualQuantity = Objects.nonNull(actualQuantities)
+                && actualQuantities.values().stream().anyMatch(quantity -> quantity > 0);
+        FirstInspectionAllocationPlan inspection = plan.getInspectionPlan();
         for (LhShiftConfigVO shift : orderedShifts(context)) {
             boolean occupies = Objects.nonNull(actualQuantities)
-                    ? actualQuantities.getOrDefault(shift.getShiftIndex(), 0) > 0 : occupies(plan, shift);
+                    ? actualQuantities.getOrDefault(shift.getShiftIndex(), 0) > 0
+                    || (hasActualQuantity && Objects.nonNull(inspection) && inspection.isSingleShiftQuantity()
+                    && inspection.hasActualOccupation(shift.getShiftIndex()))
+                    : occupies(plan, shift);
             if (Objects.nonNull(plan.getFirstShiftDecision()) && occupies
                     && shift.getShiftStartDateTime().before(anchor)) {
                 return rejectedFirstShift(context, plan, sku, machineCode, "首检或生产早于规则首班");
@@ -623,7 +629,8 @@ public final class StructureSwitchSchedulingPolicy {
             }
             // 正式提交尚未刷新索引时，合并真实正量结果；仍按物理机台去重。
             context.getScheduleResultList().stream().filter(result -> StringUtils.equals(structure, result.getStructureName()))
-                    .filter(result -> quantity(result, shift.getShiftIndex()) > 0)
+                    .filter(result -> FirstInspectionQtyUtil.hasProductionOccupation(
+                            context, result, shift.getShiftIndex()))
                     .filter(result -> !EmbryoEndingStructureMachineExemptionPolicy.isExempt(context, structure,
                             result.getEmbryoCode(), result.getStructureName(), shift))
                     .map(result -> LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode()))
@@ -718,7 +725,8 @@ public final class StructureSwitchSchedulingPolicy {
         for (LhScheduleResult result : results) {
             StructureSwitchPlan plan = resultPlans.get(result);
             if (Objects.isNull(plan) || orderedShifts(context).stream()
-                    .noneMatch(shift -> quantity(result, shift.getShiftIndex()) > 0)) {
+                    .noneMatch(shift -> FirstInspectionQtyUtil.hasProductionOccupation(
+                            context, result, shift.getShiftIndex()))) {
                 continue;
             }
             String structure = plan.getSource().getNextStructureName();
@@ -738,7 +746,9 @@ public final class StructureSwitchSchedulingPolicy {
                 continue;
             }
             LhShiftConfigVO actualFirst = orderedShifts(context).stream()
-                    .filter(shift -> quantity(result, shift.getShiftIndex()) > 0).findFirst().orElse(null);
+                    .filter(shift -> FirstInspectionQtyUtil.hasProductionOccupation(
+                            context, result, shift.getShiftIndex()))
+                    .findFirst().orElse(null);
             if (Objects.isNull(actualFirst)) {
                 continue;
             }
@@ -794,8 +804,14 @@ public final class StructureSwitchSchedulingPolicy {
      * @return 首个生产时间；无正量排在最后
      */
     private static Date firstActualTime(LhScheduleContext context, LhScheduleResult result) {
+        FirstInspectionAllocationPlan inspection = context.getFirstInspectionResultPlanMap().get(result);
+        if (Objects.nonNull(inspection) && inspection.isValid() && inspection.getInspectionQty() > 0
+                && ShiftFieldUtil.resolveScheduledQty(result) > 0) {
+            return inspection.getInspectionStartTime();
+        }
         for (LhShiftConfigVO shift : orderedShifts(context)) {
-            if (quantity(result, shift.getShiftIndex()) > 0) {
+            if (FirstInspectionQtyUtil.hasProductionOccupation(
+                            context, result, shift.getShiftIndex())) {
                 Date start = ShiftFieldUtil.getShiftStartTime(result, shift.getShiftIndex());
                 return Objects.nonNull(start) ? start : shift.getShiftStartDateTime();
             }
@@ -832,7 +848,7 @@ public final class StructureSwitchSchedulingPolicy {
                 indices.add(second.getShiftIndex());
             }
         }
-        plan.getInspectionPlan().getShiftAllocations().stream()
+        plan.getInspectionPlan().getQuantityAllocations().stream()
                 .map(item -> item.getShift().getShiftIndex()).forEach(indices::add);
         if (Objects.nonNull(availability.getFormalTargetShift())) {
             indices.add(availability.getFormalTargetShift().getShiftIndex());
@@ -854,7 +870,7 @@ public final class StructureSwitchSchedulingPolicy {
         Set<Integer> indices = resolveCommitShifts(context, availability, java.util.Collections.singletonList(shift))
                 .stream().map(LhShiftConfigVO::getShiftIndex).collect(Collectors.toSet());
         if (Objects.nonNull(availability.getFirstInspectionPlan())) {
-            availability.getFirstInspectionPlan().getShiftAllocations().stream()
+            availability.getFirstInspectionPlan().getQuantityAllocations().stream()
                     .filter(allocation -> allocation.getQuantity() > 0)
                     .map(allocation -> allocation.getShift().getShiftIndex()).forEach(indices::add);
         }

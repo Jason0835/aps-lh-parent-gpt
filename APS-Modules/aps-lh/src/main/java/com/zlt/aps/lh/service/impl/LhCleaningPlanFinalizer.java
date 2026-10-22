@@ -514,7 +514,7 @@ public class LhCleaningPlanFinalizer {
             plan.setMouldStatus("0");
             plan.setRemark(cleaningWindow.getRemark());
             if (cleaningWindow.isOffMachineCleaning()) {
-                // 同SKU置换只改变交替计划展示，不新增普通首检、计数或数量扣账。
+                // 置换额度已由主链预占，此处仅输出事实，不重复登记首检、次数或数量扣账。
                 plan.setChangeMouldType(this.resolveSandBlastPlanType(cleaningWindow));
                 plan.setMouldCode(this.resolveSandBlastPlanMouldCode(cleaningWindow));
                 if (StringUtils.isNotEmpty(cleaningWindow.getReplacementMouldCode())) {

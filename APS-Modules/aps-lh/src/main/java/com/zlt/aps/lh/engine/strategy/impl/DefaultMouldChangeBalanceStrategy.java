@@ -39,6 +39,30 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
     private static final int IDX_AFTERNOON = 1;
     private static final int MAX_ALLOCATION_ATTEMPTS = 16;
 
+    /**
+     * 为固定触发时刻的模具置换占用一次统一换模额度，不移动动作时间。
+     * 调用方负责模具、停机和准备时间准入；班次及每日额度均按动作实际日期校验。
+     *
+     * @param context 当前批次排程上下文
+     * @param changeTime 已确认的实际置换开始时间
+     * @return 班次及每日均有余额且登记成功时返回 true，失败不修改次数
+     */
+    public boolean tryReserveFixedMouldChange(LhScheduleContext context, Date changeTime) {
+        if (Objects.isNull(context) || Objects.isNull(changeTime)) {
+            return false;
+        }
+        String dateKey = this.formatDateKey(changeTime);
+        int[] counts = context.getDailyMouldChangeCountMap().getOrDefault(dateKey, new int[]{0, 0});
+        if (this.getTotalUsed(counts) >= this.getDailyLimit(context, dateKey)) {
+            return false;
+        }
+        boolean shiftAvailable = (LhScheduleTimeUtil.isMorningShift(context, changeTime)
+                && counts[IDX_MORNING] < this.getMorningLimit(context, dateKey))
+                || (LhScheduleTimeUtil.isAfternoonShift(context, changeTime)
+                && counts[IDX_AFTERNOON] < this.getAfternoonLimit(context, dateKey));
+        return shiftAvailable && this.registerMouldChangeCount(context, changeTime);
+    }
+
     @Override
     public boolean hasCapacity(LhScheduleContext context, Date targetDate) {
         String dateKey = formatDateKey(targetDate);

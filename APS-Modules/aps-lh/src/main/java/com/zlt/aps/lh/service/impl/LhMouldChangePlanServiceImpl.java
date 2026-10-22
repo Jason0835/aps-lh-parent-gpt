@@ -1843,6 +1843,10 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
                 docEntity.setOrderNo(exist.getOrderNo());
                 docEntity.setIsRelease(exist.getIsRelease());
                 docEntity.setMouldStatus(exist.getMouldStatus());
+                // 清洗标记或空白下机列没有收尾类型信息，更新时沿用原记录。
+                if (docEntity.getEndType() == null) {
+                    docEntity.setEndType(exist.getEndType());
+                }
                 this.updateImportedMouldChangePlan(docEntity);
                 updateNum++;
             } else {
@@ -1874,7 +1878,7 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
     }
 
     /**
-     * 校验并转换模具交替计划导入文本中的清洗类型、班次和示方类型。
+     * 校验并转换模具交替计划导入文本中的清洗类型、班次、示方类型和收尾方式。
      *
      * @param plan            模具交替计划导入行
      * @param importLogId     导入日志编号
@@ -1909,7 +1913,58 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
         } else {
             plan.setProductStatus(statusEnum.getCode());
         }
-        return invalid;
+        return this.normalizeMouldChangePlanImportEndType(plan, shiftEnum, importLogId,
+                errorRow, importErrorLogs) || invalid;
+    }
+
+    /**
+     * 将导出的下机文案转换为收尾类型，并核对明确填写的时间与班次。
+     *
+     * @param plan            导入计划，收尾类型字段暂存Excel原文
+     * @param shiftEnum       已校验的班次，班次无效时不重复记录时间冲突
+     * @param importLogId     导入日志编号
+     * @param errorRow        导入错误行号
+     * @param importErrorLogs 当前行错误日志集合
+     * @return 文案无法识别或时间与班次冲突时返回true
+     */
+    private boolean normalizeMouldChangePlanImportEndType(LhMouldChangePlan plan, ShiftEnum shiftEnum,
+                                                          Long importLogId, int errorRow,
+                                                          List<ImportErrorLog> importErrorLogs) {
+        String endTypeText = StringUtils.trimToEmpty(plan.getEndType());
+        if (StringUtils.isBlank(endTypeText) || "/".equals(endTypeText)) {
+            // 新增时保持为空，更新时由匹配到的原记录提供收尾类型。
+            plan.setEndType(null);
+            return false;
+        }
+        if (YesOrNoEnum.NO.getCode().equals(endTypeText)
+                || I18nUtil.getMessage(EXPORT_BY_REMAINDER_KEY).equals(endTypeText)) {
+            plan.setEndType(YesOrNoEnum.NO.getCode());
+            return false;
+        }
+        if (YesOrNoEnum.YES.getCode().equals(endTypeText)
+                || "是Có".equals(endTypeText) || "是 Có".equals(endTypeText)) {
+            plan.setEndType(YesOrNoEnum.YES.getCode());
+            return false;
+        }
+        String normalizedTime = "6:00".equals(endTypeText) ? "06:00" : endTypeText;
+        ShiftEnum timeShift = Arrays.stream(ShiftEnum.values())
+                .filter(candidate -> candidate.getStartTime().equals(normalizedTime))
+                .findFirst().orElse(null);
+        if (timeShift == null) {
+            String message = I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.endTypeInvalid");
+            ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorRow,
+                    MessageFormat.format(message, errorRow, endTypeText), importErrorLogs);
+            return true;
+        }
+        if (shiftEnum != null && timeShift != shiftEnum) {
+            String message = I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.endTimeShiftMismatch");
+            ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorRow,
+                    MessageFormat.format(message, errorRow, endTypeText,
+                            shiftEnum.getMouldChangePlanExcelText()), importErrorLogs);
+            return true;
+        }
+        plan.setEndType(YesOrNoEnum.YES.getCode());
+        return false;
     }
 
     /**
@@ -2014,13 +2069,14 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
     }
 
     /**
-     * 更新导入的模具交替计划，并显式清空导入值为空的清洗类型或交替类型字段。
+     * 更新导入的模具交替计划，并显式清空空类型字段及空白备注。
      *
      * @param plan 待更新的模具交替计划
      */
     private void updateImportedMouldChangePlan(LhMouldChangePlan plan) {
         lhMouldChangePlanMapper.updateById(plan);
-        if (plan.getCleanType() == null || plan.getChangeMouldType() == null) {
+        if (plan.getCleanType() == null || plan.getChangeMouldType() == null
+                || StringUtils.isBlank(plan.getRemark())) {
             LambdaUpdateWrapper<LhMouldChangePlan> updateWrapper = new LambdaUpdateWrapper<>();
             updateWrapper.eq(LhMouldChangePlan::getId, plan.getId());
             if (plan.getCleanType() == null) {
@@ -2028,6 +2084,9 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
             }
             if (plan.getChangeMouldType() == null) {
                 updateWrapper.set(LhMouldChangePlan::getChangeMouldType, null);
+            }
+            if (StringUtils.isBlank(plan.getRemark())) {
+                updateWrapper.set(LhMouldChangePlan::getRemark, "");
             }
             lhMouldChangePlanMapper.update(null, updateWrapper);
         }

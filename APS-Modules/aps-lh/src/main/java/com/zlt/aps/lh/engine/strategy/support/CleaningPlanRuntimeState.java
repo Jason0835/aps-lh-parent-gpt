@@ -36,6 +36,11 @@ public final class CleaningPlanRuntimeState {
      */
     private Map<String, MachineCleaningWindowDTO> sandBlastWindowMap = new LinkedHashMap<>();
     /**
+     * 同SKU置换已占用的统一换模额度，键包含物理机台、来源、实际开始时间及SKU状态。
+     * 同源L/R共用一个键，取消时移除身份后只回退一次；与清洗事件一同进入候选快照。
+     */
+    private Map<String, Date> replacementQuotaReservationMap = new LinkedHashMap<>();
+    /**
      * 仅喷砂释放后的真实回流余量，数量仍由生产策略维护。
      */
     private Map<String, Integer> remainingQtyMap = new LinkedHashMap<>();
@@ -79,6 +84,8 @@ public final class CleaningPlanRuntimeState {
                 copies.computeIfAbsent(window, CleaningPlanRuntimeState::copyWindow)));
         releaseWindowMap.forEach((key, window) -> target.releaseWindowMap.put(key,
                 copies.computeIfAbsent(window, CleaningPlanRuntimeState::copyWindow)));
+        replacementQuotaReservationMap.forEach((key, time) ->
+                target.replacementQuotaReservationMap.put(key, copyDate(time)));
         target.remainingQtyMap.putAll(remainingQtyMap);
         target.appliedEventMap.putAll(appliedEventMap);
         target.constraintVersion = constraintVersion;

@@ -3,6 +3,8 @@
  */
 package com.zlt.aps.lh.engine.strategy.impl;
 
+import com.zlt.aps.lh.engine.strategy.support.RepairPlanResult;
+import com.zlt.aps.lh.service.impl.LhRepairPlanScheduleService;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 
 import cn.hutool.core.bean.BeanUtil;
@@ -7074,12 +7076,11 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                             ? this.getMaintenanceScheduleService().resolveParallelMouldChangeReadyTime(
                             context, candidateMachine, mouldChangeStartTime, mouldChangeCompleteTime)
                             : mouldChangeCompleteTime;
-                    boolean plannedRepairAffectingSwitch = ShiftCapacityResolverUtil.isPlannedRepairAffectingSwitch(
-                            context, context.getDevicePlanShutList(), machineCode, endingTime,
+                    RepairPlanResult repairSwitchResult = LhRepairPlanScheduleService.resolveForScheduling(
+                            context, machineCode, sku, "新增切换", endingTime,
                             mouldChangeStartTime, mouldChangeCompleteTime);
-                    Date plannedRepairReadyTime = ShiftCapacityResolverUtil.resolvePlannedRepairProductionReadyTime(
-                            context, context.getDevicePlanShutList(), machineCode, endingTime,
-                            mouldChangeStartTime, mouldChangeCompleteTime);
+                    boolean plannedRepairAffectingSwitch = repairSwitchResult.isPlannedRepairAffectingSwitch();
+                    Date plannedRepairReadyTime = repairSwitchResult.getProductionNotBefore();
                     /*
                      * 精度计划、正规换模和计划性维修继续按既有并行规则取最晚恢复时间。
                      * 选机计划的时间模式由统一解析器决定；普通模式首检在切换完成前完成，
@@ -8132,13 +8133,12 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                         context.getPrecisionPreInsertResultSet().add(pairResult);
                     }
                 }
-                if (ShiftCapacityResolverUtil.isPlannedRepairAffectingSwitch(
-                        context, context.getDevicePlanShutList(), machineCode, endingTime,
-                        mouldChangeStartTime, mouldChangeCompleteTime)) {
+                RepairPlanResult repairLogResult = LhRepairPlanScheduleService.resolveForScheduling(
+                        context, machineCode, sku, "新增结果", endingTime,
+                        mouldChangeStartTime, mouldChangeCompleteTime);
+                if (repairLogResult.isPlannedRepairAffectingSwitch()) {
                     // 仅在候选最终形成有效结果后写过程日志，避免失败候选污染批次审计记录。
-                    Date repairProductionReadyTime = ShiftCapacityResolverUtil.resolvePlannedRepairProductionReadyTime(
-                            context, context.getDevicePlanShutList(), machineCode, endingTime,
-                            mouldChangeStartTime, mouldChangeCompleteTime);
+                    Date repairProductionReadyTime = repairLogResult.getProductionNotBefore();
                     StringBuilder repairTimelineDetail = new StringBuilder(256);
                     PriorityTraceLogHelper.appendLine(repairTimelineDetail,
                             "机台=" + machineCode + ", SKU=" + sku.getMaterialCode() + ", 切换类型=换模");
@@ -11027,12 +11027,12 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         }
 
         Date preparationReadyTime = changeoverEndTime;
-        boolean plannedRepairAffectingSwitch = ShiftCapacityResolverUtil.isPlannedRepairAffectingSwitch(
-                context, context.getDevicePlanShutList(), machine.getMachineCode(), occupationEndTime,
+        RepairPlanResult repairPreparationResult = LhRepairPlanScheduleService.resolveForScheduling(
+                context, machine.getMachineCode(), sku, "新增选机预演",
+                occupationEndTime,
                 changeoverStartTime, changeoverEndTime);
-        Date plannedRepairReadyTime = ShiftCapacityResolverUtil.resolvePlannedRepairProductionReadyTime(
-                context, context.getDevicePlanShutList(), machine.getMachineCode(), occupationEndTime,
-                changeoverStartTime, changeoverEndTime);
+        boolean plannedRepairAffectingSwitch = repairPreparationResult.isPlannedRepairAffectingSwitch();
+        Date plannedRepairReadyTime = repairPreparationResult.getProductionNotBefore();
         if (plannedRepairAffectingSwitch && Objects.nonNull(plannedRepairReadyTime)
                 && plannedRepairReadyTime.after(preparationReadyTime)) {
             preparationReadyTime = plannedRepairReadyTime;
@@ -11838,18 +11838,12 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             return null;
         }
         Date preparationReadyTime = preparationCompleteTime;
-        boolean plannedRepairAffectingSwitch = ShiftCapacityResolverUtil
-                .isPlannedRepairAffectingSwitch(
-                        context, context.getDevicePlanShutList(), machine.getMachineCode(),
-                        this.resolveMachineOccupationEndTime(
-                                context, sku, machine, context.getScheduleWindowShifts()),
-                        preparationStartTime, preparationCompleteTime);
-        Date plannedRepairReadyTime = ShiftCapacityResolverUtil
-                .resolvePlannedRepairProductionReadyTime(
-                        context, context.getDevicePlanShutList(), machine.getMachineCode(),
-                        this.resolveMachineOccupationEndTime(
-                                context, sku, machine, context.getScheduleWindowShifts()),
-                        preparationStartTime, preparationCompleteTime);
+        RepairPlanResult repairLookbackResult = LhRepairPlanScheduleService.resolveForScheduling(
+                context, machine.getMachineCode(), sku, "准备阶段预演",
+                this.resolveMachineOccupationEndTime(context, sku, machine, context.getScheduleWindowShifts()),
+                preparationStartTime, preparationCompleteTime);
+        boolean plannedRepairAffectingSwitch = repairLookbackResult.isPlannedRepairAffectingSwitch();
+        Date plannedRepairReadyTime = repairLookbackResult.getProductionNotBefore();
         if (plannedRepairAffectingSwitch && Objects.nonNull(plannedRepairReadyTime)
                 && plannedRepairReadyTime.after(preparationReadyTime)) {
             preparationReadyTime = plannedRepairReadyTime;
@@ -12193,7 +12187,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 .append(',')
                 .append(LhScheduleTimeUtil.formatDateTime(plan.getInspectionEndTime()))
                 .append(")，分摊=");
-        for (FirstInspectionShiftAllocation allocation : plan.getShiftAllocations()) {
+        for (FirstInspectionShiftAllocation allocation : plan.getQuantityAllocations()) {
             if (detailBuilder.charAt(detailBuilder.length() - 1) != '=') {
                 detailBuilder.append(';');
             }
@@ -14374,7 +14368,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
              * 选机预演已经校验首检本身不突破日标准和物理产能，因此这里不会制造额外超限。
              */
             for (FirstInspectionShiftAllocation allocation
-                    : firstInspectionAllocationPlan.getShiftAllocations()) {
+                    : firstInspectionAllocationPlan.getQuantityAllocations()) {
                 if (Objects.isNull(allocation) || Objects.isNull(allocation.getShift())) {
                     continue;
                 }
@@ -16889,12 +16883,11 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         Date maintenanceReadyTime = this.canParallelMouldChangeWithPrecision(context, sku, mouldChangeStartTime)
                 ? this.getMaintenanceScheduleService().resolveParallelMouldChangeReadyTime(
                 context, candidate, mouldChangeStartTime, mouldChangeCompleteTime) : mouldChangeCompleteTime;
-        boolean plannedRepairAffectingSwitch = ShiftCapacityResolverUtil.isPlannedRepairAffectingSwitch(
-                context, context.getDevicePlanShutList(), candidate.getMachineCode(), endingTime,
+        RepairPlanResult repairCapacityResult = LhRepairPlanScheduleService.resolveForScheduling(
+                context, candidate.getMachineCode(), sku, "增机容量预演", endingTime,
                 mouldChangeStartTime, mouldChangeCompleteTime);
-        Date plannedRepairReadyTime = ShiftCapacityResolverUtil.resolvePlannedRepairProductionReadyTime(
-                context, context.getDevicePlanShutList(), candidate.getMachineCode(), endingTime,
-                mouldChangeStartTime, mouldChangeCompleteTime);
+        boolean plannedRepairAffectingSwitch = repairCapacityResult.isPlannedRepairAffectingSwitch();
+        Date plannedRepairReadyTime = repairCapacityResult.getProductionNotBefore();
         Date firstInspectionBaseTime = maintenanceReadyTime;
         if (plannedRepairAffectingSwitch && Objects.nonNull(plannedRepairReadyTime)
                 && plannedRepairReadyTime.after(firstInspectionBaseTime)) {
@@ -18355,9 +18348,11 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 maintenanceWindowList, sku, isEnding, mouldChangeEndTime, shiftPlanCapacityMap,
                 firstInspectionAttributionShift, false, productionStartTimeConstrained,
                 firstInspectionAllocationPlan);
-        boolean plannedRepairAffectingSwitch = ShiftCapacityResolverUtil.isPlannedRepairAffectingSwitch(
-                context, context.getDevicePlanShutList(), result.getLhMachineCode(), machine.getEstimatedEndTime(),
+        RepairPlanResult repairInspectionResult = LhRepairPlanScheduleService.resolveForScheduling(
+                context, result.getLhMachineCode(), sku, "结果首检对齐",
+                machine.getEstimatedEndTime(),
                 mouldChangeStartTime, mouldChangeEndTime);
+        boolean plannedRepairAffectingSwitch = repairInspectionResult.isPlannedRepairAffectingSwitch();
         if (plannedRepairAffectingSwitch && Objects.nonNull(firstInspectionAttributionShift)
                 && (Objects.isNull(firstInspectionAllocationPlan)
                 || firstInspectionAllocationPlan.getInspectionQty() <= 0)) {
@@ -18365,9 +18360,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
              * 首检工具写首检条数时会先使用标准班次起点；维修场景必须再对齐到
              * max(维修结束+预热, 换模自身完成时间)，避免最终结果看起来在预热完成前已经开始首检。
              */
-            Date firstInspectionReadyTime = ShiftCapacityResolverUtil.resolvePlannedRepairProductionReadyTime(
-                    context, context.getDevicePlanShutList(), result.getLhMachineCode(), machine.getEstimatedEndTime(),
-                    mouldChangeStartTime, mouldChangeEndTime);
+            Date firstInspectionReadyTime = repairInspectionResult.getProductionNotBefore();
             ShiftFieldUtil.alignShiftStartTimeNotBefore(
                     result, firstInspectionAttributionShift.getShiftIndex(), firstInspectionReadyTime);
         }
@@ -20432,7 +20425,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         LhScheduleResult previewResult = new LhScheduleResult();
         previewResult.setMaterialCode(Objects.isNull(sku) ? null : sku.getMaterialCode());
         previewResult.setLhMachineCode(machineCode);
-        for (FirstInspectionShiftAllocation allocation : plan.getShiftAllocations()) {
+        for (FirstInspectionShiftAllocation allocation : plan.getQuantityAllocations()) {
             if (!this.canIncreaseShiftQtyByClassTotalLimit(
                     context, sku, previewResult, allocation.getShift().getShiftIndex(),
                     allocation.getQuantity(), "新增排产跨班首检落位预检")) {
@@ -20725,12 +20718,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             int currentShiftInspectionQty = Math.max(0,
                     firstInspectionShiftQtyMap.getOrDefault(shift.getShiftIndex(), 0));
             if (useCrossShiftInspectionPlan) {
-                int currentShiftCapacityCap = Math.max(0,
-                        ShiftCapacityResolverUtil.resolveActualShiftPlanQty(
-                                shiftCapacity, shift, configPlusShiftType,
-                                ScheduleTypeEnum.NEW_SPEC.getCode()));
-                shiftMaxQty = Math.min(shiftMaxQty,
-                        Math.max(0, currentShiftCapacityCap - currentShiftInspectionQty));
+                shiftMaxQty = FirstInspectionQtyUtil.resolveNormalCapacityForQuantityPlan(context, shift,
+                        shiftCapacity, currentShiftInspectionQty, shiftMaxQty, ScheduleTypeEnum.NEW_SPEC.getCode());
             } else if (!precisionInspection) {
                 shiftMaxQty = FirstInspectionQtyUtil.resolveNormalCapacityAfterFirstInspection(
                         context, sku, shift, shiftMaxQty,
@@ -23043,7 +23032,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             FirstInspectionAllocationPlan firstInspectionAllocationPlan) {
         if (Objects.isNull(firstInspectionAllocationPlan)
                 || !firstInspectionAllocationPlan.isValid()
-                || CollectionUtils.isEmpty(firstInspectionAllocationPlan.getShiftAllocations())) {
+                || CollectionUtils.isEmpty(firstInspectionAllocationPlan.getQuantityAllocations())) {
             return productionShifts;
         }
         Map<Integer, LhShiftConfigVO> accountingShiftMap =
@@ -23057,7 +23046,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         }
         int productionShiftCount = accountingShiftMap.size();
         for (FirstInspectionShiftAllocation allocation
-                : firstInspectionAllocationPlan.getShiftAllocations()) {
+                : firstInspectionAllocationPlan.getQuantityAllocations()) {
             if (Objects.nonNull(allocation) && Objects.nonNull(allocation.getShift())
                     && Objects.nonNull(allocation.getShift().getShiftIndex())) {
                 accountingShiftMap.putIfAbsent(

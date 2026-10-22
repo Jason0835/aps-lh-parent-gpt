@@ -4,6 +4,7 @@ import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.component.DayPlanAdjustRequireAssembler;
+import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.engine.chain.validators.ContinuationOnlineMouldValidator;
 import com.zlt.aps.lh.engine.factory.ScheduleStrategyFactory;
 import com.zlt.aps.lh.engine.strategy.IProductionStrategy;
@@ -52,6 +53,12 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
     @Resource
     private SharedEmbryoEndingScheduleService sharedEmbryoEndingScheduleService;
 
+    /**
+     * 在所有实机来源和历史关系就绪后统一冻结胎胚库存份额。
+     */
+    @Resource
+    private TargetScheduleQtyResolver targetScheduleQtyResolver;
+
     /** 提前提供指定后料来源，不改变独立调整的普通后置排产顺序。 */
     @Resource
     private DayPlanAdjustRequireAssembler dayPlanAdjustRequireAssembler;
@@ -98,6 +105,7 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
         dayPlanAdjustRequireAssembler.prepare(context);
         // 冻结历史交替时刻，续作识别保持原样，排量及所有后置调整共同遵守下机边界。
         previousAlternatePlanReuseService.prepareReleaseEvents(context);
+        targetScheduleQtyResolver.initializeRealMachineEmbryoAllocations(context);
         previousAlternateMachineOrderService.initializePreviousAlternateMachineOrder(context);
         ISkuPriorityStrategy priorityStrategy = strategyFactory.getSkuPriorityStrategy();
         /*

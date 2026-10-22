@@ -246,16 +246,57 @@ public class LhScheduleContext {
      * 设备停机计划列表
      */
     private List<MdmDevicePlanShut> devicePlanShutList = new ArrayList<>();
-    /** 05 原始计划快照：与固定时刻转换后的运行态列表分离，扩展窗口时禁止重复转换。 */
-    private Map<Long, MdmDevicePlanShut> plannedRepairSourcePlanMap = new LinkedHashMap<>(16);
-    /** 06 独立故障窗口，按来源计划主键去重；不进入普通设备停机业务列表。 */
-    private Map<Long, MachineFaultWindowDTO> temporaryFaultWindowMap = new LinkedHashMap<>(16);
     /**
-     * 达到连续两班禁产阈值的续作临时故障迁移事件，key=运行态续作机台编码。
-     * <p>该事件贯穿续作解绑、历史机台优先、正常候选回流和最终交替计划生成。</p>
+     * 维修来源、故障及迁移事件的唯一运行态，候选撤销不得清除固定事实。
      */
-    private Map<String, ContinuationTemporaryFaultTransferEvent> continuationTemporaryFaultTransferEventMap =
-            new LinkedHashMap<String, ContinuationTemporaryFaultTransferEvent>(4);
+    private RepairPlanRuntimeState repairPlanRuntimeState = new RepairPlanRuntimeState();
+
+    /**
+     * 接收独立维修运行态，属性复制和隔离排程不得共享可变来源及事件。
+     *
+     * @param state 待复制的维修事实和迁移进度
+     */
+    public void setRepairPlanRuntimeState(RepairPlanRuntimeState state) {
+        repairPlanRuntimeState = state.copy();
+    }
+
+    /**
+     * 发布实际停机列表并失效维修归一化缓存。
+     *
+     * @param plans 新的实际停机列表
+     */
+    public void setDevicePlanShutList(List<MdmDevicePlanShut> plans) {
+        devicePlanShutList = plans;
+        repairPlanRuntimeState.constraintsChanged();
+    }
+
+    /**
+     * 兼容访问原始维修来源，统一委托维修运行态。
+     *
+     * @return 按来源主键登记的原始快照
+     */
+    public Map<Long, MdmDevicePlanShut> getPlannedRepairSourcePlanMap() {
+        return repairPlanRuntimeState.getSourcePlanMap();
+    }
+
+    /**
+     * 兼容访问原始故障禁产窗口。
+     *
+     * @return 当前批次的原始故障窗口
+     */
+    public Map<Long, MachineFaultWindowDTO> getTemporaryFaultWindowMap() {
+        return repairPlanRuntimeState.getFaultWindowMap();
+    }
+
+    /**
+     * 兼容访问续作故障迁移事件，保留原截断、释放及扣账阶段。
+     *
+     * @return 以运行侧机台为键的迁移事件
+     */
+    public Map<String, ContinuationTemporaryFaultTransferEvent> getContinuationTemporaryFaultTransferEventMap() {
+        return repairPlanRuntimeState.getTransferEventMap();
+    }
+
     /**
      * 本次排程已加载的清洗类设备停机候选列表。
      * <p>仅保存计划开始时间位于本次排程窗口、尚未实际完成的干冰/喷砂清洗候选。
@@ -587,6 +628,11 @@ public class LhScheduleContext {
      * 当前执行的原机续排绑定，供历史指定正规规则校验，不作为候选全局豁免。
      */
     private transient ActiveMachineBinding activePreviousAlternateProductionBinding;
+    /**
+     * 当前历史组合校验普通结构上限的局部作用域，仅在预演和提交调用期间有效。
+     * 不表示机台已经释放，不参与资源、结构切换专用名额或机台统计扣除。
+     */
+    private transient PreviousAlternateStructureLimitExemptionPolicy.Scope activePreviousAlternateStructureLimitScope;
     /** 仅标识历史关联预演日志，不参与排程决策。 */
     private boolean previousAlternateGroupPreview;
     /** 同日关联预演冻结的目标模具，仅在重放提交作用域内使用。 */
@@ -931,6 +977,23 @@ public class LhScheduleContext {
      * 胎胚库存SKU级内部分摊额度，key=materialCode_productStatus；组级总量仍按胎胚账本控制
      */
     private Map<String, Integer> embryoStockSkuQuotaMap = new LinkedHashMap<>();
+    /**
+     * SKU归集和准入期间暂缓胎胚份额冻结，待实机来源及历史关系就绪后统一初始化。
+     */
+    private boolean embryoStockAllocationDeferred;
+    /**
+     * 本轮胎胚库存有效实机成员；null表示尚未初始化，空集合表示无有效实机成员。
+     * 按物料及产品状态去重，冻结后不随候选退出或虚拟兜底变化。
+     */
+    private Set<String> embryoStockRealMachineSkuKeys;
+    /**
+     * 虚拟机台硫化余量独立余额，禁止写入实机SKU份额及胎胚库存消费账本。
+     */
+    private Map<String, Integer> virtualMachineCuringRemainingQtyMap = new LinkedHashMap<>();
+    /**
+     * 胎胚分摊前的历史指定试验合法硫化总目标，虚拟补量沿用该边界而非实机库存份额。
+     */
+    private Map<String, Integer> virtualMachineCuringTargetQtyMap = new LinkedHashMap<>();
     /**
      * 命中胎胚库存T日硬目标的物料状态复合键集合，用于结果班次量按库存账本奇偶原样裁剪
      */
@@ -2363,10 +2426,10 @@ public class LhScheduleContext {
      */
     public Set<String> resolveForcedReleasedPhysicalMachineCodes(SkuScheduleDTO sku) {
         Set<String> physicalMachineCodeSet = this.resolveOnlySandBlastReleasedPhysicalMachineCodes(sku);
-        if (Objects.isNull(sku) || CollectionUtils.isEmpty(continuationTemporaryFaultTransferEventMap)) {
+        if (Objects.isNull(sku) || CollectionUtils.isEmpty(this.getContinuationTemporaryFaultTransferEventMap())) {
             return physicalMachineCodeSet;
         }
-        continuationTemporaryFaultTransferEventMap.values().stream()
+        this.getContinuationTemporaryFaultTransferEventMap().values().stream()
                 .filter(Objects::nonNull)
                 .filter(event -> StringUtils.equals(event.getMaterialCode(), sku.getMaterialCode()))
                 .filter(event -> StringUtils.equals(StringUtils.trimToEmpty(event.getProductStatus()),
@@ -2455,10 +2518,10 @@ public class LhScheduleContext {
      * @return true-故障释放SKU；false-普通候选
      */
     public boolean isTemporaryFaultTransferSku(SkuScheduleDTO sku) {
-        if (Objects.isNull(sku) || CollectionUtils.isEmpty(continuationTemporaryFaultTransferEventMap)) {
+        if (Objects.isNull(sku) || CollectionUtils.isEmpty(this.getContinuationTemporaryFaultTransferEventMap())) {
             return false;
         }
-        return continuationTemporaryFaultTransferEventMap.values().stream()
+        return this.getContinuationTemporaryFaultTransferEventMap().values().stream()
                 .filter(Objects::nonNull)
                 .anyMatch(event -> StringUtils.equals(event.getMaterialCode(), sku.getMaterialCode())
                         && StringUtils.equals(StringUtils.trimToEmpty(event.getProductStatus()),
@@ -2474,11 +2537,11 @@ public class LhScheduleContext {
      */
     public boolean isTemporaryFaultOriginalMachine(SkuScheduleDTO sku, String machineCode) {
         if (Objects.isNull(sku) || StringUtils.isEmpty(machineCode)
-                || CollectionUtils.isEmpty(continuationTemporaryFaultTransferEventMap)) {
+                || CollectionUtils.isEmpty(this.getContinuationTemporaryFaultTransferEventMap())) {
             return false;
         }
         String physicalMachineCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode);
-        return continuationTemporaryFaultTransferEventMap.values().stream()
+        return this.getContinuationTemporaryFaultTransferEventMap().values().stream()
                 .filter(Objects::nonNull)
                 .anyMatch(event -> StringUtils.equals(event.getMaterialCode(), sku.getMaterialCode())
                         && StringUtils.equals(StringUtils.trimToEmpty(event.getProductStatus()),
@@ -2508,11 +2571,11 @@ public class LhScheduleContext {
      */
     public Date resolveForcedRequeueNotBeforeTime(SkuScheduleDTO sku) {
         Date notBeforeTime = this.resolveOnlySandBlastRequeueNotBeforeTime(sku);
-        if (Objects.isNull(sku) || CollectionUtils.isEmpty(continuationTemporaryFaultTransferEventMap)) {
+        if (Objects.isNull(sku) || CollectionUtils.isEmpty(this.getContinuationTemporaryFaultTransferEventMap())) {
             return notBeforeTime;
         }
         for (ContinuationTemporaryFaultTransferEvent event
-                : continuationTemporaryFaultTransferEventMap.values()) {
+                : this.getContinuationTemporaryFaultTransferEventMap().values()) {
             if (Objects.isNull(event) || Objects.isNull(event.getFaultStartTime())
                     || !StringUtils.equals(event.getMaterialCode(), sku.getMaterialCode())
                     || !StringUtils.equals(StringUtils.trimToEmpty(event.getProductStatus()),

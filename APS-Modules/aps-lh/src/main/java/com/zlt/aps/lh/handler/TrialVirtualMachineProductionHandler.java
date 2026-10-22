@@ -142,8 +142,11 @@ public class TrialVirtualMachineProductionHandler extends AbsScheduleStepHandler
 
             int actualMachineScheduledQty = this.resolveScheduledQty(context, sku);
             int remainingCuringQty = Math.max(0, sku.getSurplusQty() - actualMachineScheduledQty);
-            Integer targetQty = context.getSkuProductionTargetQtyMap().get(
-                    MonthPlanDateResolver.buildMaterialStatusKey(sku.getMaterialCode(), sku.getProductStatus()));
+            // 虚拟候选去重键与中心账本键属于不同契约，数量读取统一复用中心物料状态键。
+            String productionSkuKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                    sku.getMaterialCode(), sku.getProductStatus());
+            Integer targetQty = context.getVirtualMachineCuringTargetQtyMap().getOrDefault(
+                    productionSkuKey, context.getSkuProductionTargetQtyMap().get(productionSkuKey));
             if (context.hasPreviousAlternateTrialPlan(sku) && Objects.nonNull(targetQty)) {
                 // 实机部分成功后只补合法总目标的缺口，不能把硫化余量再次当作新增目标。
                 remainingCuringQty = Math.min(remainingCuringQty, Math.max(0, targetQty - actualMachineScheduledQty));
@@ -218,18 +221,8 @@ public class TrialVirtualMachineProductionHandler extends AbsScheduleStepHandler
                                          String originalUnscheduledReason) {
         LhScheduleResult result = this.buildVirtualScheduleResult(
                 context, sku, virtualMachineCode, shiftCapacity);
-        String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(sku.getMaterialCode(), sku.getProductStatus());
-        Integer targetQty = context.getSkuProductionTargetQtyMap().get(skuKey);
-        if (context.hasPreviousAlternateTrialPlan(sku) && Objects.nonNull(targetQty)) {
-            // 实际结果是最终补量依据；只校正未完成余额，禁止把历史已消费量与待补量相加重建总目标。
-            context.getSkuProductionRemainingQtyMap().put(skuKey, remainingCuringQty);
-            log.info("历史指定试制量试虚拟补量余额对账, 工厂={}, 批次={}, 物料={}, 状态={}, 合法总目标={}, 待补量={}",
-                    context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(), sku.getProductStatus(),
-                    targetQty, remainingCuringQty);
-        } else {
-            targetScheduleQtyResolver.syncProductionRemainingQtyToRemaining(
-                    context, sku, remainingCuringQty, VIRTUAL_MACHINE_SCENE + "初始化硫化余量");
-        }
+        // 虚拟需求只消费独立硫化余量；实机已冻结的SKU目标、库存份额及实际消费保持原值。
+        targetScheduleQtyResolver.initializeVirtualMachineCuringRemainingQty(context, sku, remainingCuringQty);
         int remaining = remainingCuringQty;
         StringBuilder shiftPlanSummary = new StringBuilder(192);
         for (LhShiftConfigVO shift : schedulingShifts) {
@@ -267,7 +260,6 @@ public class TrialVirtualMachineProductionHandler extends AbsScheduleStepHandler
                     sku.getMaterialCode(), sku.getProductStatus(), virtualMachineCode,
                     shift.getShiftIndex(), shiftCapacity, planQty, remaining);
         }
-        sku.setRemainingScheduleQty(remaining);
         if (ShiftFieldUtil.resolveScheduledQty(result) <= 0) {
             return remainingCuringQty;
         }

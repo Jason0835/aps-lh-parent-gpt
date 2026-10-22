@@ -3,6 +3,7 @@ package com.zlt.aps.lh.util;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
+import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.FirstInspectionAllocationPlan;
 import com.zlt.aps.lh.engine.strategy.support.FirstInspectionShiftAllocation;
@@ -24,7 +25,7 @@ import java.util.stream.Collectors;
  * 换模和换活字块共用的首检时间分摊工具。
  *
  * <p>本工具只做无副作用计算：先按项目参数取得一次首检总量，再根据班产和班次有效时长
- * 计算真实首检区间，最后按各班次的真实重叠时长分摊数量。调用方只有在候选机台正式
+ * 计算真实首检区间，保留各班真实占用，并将实际切换的首检条数归集到完成班次。调用方只有在候选机台正式
  * 命中后才提交计数和结果，避免候选预演污染首检账本。</p>
  *
  * @author APS
@@ -239,8 +240,8 @@ public final class FirstInspectionAllocationUtil {
             List<LhShiftConfigVO> shifts, Date inspectionStart, int shiftCapacity, int remainingQty,
             String scheduleType, String machineCode, Map<Integer, Integer> availableCapacityMap, Long precisionPlanId) {
         return buildPlan(context, sku, shifts, inspectionStart, inspectionStart, shiftCapacity, remainingQty,
-                scheduleType, machineCode, availableCapacityMap, FirstInspectionTimingMode.START_AT_PRODUCTION_READY)
-                .withEquipmentPlanId(precisionPlanId);
+                scheduleType, machineCode, availableCapacityMap, FirstInspectionTimingMode.START_AT_PRODUCTION_READY,
+                0L, false).withEquipmentPlanId(precisionPlanId);
     }
 
     /**
@@ -265,6 +266,37 @@ public final class FirstInspectionAllocationUtil {
             Date changeoverEndTime, Date inspectionNotBeforeTime, int shiftCapacity, int remainingQty,
             String scheduleType, String machineCode, Map<Integer, Integer> availableCapacityMap,
             FirstInspectionTimingMode timingMode, long fixedDurationSeconds) {
+        boolean changeoverQuantity = fixedDurationSeconds == 0L
+                && (ScheduleTypeEnum.NEW_SPEC.getCode().equals(scheduleType)
+                || ScheduleTypeEnum.TYPE_BLOCK.getCode().equals(scheduleType));
+        return buildPlan(context, sku, shifts, changeoverEndTime, inspectionNotBeforeTime, shiftCapacity,
+                remainingQty, scheduleType, machineCode, availableCapacityMap, timingMode,
+                fixedDurationSeconds, changeoverQuantity);
+    }
+
+    /**
+     * 构建保留真实资源占用的首检计划，实际切换的条数统一归集到一个计量班次。
+     *
+     * @param context 排程上下文
+     * @param sku 当前物料
+     * @param shifts 完整排程窗口
+     * @param changeoverEndTime 实际切换完成时间
+     * @param inspectionNotBeforeTime 首检生产门禁
+     * @param shiftCapacity 运行态班产
+     * @param remainingQty 当前可消费量
+     * @param scheduleType 排程类型
+     * @param machineCode 运行态机台
+     * @param availableCapacityMap 真实首检区间可用产能
+     * @param timingMode 首检时间模式
+     * @param fixedDurationSeconds 固定首检时长，零表示按条数折算
+     * @param changeoverQuantity 是否启用实际切换首检单班计量
+     * @return 已校验占用与数量的无副作用计划
+     */
+    private static FirstInspectionAllocationPlan buildPlan(
+            LhScheduleContext context, SkuScheduleDTO sku, List<LhShiftConfigVO> shifts,
+            Date changeoverEndTime, Date inspectionNotBeforeTime, int shiftCapacity, int remainingQty,
+            String scheduleType, String machineCode, Map<Integer, Integer> availableCapacityMap,
+            FirstInspectionTimingMode timingMode, long fixedDurationSeconds, boolean changeoverQuantity) {
         if (CollectionUtils.isEmpty(shifts) || Objects.isNull(changeoverEndTime)) {
             return FirstInspectionAllocationPlan.invalid(
                     "首检缺少完整班次或切换结束时间", null, changeoverEndTime);
@@ -303,6 +335,14 @@ public final class FirstInspectionAllocationUtil {
                     "首检时间未命中排程班次", null, inspectionReferenceTime);
         }
 
+        // 参数计数和首检时间继续沿用原规则；只为计划条数另行解析完成班次。
+        LhShiftConfigVO quantityShift = changeoverQuantity && !forwardInspection
+                ? FirstInspectionQtyUtil.resolveChangeoverCompletionShift(orderedShifts, changeoverEndTime)
+                : countingShift;
+        if (Objects.isNull(quantityShift)) {
+            return FirstInspectionAllocationPlan.invalid("切换完成事件未命中计量班次", countingShift, inspectionReferenceTime);
+        }
+
         int sequence = FirstInspectionQtyUtil.resolveNextFirstInspectionSequence(context, countingShift);
         if (FirstInspectionQtyUtil.isTrialTimeBasedFirstInspection(context, sku, countingShift, scheduleType)) {
             // 普通试制沿用固定2小时/75%规则；有效历史指定已由统一判断转入正规计件。
@@ -315,10 +355,11 @@ public final class FirstInspectionAllocationUtil {
                 context, sequence, machineCode, false);
         int inspectionQty = Math.min(Math.max(0, configuredQty), Math.max(0, remainingQty));
         if (inspectionQty <= 0) {
-            return FirstInspectionAllocationPlan.valid(
+            FirstInspectionAllocationPlan emptyPlan = FirstInspectionAllocationPlan.valid(
                     sequence, 0, BigDecimal.ZERO, fixedDurationSeconds, inspectionReferenceTime,
                     new Date(inspectionReferenceTime.getTime() + fixedDurationSeconds * MILLIS_PER_SECOND),
                     countingShift, new ArrayList<FirstInspectionShiftAllocation>(0));
+            return changeoverQuantity ? emptyPlan.withSingleShiftQuantity(quantityShift) : emptyPlan;
         }
 
         long effectiveSeconds = ShiftCapacityResolverUtil.resolveShiftDurationSeconds(countingShift);
@@ -433,6 +474,14 @@ public final class FirstInspectionAllocationUtil {
         FirstInspectionAllocationPlan plan = FirstInspectionAllocationPlan.valid(
                 sequence, faultAdjustedInspectionQty, hourlyOutput, durationSeconds,
                 inspectionStartTime, inspectionEndTime, countingShift, positiveAllocations);
+        if (changeoverQuantity) {
+            int quantityCapacity = Math.max(0, ShiftCapacityResolverUtil.resolveActualShiftPlanQty(
+                    shiftCapacity, quantityShift, configPlusShiftType, scheduleType));
+            if (finalQty > quantityCapacity) {
+                return FirstInspectionAllocationPlan.invalid("完整首检超过计量班次班产", countingShift, inspectionEndTime);
+            }
+            plan = plan.withSingleShiftQuantity(quantityShift);
+        }
         // 完整首检参与结构胎胚首班共享额度预演；不足时拒绝整次首检，禁止截断后继续生产。
         return StructureSwitchFirstShiftQuantityPolicy.validateInspection(context, sku, machineCode, plan);
     }
@@ -604,7 +653,7 @@ public final class FirstInspectionAllocationUtil {
         if (Objects.isNull(plan) || !plan.isValid()) {
             return shiftQtyMap;
         }
-        for (FirstInspectionShiftAllocation allocation : plan.getShiftAllocations()) {
+        for (FirstInspectionShiftAllocation allocation : plan.getQuantityAllocations()) {
             shiftQtyMap.put(allocation.getShift().getShiftIndex(), allocation.getQuantity());
         }
         return shiftQtyMap;

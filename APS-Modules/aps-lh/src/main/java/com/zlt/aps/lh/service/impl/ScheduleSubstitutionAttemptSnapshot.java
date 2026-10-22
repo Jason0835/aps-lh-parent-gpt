@@ -34,6 +34,8 @@ import com.zlt.aps.lh.engine.strategy.support.UnscheduledResultRuntime;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchPlan;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchRuntimeState;
 import com.zlt.aps.lh.engine.strategy.support.EquipmentPlanRuntimeState;
+import com.zlt.aps.lh.engine.strategy.support.RepairPlanRuntimeState;
+import com.zlt.aps.lh.engine.strategy.support.ContinuationTemporaryFaultTransferEvent;
 import com.zlt.aps.lh.engine.strategy.support.CleaningPlanRuntimeState;
 import com.zlt.aps.lh.engine.strategy.support.ContinuousProductionConsumption;
 
@@ -65,6 +67,10 @@ final class ScheduleSubstitutionAttemptSnapshot {
 
     /** 公共设备计划全部状态，包含0判定缓存、待复评、候选时间计划、安排记录和版本。 */
     private EquipmentPlanRuntimeState equipmentPlanRuntimeState;
+    /**
+     * 候选可改变的故障迁移进度；固定维修来源和禁产窗口不随候选撤销。
+     */
+    private Map<String, ContinuationTemporaryFaultTransferEvent> repairTransferEventMap;
     /**
      * 清洗完整状态及约束版本快照。
      */
@@ -124,6 +130,22 @@ final class ScheduleSubstitutionAttemptSnapshot {
      * 候选试排前已成立的共用胎胚收尾身份。
      */
     private Map<String, String> sharedEmbryoStockEndingIdentityMap;
+    /**
+     * 胎胚实机成员和虚拟硫化余量随试排恢复，避免回滚后重复领取库存或虚拟需求。
+     */
+    private Set<String> embryoStockRealMachineSkuKeys;
+    /**
+     * SKU准入期间的库存冻结门禁。
+     */
+    private boolean embryoStockAllocationDeferred;
+    /**
+     * 独立虚拟机硫化余量快照。
+     */
+    private Map<String, Integer> virtualMachineCuringRemainingQtyMap;
+    /**
+     * 独立虚拟需求的历史合法硫化总目标。
+     */
+    private Map<String, Integer> virtualMachineCuringTargetQtyMap;
     /**
      * 候选试排前的共用胎胚首次额度。
      */
@@ -367,6 +389,13 @@ final class ScheduleSubstitutionAttemptSnapshot {
                 new LinkedHashSet<String>(context.getEmbryoStockHardTargetMaterialSet());
         snapshot.sharedEmbryoStockEndingIdentityMap =
                 new LinkedHashMap<>(context.getSharedEmbryoStockEndingIdentityMap());
+        snapshot.embryoStockRealMachineSkuKeys = Objects.isNull(context.getEmbryoStockRealMachineSkuKeys())
+                ? null : new LinkedHashSet<>(context.getEmbryoStockRealMachineSkuKeys());
+        snapshot.embryoStockAllocationDeferred = context.isEmbryoStockAllocationDeferred();
+        snapshot.virtualMachineCuringRemainingQtyMap =
+                new LinkedHashMap<>(context.getVirtualMachineCuringRemainingQtyMap());
+        snapshot.virtualMachineCuringTargetQtyMap =
+                new LinkedHashMap<>(context.getVirtualMachineCuringTargetQtyMap());
         snapshot.sharedEmbryoStockEndingInitialQuotaMap =
                 new LinkedHashMap<>(context.getSharedEmbryoStockEndingInitialQuotaMap());
         snapshot.sharedEmbryoStockEndingConsumedQtyMap =
@@ -391,6 +420,10 @@ final class ScheduleSubstitutionAttemptSnapshot {
         snapshot.dailyMaintenanceCountMap =
                 new LinkedHashMap<String, Integer>(context.getDailyMaintenanceCountMap());
         snapshot.equipmentPlanRuntimeState = context.getEquipmentPlanRuntimeState().copy();
+        snapshot.repairTransferEventMap = context.getContinuationTemporaryFaultTransferEventMap().entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey,
+                        entry -> RepairPlanRuntimeState.copyEvent(entry.getValue()),
+                        (first, duplicate) -> first, LinkedHashMap::new));
         snapshot.cleaningPlanRuntimeState = context.getCleaningPlanRuntimeState().copy();
         snapshot.continuousProductionConsumptionMap = new IdentityHashMap<>(context.getContinuousProductionConsumptionMap());
         snapshot.maintenanceDeferredPhysicalMachineCodeSet =
@@ -616,6 +649,11 @@ final class ScheduleSubstitutionAttemptSnapshot {
         context.setEmbryoStockHardTargetMaterialSet(
                 new LinkedHashSet<String>(embryoStockHardTargetMaterialSet));
         context.setSharedEmbryoStockEndingIdentityMap(new LinkedHashMap<>(sharedEmbryoStockEndingIdentityMap));
+        context.setEmbryoStockRealMachineSkuKeys(Objects.isNull(embryoStockRealMachineSkuKeys)
+                ? null : new LinkedHashSet<>(embryoStockRealMachineSkuKeys));
+        context.setEmbryoStockAllocationDeferred(embryoStockAllocationDeferred);
+        context.setVirtualMachineCuringRemainingQtyMap(new LinkedHashMap<>(virtualMachineCuringRemainingQtyMap));
+        context.setVirtualMachineCuringTargetQtyMap(new LinkedHashMap<>(virtualMachineCuringTargetQtyMap));
         context.setSharedEmbryoStockEndingInitialQuotaMap(new LinkedHashMap<>(sharedEmbryoStockEndingInitialQuotaMap));
         context.setSharedEmbryoStockEndingConsumedQtyMap(new LinkedHashMap<>(sharedEmbryoStockEndingConsumedQtyMap));
         context.setSharedEmbryoStockEndingMachineQuotaMap(new IdentityHashMap<>(sharedEmbryoStockEndingMachineQuotaMap));
@@ -634,6 +672,7 @@ final class ScheduleSubstitutionAttemptSnapshot {
         context.setDailyMaintenanceCountMap(
                 new LinkedHashMap<String, Integer>(dailyMaintenanceCountMap));
         context.setEquipmentPlanRuntimeState(equipmentPlanRuntimeState.copy());
+        context.getRepairPlanRuntimeState().restoreTransferProgress(repairTransferEventMap);
         context.setCleaningPlanRuntimeState(cleaningPlanRuntimeState.copy());
         context.setContinuousProductionConsumptionMap(new IdentityHashMap<>(continuousProductionConsumptionMap));
         context.setMaintenanceDeferredPhysicalMachineCodeSet(new LinkedHashSet<>(maintenanceDeferredPhysicalMachineCodeSet));

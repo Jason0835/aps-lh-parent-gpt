@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.Objects;
@@ -32,6 +33,7 @@ public class LhTemporaryFaultService {
 
     /**
      * 登记故障原始时间；未来故障不会修改机台就绪时间或维修标记。
+     *
      * @param context 排程上下文
      * @param plan 原始06计划，已通过公共有效性校验
      */
@@ -42,22 +44,36 @@ public class LhTemporaryFaultService {
         window.setStartTime(new Date(plan.getBeginDate().getTime()));
         window.setEndTime(new Date(plan.getEndDate().getTime()));
         context.getTemporaryFaultWindowMap().put(plan.getId(), window);
+        context.getRepairPlanRuntimeState().constraintsChanged();
     }
 
     /**
      * 将故障只读适配为公共产能区间；不得把返回列表挂入机台精度窗口。
+     *
      * @param context 排程上下文
      * @param machineCode 当前运行态机台编码，L/R按物理机台命中
      * @return 原始故障开始至结束的禁产区间，无预热
      */
     public static List<MachineMaintenanceWindowDTO> resolveCapacityWindows(
             LhScheduleContext context, String machineCode) {
-        List<MachineMaintenanceWindowDTO> windows = new ArrayList<>(4);
         if (Objects.isNull(context) || StringUtils.isEmpty(machineCode)) {
-            return windows;
+            return new ArrayList<>(0);
         }
+        return projectCapacityWindows(context.getTemporaryFaultWindowMap().values(), machineCode);
+    }
+
+    /**
+     * 将已筛选或原始故障列表投影为独立容量窗口，不共享原始可变日期。
+     *
+     * @param faults 原始故障或当前物理机台的故障副本
+     * @param machineCode 当前运行侧
+     * @return 不含预热且日期独立的故障容量投影
+     */
+    public static List<MachineMaintenanceWindowDTO> projectCapacityWindows(
+            Collection<MachineFaultWindowDTO> faults, String machineCode) {
+        List<MachineMaintenanceWindowDTO> windows = new ArrayList<>(faults.size());
         String physicalCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode);
-        for (MachineFaultWindowDTO fault : context.getTemporaryFaultWindowMap().values()) {
+        for (MachineFaultWindowDTO fault : faults) {
             if (!StringUtils.equals(physicalCode,
                     LhSingleControlMachineUtil.resolvePhysicalMachineCode(fault.getMachineCode()))) {
                 continue;
@@ -66,9 +82,9 @@ public class LhTemporaryFaultService {
             window.setMachineCode(machineCode);
             window.setMaintenanceType(FAULT_CAPACITY_WINDOW_TYPE);
             window.setSourcePlanDate(LhScheduleTimeUtil.clearTime(fault.getStartTime()));
-            window.setMaintenanceStartTime(fault.getStartTime());
-            window.setMaintenanceEndTime(fault.getEndTime());
-            window.setProductionResumeTime(fault.getEndTime());
+            window.setMaintenanceStartTime(new Date(fault.getStartTime().getTime()));
+            window.setMaintenanceEndTime(new Date(fault.getEndTime().getTime()));
+            window.setProductionResumeTime(new Date(fault.getEndTime().getTime()));
             window.setTriggerReason(MachineStopTypeEnum.TEMPORARY_FAULT.getCode() + "临时故障仅扣时间产能");
             windows.add(window);
         }

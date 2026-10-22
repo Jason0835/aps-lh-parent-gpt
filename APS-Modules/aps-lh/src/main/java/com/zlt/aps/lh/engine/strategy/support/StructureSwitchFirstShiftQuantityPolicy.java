@@ -125,7 +125,7 @@ public final class StructureSwitchFirstShiftQuantityPolicy {
             return plan;
         }
         int sides = resolvePreviewSides(context, sku, machineCode);
-        for (FirstInspectionShiftAllocation allocation : plan.getShiftAllocations()) {
+        for (FirstInspectionShiftAllocation allocation : plan.getQuantityAllocations()) {
             Integer limit = resolveLimit(context, source, sku.getEmbryoCode(), allocation.getShift());
             if (Objects.nonNull(limit) && usedQuantity(context, sku.getStructureName(), sku.getEmbryoCode(),
                     allocation.getShift(), null) + (long) allocation.getQuantity() * sides > limit) {
@@ -153,7 +153,7 @@ public final class StructureSwitchFirstShiftQuantityPolicy {
         int sides = LhSingleControlMachineUtil.isConfiguredSingleControlMachine(context, result.getLhMachineCode())
                 && LhSingleControlMachineUtil.isWholeMachineGranularityResult(context, result)
                 ? WHOLE_MACHINE_SIDES : 1;
-        for (FirstInspectionShiftAllocation allocation : plan.getShiftAllocations()) {
+        for (FirstInspectionShiftAllocation allocation : plan.getQuantityAllocations()) {
             LhShiftConfigVO shift = allocation.getShift();
             Integer limit = resolveLimit(context, source, result.getEmbryoCode(), shift);
             long current = StructureSwitchSchedulingPolicy.quantity(result, shift.getShiftIndex());

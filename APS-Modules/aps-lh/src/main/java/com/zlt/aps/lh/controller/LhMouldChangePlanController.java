@@ -44,6 +44,7 @@ import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
 import com.zlt.aps.lh.mapper.LhSharedMouldPatEntityMapper;
 import com.zlt.aps.lh.service.ILhMouldChangePlanService;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
+import com.zlt.aps.lh.util.LhMouldChangePlanImportReader;
 import com.zlt.aps.utils.AppUtils;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
@@ -272,7 +273,6 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         ImportLog importLog = ImportExcelUtils.getImportLogAndUploadFile(importContext.getFileBytes(), importContext.getImportFilePath(), importContext.getProcedureCode(), importContext.getFunctionName(), importContext.getOriFileName(), 1);
         importLog = this.iImportLogService.add(importLog);
         byte[] fileBytes = importContext.getFileBytes();
-        ExcelUtil<LhMouldChangePlanVo> util = new ExcelUtil<>(LhMouldChangePlanVo.class);
         String sheetName = I18nUtil.getMessage("ui.data.column.lhMouldChangePlan.import.modelName");
         String titleFormat = I18nUtil.getMessage("mouldChangePlan.export.title");
         String templateErrorStr = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.import.templateError");
@@ -307,8 +307,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             return AjaxResult.error(templateErrorStr);
         }
         lhImportContext.setScheduleResult(scheduleResult);
-        List<LhMouldChangePlanVo> list = util.importExcel(
-                sheetName, new ByteArrayInputStream(fileBytes), 0, 4, -1);
+        List<LhMouldChangePlanVo> list = LhMouldChangePlanImportReader.readRows(fileBytes, sheetName);
         List<LhMouldChangePlan> mouldChangePlanList = buildLhMouldChangePlanList(list, scheduleDate);
         AjaxResult ajaxResult = this.doImportData(mouldChangePlanList, updateSupport, importLog.getId());
         // 导入成功后，补全模具交替计划的批次号
@@ -350,12 +349,9 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             // 保留模板示方类型原文，由导入服务统一校验并转换为字典值。
             lhMouldChangePlan.setProductStatus(lhMouldChangePlanVo.getAfterMaterialType());
 
-            String endType = lhMouldChangePlanVo.getEndType();
-            if ("是Có".equals(endType)) {
-                lhMouldChangePlan.setEndType(YesOrNoEnum.NO.getCode());
-            } else {
-                lhMouldChangePlan.setEndType(YesOrNoEnum.YES.getCode());
-            }
+            // 模板下机列沿用changeType表头字段，原始文本交给服务层校验和转换。
+            lhMouldChangePlan.setEndType(lhMouldChangePlanVo.getChangeType());
+            lhMouldChangePlan.setRemark(StringUtils.defaultString(lhMouldChangePlanVo.getRemark()));
             resultList.add(lhMouldChangePlan);
         }
         return resultList;

@@ -9,6 +9,7 @@ import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.engine.strategy.impl.DefaultMouldChangeBalanceStrategy;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceAllocationResult;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceContext;
 import com.zlt.aps.lh.util.LhMouldCodeUtil;
@@ -17,6 +18,7 @@ import com.zlt.aps.lh.util.CleaningDispositionResolver;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.MachineCleaningOverlapUtil;
+import com.zlt.aps.lh.util.PriorityTraceLogHelper;
 import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -35,18 +37,30 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * 续作仅喷砂处置：只负责精确模具交接和清洗事件，不改变数量账本及选机算法。
+ * 续作仅喷砂处置：负责精确模具交接、置换额度和清洗事件，不改变数量账本及选机算法。
  * 本协作服务无外部依赖和实例运行态，由使用方持有，全部批次状态均写入排程上下文。
+ *
+ * @author APS
+ * @since 2026/10/21
  */
 @Slf4j
 public class ContinuationSandBlastDispositionService {
 
-    /** 同 SKU 原机更换模具的业务原因。 */
+    /**
+     * 同 SKU 原机更换模具的业务原因。
+     */
     public static final String REPLACEMENT_ANALYSIS = "模具置换";
 
     /**
+     * 复用普通换模的动态额度及登记、回退，全部运行态仍保存在批次上下文中。
+     */
+    private final DefaultMouldChangeBalanceStrategy mouldChangeBalanceStrategy =
+            new DefaultMouldChangeBalanceStrategy();
+
+    /**
      * 续作计算产能前优先落实可用模具，防止置换后仍扣减原模具的清洗停机产能。
-     * 单控同源事件先整体检查足量模具，再按运行侧精确绑定，不允许半套置换。
+     * 单控同源事件先整体检查足量模具及一次物理换模额度，再按运行侧精确绑定。
+     *
      * @param context 排程上下文
      */
     public void prepare(LhScheduleContext context) {
@@ -152,8 +166,8 @@ public class ContinuationSandBlastDispositionService {
     }
 
     /**
-     * 整组预占替换模具并冻结新模具的准备和计件首检时间。
-     * 没有足量模具时只记录原处置，截断和扣账仍由续作主链完成。
+     * 整组预占替换模具及一次换模额度，并冻结新模具的准备和计件首检时间。
+     * 没有足量模具时沿原离机处置；有模具但额度不足时保留原机台清洗窗口。
      *
      * @param context 排程上下文
      * @param resources 共享模具资源
@@ -196,6 +210,11 @@ public class ContinuationSandBlastDispositionService {
             log.error("续作置换首检时间配置无效, 工厂: {}, 批次: {}, 机台: {}, 物料: {}, 班产: {}, 首检条数: {}",
                     context.getFactoryCode(), context.getBatchNo(), sides, materialCode, physicalCapacity, inspectionQty);
             throw new IllegalStateException(I18nUtil.getMessage("ui.data.column.lhScheduleResult.errorCode.systemError"));
+        }
+        if (replacement && !this.reserveReplacementQuota(context, sides.get(0),
+                candidates.get(sides.get(0)), sources.get(sides.get(0)))) {
+            // 未取得额度时不能发布离机事件，否则续作主链会误将其按无模具分支强制下机。
+            return;
         }
         int offset = 0;
         int sideIndex = 0;
@@ -279,7 +298,7 @@ public class ContinuationSandBlastDispositionService {
     }
 
     /**
-     * 最终续作未跨过触发时刻时取消预占及置换时间，恢复原清洗窗口。
+     * 最终续作未跨过触发时刻时取消模具、额度预占及置换时间，恢复原清洗窗口。
      *
      * @param context 排程上下文
      */
@@ -336,12 +355,14 @@ public class ContinuationSandBlastDispositionService {
                     entry.getKey(), event.getContinuationMaterialCode(), event.getCleanStartTime());
         }
         cancelled.forEach(context.getContinuationSandBlastWindowMap()::remove);
+        this.reconcileReplacementQuotas(context);
         context.setMouldResourceContext(MouldResourceContext.from(context));
     }
 
     /**
      * 正式结果提交后解除已取消喷砂的模具清洗边界，保留来源事件供最终计划及回填追溯。
      * 只恢复仍等于本事件清洗结束的边界，禁止覆盖后续合法事件；候选预演不得调用。
+     * 已取消置换的换模额度同步幂等释放，不影响其他真实动作。
      *
      * @param context 已正式提交结果的当前批次上下文
      */
@@ -385,6 +406,90 @@ public class ContinuationSandBlastDispositionService {
         if (resourceChanged) {
             context.setMouldResourceContext(MouldResourceContext.from(context));
         }
+        this.reconcileReplacementQuotas(context);
+    }
+
+    /**
+     * 在实际模具绑定前按固定触发时刻占用统一额度，同源左右侧仅登记一次。
+     *
+     * @param context 当前批次上下文
+     * @param machineCode 本次物理事件的代表运行侧
+     * @param window 原喷砂清洗窗口
+     * @param source 来源续作SKU
+     * @return 已占用额度或本次成功占用时返回 true，额度不足时返回 false
+     */
+    private boolean reserveReplacementQuota(LhScheduleContext context, String machineCode,
+                                             MachineCleaningWindowDTO window, SkuScheduleDTO source) {
+        String eventKey = this.buildReplacementQuotaKey(machineCode, window,
+                source.getMaterialCode(), source.getProductStatus());
+        Map<String, Date> reservations = context.getCleaningPlanRuntimeState().getReplacementQuotaReservationMap();
+        if (reservations.containsKey(eventKey)) {
+            return true;
+        }
+        Date changeTime = window.getCleanStartTime();
+        boolean reserved = mouldChangeBalanceStrategy.tryReserveFixedMouldChange(context, changeTime);
+        if (reserved) {
+            reservations.put(eventKey, (Date) changeTime.clone());
+        }
+        String dateKey = LhScheduleTimeUtil.formatDate(changeTime);
+        int[] counts = context.getDailyMouldChangeCountMap().getOrDefault(dateKey, new int[]{0, 0});
+        String detail = "工厂=" + context.getFactoryCode() + "，批次=" + context.getBatchNo()
+                + "，机台=" + machineCode + "，物料=" + source.getMaterialCode()
+                + "，状态=" + source.getProductStatus() + "，置换开始="
+                + LhScheduleTimeUtil.formatDateTime(changeTime)
+                + "，早班次数=" + counts[0] + "/" + LhScheduleTimeUtil.getMorningMouldChangeLimit(context, dateKey)
+                + "，中班次数=" + counts[1] + "/" + LhScheduleTimeUtil.getAfternoonMouldChangeLimit(context, dateKey)
+                + "，每日次数=" + (counts[0] + counts[1]) + "/"
+                + LhScheduleTimeUtil.getDailyMouldChangeLimit(context, dateKey)
+                + "，处置=" + (reserved ? "占用一次置换额度" : "额度不足，保留原清洗处理");
+        PriorityTraceLogHelper.appendProcessLog(context, "喷砂置换换模额度", detail);
+        log.info("{}", detail);
+        return reserved;
+    }
+
+    /**
+     * 释放已经取消或未达到触发时刻的置换额度；同源L/R仍有有效侧时保留该物理次数。
+     * 额度身份与清洗事件同属运行态快照，预演恢复后可再次按真实结果正确撤销。
+     *
+     * @param context 已完成事件取消或正式处置复核的上下文
+     */
+    private void reconcileReplacementQuotas(LhScheduleContext context) {
+        Map<String, Date> reservations = context.getCleaningPlanRuntimeState().getReplacementQuotaReservationMap();
+        if (reservations.isEmpty()) {
+            return;
+        }
+        Set<String> activeKeys = context.getContinuationSandBlastWindowMap().entrySet().stream()
+                .filter(entry -> StringUtils.isNotEmpty(entry.getValue().getReplacementMouldCode()))
+                .filter(entry -> CleaningDispositionResolver.resolve(context, entry.getKey(), entry.getValue())
+                        .getDisposition() == CleaningDispositionResolver.Disposition.INDEPENDENT)
+                .map(entry -> this.buildReplacementQuotaKey(entry.getKey(), entry.getValue(),
+                        entry.getValue().getContinuationMaterialCode(),
+                        entry.getValue().getContinuationProductStatus()))
+                .collect(Collectors.toSet());
+        List<String> cancelledKeys = reservations.keySet().stream()
+                .filter(key -> !activeKeys.contains(key)).collect(Collectors.toList());
+        for (String eventKey : cancelledKeys) {
+            Date changeTime = reservations.remove(eventKey);
+            mouldChangeBalanceStrategy.rollbackMouldChange(context, changeTime);
+            log.info("喷砂置换额度取消, 工厂: {}, 批次: {}, 事件: {}, 置换开始: {}",
+                    context.getFactoryCode(), context.getBatchNo(), eventKey,
+                    LhScheduleTimeUtil.formatDateTime(changeTime));
+        }
+    }
+
+    /**
+     * 为同一物理置换构建稳定身份，保留来源、SKU状态及开始时刻以区分独立真实动作。
+     *
+     * @param machineCode 运行侧机台编码
+     * @param window 来源喷砂清洗窗口
+     * @param materialCode 触发时刻的续作物料
+     * @param productStatus 触发时刻的产品状态
+     * @return 同源左右侧一致、不同动作独立的额度身份
+     */
+    private String buildReplacementQuotaKey(String machineCode, MachineCleaningWindowDTO window,
+                                            String materialCode, String productStatus) {
+        return LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode) + "|" + window.getSourcePlanId()
+                + "|" + window.getCleanStartTime().getTime() + "|" + materialCode + "|" + productStatus;
     }
 
     /**

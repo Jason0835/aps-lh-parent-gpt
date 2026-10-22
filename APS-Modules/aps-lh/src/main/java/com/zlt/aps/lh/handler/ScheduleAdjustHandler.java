@@ -159,8 +159,15 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     @Resource
     private DayPlanAdjustRequireAssembler dayPlanAdjustRequireAssembler;
 
+    /**
+     * 归集需求并完成续作、新增准入，库存份额延后至实机与历史来源就绪后统一冻结。
+     *
+     * @param context 当前批次原始月计划及运行态需求
+     */
     @Override
     protected void doHandle(LhScheduleContext context) {
+        // 准入过滤前的结构池包含仅虚拟兜底及稍后退出的SKU，此时不得冻结库存份额。
+        context.setEmbryoStockAllocationDeferred(true);
         log.info("排程调整与SKU归集开始, 工厂: {}, 目标日: {}, T日: {}, 月计划记录数: {}, 前批次结果数: {}",
                 context.getFactoryCode(), LhScheduleTimeUtil.formatDate(context.getScheduleTargetDate()),
                 LhScheduleTimeUtil.formatDate(context.getScheduleDate()),
@@ -186,9 +193,6 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
 
         // S4.3.3 标注收尾SKU（3天内可收尾）
         markEndingSkus(context);
-        // 共用胎胚为收尾时按原始余量占比冻结份额，不依赖SKU收尾标签或T日同日条件。
-        getTargetScheduleQtyResolver().refreshAllSharedEmbryoStockAllocations(context, "S4.3收尾标注完成");
-
         /*
          * S4.3.4 区分续作SKU和新增SKU。完成MES在机续作识别后，分类方法统一执行共用胎胚
          * 混合余量门禁，覆盖续作与新增零余量SKU；全零余量组继续复用续作库存承接规则。

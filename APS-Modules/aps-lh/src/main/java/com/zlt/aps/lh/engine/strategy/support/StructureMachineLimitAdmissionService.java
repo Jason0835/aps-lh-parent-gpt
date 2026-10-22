@@ -1,6 +1,7 @@
 package com.zlt.aps.lh.engine.strategy.support;
 
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
+import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.component.StructureEarlyProductionAdmission;
 import com.zlt.aps.lh.component.EmbryoEndingStructureMachineExemptionPolicy;
@@ -25,7 +26,7 @@ import java.util.Set;
  * 新增结构物理机台上限统一准入计算器。
  *
  * <p>普通新增、续作加机台和普通结构提前生产统一按生产占用班次所属业务日读取结构机台上限，
- * 并复用结构收尾服务的班次边界判断计算有效在机数。试制、量试豁免普通结构上限，
+ * 并复用结构收尾服务的班次边界判断计算有效在机数。精确历史交替后料、试制和量试豁免普通结构上限，
  * 仍按真实占用计入在机统计；豁免不改变资源、首检及结构切换专用名额。结构切换在提前生产和后续正常资源
  * 竞争阶段统一使用S0/S1专用逐班名额；结构收尾提前生产沿用专用准入，两者都不重复套用
  * 普通结构班次门禁。计算过程只读，不修改结构索引、排程结果、候选运行态或资源账本。</p>
@@ -74,7 +75,8 @@ public class StructureMachineLimitAdmissionService {
 
     /**
      * 按首检或正式生产实际占用时刻计算结构机台上限准入结果。
-     * 试制、量试和成型收尾后的匹配SKU按各自规则豁免数量上限，必要班次和机台信息仍须完整。
+     * 精确历史交替后料、试制量试和成型收尾后的匹配SKU按各自规则豁免数量上限，
+     * 历史交替只免数量比较，必要班次、机台及统计索引仍须完整。
      *
      * @param context 排程上下文
      * @param phase 当前排程阶段
@@ -161,7 +163,9 @@ public class StructureMachineLimitAdmissionService {
             return this.buildDecision(true, true, phase, businessDate, formalTargetShift, machineCode,
                     sku, originalPoolDate, exemptStatistics, structureMachineLimit, "成型胎胚收尾后同胎胚同结构不占机台配额");
         }
-        if (structureMachineLimit <= 0) {
+        LhMouldChangePlan previousAlternatePlan = PreviousAlternateStructureLimitExemptionPolicy
+                .resolvePlan(context, sku, machineCode);
+        if (structureMachineLimit <= 0 && Objects.isNull(previousAlternatePlan)) {
             return this.buildDecision(
                     true, false, phase, businessDate, formalTargetShift, machineCode,
                     sku, originalPoolDate, null, structureMachineLimit,
@@ -193,14 +197,35 @@ public class StructureMachineLimitAdmissionService {
         int newMachineDelta = effectivePhysicalMachineCodes.contains(
                 physicalMachineCode) ? 0 : 1;
         int effectiveMachineCount = effectivePhysicalMachineCodes.size();
-        boolean allowed = effectiveMachineCount + newMachineDelta
-                <= structureMachineLimit;
-        String reason = allowed
-                ? "结构有效在机数与候选新增增量未超过实际开产日上限"
-                : new StringBuilder("目标班次结构有效物理机台数加候选增量超过实际开产日上限，")
-                .append(effectiveMachineCount).append("+")
-                .append(newMachineDelta).append(">")
-                .append(structureMachineLimit).toString();
+        // 历史交替仅跳过本次上限比较，真实集合和新增增量继续供提交累计及后续普通候选使用。
+        boolean previousAlternateExempt = Objects.nonNull(previousAlternatePlan);
+        boolean allowed = previousAlternateExempt
+                || effectiveMachineCount + newMachineDelta <= structureMachineLimit;
+        String reason;
+        if (previousAlternateExempt) {
+            reason = "前日交替计划后物料豁免普通结构机台上限，仍按原规则累计在机数";
+        } else if (allowed) {
+            reason = "结构有效在机数与候选新增增量未超过实际开产日上限";
+        } else {
+            reason = new StringBuilder("目标班次结构有效物理机台数加候选增量超过实际开产日上限，")
+                    .append(effectiveMachineCount).append("+")
+                    .append(newMachineDelta).append(">")
+                    .append(structureMachineLimit).toString();
+        }
+        if (previousAlternateExempt) {
+            log.info("历史交替后料结构机台上限豁免, factoryCode: {}, batchNo: {}, sourceBatchNo: {}, planId: {}, "
+                            + "businessDate: {}, shiftIndex: {}, materialCode: {}, productStatus: {}, "
+                            + "structureName: {}, machineCode: {}, physicalMachineCode: {}, rawMachineCount: {}, "
+                            + "effectiveMachineCount: {}, newMachineDelta: {}, structureMachineLimit: {}, proposalPreview: {}, "
+                            + "groupPreview: {}, timedMachineOffPreview: {}",
+                    context.getFactoryCode(), context.getBatchNo(), previousAlternatePlan.getLhResultBatchNo(),
+                    previousAlternatePlan.getId(), businessDate, formalTargetShift.getShiftIndex(),
+                    sku.getMaterialCode(), sku.getProductStatus(), sku.getStructureName(), machineCode,
+                    physicalMachineCode, statistics.getRawScheduledPhysicalMachineCodes().size(),
+                    effectiveMachineCount, newMachineDelta, structureMachineLimit,
+                    context.isNewSpecProposalPreview(), context.isPreviousAlternateGroupPreview(),
+                    Objects.nonNull(context.getTimedMachineOffActionPreviewCapture()));
+        }
         return new StructureMachineLimitDecision(
                 true, allowed, phase, businessDate,
                 formalTargetShift.getShiftIndex(),
@@ -215,7 +240,7 @@ public class StructureMachineLimitAdmissionService {
 
     /**
      * 从完整排程窗口中的真实占用班次开始解析最早满足结构机台上限的开产时刻。
-     * 试制、量试不因普通结构名额后移首检或生产，结构切换专用名额仍继续生效。
+     * 精确历史交替后料、试制和量试不因普通结构名额后移首检或生产，结构切换专用名额仍继续生效。
      *
      * <p>首检计入在线硫化机。结构机台数按整个班次统计，当前班次已满时不得因班内某台
      * 收尾而提前释放名额；历史首检班次有名额时保留原时刻，只有真实超限才继续扫描

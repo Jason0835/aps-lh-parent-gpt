@@ -1,5 +1,7 @@
 package com.zlt.aps.lh.service.impl;
 
+import com.zlt.aps.lh.engine.strategy.support.RepairPlanResult;
+
 import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineMaintenanceWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
@@ -676,12 +678,11 @@ public class LhEquipmentPlanScheduleService {
     private String resolveUnsupportedCombination(LhScheduleContext context, EquipmentPlanTimeline timeline) {
         Date start = timeline.getMaintenanceStartTime();
         Date end = timeline.getProductionResumeTime();
-        for (MdmDevicePlanShut stop : context.getDevicePlanShutList()) {
-            if (Objects.nonNull(stop) && StringUtils.equals(timeline.getPhysicalMachineCode(),
-                    LhSingleControlMachineUtil.resolvePhysicalMachineCode(stop.getMachineCode()))
-                    && this.overlaps(start, end, stop.getBeginDate(), stop.getEndDate())) {
-                return "精度与设备停机/维修重叠尚未接入，停机类型=" + stop.getMachineStopType();
-            }
+        RepairPlanResult repairOverlap = LhRepairOverlapResolver.resolveWithPrecision(
+                context.getDevicePlanShutList(), timeline.getPhysicalMachineCode(), start, end,
+                "精度与设备停机/维修重叠尚未接入，停机类型=");
+        if (repairOverlap.getOverlapStatus() == RepairPlanResult.OverlapStatus.UNSUPPORTED) {
+            return repairOverlap.getReason();
         }
         for (MachineScheduleDTO side : this.physicalMachines(context, timeline.getPhysicalMachineCode())) {
             for (MachineCleaningWindowDTO cleaning : side.getCleaningWindowList()) {

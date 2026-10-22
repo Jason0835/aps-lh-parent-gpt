@@ -271,8 +271,7 @@ public class LhNextShiftNewPlanService {
         LhScheduleContext isolatedContext = new LhScheduleContext();
         BeanUtil.copyProperties(sourceContext, isolatedContext);
         // 扩展窗口只能写独立副本的停机索引，不能污染原8班已经完成的回填范围。
-        isolatedContext.setPlannedRepairSourcePlanMap(new LinkedHashMap<>(sourceContext.getPlannedRepairSourcePlanMap()));
-        isolatedContext.setTemporaryFaultWindowMap(new LinkedHashMap<>(sourceContext.getTemporaryFaultWindowMap()));
+        isolatedContext.setRepairPlanRuntimeState(sourceContext.getRepairPlanRuntimeState());
         // 快照恢复会重建全部可变资源；先切断机台Map引用，避免恢复时清理原上下文。
         isolatedContext.setMachineScheduleMap(new LinkedHashMap<String, MachineScheduleDTO>());
         ScheduleSubstitutionAttemptSnapshot.capture(

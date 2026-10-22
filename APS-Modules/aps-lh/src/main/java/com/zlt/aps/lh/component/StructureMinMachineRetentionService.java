@@ -11,6 +11,7 @@ import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.util.FirstInspectionQtyUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
@@ -431,7 +432,13 @@ public class StructureMinMachineRetentionService {
         if (isContinuousStopHoldAtShift(context, machineCode, shift)) {
             return false;
         }
-        if (hasPositiveStructurePlan(context, structureName, machineCode, shiftIndex)) {
+        // 首检条数归入完成班次后，前班真实首检仍占结构名额，不能因计划槽位为零而释放。
+        boolean inspectionOccupies = context.getScheduleResultList().stream()
+                .filter(result -> StringUtils.equals(machineCode, result.getLhMachineCode()))
+                .filter(result -> StringUtils.equals(structureName, result.getStructureName())
+                        || isSnapshotStructureMaterial(context, structureName, result.getMaterialCode()))
+                .anyMatch(result -> FirstInspectionQtyUtil.hasProductionOccupation(context, result, shiftIndex));
+        if (inspectionOccupies || hasPositiveStructurePlan(context, structureName, machineCode, shiftIndex)) {
             return true;
         }
         if (hasPositiveOtherStructurePlan(context, structureName, machineCode, shiftIndex)

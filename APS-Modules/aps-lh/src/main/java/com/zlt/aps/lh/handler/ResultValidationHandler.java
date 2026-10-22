@@ -1,5 +1,6 @@
 package com.zlt.aps.lh.handler;
 
+import com.zlt.aps.lh.service.impl.LhPlannedRepairResolver;
 import cn.hutool.core.date.DateUtil;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
@@ -257,7 +258,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                 continue;
             }
             List<MachineMaintenanceWindowDTO> repairWindowList =
-                    ShiftCapacityResolverUtil.resolvePlannedRepairCapacityWindowList(
+                    LhPlannedRepairResolver.resolveCapacityWindows(
                             context, context.getDevicePlanShutList(), result.getLhMachineCode());
             for (MachineMaintenanceWindowDTO repairWindow : repairWindowList) {
                 alignResultShiftStartAfterPlannedRepair(context, result, repairWindow);
@@ -1634,6 +1635,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
      *     同组有实际排量的SKU同样收尾，不依赖后续候选刷新后的内部额度。</li>
      * </ol>
      *
+     * <p>仅复核真实机台结果，虚拟计划不参与实机库存和收尾统计，其自身标识由虚拟排产阶段保持。</p>
+     *
      * @param context 排程上下文
      */
     private void refreshFinalEndingFlagByMaterialStatus(LhScheduleContext context) {
@@ -1643,7 +1646,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         Map<String, Integer> scheduledQtyMap = new LinkedHashMap<String, Integer>(32);
         Map<String, SkuScheduleDTO> sourceSkuMap = new LinkedHashMap<String, SkuScheduleDTO>(32);
         for (LhScheduleResult result : context.getScheduleResultList()) {
-            if (Objects.isNull(result) || StringUtils.isEmpty(result.getMaterialCode())) {
+            if (Objects.isNull(result) || StringUtils.isEmpty(result.getMaterialCode())
+                    || LhSingleControlMachineUtil.isVirtualMachineCode(result.getLhMachineCode())) {
                 continue;
             }
             String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
@@ -1691,6 +1695,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             boolean finalTailFlag = surplusTailFlag || embryoStockTailFlag || embryoGroupExhausted;
             context.getScheduleResultList().stream()
                     .filter(Objects::nonNull)
+                    .filter(result -> !LhSingleControlMachineUtil.isVirtualMachineCode(result.getLhMachineCode()))
                     .filter(result -> StringUtils.equals(entry.getKey(),
                             MonthPlanDateResolver.buildMaterialStatusKey(
                                     result.getMaterialCode(), result.getProductStatus())))
@@ -1709,7 +1714,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     /**
      * 校验严格目标量SKU的跨阶段计划量上限。
      * <p>正规/量试非收尾存在模台数归整、最后已开班补满和126/128等既有口径，
-     * 历史通用数量校验仍保持关闭；本次只启用收尾、试制等严格目标量的保存前强校验。</p>
+     * 历史通用数量校验仍保持关闭；本方法只处理实机严格目标量，虚拟计划按独立硫化需求裁量。</p>
      *
      * @param context 排程上下文
      */
@@ -1722,6 +1727,11 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         Map<String, Integer> endingAllowedOverQtyMap = new LinkedHashMap<String, Integer>(32);
         Map<String, SkuScheduleDTO> validationSkuMap = new LinkedHashMap<String, SkuScheduleDTO>(32);
         for (LhScheduleResult result : context.getScheduleResultList()) {
+            // 虚拟计划已按独立硫化需求裁量，不能与实机库存硬额度合并校验。
+            if (Objects.isNull(result)
+                    || LhSingleControlMachineUtil.isVirtualMachineCode(result.getLhMachineCode())) {
+                continue;
+            }
             SkuScheduleDTO sourceSku = context.getScheduleResultSourceSkuMap().get(result);
             if (Objects.isNull(sourceSku)) {
                 continue;
@@ -2977,9 +2987,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         }
         Map<String, int[]> singleControlEventSideCountMap = new HashMap<>();
         for (LhMouldChangePlan plan : context.getMouldChangePlanList()) {
-            // 同SKU喷砂置换虽展示为换模，仍不占普通换模资源名额。
-            if (!shouldCountMouldChangePlan(plan) || Objects.isNull(plan.getPlanDate())
-                    || Objects.nonNull(this.resolveOffMachineCleaningEvent(context, plan))) {
+            // 同SKU喷砂置换也是实际换模，与普通01/02动作共用物理事件去重及次数复核。
+            if (!this.shouldCountMouldChangePlan(plan) || Objects.isNull(plan.getPlanDate())) {
                 continue;
             }
             String physicalMachineCode = this.resolvePhysicalMouldChangeMachineCode(
@@ -3588,9 +3597,9 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     }
 
     /**
-     * 汇总本次排程指定“物料+产品状态”的全部结果计划量。
+     * 汇总本次排程指定“物料+产品状态”的真实机台结果计划量。
      * <p>同一物料在多个机台或多次换活字块上生产时均计入，确保与“SKU 硫化余量”同一口径
-     * 核算本次排程后的真实剩余量；结果行日计划量为空时回退到 8 班班次量之和。</p>
+     * 核算实机交替前料的真实剩余量，虚拟计划不计入；日计划量为空时回退到8班班次量之和。</p>
      *
      * @param context 排程上下文
      * @param materialCode 物料编码
@@ -3607,6 +3616,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         String targetSkuKey = MonthPlanDateResolver.buildMaterialStatusKey(materialCode, productStatus);
         return context.getScheduleResultList().stream()
                 .filter(Objects::nonNull)
+                .filter(result -> !LhSingleControlMachineUtil.isVirtualMachineCode(result.getLhMachineCode()))
                 .filter(result -> StringUtils.equals(materialCode, result.getMaterialCode()))
                 .filter(result -> StringUtils.equals(targetSkuKey,
                         MonthPlanDateResolver.buildMaterialStatusKey(

@@ -159,7 +159,10 @@ public class LhMouldChangePlanVo extends BaseEntity implements Serializable {
     @TableField(value = "END_TYPE")
     private String endType;
 
-    @ApiModelProperty(value = "换模类型")
+    /**
+     * 下机列的模板表头及导入原文，保留历史字段名changeType以兼容已有模板。
+     */
+    @ApiModelProperty(value = "下机列模板字段")
     @Excel(name = "ui.data.column.lhMouldChangePlan.changeType", width = 25)
     @TableField(exist = false)
     private String changeType;

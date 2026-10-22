@@ -3,6 +3,7 @@
  */
 package com.zlt.aps.lh.engine.strategy.impl;
 
+import com.zlt.aps.lh.engine.strategy.support.RepairPlanResult;
 import cn.hutool.core.bean.BeanUtil;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
@@ -48,9 +49,11 @@ import com.zlt.aps.lh.engine.strategy.support.DailyMachineExpansionPlanner;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationRemainderFinishGroup;
 import com.zlt.aps.lh.engine.strategy.support.TimedMachineOffRequest;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationFinishScheduleResult;
+import com.zlt.aps.lh.engine.strategy.support.ContinuationFinishPlanMatcher;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationMachineFinishPlan;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationNightFinishConstraint;
 import com.zlt.aps.lh.service.impl.ContinuationRemainderFinishScheduleService;
+import com.zlt.aps.lh.service.impl.ContinuationHistoryFinishMatchService;
 import com.zlt.aps.lh.service.impl.TimedMachineOffShiftService;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationEndingAllocationSnapshot;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationEndingMachineProfile;
@@ -64,9 +67,11 @@ import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
 import com.zlt.aps.lh.service.impl.LhMaintenanceScheduleService;
 import com.zlt.aps.lh.service.impl.LhEquipmentPlanScheduleService;
 import com.zlt.aps.lh.engine.strategy.support.ContinuousProductionConsumption;
-import com.zlt.aps.lh.service.impl.ContinuationTemporaryFaultTransferService;
+import com.zlt.aps.lh.service.impl.LhRepairPlanScheduleService;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationMachineReducer;
 import com.zlt.aps.lh.engine.strategy.support.PreviousAlternatePlanReleaseEvent;
+import com.zlt.aps.lh.engine.strategy.support.StructureSwitchCandidateScope;
+import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.engine.strategy.support.ReductionResult;
 import com.zlt.aps.lh.engine.strategy.support.MachineReductionDecision;
 import com.zlt.aps.lh.util.CleaningDispositionResolver;
@@ -188,12 +193,20 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     @Resource
     private ContinuationRemainderFinishScheduleService continuationRemainderFinishScheduleService;
 
+    /**
+     * 正式时间决定之后隔离复核余量收尾对调的历史后料资源，不参与时间下机负荷选班。
+     */
+    @Resource
+    private ContinuationHistoryFinishMatchService continuationHistoryFinishMatchService;
+
     /** 无跨批次状态，仅在统一扣账完成后发布已确定的按时间下机事实。 */
     private final TimedMachineOffShiftService timedMachineOffShiftService = new TimedMachineOffShiftService();
 
-    /** 续作临时故障达到两班阈值后的独立迁移事件入口。 */
+    /**
+     * 统一准备续作临时故障迁移事件，保持原执行阶段。
+     */
     @Resource
-    private ContinuationTemporaryFaultTransferService continuationTemporaryFaultTransferService;
+    private LhRepairPlanScheduleService repairPlanScheduleService;
 
     private static final String CONTINUOUS_SCHEDULE_TYPE = "01";
     private static final String AUTO_DATA_SOURCE = "0";
@@ -313,7 +326,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
 
         List<LhShiftConfigVO> shifts = LhScheduleTimeUtil.getScheduleShifts(context, context.getScheduleDate());
         // 续作产能计算前冻结故障事件；普通短时故障仍只走原有时间产能扣减。
-        continuationTemporaryFaultTransferService.prepare(context);
+        repairPlanScheduleService.prepareContinuationEvents(context);
         // 班次产能计算前优先落实同 SKU 模具置换，避免把离机清洗继续作为机台停机扣量。
         cleaningScheduleService.prepareBeforeContinuous(context);
         // continuationGroupMachineCountMap 用于区分同一物料/账本是否多机台续作，决定单机满排还是交给降模分摊。
@@ -1081,6 +1094,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         // 全部续作准备、裁量及按时间下机已经完成；先确定强制精度再进入唯一扣账入口。
         this.equipmentPlanScheduleService.prepareBeforeContinuousCommit(context);
         this.enforcePrecisionBeforeCommit(context, shifts);
+        // 时间负荷预演保持原分配；正式时间决定已冻结后才允许历史机台之间做守恒匹配。
+        this.matchRemainderFinishHistory(context, shifts);
         // 最终账本同步是本阶段唯一一次扣账；其内部若按中心账本回裁，后续只重新汇总元数据，不再改班次量。
         this.syncContinuousDailyPlanQuota(context, shifts);
         /*
@@ -1109,6 +1124,121 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         this.appendContinuousCompensationSkuList(context, context.getContinuationFinishLockedFormalSkuKeys());
         // 续作阶段全部处理完成后，再按剩余新增待排SKU统一收口结构视图，供S4.5排序使用。
         context.rebuildStructureSkuMapFromPending(context.getNewSpecSkuList());
+    }
+
+    /**
+     * 在正式时间下机决定冻结之后匹配历史收尾机台，负荷预演及已扣账阶段保持原结果。
+     *
+     * @param context 尚未消费续作账本的正式上下文
+     * @param shifts 真实窗口班次
+     */
+    private void matchRemainderFinishHistory(LhScheduleContext context, List<LhShiftConfigVO> shifts) {
+        if (context.isTimedMachineOffLoadPreview() || context.isTimedMachineOffHandoffPreview()
+                || context.isPreviousAlternateGroupPreview()
+                || context.isContinuousDailyQuotaSynced()) {
+            return;
+        }
+        Map<String, LhMouldChangePlan> confirmedHistories = new LinkedHashMap<>();
+        for (ContinuationRemainderFinishGroup group : context.getContinuationRemainderFinishGroups()) {
+            if (this.canMatchRemainderFinishHistory(context, group)) {
+                this.matchRemainderFinishHistoryGroup(context, group, shifts, confirmedHistories);
+            }
+        }
+    }
+
+    /**
+     * 排除时间下机请求、已确认决定以及设备最终化已改变数量的组，禁止覆盖这些既定事实。
+     *
+     * @param context 正式续作状态
+     * @param group 节点计算完毕的收尾组
+     * @return 当前结果仍完整对应原节点方案时返回 true
+     */
+    private boolean canMatchRemainderFinishHistory(LhScheduleContext context, ContinuationRemainderFinishGroup group) {
+        if (CollectionUtils.isEmpty(group.getMachineProfiles()) || Objects.isNull(group.getOriginalMachineFinishPlan())
+                || group.getOriginalMachineFinishPlan().getRemainingQty() > 0) {
+            return false;
+        }
+        return group.getOriginalResults().stream().allMatch(result -> {
+            ContinuationEndingAllocationSnapshot snapshot =
+                    context.getContinuationSurplusEndingSnapshotMap().get(result);
+            return !context.hasTimedMachineOffRequest(result)
+                    && !context.getTimedMachineOffDecisionMap().containsKey(result)
+                    && context.getScheduleResultList().contains(result)
+                    && Objects.nonNull(snapshot)
+                    && java.util.Arrays.equals(snapshot.getShiftQuantities(), context.getScheduleWindowShifts().stream()
+                    .mapToInt(shift -> this.resolveShiftPlanQty(result, shift.getShiftIndex())).toArray());
+        });
+    }
+
+    /**
+     * 以原节点方案生成完整匹配，隔离验证指定后料后再提交；资源不足保持原有分配。
+     *
+     * @param context 时间下机已完成的正式上下文
+     * @param group 已计算数量及真实容量画像的组
+     * @param shifts 真实窗口班次
+     * @param confirmedHistories 本轮已通过的其他组关系，后续候选不得挤掉它们的承接资源
+     */
+    private void matchRemainderFinishHistoryGroup(LhScheduleContext context,
+            ContinuationRemainderFinishGroup group, List<LhShiftConfigVO> shifts,
+            Map<String, LhMouldChangePlan> confirmedHistories) {
+        ContinuationFinishScheduleResult candidate = BeanUtil.copyProperties(
+                group.getOriginalMachineFinishPlan(), ContinuationFinishScheduleResult.class);
+        new ContinuationFinishPlanMatcher().match(context, group.getSourceSku(), group.getMachineProfiles(),
+                shifts, group.getStopHoldResults(), candidate);
+        Map<String, LhMouldChangePlan> changedHistories = new LinkedHashMap<>();
+        for (int machine = 0; machine < group.getMachineProfiles().size(); machine++) {
+            if (candidate.getMachinePlans().get(machine).getPlanQty()
+                    != group.getOriginalMachineFinishPlan().getMachinePlans().get(machine).getPlanQty()) {
+                group.getMachineProfiles().get(machine).getOriginals().forEach(result -> changedHistories.put(
+                        result.getLhMachineCode(), context.getPreviousAlternateMachineOrder()
+                                .uniquePlan(result.getLhMachineCode(), group.getSourceSku().getMaterialCode())));
+            }
+        }
+        if (changedHistories.isEmpty()) {
+            return;
+        }
+        int[] quantities = candidate.getMachinePlans().stream().mapToInt(ContinuationMachineFinishPlan::getPlanQty)
+                .toArray();
+        Map<String, LhMouldChangePlan> requiredHistories = new LinkedHashMap<>(confirmedHistories);
+        requiredHistories.putAll(changedHistories);
+        boolean accepted = continuationHistoryFinishMatchService.validate(context, requiredHistories,
+                () -> this.commitRemainderFinishHistoryCandidate(context, group, shifts, candidate, quantities),
+                () -> {
+                    this.finalizeContinuousProduction(context);
+                    equipmentPlanScheduleService.reviewConfirmedEndings(context);
+                    StructureSwitchCandidateScope.freeze(context);
+                    // 最终化若因设备约束或账本回裁改变候选，不能将不再守恒的方案交给后料验证。
+                    return this.canMatchRemainderFinishHistory(context, group);
+                });
+        if (accepted && !this.commitRemainderFinishHistoryCandidate(context, group, shifts, candidate, quantities)) {
+            throw new IllegalStateException("余量收尾历史匹配正式提交与隔离复核不一致");
+        }
+        if (accepted) {
+            confirmedHistories.putAll(changedHistories);
+        }
+    }
+
+    /**
+     * 统一提交候选数量及释放快照，使隔离承接与正式后料读取相同物理边界。
+     *
+     * @param context 待提交的隔离或正式上下文
+     * @param group 原收尾组及容量画像
+     * @param shifts 完整班次
+     * @param candidate 已完成匹配的候选方案
+     * @param quantities 与物理画像一一对应的数量
+     * @return 整组数量和时间校验通过时返回 true
+     */
+    private boolean commitRemainderFinishHistoryCandidate(LhScheduleContext context,
+            ContinuationRemainderFinishGroup group, List<LhShiftConfigVO> shifts,
+            ContinuationFinishScheduleResult candidate, int[] quantities) {
+        if (!this.commitSurplusEndingAllocation(context, group.getSourceSku(), group.getOriginalResults(),
+                group.getMachineProfiles(), quantities, shifts, group.getNextActions(),
+                group.getStopHoldResults(), candidate)) {
+            return false;
+        }
+        this.recordRemainderFinishSnapshots(context, group.getSourceSku(),
+                group.getMachineProfiles(), shifts, candidate);
+        return true;
     }
 
     /**
@@ -3007,7 +3137,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         // 按场景确定节点角色，不按月计划目标机台数裁减收尾参与集合。
         this.sortRemainderFinishProfiles(context, sourceSku, profiles, shifts, dateOffset, targetQty);
         boolean previousAlternateSegmentFinish = this.hasDeferredPreviousAlternateRelease(context, group);
-        // 余量收尾独立确定角色、数量和时间，历史排序及历史班次重绑均不得反向改变本轮结果。
+        // 节点计算独立确定数量及时间；历史绑定调整仅在正式时间下机决定完成后隔离复核。
         ContinuationFinishScheduleResult calculated = continuationRemainderFinishScheduleService.calculate(
                 profiles, shifts, targetQty, sourceSku.getShiftCapacity(), dateOffset);
         int[] quantities = calculated.getMachinePlans().stream().mapToInt(ContinuationMachineFinishPlan::getPlanQty).toArray();
@@ -3018,6 +3148,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         // 冻结本轮合法总目标，后续补排或回裁只改变实际排量，不得改变最终缺口的比较基准。
         group.setFinalTargetQty(finalTargetQty);
         group.setOriginalMachineFinishPlan(calculated);
+        group.setMachineProfiles(profiles);
+        group.setNextActions(new HashMap<>(nextActions));
         if (previousAlternateSegmentFinish) {
             String capacityDetail = String.format("工厂=%s, 批次=%s, 物料=%s, 状态=%s, 窗口截止=%s, "
                             + "原机待排目标=%s, 原机已分配=%s, 真实缺口=%s, 原机可完成=%s",
@@ -7870,14 +8002,13 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         }
         int switchDurationHours = LhScheduleTimeUtil.getTypeBlockChangeTotalHours(context);
         Date switchCompleteTime = LhScheduleTimeUtil.addHours(switchStartTime, switchDurationHours);
-        boolean plannedRepairAffectingSwitch = ShiftCapacityResolverUtil.isPlannedRepairAffectingSwitch(
-                context, context.getDevicePlanShutList(), machine.getMachineCode(), estimatedEndTime,
+        RepairPlanResult repairPlanResult = LhRepairPlanScheduleService.resolveForScheduling(
+                context, machine.getMachineCode(), estimatedEndTime,
                 switchStartTime, switchCompleteTime);
+        boolean plannedRepairAffectingSwitch = repairPlanResult.isPlannedRepairAffectingSwitch();
         if (plannedRepairAffectingSwitch) {
             // 换活字块命中05后，预热完成即可首检/生产，不再叠加精度保养分支的1小时等待。
-            return ShiftCapacityResolverUtil.resolvePlannedRepairProductionReadyTime(
-                    context, context.getDevicePlanShutList(), machine.getMachineCode(), estimatedEndTime,
-                    switchStartTime, switchCompleteTime);
+            return repairPlanResult.getProductionNotBefore();
         }
         return switchCompleteTime;
     }
@@ -8040,12 +8171,11 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         try {
             Date mouldChangeCompleteTime = LhScheduleTimeUtil.addHours(mouldChangeStartTime, switchDurationHours);
             Date maintenanceReadyTime = mouldChangeCompleteTime;
-            boolean plannedRepairAffectingSwitch = ShiftCapacityResolverUtil.isPlannedRepairAffectingSwitch(
-                    context, context.getDevicePlanShutList(), machine.getMachineCode(), endingTime,
+            RepairPlanResult repairPlanResult = LhRepairPlanScheduleService.resolveForScheduling(
+                    context, machine.getMachineCode(), specifySku, "续作定点预演", endingTime,
                     mouldChangeStartTime, mouldChangeCompleteTime);
-            Date plannedRepairReadyTime = ShiftCapacityResolverUtil.resolvePlannedRepairProductionReadyTime(
-                    context, context.getDevicePlanShutList(), machine.getMachineCode(), endingTime,
-                    mouldChangeStartTime, mouldChangeCompleteTime);
+            boolean plannedRepairAffectingSwitch = repairPlanResult.isPlannedRepairAffectingSwitch();
+            Date plannedRepairReadyTime = repairPlanResult.getProductionNotBefore();
             Date firstInspectionBaseTime = maintenanceReadyTime;
             if (plannedRepairAffectingSwitch && Objects.nonNull(plannedRepairReadyTime)
                     && plannedRepairReadyTime.after(firstInspectionBaseTime)) {

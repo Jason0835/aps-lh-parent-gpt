@@ -23,6 +23,7 @@ import com.zlt.aps.lh.engine.strategy.support.NewSpecMachineAssignmentPlan;
 import com.zlt.aps.lh.engine.strategy.support.NewSpecProposalRoundCache;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceContext;
 import com.zlt.aps.lh.engine.strategy.support.PreviousAlternatePlanReleaseEvent;
+import com.zlt.aps.lh.engine.strategy.support.PreviousAlternateStructureLimitExemptionPolicy;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchCandidateScope;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchPriorityPolicy;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchSchedulingPolicy;
@@ -570,7 +571,8 @@ public class StructureSwitchSchedulingService {
         Date previousReady = context.getPreviousAlternateCandidateAvailableTimeMap().get(sku);
         PreviousAlternatePlanReleaseEvent event = context.getPreviousAlternateReleaseEventMap().get(machineCode);
         boolean matches = Objects.nonNull(plan) && Objects.nonNull(event) && event.getPlan() == plan;
-        try {
+        try (PreviousAlternateStructureLimitExemptionPolicy.Scope scope =
+                     PreviousAlternateStructureLimitExemptionPolicy.openScope(context, sku, plan, machineCode)) {
             context.setActivePreviousAlternateEvent(matches ? event : null);
             if (matches) {
                 context.getPreviousAlternateCandidateAvailableTimeMap().put(sku, event.getOfflineTime());

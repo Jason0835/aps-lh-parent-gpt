@@ -6,6 +6,7 @@ import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.util.FirstInspectionQtyUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.PriorityTraceLogHelper;
@@ -274,7 +275,8 @@ public final class EmbryoSupplyNewMachineLimitPolicy {
         Set<String> baseline = baselineMachines(context, source);
         return context.getScheduleResultList().stream().filter(result -> !isContinuation(result))
                 .filter(result -> StringUtils.equals(source.getNextStructureName(), result.getStructureName()))
-                .filter(result -> StructureSwitchSchedulingPolicy.quantity(result, shift.getShiftIndex()) > 0)
+                .filter(result -> FirstInspectionQtyUtil.hasProductionOccupation(
+                            context, result, shift.getShiftIndex()))
                 .map(result -> physical(result.getLhMachineCode())).filter(machine -> !baseline.contains(machine))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
     }
