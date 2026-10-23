@@ -311,12 +311,12 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         List<LhMouldChangePlan> mouldChangePlanList = buildLhMouldChangePlanList(list, scheduleDate);
         AjaxResult ajaxResult = this.doImportData(mouldChangePlanList, updateSupport, importLog.getId());
         // 导入成功后，补全模具交替计划的批次号
-        if (!ajaxResult.get(AjaxResult.CODE_TAG).equals(AjaxResult.Type.ERROR.value())) {
+//        if (!ajaxResult.get(AjaxResult.CODE_TAG).equals(AjaxResult.Type.ERROR.value())) {
             if (CollectionUtils.isNotEmpty(list)) {
                 String factoryCode = scheduleResult.getFactoryCode().trim();
                 lhScheduleResultService.fillMouldChangePlanFieldsAfterImport(factoryCode, scheduleDate);
             }
-        }
+//        }
         Date endTime = DateUtils.getNowDate();
         importLog.setRowCount(list.size());
         importLog.setBeginTime(beginTime);

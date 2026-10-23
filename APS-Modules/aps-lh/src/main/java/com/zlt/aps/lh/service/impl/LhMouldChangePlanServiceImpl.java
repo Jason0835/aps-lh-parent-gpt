@@ -54,6 +54,7 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.annotation.Resource;
 import java.text.MessageFormat;
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -105,6 +106,12 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
      */
     private static final String REMARK_SCHEDULE_CHANGE_KEY =
             "ui.data.column.lhMouldChangePlan.remark.scheduleChange";
+
+    /**
+     * 下机列时间格式正则，支持 H:mm、HH:mm、H:mm:ss、HH:mm:ss 及 24:00。
+     */
+    private static final Pattern TIMED_OFF_PATTERN =
+            Pattern.compile("^(([01]?\\d|2[0-3]):[0-5]\\d(:[0-5]\\d)?|24:00(:00)?)$");
 
     /**
      * 导出下机列按余量收尾文案国际化键。
@@ -1918,14 +1925,14 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
     }
 
     /**
-     * 将导出的下机文案转换为收尾类型，并核对明确填写的时间与班次。
+     * 将导出的下机文案转换为收尾类型，支持按余量收尾与按时间下机识别。
      *
      * @param plan            导入计划，收尾类型字段暂存Excel原文
-     * @param shiftEnum       已校验的班次，班次无效时不重复记录时间冲突
+     * @param shiftEnum       已校验的班次
      * @param importLogId     导入日志编号
      * @param errorRow        导入错误行号
      * @param importErrorLogs 当前行错误日志集合
-     * @return 文案无法识别或时间与班次冲突时返回true
+     * @return 文案无法识别时返回true
      */
     private boolean normalizeMouldChangePlanImportEndType(LhMouldChangePlan plan, ShiftEnum shiftEnum,
                                                           Long importLogId, int errorRow,
@@ -1936,35 +1943,71 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
             plan.setEndType(null);
             return false;
         }
-        if (YesOrNoEnum.NO.getCode().equals(endTypeText)
-                || I18nUtil.getMessage(EXPORT_BY_REMAINDER_KEY).equals(endTypeText)) {
+        if (this.isRemainderEndType(endTypeText)) {
             plan.setEndType(YesOrNoEnum.NO.getCode());
             return false;
         }
-        if (YesOrNoEnum.YES.getCode().equals(endTypeText)
-                || "是Có".equals(endTypeText) || "是 Có".equals(endTypeText)) {
+        if (this.isTimedOffEndType(endTypeText)) {
             plan.setEndType(YesOrNoEnum.YES.getCode());
             return false;
         }
-        String normalizedTime = "6:00".equals(endTypeText) ? "06:00" : endTypeText;
-        ShiftEnum timeShift = Arrays.stream(ShiftEnum.values())
-                .filter(candidate -> candidate.getStartTime().equals(normalizedTime))
-                .findFirst().orElse(null);
-        if (timeShift == null) {
-            String message = I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.endTypeInvalid");
-            ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorRow,
-                    MessageFormat.format(message, errorRow, endTypeText), importErrorLogs);
+        String message = I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.endTypeInvalid");
+        ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorRow,
+                MessageFormat.format(message, errorRow, endTypeText), importErrorLogs);
+        return true;
+    }
+
+    /**
+     * 判断下机列是否为按余量收尾。
+     * 兼容 "0"、中文"按余量收尾"、越南语"Theo số lượng kết thúc"（含带声调/无声调、包含换行或空格）及国际化文案。
+     *
+     * @param endTypeText 待识别的文本
+     * @return 是否为按余量收尾
+     */
+    private boolean isRemainderEndType(String endTypeText) {
+        if (StringUtils.isBlank(endTypeText)) {
+            return false;
+        }
+        if (YesOrNoEnum.NO.getCode().equals(endTypeText)) {
             return true;
         }
-        if (shiftEnum != null && timeShift != shiftEnum) {
-            String message = I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.endTimeShiftMismatch");
-            ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorRow,
-                    MessageFormat.format(message, errorRow, endTypeText,
-                            shiftEnum.getMouldChangePlanExcelText()), importErrorLogs);
+        String remainderI18n = I18nUtil.getMessage(EXPORT_BY_REMAINDER_KEY);
+        if (StringUtils.isNotBlank(remainderI18n) && remainderI18n.equals(endTypeText)) {
             return true;
         }
-        plan.setEndType(YesOrNoEnum.YES.getCode());
-        return false;
+        String compactText = endTypeText.replaceAll("\\s+", "");
+        if (compactText.contains("按余量收尾")) {
+            return true;
+        }
+        String lowerCompact = compactText.toLowerCase();
+        return lowerCompact.contains("sốlượngkếtthúc")
+                || lowerCompact.contains("soluongketthuc");
+    }
+
+    /**
+     * 判断下机列是否为按时间下机。
+     * 兼容 "1"、"是"、"是Có"、"是 Có"、中文"按时间下机"、越南语"Xuống máy theo thời gian" 以及任意合法时间格式（如 20:00、20:00:00、06:00、6:00）。
+     *
+     * @param endTypeText 待识别的文本
+     * @return 是否为按时间下机
+     */
+    private boolean isTimedOffEndType(String endTypeText) {
+        if (StringUtils.isBlank(endTypeText)) {
+            return false;
+        }
+        if (YesOrNoEnum.YES.getCode().equals(endTypeText)
+                || "是".equals(endTypeText)
+                || "是Có".equals(endTypeText)
+                || "是 Có".equals(endTypeText)) {
+            return true;
+        }
+        String compactText = endTypeText.replaceAll("\\s+", "");
+        if (compactText.contains("按时间下机")
+                || compactText.equalsIgnoreCase("xuốngmáytheothờigian")
+                || compactText.equalsIgnoreCase("xuongmaytheothoigian")) {
+            return true;
+        }
+        return TIMED_OFF_PATTERN.matcher(endTypeText).matches();
     }
 
     /**

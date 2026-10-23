@@ -149,6 +149,40 @@ public class LhRepairPlanScheduleService {
     }
 
     /**
+     * 生成当前真实切换的容量副本，使首检、正式生产和完成时间使用相同组合规则。
+     *
+     * @param windows 已解析的精度、维修、故障及胶囊窗口
+     * @param switchStartTime 真实切换开始
+     * @param switchEndTime 真实切换自身完成
+     * @return 当前切换专用容量窗口
+     */
+    public static List<MachineMaintenanceWindowDTO> adaptCapacityWindowsForSwitch(
+            List<MachineMaintenanceWindowDTO> windows, Date switchStartTime, Date switchEndTime) {
+        return LhRepairOverlapResolver.adaptCapacityWindowsForSwitch(windows, switchStartTime, switchEndTime);
+    }
+
+    /**
+     * 按结果记录的真实切换动作恢复组合容量，不用正式生产开始时间扩大重叠范围。
+     *
+     * @param context 当前批次
+     * @param result 已确定切换身份及开始时间的结果
+     * @param windows 已解析的容量窗口
+     * @return 换模或换活字块使用组合副本，普通续作保留独立维修窗口
+     */
+    public static List<MachineMaintenanceWindowDTO> adaptCapacityWindowsForResult(
+            LhScheduleContext context, LhScheduleResult result, List<MachineMaintenanceWindowDTO> windows) {
+        if (result.getMouldChangeStartTime() == null
+                || (!"1".equals(result.getIsChangeMould()) && !"1".equals(result.getIsTypeBlock()))) {
+            return windows;
+        }
+        int durationHours = "1".equals(result.getIsTypeBlock())
+                ? LhScheduleTimeUtil.getTypeBlockChangeTotalHours(context)
+                : LhScheduleTimeUtil.getMouldChangeTotalHours(context);
+        return adaptCapacityWindowsForSwitch(windows, result.getMouldChangeStartTime(),
+                LhScheduleTimeUtil.addHours(result.getMouldChangeStartTime(), durationHours));
+    }
+
+    /**
      * 最终只读汇总设备事件的回填事实，仍由原保存事务执行更新。
      *
      * @param context 已完成排产的上下文
@@ -162,7 +196,7 @@ public class LhRepairPlanScheduleService {
     }
 
     /**
-     * 按来源日期准备05维修及06故障，其他类型保留原有对象和处理规则。
+     * 按来源日期准备05维修，按窗口交集保留06故障，其他类型保持原有处理规则。
      *
      * @param context 排程上下文
      * @param sourcePlans 本次加载或扩展的设备停机计划
@@ -192,7 +226,9 @@ public class LhRepairPlanScheduleService {
                         plan.getBeginDate(), plan.getEndDate());
                 continue;
             }
-            if (plan.getBeginDate().before(startDate)) {
+            // 跨窗口故障保留原始起止；05仍只接受本轮来源日期，不能共用开始日期过滤。
+            if ((repair && plan.getBeginDate().before(startDate))
+                    || (fault && !plan.getEndDate().after(startDate))) {
                 continue;
             }
             if (fault) {
@@ -240,14 +276,21 @@ public class LhRepairPlanScheduleService {
             boolean repair = StringUtils.equals(
                     MachineStopTypeEnum.PLANNED_REPAIR.getCode(), source.getMachineStopType());
             MdmDevicePlanShut actual = repair ? LhPlannedRepairResolver.buildActualRepairPlan(context, source) : source;
+            if (repair) {
+                // 完整收尾已兑现时读取同一实际时间投影，不能回填成原早班已经执行维修。
+                actual = context.getDevicePlanShutList().stream()
+                        .filter(plan -> Objects.equals(source.getId(), plan.getId())).findFirst().orElse(actual);
+            }
             if (Objects.isNull(actual)) {
                 continue;
             }
             boolean machineExists = physicalMachines.contains(
                     LhSingleControlMachineUtil.resolvePhysicalMachineCode(source.getMachineCode()));
+            Date actualStart = actual.getBeginDate();
+            Date actualEnd = actual.getEndDate();
             boolean inWindow = shifts.stream()
-                    .anyMatch(shift -> actual.getBeginDate().before(shift.getShiftEndDateTime())
-                            && actual.getEndDate().after(shift.getShiftStartDateTime()));
+                    .anyMatch(shift -> actualStart.before(shift.getShiftEndDateTime())
+                            && actualEnd.after(shift.getShiftStartDateTime()));
             if (!machineExists || !inWindow) {
                 continue;
             }

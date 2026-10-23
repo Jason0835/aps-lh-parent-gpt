@@ -37,6 +37,7 @@ import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.component.UnscheduledResultCollector;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.service.impl.LhCleaningScheduleService;
+import com.zlt.aps.lh.service.impl.LhCleaningRepairOverlapPolicy;
 import com.zlt.aps.lh.engine.strategy.support.TimedMachineOffActionPreviewCapture;
 import com.zlt.aps.lh.component.LhMachineSupplyStructureRule;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
@@ -2923,7 +2924,9 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     new ArrayList<>(MachineCleaningOverlapUtil.excludeOverlapWindows(
                             this.resolveMachineCleaningWindowList(context, machine.getMachineCode()), switchStartTime, candidateStartTime));
             List<MachineMaintenanceWindowDTO> maintenanceWindowList =
-                    this.resolveMachineMaintenanceWindowList(context, machine.getMachineCode());
+                    this.resolveMachineMaintenanceWindowList(context, machine.getMachineCode(), switchStartTime,
+                            LhScheduleTimeUtil.addHours(switchStartTime,
+                                    LhScheduleTimeUtil.getTypeBlockChangeTotalHours(context)));
             Map<Integer, Integer> shiftCapacityMap =
                     this.calculateDailyStandardShiftCapacityMap(
                             context, capacityPreviewResult, shifts, candidateStartTime,
@@ -4430,6 +4433,8 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         result.setIsDelete(0);
         result.setScheduleType(ScheduleTypeEnum.TYPE_BLOCK.getCode());
         result.setIsTypeBlock(YES_FLAG);
+        // 保存真实动作起点，后续补量及时间校正据此恢复维修组合，不使用后移的生产时刻。
+        result.setMouldChangeStartTime(switchStartTime);
         result.setConstructionStage(sku.getConstructionStage());
         // 产品状态从月计划获取
         result.setProductStatus(sku.getProductStatus());
@@ -4504,8 +4509,8 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
          */
         List<MachineCleaningWindowDTO> cleaningWindowList = new ArrayList<>(MachineCleaningOverlapUtil.excludeOverlapWindows(
                 this.resolveMachineCleaningWindowList(context, machine.getMachineCode()), switchStartTime, switchCompleteTime));
-        List<MachineMaintenanceWindowDTO> maintenanceWindowList = resolveMachineMaintenanceWindowList(
-                context, machine.getMachineCode());
+        List<MachineMaintenanceWindowDTO> maintenanceWindowList = this.resolveMachineMaintenanceWindowList(
+                context, machine.getMachineCode(), switchStartTime, switchCompleteTime);
         /*
          * 普通换活字块保留包含首检的既有准备口径；大换英寸由共享策略重新冻结实际
          * 首检与普通生产区间，不能先用旧首检区间的容量失败阻断后续合法时间轴。
@@ -4520,7 +4525,19 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                         runtimeShiftCapacity, refinedTargetQty,
                         ScheduleTypeEnum.TYPE_BLOCK.getCode(),
                         machine.getMachineCode(), null);
-        Date supplyOccupationBoundary = null;
+        Date supplyOccupationBoundary = LhCleaningRepairOverlapPolicy.resolveForwardInspectionReady(
+                context, machine.getMachineCode(), ScheduleTypeEnum.TYPE_BLOCK.getCode(), switchStartTime,
+                LhScheduleTimeUtil.addHours(switchStartTime, LhScheduleTimeUtil.getTypeBlockChangeTotalHours(context)));
+        if (!largeTimelineRequired && !precisionOverlap.isSupported() && supplyOccupationBoundary != null) {
+            firstInspectionAllocationPlan = FirstInspectionAllocationUtil.buildPlan(
+                    context, sku, shifts, switchCompleteTime, supplyOccupationBoundary,
+                    runtimeShiftCapacity, refinedTargetQty, ScheduleTypeEnum.TYPE_BLOCK.getCode(),
+                    machine.getMachineCode(), null, FirstInspectionTimingMode.START_AT_PRODUCTION_READY);
+            if (firstInspectionAllocationPlan.isValid()
+                    && firstInspectionAllocationPlan.getInspectionEndTime().after(startTime)) {
+                startTime = firstInspectionAllocationPlan.getInspectionEndTime();
+            }
+        }
         if (!largeTimelineRequired && firstInspectionAllocationPlan.isValid()
                 && Objects.nonNull(EmbryoSupplyNewMachineLimitPolicy.resolveSource(context, sku))) {
             Date originalOccupationStart = firstInspectionAllocationPlan.getInspectionQty() > 0
@@ -4893,7 +4910,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             shiftQty = StructureSwitchSchedulingPolicy.capQuantity(context, sku, result, shift,
                     shiftQty, physicalShiftMaxQty, remaining);
             // 未满产换胶囊可能刚登记时间窗口，后续班次必须立即读取最新窗口重新计算产能。
-            maintenanceWindowList = resolveMachineMaintenanceWindowList(context, result.getLhMachineCode());
+            maintenanceWindowList = this.resolveMachineMaintenanceWindowList(context, result);
             if (shiftQty <= 0) {
                 logTypeBlockShiftSkip(result, shift, remaining, shiftCapacity,
                         physicalShiftMaxQty, shiftMaxQty, "目标量/硫化余量或换胶囊扣减后为0");
@@ -4984,8 +5001,10 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         if (Objects.nonNull(plan.getEquipmentPlanId())) {
             // 仅首检容量副本释放本计划的首检区间，真实保养及其他设备约束继续扣减。
             MachineScheduleDTO machine = context.getMachineScheduleMap().get(result.getLhMachineCode());
-            maintenanceWindowList = ShiftCapacityResolverUtil.resolvePrecisionInspectionCapacityWindows(
-                    context, result.getLhMachineCode(), machine.getMaintenanceWindowList(), plan.getEquipmentPlanId());
+            maintenanceWindowList = LhRepairPlanScheduleService.adaptCapacityWindowsForResult(context, result,
+                    ShiftCapacityResolverUtil.resolvePrecisionInspectionCapacityWindows(
+                            context, result.getLhMachineCode(), machine.getMaintenanceWindowList(),
+                            plan.getEquipmentPlanId()));
         }
         int dryIceLossQty = context.getParamIntValue(
                 LhScheduleParamConstant.DRY_ICE_LOSS_QTY,
@@ -5444,6 +5463,34 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
      */
     private List<MachineCleaningWindowDTO> resolveMachineCleaningWindowList(LhScheduleContext context, String machineCode) {
         return cleaningScheduleService.resolveMachineCleaningWindowList(context, machineCode);
+    }
+
+    /**
+     * 按真实切换区间投影维修容量，供候选首检及正式生产共用。
+     *
+     * @param context 排程上下文
+     * @param machineCode 运行侧机台
+     * @param switchStartTime 真实切换开始
+     * @param switchEndTime 真实切换自身完成
+     * @return 当前候选独立容量窗口
+     */
+    private List<MachineMaintenanceWindowDTO> resolveMachineMaintenanceWindowList(
+            LhScheduleContext context, String machineCode, Date switchStartTime, Date switchEndTime) {
+        return LhRepairPlanScheduleService.adaptCapacityWindowsForSwitch(
+                this.resolveMachineMaintenanceWindowList(context, machineCode), switchStartTime, switchEndTime);
+    }
+
+    /**
+     * 根据结果的真实切换身份恢复组合容量，补量和回裁不得重新应用独立维修预热。
+     *
+     * @param context 排程上下文
+     * @param result 当前排产结果
+     * @return 当前结果对应的容量窗口
+     */
+    private List<MachineMaintenanceWindowDTO> resolveMachineMaintenanceWindowList(
+            LhScheduleContext context, LhScheduleResult result) {
+        return LhRepairPlanScheduleService.adaptCapacityWindowsForResult(context, result,
+                this.resolveMachineMaintenanceWindowList(context, result.getLhMachineCode()));
     }
 
     /**
@@ -6216,6 +6263,6 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         // 保留本策略已有清洗豁免语义，复用公共入口计算容量和完成时间。
         return ResultShiftTimeUtil.resolveEndTime(context, result, shift, startTime, planQty,
                 this.resolveEffectiveCleaningWindowList(context, result, this.resolveFirstPlannedShiftStartTime(result)),
-                this.resolveMachineMaintenanceWindowList(context, result.getLhMachineCode()));
+                this.resolveMachineMaintenanceWindowList(context, result));
     }
 }

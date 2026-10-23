@@ -189,6 +189,12 @@ public final class LhPlannedRepairResolver {
                 for (LhShiftConfigVO shift : LhScheduleTimeUtil.getScheduleShifts(
                         context, context.getScheduleDate())) {
                     if (ShiftEnum.MORNING_SHIFT == shift.resolveShiftTypeEnum()
+                            && devicePlanShutList.stream().noneMatch(plan ->
+                            Objects.equals(plan.getBeginDate(), repairInterval[0])
+                                    && StringUtils.equals(
+                                    LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode),
+                                    LhSingleControlMachineUtil.resolvePhysicalMachineCode(plan.getMachineCode()))
+                                    && LhRepairEndingDeferralPolicy.isDeferred(context, plan))
                             && hasRepairStartingOnWorkDate(
                             devicePlanShutList, machineCode, repairInterval, shift.getWorkDate())) {
                         repairWindow.getRepairFixedQtyShiftWindowMap().put(
@@ -256,7 +262,8 @@ public final class LhPlannedRepairResolver {
     }
 
     /**
-     * 解析维修当天早班的维修起点。现代容量窗口携带完整早班边界，残班也不能再次按普通班产排满。
+     * 解析维修当天早班的维修前固定量起点，真实切换组合的后料容量不沿用该限制。
+     * 独立维修窗口携带完整早班边界，维修前残班仍不得按普通班产排满。
      *
      * @param stops 普通设备停机
      * @param windows 公共容量窗口
@@ -275,7 +282,12 @@ public final class LhPlannedRepairResolver {
                         window.getMaintenanceType())) {
                     continue;
                 }
-                hasRepairWindow |= !window.getRepairFixedQtyShiftWindowMap().isEmpty();
+                // 明确提供的05投影即为唯一容量事实，等待收尾的维修没有维修前固定量早班。
+                hasRepairWindow = true;
+                if (window.isRepairCombinedWithSwitch()) {
+                    // 后料组合首检不属于维修前固定量；显式投影同时阻止退回原停机列表再次命中。
+                    continue;
+                }
                 for (Map.Entry<Date, Date> fixedShift : window.getRepairFixedQtyShiftWindowMap().entrySet()) {
                     if (start.before(fixedShift.getValue()) && end.after(fixedShift.getKey())) {
                         repairStart = earlier(repairStart, window.getMaintenanceStartTime());

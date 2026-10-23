@@ -183,9 +183,18 @@ public class LhCleaningOverlapResolver {
         List<MachineCleaningWindowDTO> effectiveCleaningWindows =
                 this.resolveMachineWindows(context, machine.getMachineCode());
         Date resolvedStartTime = productionStartTime;
+        Date switchEndTime = LhScheduleTimeUtil.addHours(switchStartTime,
+                LhScheduleTimeUtil.getTypeBlockChangeTotalHours(context));
+        Date combinedReadyTime = LhCleaningRepairOverlapPolicy.resolvePreparationEnd(
+                context, machine.getMachineCode(), switchStartTime, switchEndTime, true);
+        if (combinedReadyTime != null && combinedReadyTime.after(resolvedStartTime)) {
+            resolvedStartTime = combinedReadyTime;
+        }
         for (MachineCleaningWindowDTO cleaningWindow : effectiveCleaningWindows) {
+            MachineCleaningWindowDTO combinedWindow = LhCleaningRepairOverlapPolicy.projectWindow(
+                    context, cleaningWindow, switchStartTime, switchEndTime, true);
             Date cleaningOccupationEndTime = MachineCleaningOverlapUtil
-                    .resolveEffectiveCleanEndTime(cleaningWindow);
+                    .resolveEffectiveCleanEndTime(combinedWindow == null ? cleaningWindow : combinedWindow);
             if (Objects.isNull(cleaningWindow)
                     || Objects.isNull(cleaningWindow.getCleanStartTime())
                     || Objects.isNull(cleaningOccupationEndTime)

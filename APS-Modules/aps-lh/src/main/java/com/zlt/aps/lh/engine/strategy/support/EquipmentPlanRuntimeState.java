@@ -25,6 +25,14 @@ public final class EquipmentPlanRuntimeState {
     private final Set<String> pendingPhysicalMachines = new LinkedHashSet<>();
     /** 未覆盖组合原因去重，避免每次预演重复输出。 */
     private final Set<String> diagnosticKeys = new LinkedHashSet<>();
+    /**
+     * 依赖同物料喷砂置换机会的精度主键，按物理机台登记并随预演快照恢复。
+     */
+    private final Map<String, Long> replacementPrecisionPlanMap = new LinkedHashMap<>();
+    /**
+     * 组合前各运行侧的冻结置换时间，撤销时不重新读取时长参数。
+     */
+    private final Map<String, CleaningPlanTimeline> replacementOriginalTimelineMap = new LinkedHashMap<>();
     /** 仅约束发布、撤销时递增，用于失效候选、容量和时间缓存。 */
     private long constraintVersion;
 
@@ -33,7 +41,11 @@ public final class EquipmentPlanRuntimeState {
         constraintVersion++;
     }
 
-    /** @return 独立运行态副本；只读时间计划及安排记录可共享。 */
+    /**
+     * 复制本批设备及置换精度的身份和生命周期状态，只读时间计划安全共享。
+     *
+     * @return 与原容器隔离的运行态副本
+     */
     public EquipmentPlanRuntimeState copy() {
         EquipmentPlanRuntimeState target = new EquipmentPlanRuntimeState();
         target.inputVersionMap.putAll(inputVersionMap);
@@ -42,6 +54,8 @@ public final class EquipmentPlanRuntimeState {
         target.arrangementMap.putAll(arrangementMap);
         target.pendingPhysicalMachines.addAll(pendingPhysicalMachines);
         target.diagnosticKeys.addAll(diagnosticKeys);
+        target.replacementPrecisionPlanMap.putAll(replacementPrecisionPlanMap);
+        target.replacementOriginalTimelineMap.putAll(replacementOriginalTimelineMap);
         target.constraintVersion = constraintVersion;
         return target;
     }

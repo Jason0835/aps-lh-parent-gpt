@@ -27,6 +27,16 @@ public final class CleaningPlanRuntimeState {
      */
     private List<CleaningScheduleDateFillItem> scheduleDateFillList = new ArrayList<>();
     /**
+     * 已通过来源和日期校验的归一清洗窗口，按运行侧索引；独立执行额度另行保存。
+     * 初始化收尾跳过仍保留事实；候选只投影副本，不能将后料的切换时刻写回来源。
+     */
+    private final Map<String, List<MachineCleaningWindowDTO>> sourceWindowMap = new LinkedHashMap<>();
+    /**
+     * 独立清洗已取得名额的实际班次起点，键为来源主键和运行侧。
+     * 正规换模仅覆盖来源、不生成独立清洗；换活字块保留清洗时必须使用本名额。
+     */
+    private final Map<String, Date> independentQuotaStartMap = new LinkedHashMap<>();
+    /**
      * 仅喷砂实际释放机台后的来源事件，保存旧SKU及机台从清洗开始释放、原模具到清洗结束
      * 才可复用以及真实余量回流三项事实；喷砂与其他停机重叠时不登记该专用处置。
      */
@@ -80,6 +90,9 @@ public final class CleaningPlanRuntimeState {
                 .collect(Collectors.toCollection(ArrayList::new));
         target.scheduleDateFillList.forEach(item -> item.setScheduleDate(copyDate(item.getScheduleDate())));
         Map<MachineCleaningWindowDTO, MachineCleaningWindowDTO> copies = new IdentityHashMap<>();
+        sourceWindowMap.forEach((machineCode, windows) ->
+                target.sourceWindowMap.put(machineCode, copyWindows(windows)));
+        independentQuotaStartMap.forEach((key, time) -> target.independentQuotaStartMap.put(key, copyDate(time)));
         sandBlastWindowMap.forEach((key, window) -> target.sandBlastWindowMap.put(key,
                 copies.computeIfAbsent(window, CleaningPlanRuntimeState::copyWindow)));
         releaseWindowMap.forEach((key, window) -> target.releaseWindowMap.put(key,

@@ -12,6 +12,7 @@ import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.component.CapsuleReplacementRuleService;
 import com.zlt.aps.lh.component.StructureMinMachineRetentionService;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.service.impl.LhRepairPlanScheduleService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -38,6 +39,8 @@ public final class ResultShiftTimeUtil {
 
     /**
      * 按实际班产及已生效损失反算当前数量的完成时间。
+     * 真实维修与切换重叠时复用结果专用容量投影，避免回裁恢复独立维修前固定量。
+     *
      * @param context 排程上下文
      * @param result 当前结果，班产已经采用当前机台口径
      * @param shift 真实班次配置
@@ -55,6 +58,8 @@ public final class ResultShiftTimeUtil {
                 || Objects.isNull(startTime) || planQty <= 0) {
             return null;
         }
+        maintenanceWindows = LhRepairPlanScheduleService.adaptCapacityWindowsForResult(
+                context, result, maintenanceWindows);
         ShiftProductionControlDTO control = ShiftProductionControlUtil.resolveEffectiveControl(context, shift, startTime);
         if (Objects.isNull(control) || !control.isCanSchedule()) {
             return null;

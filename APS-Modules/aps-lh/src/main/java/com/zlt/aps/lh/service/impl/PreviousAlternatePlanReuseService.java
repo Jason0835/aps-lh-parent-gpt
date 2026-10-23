@@ -1,6 +1,8 @@
 package com.zlt.aps.lh.service.impl;
 
 import com.zlt.aps.lh.util.ShiftFieldUtil;
+import com.zlt.aps.lh.engine.strategy.impl.ContinuousProductionStrategy;
+import org.springframework.context.annotation.Lazy;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationEndingAllocationSnapshot;
 import cn.hutool.core.bean.BeanUtil;
 import java.time.ZoneId;
@@ -71,6 +73,19 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 public class PreviousAlternatePlanReuseService {
+
+    /**
+     * 原历史流程之后的独立补充交接编排。
+     */
+    @Resource
+    private PreviousAlternateHandoffExtensionService handoffExtensionService;
+
+    /**
+     * 复用原续作截量与消费机制，延迟注入以隔离策略工厂的循环装配。
+     */
+    @Lazy
+    @Resource
+    private ContinuousProductionStrategy continuousProductionStrategy;
 
     @Resource
     private NewSpecMaterialEligibilityService materialEligibilityService;
@@ -276,9 +291,79 @@ public class PreviousAlternatePlanReuseService {
         context.setPreviousAlternateScheduling(true);
         try {
             this.reusePlans(context);
+            this.applyHandoffExtensions(context);
         } finally {
             context.setPreviousAlternateScheduling(originalScope);
         }
+    }
+
+    /**
+     * 原复用完整结束后调用独立扩展，正常组合不重新试排。
+     *
+     * @param context 已执行原历史链的上下文
+     */
+    private void applyHandoffExtensions(LhScheduleContext context) {
+        if (context.isTimedMachineOffLoadPreview() || context.isTimedMachineOffHandoffPreview()
+                || context.isPreviousAlternateGroupPreview() || !context.isContinuousDailyQuotaSynced()) {
+            return;
+        }
+        List<LhMouldChangePlan> plans = context.getEligiblePreviousAlternatePlans().stream()
+                .sorted(PreviousAlternatePlanEligibilityService.planOrder())
+                .collect(Collectors.toList());
+        handoffExtensionService.continueFormalChains(context, plans,
+                (plan, previous) -> this.createFormalChainEvent(context, plan, previous),
+                (event, day) -> this.executeExtensionHandoff(context, event, day));
+        handoffExtensionService.recoverUnfulfilled(context,
+                (event, cutoff) -> continuousProductionStrategy.releaseForHistoricalHandoff(context, event, cutoff),
+                (event, day) -> this.executeExtensionHandoff(context, event, day));
+        context.getNewSpecSkuList().removeIf(sku -> StringUtils.equals(
+                SkuScheduleSourceTypeEnum.DAY_PLAN_ADJUST.getCode(), sku.getSourceType())
+                || StringUtils.equals(SkuScheduleSourceTypeEnum.PREVIOUS_ALTERNATE_TRIAL.getCode(), sku.getSourceType()));
+        context.rebuildStructureSkuMapFromPending(context.getNewSpecSkuList());
+    }
+
+    /**
+     * 用已完成正规前段建立局部后段事件，不覆盖原续作释放事件。
+     *
+     * @param context 本轮班次配置
+     * @param plan 后段原始历史计划
+     * @param previous 同机已完成前段正量结果
+     * @return 保留计划身份及真实模具的局部交接事件
+     */
+    private PreviousAlternatePlanReleaseEvent createFormalChainEvent(LhScheduleContext context,
+            LhMouldChangePlan plan, LhScheduleResult previous) {
+        PreviousAlternatePlanReleaseEvent event = new PreviousAlternatePlanReleaseEvent();
+        event.setPlan(plan);
+        event.setMachineCode(plan.getLhMachineCode());
+        event.setMaterialCode(previous.getMaterialCode());
+        event.setProductStatus(previous.getProductStatus());
+        LhShiftConfigVO shift = this.resolvePreviousAlternatePlanShift(context, plan, plan.getPlanDate());
+        event.setPlannedShiftStartTime(shift.getShiftStartDateTime());
+        event.setPlannedShiftEndTime(shift.getShiftEndDateTime());
+        event.setOfflineTime(previous.getSpecEndTime());
+        event.setCompletedStrictEndingReleaseTime(previous.getSpecEndTime());
+        event.setOriginalMouldCodes(new LinkedHashSet<>(LhMouldCodeUtil.splitMouldCode(previous.getMouldCode())));
+        this.freezeRetainedMouldCodes(context, event);
+        return event;
+    }
+
+    /**
+     * 单次扩展只调用既有指定机台提交，不重跑历史列表及时间决策。
+     *
+     * @param context 单次完整快照中的实时资源
+     * @param event 待兑现的精确事件
+     * @param day 当前允许准备的业务日
+     * @return 指定后料已提交时为真
+     */
+    private boolean executeExtensionHandoff(LhScheduleContext context, PreviousAlternatePlanReleaseEvent event,
+            DayScheduleContext day) {
+        if (Objects.isNull(context.getMouldResourceContext())) {
+            context.setMouldResourceContext(MouldResourceContext.from(context));
+        }
+        context.getMouldResourceContext().refreshAvailability(context);
+        Set<String> completed = new LinkedHashSet<>();
+        this.tryReuseReleasedMachineAcrossDays(context, day, event, completed);
+        return completed.contains(event.getMachineCode());
     }
 
     /**

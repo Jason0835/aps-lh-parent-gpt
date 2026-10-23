@@ -252,6 +252,17 @@ public class LhScheduleContext {
     private RepairPlanRuntimeState repairPlanRuntimeState = new RepairPlanRuntimeState();
 
     /**
+     * 读取本候选独立维修视图，候选外按已提交的完整收尾结果兑现等待。
+     *
+     * @return 当前业务可消费的设备时间视图，固定来源保持原位
+     */
+    public List<MdmDevicePlanShut> getDevicePlanShutList() {
+        List<MdmDevicePlanShut> scoped = repairPlanRuntimeState.getScopedStopPlans();
+        return scoped == null ? com.zlt.aps.lh.service.impl.LhRepairEndingDeferralPolicy
+                .resolveCommittedPlans(this, devicePlanShutList) : scoped;
+    }
+
+    /**
      * 接收独立维修运行态，属性复制和隔离排程不得共享可变来源及事件。
      *
      * @param state 待复制的维修事实和迁移进度
@@ -1011,11 +1022,11 @@ public class LhScheduleContext {
      */
     private Map<String, Integer> sharedEmbryoStockEndingConsumedQtyMap = new LinkedHashMap<>();
     /**
-     * 独立胎胚收尾已提交的逐侧任务量，L/R两侧来自同一物理机台方案。
+     * 公共胎胚收尾逐侧数量的兼容投影，完成判定只读取公共快照。
      */
     private Map<LhScheduleResult, Integer> sharedEmbryoStockEndingMachineQuotaMap = new IdentityHashMap<>();
     /**
-     * 独立胎胚收尾的逐侧真实物理释放时间，零量结果移除后仍可供历史后料承接。
+     * 公共胎胚收尾逐侧物理释放的兼容投影，零量行移除后仍保留公共事实。
      */
     private Map<LhScheduleResult, Date> sharedEmbryoStockEndingMachineReleaseMap = new IdentityHashMap<>();
     /**
@@ -1038,7 +1049,9 @@ public class LhScheduleContext {
      */
     private Map<LhScheduleResult, Integer> endingFillAllowedOverQtyMap =
             new IdentityHashMap<LhScheduleResult, Integer>();
-    /** 前置降模冻结的余量收尾组，后续计算只消费此集合。 */
+    /**
+     * 前置降模按类型冻结的公共收尾组，后续节点及缺口核对只消费此集合。
+     */
     private List<ContinuationRemainderFinishGroup> continuationRemainderFinishGroups =
             new ArrayList<>(16);
     /** 同料多状态专用链锁定的来源键，传递给最终补偿收口。 */
@@ -1046,7 +1059,9 @@ public class LhScheduleContext {
     /** 已由新服务接管的单机及多机结果身份，阻止旧补量、均衡与保存前归整。 */
     private Set<LhScheduleResult> continuationSurplusEndingAllocatedResults =
             Collections.newSetFromMap(new IdentityHashMap<LhScheduleResult, Boolean>(16));
-    /** 余量收尾成功提交后的轻量快照，供S4.6只读复核节点与正式交替，不能反向修改后料。 */
+    /**
+     * 两类公共收尾提交后的逐机事实，供S4.6复核节点与正式交替，数量变化时同步刷新。
+     */
     private Map<LhScheduleResult, ContinuationEndingAllocationSnapshot> continuationSurplusEndingSnapshotMap =
             new IdentityHashMap<LhScheduleResult, ContinuationEndingAllocationSnapshot>(16);
     /**
@@ -2426,6 +2441,14 @@ public class LhScheduleContext {
      */
     public Set<String> resolveForcedReleasedPhysicalMachineCodes(SkuScheduleDTO sku) {
         Set<String> physicalMachineCodeSet = this.resolveOnlySandBlastReleasedPhysicalMachineCodes(sku);
+        if (Objects.nonNull(sku)) {
+            this.getPreviousAlternateReleaseEventMap().values().stream()
+                    .filter(event -> Objects.nonNull(event.getForcedHandoffReleaseTime()))
+                    .filter(event -> StringUtils.equals(event.getMaterialCode(), sku.getMaterialCode())
+                            && StringUtils.equals(event.getProductStatus(), sku.getProductStatus()))
+                    .map(event -> LhSingleControlMachineUtil.resolvePhysicalMachineCode(event.getMachineCode()))
+                    .forEach(physicalMachineCodeSet::add);
+        }
         if (Objects.isNull(sku) || CollectionUtils.isEmpty(this.getContinuationTemporaryFaultTransferEventMap())) {
             return physicalMachineCodeSet;
         }
@@ -2441,7 +2464,8 @@ public class LhScheduleContext {
     }
 
     /**
-     * 按需求日期解析仍失效的强制释放机台，保留普通补机实际重新上机后的有效承载。
+     * 按需求日期解析仍失效的强制释放机台，包含已确认历史强制交接。
+     * 释放前业务日及普通补机重新上机后的有效承载不按历史释放排除。
      *
      * @param sku 当前物料及产品状态
      * @param businessDate 统计需求的业务日期；为空时保留原释放事实
@@ -2452,6 +2476,16 @@ public class LhScheduleContext {
         if (Objects.isNull(sku) || Objects.isNull(businessDate)) {
             return machines;
         }
+        this.getPreviousAlternateReleaseEventMap().forEach((machineCode, event) -> {
+            Date release = event.getForcedHandoffReleaseTime();
+            if (Objects.nonNull(release)
+                    && StringUtils.equals(event.getMaterialCode(), sku.getMaterialCode())
+                    && StringUtils.equals(event.getProductStatus(), sku.getProductStatus())
+                    && (businessDate.isBefore(release.toInstant().atZone(ZoneId.systemDefault()).toLocalDate())
+                    || this.hasPreviousAlternateReplacementResult(sku, machineCode, release, businessDate))) {
+                machines.remove(LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode));
+            }
+        });
         this.getOnlySandBlastContinuationReleaseWindowMap().forEach((machineCode, event) -> {
             if (Objects.nonNull(event) && Objects.nonNull(event.getCleanStartTime())
                     && !this.isTemporaryFaultOriginalMachine(sku, machineCode)
@@ -3265,6 +3299,8 @@ public class LhScheduleContext {
      * 续作补偿与新增选机共用原机完成能力结论，并用当前结果复核已分配量。
      * 只有原机真实容量分配已覆盖合法目标且结果未被后处理撤回时才阻止补机；
      * 原机不足、尚未提交或当前仍有缺口时均继续既有资源竞争，不改变余量和日计划账本。
+     * 胎胚组按冻结物料状态份额核对实机，普通余量保留同源日计划账本隔离。
+     *
      * @param sku 当前来源续作或同源新增候选
      * @return 是否已由原机完成本组合法余量
      */
@@ -3280,12 +3316,15 @@ public class LhScheduleContext {
                     || group.getOriginalMachineFinishPlan().getRemainingQty() != 0
                     || !StringUtils.equals(skuKey, MonthPlanDateResolver.buildMaterialStatusKey(
                     source.getMaterialCode(), source.getProductStatus()))
-                    || Objects.isNull(source.getDailyPlanQuotaMap())
-                    || source.getDailyPlanQuotaMap() != sku.getDailyPlanQuotaMap()) {
+                    || (group.getEndingType() == ContinuationRemainderFinishGroup.EndingType.SURPLUS
+                    && (Objects.isNull(source.getDailyPlanQuotaMap())
+                    || source.getDailyPlanQuotaMap() != sku.getDailyPlanQuotaMap()))) {
                 continue;
             }
             // 复核当前结果是否仍覆盖原目标；共享日计划对象隔离同物料独立日调整候选。
             long scheduledQty = scheduleResultList.stream().filter(Objects::nonNull)
+                    .filter(result -> group.getEndingType() != ContinuationRemainderFinishGroup.EndingType.EMBRYO_STOCK
+                            || !LhSingleControlMachineUtil.isVirtualMachineCode(result.getLhMachineCode()))
                     .filter(result -> StringUtils.equals(skuKey, MonthPlanDateResolver.buildMaterialStatusKey(
                             result.getMaterialCode(), result.getProductStatus())))
                     .mapToLong(ShiftFieldUtil::resolveScheduledQty).sum();

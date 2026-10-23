@@ -56,6 +56,50 @@ public final class RepairPlanRuntimeState {
     private long constraintVersion;
 
     /**
+     * 当前候选持有的维修等待投影，退出作用域后恢复外层视图。
+     */
+    private List<MdmDevicePlanShut> scopedStopPlans;
+
+    /**
+     * 已兑现等待投影对应的固定实际来源列表，仅用于当前批次视图复用。
+     */
+    private List<MdmDevicePlanShut> committedStopSource;
+    /**
+     * 来源时刻、相关整机侧位和收尾数量时间的不可变值快照，回滚或就地改量时自然失效。
+     */
+    private List<Object> committedStopKey;
+    /**
+     * 相关事实未变时复用的实际维修投影，保证容量解析器能够复用同一输入对象。
+     */
+    private List<MdmDevicePlanShut> committedStopView;
+
+    /**
+     * 缓存已提交结果决定的维修视图；隔离上下文不复制该派生缓存。
+     *
+     * @param source 当前固定实际来源
+     * @param key 不引用可变日期或结果对象的事实快照
+     * @param view 供当前批次重复读取的实际视图
+     */
+    public void cacheCommittedStopView(List<MdmDevicePlanShut> source, List<Object> key,
+            List<MdmDevicePlanShut> view) {
+        committedStopSource = source;
+        committedStopKey = key;
+        committedStopView = view;
+    }
+
+    /**
+     * 发布候选设备时间视图并失效派生容量，不修改固定维修来源。
+     *
+     * @param plans 独立候选视图，为空时读取批次固定事实
+     */
+    public void setScopedStopPlans(List<MdmDevicePlanShut> plans) {
+        if (scopedStopPlans != plans) {
+            scopedStopPlans = plans;
+            this.constraintsChanged();
+        }
+    }
+
+    /**
      * 失效来源归一化缓存，不改变来源及迁移事件。
      */
     public void constraintsChanged() {
@@ -87,6 +131,8 @@ public final class RepairPlanRuntimeState {
         faultWindowMap.forEach((planId, fault) -> target.faultWindowMap.put(planId, copyFault(fault)));
         transferEventMap.forEach((machineCode, event) -> target.transferEventMap.put(machineCode, copyEvent(event)));
         target.constraintVersion = constraintVersion;
+        target.scopedStopPlans = scopedStopPlans == null ? null : scopedStopPlans.stream()
+                .map(RepairPlanRuntimeState::copySource).collect(java.util.stream.Collectors.toList());
         return target;
     }
 

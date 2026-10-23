@@ -602,6 +602,24 @@ public class LhCleaningPlanFinalizer {
         this.synchronizeCancelledCleaningSummaries(context);
         List<CleaningScheduleDateFillItem> sourceFillList =
                 new ArrayList<>(context.getCleaningScheduleDateFillList());
+        Set<Long> sourceIds = sourceFillList.stream().filter(Objects::nonNull)
+                .map(CleaningScheduleDateFillItem::getPlanId)
+                .collect(Collectors.toSet());
+        context.getCleaningPlanRuntimeState().getSourceWindowMap().forEach((machineCode, sources) -> {
+            for (MachineCleaningWindowDTO source : sources) {
+                if (sourceIds.contains(source.getSourcePlanId())
+                        || LhCleaningRepairOverlapPolicy.resolveCommittedSwitch(context, machineCode, source) == null) {
+                    continue;
+                }
+                // 独立清洗额度满不等于正规换模未覆盖来源；仅为已兑现组合补本来源回填。
+                CleaningScheduleDateFillItem fill = new CleaningScheduleDateFillItem();
+                fill.setPlanId(source.getSourcePlanId());
+                fill.setMachineCode(machineCode);
+                fill.setCleanType(source.getCleanType());
+                sourceFillList.add(fill);
+                sourceIds.add(source.getSourcePlanId());
+            }
+        });
         Map<Long, CleaningScheduleDateFillItem> finalFillMap = new LinkedHashMap<>(sourceFillList.size());
         for (CleaningScheduleDateFillItem sourceFill : sourceFillList) {
             if (Objects.isNull(sourceFill) || Objects.isNull(sourceFill.getPlanId())) {
@@ -617,6 +635,12 @@ public class LhCleaningPlanFinalizer {
             CleaningScheduleDateFillItem finalFill = this.copyCleaningScheduleDateFillItem(sourceFill);
             if (Objects.nonNull(endingResult)) {
                 this.applyCleaningEndingAnalysis(endingResult, sourceFill.getCleanType());
+                // 同一物理事件的左右侧分别绑定本侧真实收尾，来源日期仍只回填一次。
+                context.getCleaningPlanRuntimeState().getSourceWindowMap().forEach((side, windows) -> windows.stream()
+                        .filter(window -> Objects.equals(sourceFill.getPlanId(), window.getSourcePlanId()))
+                        .map(window -> CleaningDispositionResolver.resolve(context, side, window).getEndingResult())
+                        .filter(Objects::nonNull)
+                        .forEach(ending -> this.applyCleaningEndingAnalysis(ending, sourceFill.getCleanType())));
                 finalFill.setScheduleDate(LhScheduleTimeUtil.clearTime(endingResult.getSpecEndTime()));
                 finalFill.setFillReason("收尾未安排清洗");
                 log.info("清洗最终处置, 处置: 三天内收尾跳过, 机台: {}, 物料: {}, 产品状态: {}, "
@@ -652,6 +676,112 @@ public class LhCleaningPlanFinalizer {
         }
         context.getCleaningScheduleDateFillList().clear();
         context.getCleaningScheduleDateFillList().addAll(finalFillMap.values());
+        this.applyCleaningRepairCombinationAnalysis(context);
+    }
+    /**
+     * 将已兑现三项组合的准备说明写入切换开始班次，首检和数量仍使用主链冻结的真实时间轴。
+     * 同一来源旧收尾说明仅在没有其他同类型独立清洗来源时移除，保留换胶囊等无关原因。
+     *
+     * @param context 已完成正式排量的结果和来源事件
+     */
+    private void applyCleaningRepairCombinationAnalysis(LhScheduleContext context) {
+        if (context.getCleaningPlanRuntimeState().getSourceWindowMap().isEmpty()) {
+            return;
+        }
+        Map<String, List<MachineCleaningWindowDTO>> effectiveWindows = this.collectCleaningPlanItems(context).stream()
+                .filter(item -> !item.getValue().isOffMachineCleaning())
+                .filter(item -> CleaningDispositionResolver.resolve(context,
+                        this.resolveCleaningMachineCode(item.getKey(), item.getValue()), item.getValue())
+                        .getDisposition() == CleaningDispositionResolver.Disposition.INDEPENDENT)
+                .collect(Collectors.groupingBy(item -> this.resolveCleaningMachineCode(item.getKey(), item.getValue()),
+                        Collectors.mapping(Map.Entry::getValue, Collectors.toList())));
+        context.getCleaningPlanRuntimeState().getSourceWindowMap().forEach((machineCode, sources) -> {
+            for (MachineCleaningWindowDTO source : sources) {
+                LhScheduleResult result = LhCleaningRepairOverlapPolicy.resolveCommittedSwitch(
+                        context, machineCode, source);
+                if (result == null) {
+                    continue;
+                }
+                Date switchStart = result.getMouldChangeStartTime();
+                Date switchEnd = LhCleaningRepairOverlapPolicy.resolveSwitchEnd(context, result);
+                LhShiftConfigVO preparationShift = LhScheduleTimeUtil.resolveShiftByTime(
+                        context.getScheduleWindowShifts(), switchStart);
+                if (preparationShift == null) {
+                    continue;
+                }
+                boolean typeBlock = "1".equals(result.getIsTypeBlock());
+                boolean sandBlast = MachineCleaningOverlapUtil.isSandBlastCleaning(source);
+                String analysis = sandBlast ? "喷砂清洗+维修+换活字块"
+                        : typeBlock ? "维修+换活字块+预热" : "干冰清洗+换模+维修";
+                Date preparationEnd = LhCleaningRepairOverlapPolicy.resolvePreparationEnd(
+                        context, machineCode, switchStart, switchEnd, typeBlock);
+                boolean otherDryIceSource = sources.stream().anyMatch(other -> MachineCleaningOverlapUtil
+                        .isDryIceCleaning(other) && !Objects.equals(other.getSourcePlanId(), source.getSourcePlanId()));
+                List<MachineMaintenanceWindowDTO> repairWindows = LhPlannedRepairResolver.resolveCapacityWindows(
+                        context, context.getDevicePlanShutList(), machineCode);
+                int firstProductionShiftIndex = ShiftFieldUtil.resolveFirstPlannedShiftIndex(result);
+                for (LhShiftConfigVO shift : context.getScheduleWindowShifts()) {
+                    boolean preparationOverlap = shift.getShiftStartDateTime().before(preparationEnd)
+                            && shift.getShiftEndDateTime().after(switchStart);
+                    // 维修末端校正写在首个有量班次；即使首检被供胚门禁推迟，也应移除同源旧组合说明。
+                    if (!preparationOverlap && shift.getShiftIndex() != firstProductionShiftIndex) {
+                        continue;
+                    }
+                    int shiftIndex = shift.getShiftIndex();
+                    boolean independentRepair = repairWindows.stream()
+                            .anyMatch(repair -> repair.getMaintenanceStartTime().before(shift.getShiftEndDateTime())
+                                    && repair.getProductionResumeTime().after(shift.getShiftStartDateTime())
+                                    && !(repair.getMaintenanceStartTime().before(switchEnd)
+                                    && repair.getMaintenanceEndTime().after(switchStart)));
+                    if (!independentRepair) {
+                        ShiftFieldUtil.removeShiftAnalysis(result, shiftIndex, "计划性维修+换活字块+预热");
+                        ShiftFieldUtil.removeShiftAnalysis(result, shiftIndex, "计划性维修+换活字块（含预热）");
+                        ShiftFieldUtil.removeShiftAnalysis(result, shiftIndex, "计划性维修+换模+预热");
+                        ShiftFieldUtil.removeShiftAnalysis(result, shiftIndex, "计划性维修+换模（含预热）");
+                    }
+                    ShiftFieldUtil.removeShiftAnalysis(result, shiftIndex, TYPE_BLOCK_DRY_ICE_CLEANING_ANALYSIS);
+                    ShiftFieldUtil.removeShiftAnalysis(result, shiftIndex, analysis);
+                    if (sandBlast) {
+                        ShiftFieldUtil.removeShiftAnalysis(result, shiftIndex, "喷砂清洗+换模");
+                        ShiftFieldUtil.removeShiftAnalysis(result, shiftIndex, "喷砂清洗+换活字块");
+                        ShiftFieldUtil.removeShiftAnalysis(result, shiftIndex, "喷砂清洗首检");
+                    }
+                    if (typeBlock && !otherDryIceSource) {
+                        ShiftFieldUtil.removeShiftAnalysis(result, shiftIndex, "干冰清洗");
+                    }
+                }
+                if (!otherDryIceSource) {
+                    context.getScheduleResultList().stream().filter(Objects::nonNull)
+                            .filter(ending -> StringUtils.equals(machineCode, ending.getLhMachineCode()))
+                            .filter(ending -> StringUtils.equals(
+                                    source.getSourceMaterialCode(), ending.getMaterialCode())
+                                    && StringUtils.equals(source.getSourceProductStatus(), ending.getProductStatus()))
+                            .forEach(ending -> context.getScheduleWindowShifts().forEach(shift ->
+                                    ShiftFieldUtil.removeShiftAnalysis(ending, shift.getShiftIndex(),
+                                            DRY_ICE_ENDING_ANALYSIS)));
+                }
+                if (typeBlock && !sandBlast) {
+                    ShiftFieldUtil.appendShiftAnalysis(result, preparationShift.getShiftIndex(), "干冰清洗");
+                }
+                ShiftFieldUtil.appendShiftAnalysis(result, preparationShift.getShiftIndex(), analysis);
+                MachineCleaningWindowDTO projected = LhCleaningRepairOverlapPolicy.projectWindow(
+                        context, source, switchStart, switchEnd, typeBlock);
+                if (typeBlock) {
+                    ResultDowntimeSummaryUtil.refreshCancelledCleaningSummary(result,
+                            effectiveWindows.getOrDefault(machineCode, Collections.emptyList()),
+                            Collections.emptyList(), context.getScheduleWindowShifts());
+                }
+                String detail = "工厂=" + context.getFactoryCode() + ", 批次=" + context.getBatchNo()
+                        + ", 机台=" + machineCode + ", 物料=" + result.getMaterialCode()
+                        + ", 状态=" + result.getProductStatus() + ", 来源=" + source.getSourcePlanId()
+                        + ", 清洗开始=" + LhScheduleTimeUtil.formatDateTime(projected.getCleanStartTime())
+                        + ", 清洗结束=" + LhScheduleTimeUtil.formatDateTime(projected.getCleanEndTime())
+                        + ", 切换开始=" + LhScheduleTimeUtil.formatDateTime(switchStart)
+                        + ", 准备说明班次=" + preparationShift.getShiftIndex() + ", 组合说明=" + analysis;
+                PriorityTraceLogHelper.appendProcessLog(context, "清洗维修切换组合最终处置", detail);
+                log.info("清洗维修切换组合最终处置, {}", detail);
+            }
+        });
     }
     /**
      * 将最终来源事件处置同步到同机台全部结果，清除后料继承的无效清洗摘要。
@@ -724,7 +854,14 @@ public class LhCleaningPlanFinalizer {
                 matchedWindow = cleaningWindow;
             }
         }
-        return matchedWindow;
+        if (matchedWindow != null) {
+            return matchedWindow;
+        }
+        // 初始化收尾跳过没有机台容量窗口，但完整来源仍可按最终正量结果校正日期。
+        return context.getCleaningPlanRuntimeState().getSourceWindowMap()
+                .getOrDefault(sourceFill.getMachineCode(), Collections.emptyList()).stream()
+                .filter(window -> Objects.equals(sourceFill.getPlanId(), window.getSourcePlanId()))
+                .findFirst().orElse(null);
     }
     /**
      * 复制清洗日期回填项，最终阶段不修改初始化阶段的只读来源信息。
@@ -861,6 +998,25 @@ public class LhCleaningPlanFinalizer {
                                 context.getMachineScheduleMap().get(entry.getKey()), entry.getValue()));
             }
         }
+        // 初始化收尾跳过的来源只有在正式三项组合兑现后才加入输出，不补造独立清洗。
+        context.getCleaningPlanRuntimeState().getSourceWindowMap().forEach((machineCode, sources) -> {
+            for (MachineCleaningWindowDTO source : sources) {
+                LhScheduleResult result = LhCleaningRepairOverlapPolicy.resolveCommittedSwitch(
+                        context, machineCode, source);
+                if (result == null) {
+                    continue;
+                }
+                MachineCleaningWindowDTO projected = LhCleaningRepairOverlapPolicy.projectWindow(context, source,
+                        result.getMouldChangeStartTime(),
+                        LhCleaningRepairOverlapPolicy.resolveSwitchEnd(context, result),
+                        "1".equals(result.getIsTypeBlock()));
+                itemList.removeIf(item -> StringUtils.equals(machineCode,
+                        this.resolveCleaningMachineCode(item.getKey(), item.getValue()))
+                        && Objects.equals(source.getSourcePlanId(), item.getValue().getSourcePlanId()));
+                itemList.add(new AbstractMap.SimpleEntry<>(
+                        context.getMachineScheduleMap().get(machineCode), projected));
+            }
+        });
         itemList.sort(Comparator
                 .comparing(
                         (Map.Entry<MachineScheduleDTO,

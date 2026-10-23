@@ -9,6 +9,7 @@ import com.zlt.aps.lh.engine.strategy.support.FirstInspectionAllocationPlan;
 import com.zlt.aps.lh.engine.strategy.support.FirstInspectionShiftAllocation;
 import com.zlt.aps.lh.engine.strategy.support.FirstInspectionTimelinePlan;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchFirstShiftQuantityPolicy;
+import com.zlt.aps.lh.service.impl.LhCleaningRepairOverlapPolicy;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
@@ -565,8 +566,16 @@ public final class FirstInspectionAllocationUtil {
                 sku, scheduleType, changeoverAction, businessScene,
                 productionReadyTime, changeoverEndTime,
                 productionOccupationNotBeforeTime, previousAlternateNormalMode);
+        Date combinedReadyTime = LhCleaningRepairOverlapPolicy.resolveForwardInspectionReady(
+                context, machineCode, scheduleType, changeoverStartTime, changeoverEndTime);
+        if (combinedReadyTime != null) {
+            productionReadyTime = resolveLaterTime(productionReadyTime, combinedReadyTime);
+            decision = FirstInspectionTimingModeDecision.of(FirstInspectionTimingMode.START_AT_PRODUCTION_READY,
+                    "清洗、维修及切换组合准备完成后正向首检，首检与生产共用首班上限");
+        }
         Date inspectionNotBeforeTime = Objects.nonNull(productionOccupationNotBeforeTime)
                 ? productionOccupationNotBeforeTime : productionReadyTime;
+        inspectionNotBeforeTime = resolveLaterTime(inspectionNotBeforeTime, combinedReadyTime);
         FirstInspectionAllocationPlan allocationPlan = buildPlan(
                 context, sku, shifts, changeoverEndTime, inspectionNotBeforeTime,
                 shiftCapacity, remainingQty, scheduleType, machineCode,

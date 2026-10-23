@@ -15,6 +15,14 @@ import java.util.Map;
  */
 @Data
 public class ContinuationRemainderFinishGroup {
+    /**
+     * 本轮唯一收尾类型；旧余量调用沿用默认类型。
+     */
+    private EndingType endingType = EndingType.SURPLUS;
+    /**
+     * 本次原机可分配预算，与最终验收总目标分开保存。
+     */
+    private Integer allocationBudgetQty;
     /** 原始需求对象，沿用生产余量和日计划账本。 */
     private SkuScheduleDTO sourceSku;
     /** 整组提交时冻结的合法总目标，包含同物料状态的固定排量；保存前用于缺口核对。 */
@@ -29,10 +37,26 @@ public class ContinuationRemainderFinishGroup {
      * 节点计算时已有的后续动作硬截止，匹配提交仍须逐机校验。
      */
     private Map<String, Date> nextActions;
-    /** 本组全部原结果，提交时清除未保留的初始排量。 */
+    /**
+     * 登记的原机结果；公共计算前重新确认有效可调整集合，固定状态链不得进入整行覆盖。
+     */
     private List<LhScheduleResult> originalResults;
     /** 按既有下机顺序冻结的参与结果；L/R成组后仅T日大余量角色改用保留顺序。 */
     private List<LhScheduleResult> participatingResults;
     /** 前置停产保机结果；余量收尾不因月计划降模新增该身份，已有占用由上下文约束。 */
     private List<LhScheduleResult> stopHoldResults;
+
+    /**
+     * 区分库存硬目标和普通硫化余量目标，公共节点计算只消费解析后的预算。
+     */
+    public enum EndingType {
+        /**
+         * 首次冻结的实机胎胚库存份额，不向上归整。
+         */
+        EMBRYO_STOCK,
+        /**
+         * 原有硫化余量及其合法数量归整规则。
+         */
+        SURPLUS
+    }
 }

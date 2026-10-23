@@ -1,6 +1,7 @@
 package com.zlt.aps.lh.handler;
 
 import com.zlt.aps.lh.service.impl.LhPlannedRepairResolver;
+import com.zlt.aps.lh.service.impl.LhRepairPlanScheduleService;
 import cn.hutool.core.date.DateUtil;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
@@ -190,6 +191,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
              * 并执行保存前数量上限强校验。
              */
             refreshFinalEndingFlagByMaterialStatus(context);
+            com.zlt.aps.lh.service.impl.LhRepairEndingDeferralPolicy.appendCommittedAnalysis(context);
 //            validateProductionQuantityPolicy(context);
             // 正式后料、首检及最终裁量均已完成，只读比较续作预测与实际衔接，禁止为维持预测改后料。
             ContinuationEndingHandoffAudit.audit(context);
@@ -241,7 +243,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     }
 
     /**
-     * 将计划性维修结束并完成 SYS0307009 预热后的首个有量班次对齐到最早开产时间。
+     * 将计划性维修后的首个有量班次按独立维修或真实切换组合边界校正。
      * <p>维修容量窗口由设备停机计划临时构造，不写入机台精度保养列表，因此本方法不会生成
      * 精度计划摘要、占用保养额度或改变计划回填；班次量、月/日计划账本、胎胚库存和胶囊次数
      * 均保持排程主链已经确定的值，仅校正最终展示时间并补充组合原因。</p>
@@ -258,8 +260,9 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                 continue;
             }
             List<MachineMaintenanceWindowDTO> repairWindowList =
-                    LhPlannedRepairResolver.resolveCapacityWindows(
-                            context, context.getDevicePlanShutList(), result.getLhMachineCode());
+                    LhRepairPlanScheduleService.adaptCapacityWindowsForResult(context, result,
+                            LhPlannedRepairResolver.resolveCapacityWindows(
+                                    context, context.getDevicePlanShutList(), result.getLhMachineCode()));
             for (MachineMaintenanceWindowDTO repairWindow : repairWindowList) {
                 alignResultShiftStartAfterPlannedRepair(context, result, repairWindow);
             }
@@ -269,7 +272,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     /**
      * 校正单条结果在计划性维修预热后的首个生产班次，并追加可对账的组合原因。
      * <p>维修开始班次固定排产量的结束时间已在主链截到维修开始，因此不会被当作维修后结果；
-     * 维修后首个有量班次即使仍保留标准班次起点，也会向后对齐到预热完成时刻。
+     * 独立维修向后对齐到预热完成，真实切换组合只校验维修本体结束，保留主链冻结的首检区间。
      * 若该结果属于换模或换活字块，则原因中同步体现切换类型。</p>
      *
      * @param context 排程上下文
@@ -293,15 +296,15 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                     || !shiftEndTime.after(repairWindow.getProductionResumeTime())) {
                 continue;
             }
-            // 维修开始班次固定2条的结束时间已被主链截到维修开始，不会进入本分支；
-            // 因此即使结果仍保留标准班次起点，也可以安全向后对齐到预热完成时间。
+            // 组合首检已由主链校验真实容量；此处不得再次套用独立预热将合法首检截短。
             ShiftFieldUtil.alignShiftStartTimeNotBefore(
                     result, shiftIndex, repairWindow.getProductionResumeTime());
             String analysis = "计划性维修+预热";
-            if ("1".equals(result.getIsChangeMould())) {
-                analysis = "计划性维修+换模+预热";
-            } else if ("1".equals(result.getIsTypeBlock())) {
+            // 新增主链的同模具切换可同时携带两个标记，按最终换活字块身份优先展示。
+            if ("1".equals(result.getIsTypeBlock())) {
                 analysis = "计划性维修+换活字块+预热";
+            } else if (repairWindow.isRepairCombinedWithSwitch()) {
+                analysis = "计划性维修+换模（含预热）";
             }
             ShiftFieldUtil.appendShiftAnalysis(result, shiftIndex, analysis);
             log.info("计划性维修后班次开产时间对齐完成, machineCode: {}, materialCode: {}, "
@@ -2514,18 +2517,22 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     }
 
     /**
-     * 为原故障机台生成同物料模具下机记录。
+     * 为原故障机台生成同物料模具下机记录，保留下机身份供当轮及历史换模配额排除。
      *
      * @param context 排程上下文
      * @param event 故障迁移事件
      */
     private void appendTemporaryFaultOfflinePlan(
             LhScheduleContext context, ContinuationTemporaryFaultTransferEvent event) {
+        // 迁移成功后buildRemark会变为置换说明，旧机仍是仅下机动作，必须保留独立身份前缀。
+        String offlineRemark = "临时性故障模具下机：" + event.getOriginalPhysicalMachineCode();
+        String planRemark = StringUtils.isNotEmpty(event.getTargetMachineCode())
+                ? offlineRemark + "；" + event.buildRemark() : offlineRemark;
         boolean exists = context.getMouldChangePlanList().stream()
                 .filter(Objects::nonNull)
                 .anyMatch(plan -> StringUtils.equals(event.getOriginalMachineCode(), plan.getLhMachineCode())
                         && Objects.equals(event.getFaultStartTime(), plan.getPlanDate())
-                        && StringUtils.equals(event.buildRemark(), plan.getRemark()));
+                        && StringUtils.startsWith(plan.getRemark(), offlineRemark));
         if (exists) {
             return;
         }
@@ -2556,7 +2563,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         plan.setMouldStatus("0");
         plan.setEndType("0");
         plan.setIsDelete(0);
-        plan.setRemark(event.buildRemark());
+        plan.setRemark(planRemark);
         context.getMouldChangePlanList().add(plan);
         log.info("临时性故障旧机模具下机计划已生成, originalMachine: {}, materialCode: {}, "
                         + "faultStartTime: {}, originalMould: {}, remark: {}",

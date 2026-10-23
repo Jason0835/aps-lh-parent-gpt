@@ -1,6 +1,10 @@
 package com.zlt.aps.lh.service.impl;
 
 import com.zlt.aps.lh.engine.strategy.support.ContinuationEndingAllocationSnapshot;
+import com.zlt.aps.lh.engine.strategy.support.ContinuationRemainderFinishGroup;
+import com.zlt.aps.lh.engine.strategy.support.ContinuationFinishScheduleResult;
+import com.zlt.aps.lh.engine.strategy.support.ContinuationMachineFinishPlan;
+import com.zlt.aps.lh.engine.strategy.support.ContinuationEndingMachineProfile;
 import com.zlt.aps.lh.engine.strategy.support.FirstInspectionAllocationPlan;
 import com.zlt.aps.lh.engine.strategy.support.PreviousAlternateAdditionalMachineDemand;
 import cn.hutool.core.bean.BeanUtil;
@@ -18,6 +22,7 @@ import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.context.EmbryoStockConsumeLedger;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.component.StructureEarlyProductionAdmission;
+import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.StructureShiftInMachineIndex;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionRuntimePlan;
 import com.zlt.aps.lh.engine.strategy.support.ActiveMachineBinding;
@@ -299,6 +304,18 @@ final class ScheduleSubstitutionAttemptSnapshot {
 
     /** 收尾只读快照采用写时复制，置换失败恢复原对象映射。 */
     private Map<LhScheduleResult, ContinuationEndingAllocationSnapshot> continuationFinishSnapshots;
+    /**
+     * 收尾组保留对象身份，另存类型、目标、预算、容量及公共完成输出的内容快照。
+     */
+    private List<ContinuationRemainderFinishGroup> continuationFinishGroups;
+    /**
+     * 预演会改变公共完成事实，不能仅复制收尾组列表外壳。
+     */
+    private Map<ContinuationRemainderFinishGroup, ContinuationRemainderFinishGroup> continuationFinishGroupStates;
+    /**
+     * 分组时已保护的原机集合与组内容同时回滚。
+     */
+    private Set<LhScheduleResult> continuationFinishAllocatedResults;
 
     private ScheduleSubstitutionAttemptSnapshot() {
     }
@@ -341,6 +358,10 @@ final class ScheduleSubstitutionAttemptSnapshot {
         snapshot.previousAlternateAdditionalMachineDemandMap =
                 new LinkedHashMap<>(context.getPreviousAlternateAdditionalMachineDemandMap());
         snapshot.continuationFinishSnapshots = copyContinuationFinishSnapshots(context.getContinuationSurplusEndingSnapshotMap());
+        snapshot.continuationFinishGroups = new ArrayList<>(context.getContinuationRemainderFinishGroups());
+        snapshot.continuationFinishGroupStates = new IdentityHashMap<>();
+        snapshot.continuationFinishGroups.forEach(group -> snapshot.continuationFinishGroupStates.put(group, copyFinishGroup(group)));
+        snapshot.continuationFinishAllocatedResults = copyIdentityResultSet(context.getContinuationSurplusEndingAllocatedResults());
         snapshot.nextShiftNewPlanCandidateList = new ArrayList<>(context.getNextShiftNewPlanCandidateList());
         snapshot.nextShiftNewPlanPoolDateMap = new LinkedHashMap<>(context.getNextShiftNewPlanPoolDateMap());
         snapshot.structureShiftInMachineIndex = Objects.isNull(context.getStructureShiftInMachineIndex())
@@ -355,6 +376,9 @@ final class ScheduleSubstitutionAttemptSnapshot {
         for (LhScheduleResult result : context.getScheduleResultList()) {
             snapshot.scheduleResultStateMap.put(result, copyBean(result, LhScheduleResult.class));
         }
+        // 零量行已移除时，公共快照仍引用原对象；预演修改这些字段也必须恢复。
+        context.getContinuationSurplusEndingSnapshotMap().keySet().forEach(result ->
+                snapshot.scheduleResultStateMap.putIfAbsent(result, copyBean(result, LhScheduleResult.class)));
         snapshot.scheduleResultSourceSkuMap =
                 new IdentityHashMap<LhScheduleResult, SkuScheduleDTO>(context.getScheduleResultSourceSkuMap());
         snapshot.machineAssignmentMap = copyResultListMap(context.getMachineAssignmentMap());
@@ -403,7 +427,7 @@ final class ScheduleSubstitutionAttemptSnapshot {
         snapshot.sharedEmbryoStockEndingMachineQuotaMap =
                 new IdentityHashMap<>(context.getSharedEmbryoStockEndingMachineQuotaMap());
         snapshot.sharedEmbryoStockEndingMachineReleaseMap =
-                new IdentityHashMap<>(context.getSharedEmbryoStockEndingMachineReleaseMap());
+                copyResultDateMap(context.getSharedEmbryoStockEndingMachineReleaseMap());
         snapshot.skuDecrementKeySet =
                 new LinkedHashSet<String>(context.getSkuDecrementKeySet());
         snapshot.decrementHandledSkuKeySet =
@@ -560,6 +584,13 @@ final class ScheduleSubstitutionAttemptSnapshot {
                 new IdentityHashMap<SkuScheduleDTO, Map<LocalDate, SkuDailyPlanQuotaDTO>>(4);
         // 独立调整原对象不一定在普通候选集合中，必须一并恢复其字段和共享日计划账本。
         List<SkuScheduleDTO> capturedSkus = new ArrayList<>(context.getDayPlanAdjustSkuList());
+        // 公共组来源可能已退出候选池；嵌套预演修改其目标或消费后仍须恢复DTO与共享dayN。
+        context.getContinuationRemainderFinishGroups().stream().map(ContinuationRemainderFinishGroup::getSourceSku)
+                .forEach(capturedSkus::add);
+        context.getScheduleResultSourceSkuMap().values().stream()
+                .filter(sku -> Objects.nonNull(sku) && context.getSharedEmbryoStockEndingIdentityMap().containsKey(
+                        MonthPlanDateResolver.buildMaterialStatusKey(sku.getMaterialCode(), sku.getProductStatus())))
+                .forEach(capturedSkus::add);
         // 无日计划的指定试验原对象与派生候选共享额度，失败仍需一并恢复。
         capturedSkus.addAll(context.getPreviousAlternateTrialDemandList());
         // 前置结构切换绑定可能已移出待排列表，逐班续排失败仍须恢复其共享数量与日计划账本。
@@ -622,6 +653,14 @@ final class ScheduleSubstitutionAttemptSnapshot {
             }
         }
         context.setScheduleResultList(new ArrayList<LhScheduleResult>(scheduleResultList));
+        if (restoreSourceObjects) {
+            continuationFinishGroupStates.forEach((group, state) -> BeanUtil.copyProperties(copyFinishGroup(state), group));
+            context.setContinuationRemainderFinishGroups(new ArrayList<>(continuationFinishGroups));
+        } else {
+            context.setContinuationRemainderFinishGroups(continuationFinishGroups.stream()
+                    .map(group -> copyFinishGroup(continuationFinishGroupStates.get(group))).collect(Collectors.toList()));
+        }
+        context.setContinuationSurplusEndingAllocatedResults(copyIdentityResultSet(continuationFinishAllocatedResults));
         context.setScheduleResultSourceSkuMap(
                 new IdentityHashMap<LhScheduleResult, SkuScheduleDTO>(scheduleResultSourceSkuMap));
         context.setCommittedWholeSingleControlPairMap(new IdentityHashMap<>(committedWholeSingleControlPairMap));
@@ -657,7 +696,7 @@ final class ScheduleSubstitutionAttemptSnapshot {
         context.setSharedEmbryoStockEndingInitialQuotaMap(new LinkedHashMap<>(sharedEmbryoStockEndingInitialQuotaMap));
         context.setSharedEmbryoStockEndingConsumedQtyMap(new LinkedHashMap<>(sharedEmbryoStockEndingConsumedQtyMap));
         context.setSharedEmbryoStockEndingMachineQuotaMap(new IdentityHashMap<>(sharedEmbryoStockEndingMachineQuotaMap));
-        context.setSharedEmbryoStockEndingMachineReleaseMap(new IdentityHashMap<>(sharedEmbryoStockEndingMachineReleaseMap));
+        context.setSharedEmbryoStockEndingMachineReleaseMap(copyResultDateMap(sharedEmbryoStockEndingMachineReleaseMap));
         context.setSkuDecrementKeySet(new LinkedHashSet<String>(skuDecrementKeySet));
         context.setDecrementHandledSkuKeySet(
                 new LinkedHashSet<String>(decrementHandledSkuKeySet));
@@ -847,6 +886,42 @@ final class ScheduleSubstitutionAttemptSnapshot {
         return target;
     }
 
+    /**
+     * 复制收尾组的可变输入与输出，结果和来源仍引用由通用快照恢复的原对象。
+     *
+     * @param source 原收尾组
+     * @return 与原组隔离的内容快照
+     */
+    private static ContinuationRemainderFinishGroup copyFinishGroup(ContinuationRemainderFinishGroup source) {
+        ContinuationRemainderFinishGroup copied = copyBean(source, ContinuationRemainderFinishGroup.class);
+        copied.setOriginalResults(source.getOriginalResults() == null ? null : new ArrayList<>(source.getOriginalResults()));
+        copied.setParticipatingResults(source.getParticipatingResults() == null ? null : new ArrayList<>(source.getParticipatingResults()));
+        copied.setStopHoldResults(source.getStopHoldResults() == null ? null : new ArrayList<>(source.getStopHoldResults()));
+        if (Objects.nonNull(source.getMachineProfiles())) {
+            copied.setMachineProfiles(source.getMachineProfiles().stream()
+                    .map(ContinuationEndingMachineProfile::copyForCalculation).collect(Collectors.toList()));
+        }
+        if (Objects.nonNull(source.getNextActions())) {
+            Map<String, Date> actions = new LinkedHashMap<>();
+            source.getNextActions().forEach((machine, time) -> actions.put(machine, copyDate(time)));
+            copied.setNextActions(actions);
+        }
+        if (Objects.nonNull(source.getOriginalMachineFinishPlan())) {
+            ContinuationFinishScheduleResult plan = copyBean(source.getOriginalMachineFinishPlan(), ContinuationFinishScheduleResult.class);
+            if (Objects.nonNull(source.getOriginalMachineFinishPlan().getMachinePlans())) {
+                plan.setMachinePlans(source.getOriginalMachineFinishPlan().getMachinePlans().stream().map(original -> {
+                    ContinuationMachineFinishPlan item = copyBean(original, ContinuationMachineFinishPlan.class);
+                    item.setFinishTime(copyDate(original.getFinishTime()));
+                    item.setOfflineTime(copyDate(original.getOfflineTime()));
+                    item.setFinishDeadline(copyDate(original.getFinishDeadline()));
+                    return item;
+                }).collect(Collectors.toList()));
+            }
+            copied.setOriginalMachineFinishPlan(plan);
+        }
+        return copied;
+    }
+
     /** 精度强制释放会更新收尾事实，捕获及恢复都复制数组与日期，防止嵌套预演污染原快照。 */
     private static Map<LhScheduleResult, ContinuationEndingAllocationSnapshot> copyContinuationFinishSnapshots(
             Map<LhScheduleResult, ContinuationEndingAllocationSnapshot> sources) {
@@ -864,6 +939,18 @@ final class ScheduleSubstitutionAttemptSnapshot {
             copies.put(result, copy);
         });
         return copies;
+    }
+
+    /**
+     * 复制公共胎胚释放投影中的日期内容，避免与节点方案日期共享可变对象。
+     *
+     * @param source 原结果到释放日期映射
+     * @return 保持结果身份且日期隔离的映射
+     */
+    private static Map<LhScheduleResult, Date> copyResultDateMap(Map<LhScheduleResult, Date> source) {
+        Map<LhScheduleResult, Date> copied = new IdentityHashMap<>();
+        source.forEach((result, date) -> copied.put(result, copyDate(date)));
+        return copied;
     }
 
     /** @param source 来源日期 @return 独立日期副本 */

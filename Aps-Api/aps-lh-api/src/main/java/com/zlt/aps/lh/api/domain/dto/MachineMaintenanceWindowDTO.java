@@ -44,6 +44,10 @@ public class MachineMaintenanceWindowDTO {
     private Date productionResumeTime;
     /** 仅05容量窗口使用：每个来源维修日期的早班起止，跨日合并维修仍保留各自固定量班别。 */
     private Map<Date, Date> repairFixedQtyShiftWindowMap = new LinkedHashMap<>(3);
+    /**
+     * 仅05候选容量投影使用：已与真实切换区间相交，预热由组合准备覆盖，后料不沿用维修前固定量。
+     */
+    private boolean repairCombinedWithSwitch;
     /** 当前生产截止时间；公共编排使用判定返回的维护开始，旧窗口保持原契约。 */
     private Date productionCutoffTime;
     /** 是否允许在前SKU自然收尾后、生产截止时间前插排完整小余量SKU */
@@ -57,6 +61,7 @@ public class MachineMaintenanceWindowDTO {
 
     /**
      * 复制可变窗口及其日期、维修班次映射，供预演和恢复各自持有独立副本。
+     *
      * @return 完整窗口副本
      */
     public MachineMaintenanceWindowDTO copy() {
@@ -75,6 +80,7 @@ public class MachineMaintenanceWindowDTO {
         target.setFirstInspectionStartTime(this.copyDate(firstInspectionStartTime));
         target.setFirstInspectionEndTime(this.copyDate(firstInspectionEndTime));
         target.setProductionResumeTime(this.copyDate(productionResumeTime));
+        target.setRepairCombinedWithSwitch(repairCombinedWithSwitch);
         target.setProductionCutoffTime(this.copyDate(productionCutoffTime));
         target.setPreInsertAllowed(preInsertAllowed);
         target.setPreInsertScheduled(preInsertScheduled);

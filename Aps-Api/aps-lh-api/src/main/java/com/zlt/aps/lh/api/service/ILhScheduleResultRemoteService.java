@@ -240,4 +240,16 @@ public interface ILhScheduleResultRemoteService {
     @ApiOperation("构建排产小结导出数据")
     @PostMapping("/lhScheduleResult/buildScheduleSummaryExportData")
     Map<String, Object> buildScheduleSummaryExportData(@RequestBody ScheduleSummaryReportVO queryVO);
+
+    /**
+     * 日排产进度报表导出
+     *
+     * @param queryDTO 查询条件，包含排程日期和分厂编码
+     * @param fileName 导出文件名
+     * @return Excel文件字节数组
+     */
+    @ApiOperation("日排产进度报表导出")
+    @PostMapping("/lhScheduleResult/exportDailyPlanProgressReport/{fileName}")
+    byte[] exportDailyPlanProgressReport(@RequestBody LhDailyPlanProgressReportDTO queryDTO,
+                                         @PathVariable("fileName") String fileName);
 }

@@ -58,6 +58,7 @@ import javax.annotation.Resource;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
@@ -654,6 +655,40 @@ public class TargetScheduleQtyResolver {
      */
     public boolean isSharedEmbryoStockEnding(LhScheduleContext context, SkuScheduleDTO sku) {
         return sharedEmbryoEndingQuotaPolicy.isSharedEmbryoStockEnding(context, sku);
+    }
+
+    /**
+     * 解析公共收尾本次可分配的实机库存预算，不改写原始硫化余量或首次冻结份额。
+     * 已正式消费的结果不再计入固定量，待替换试算量不占用第二份预算。
+     *
+     * @param context 冻结份额、实际消费和有效结果上下文
+     * @param sku 本组物料及产品状态来源
+     * @param recalculatingResults 本次将整体替换的未消费原机结果
+     * @return 扣除正式消费及集合外未消费固定量后的预算
+     * @throws IllegalStateException 非胎胚收尾身份、缺少份额或已占用量超过份额
+     */
+    public int resolveSharedEmbryoEndingBudget(LhScheduleContext context, SkuScheduleDTO sku,
+            Collection<LhScheduleResult> recalculatingResults) {
+        String skuKey = this.buildSkuKey(sku);
+        Integer quota = context.getSharedEmbryoStockEndingInitialQuotaMap().get(skuKey);
+        if (!this.isSharedEmbryoStockEnding(context, sku) || Objects.isNull(quota)) {
+            throw new IllegalStateException("公共胎胚收尾缺少已冻结份额：" + skuKey);
+        }
+        Set<LhScheduleResult> replacing = Collections.newSetFromMap(new IdentityHashMap<>());
+        replacing.addAll(recalculatingResults);
+        long consumed = context.getSharedEmbryoStockEndingConsumedQtyMap().getOrDefault(skuKey, 0);
+        long fixed = context.getScheduleResultList().stream().filter(Objects::nonNull)
+                .filter(result -> !LhSingleControlMachineUtil.isVirtualMachineCode(result.getLhMachineCode()))
+                .filter(result -> StringUtils.equals(skuKey, MonthPlanDateResolver.buildMaterialStatusKey(
+                        result.getMaterialCode(), result.getProductStatus())))
+                .filter(result -> !replacing.contains(result)
+                        && !context.getContinuousProductionConsumptionMap().containsKey(result))
+                .mapToLong(ShiftFieldUtil::resolveScheduledQty).sum();
+        if (consumed < 0 || fixed < 0 || consumed + fixed > quota) {
+            throw new IllegalStateException("胎胚收尾已占用量超过冻结份额：" + skuKey
+                    + "，份额=" + quota + "，已消费=" + consumed + "，未消费固定量=" + fixed);
+        }
+        return (int) (quota - consumed - fixed);
     }
 
     /**
@@ -1548,11 +1583,16 @@ public class TargetScheduleQtyResolver {
                 Objects.isNull(machine) || CollectionUtils.isEmpty(machine.getCleaningWindowList())
                         ? new ArrayList<MachineCleaningWindowDTO>(0) : machine.getCleaningWindowList();
         List<MachineMaintenanceWindowDTO> maintenanceWindowList =
-                Objects.isNull(machine) || CollectionUtils.isEmpty(machine.getMaintenanceWindowList())
-                        ? new ArrayList<MachineMaintenanceWindowDTO>(0)
-                        : ShiftCapacityResolverUtil.resolveCapacityMaintenanceWindowList(
-                                context, context.getDevicePlanShutList(), result.getLhMachineCode(),
-                                machine.getMaintenanceWindowList());
+                Objects.isNull(machine) ? Collections.emptyList() : machine.getMaintenanceWindowList();
+        boolean hasActualSwitch = Objects.nonNull(result.getMouldChangeStartTime())
+                && ("1".equals(result.getIsChangeMould()) || "1".equals(result.getIsTypeBlock()));
+        if (!CollectionUtils.isEmpty(maintenanceWindowList) || hasActualSwitch) {
+            // 没有精度窗口的真实切换也必须投影05，否则回裁会退回原停机列表的维修前固定量。
+            maintenanceWindowList = ShiftCapacityResolverUtil.resolveCapacityMaintenanceWindowList(
+                    context, context.getDevicePlanShutList(), result.getLhMachineCode(), maintenanceWindowList);
+        }
+        maintenanceWindowList = LhRepairPlanScheduleService.adaptCapacityWindowsForResult(
+                context, result, maintenanceWindowList);
         cleaningWindowList = cleaningOverlapResolver.appendReplacementCapacityWindow(context,
                 result.getLhMachineCode(), result.getMaterialCode(), result.getProductStatus(), cleaningWindowList);
         Date calculationEndTime = Objects.nonNull(originalShiftEndTime)
@@ -2244,6 +2284,11 @@ public class TargetScheduleQtyResolver {
                 LhScheduleParamConstant.PLANNED_REPAIR_FIXED_QTY, LhScheduleConstant.PLANNED_REPAIR_FIXED_QTY);
         String configPlusShiftType = ShiftCapacityResolverUtil.resolveOddShiftCapacityPlusShiftType(context);
 
+        List<MachineMaintenanceWindowDTO> maintenanceWindowList =
+                LhRepairPlanScheduleService.adaptCapacityWindowsForSwitch(
+                        ShiftCapacityResolverUtil.resolveCapacityMaintenanceWindowList(
+                                context, context.getDevicePlanShutList(), machine.getMachineCode(),
+                                machine.getMaintenanceWindowList()), switchStartTime, mouldChangeCompleteTime);
         Date cursorStartTime = firstProductionStartTime;
         int totalQty = 0;
         LhShiftConfigVO firstInspectionShift = FirstInspectionQtyUtil.resolveFirstInspectionAttributionShift(
@@ -2298,9 +2343,7 @@ public class TargetScheduleQtyResolver {
             int shiftMaxQty = ShiftCapacityResolverUtil.resolveShiftCapacityWithDowntime(
                     context.getDevicePlanShutList(),
                     cleaningWindowList,
-                    ShiftCapacityResolverUtil.resolveCapacityMaintenanceWindowList(
-                            context, context.getDevicePlanShutList(), machine.getMachineCode(),
-                            machine.getMaintenanceWindowList()),
+                    maintenanceWindowList,
                     machine.getMachineCode(),
                     effectiveStartTime,
                     effectiveEndTime,

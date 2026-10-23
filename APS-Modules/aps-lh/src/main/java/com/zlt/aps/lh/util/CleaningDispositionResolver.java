@@ -11,6 +11,7 @@ import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.PreviousAlternateActionPlan;
 import com.zlt.aps.lh.engine.strategy.support.PreviousAlternatePlanReleaseEvent;
+import com.zlt.aps.lh.service.impl.LhCleaningRepairOverlapPolicy;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.Collections;
@@ -112,7 +113,8 @@ public final class CleaningDispositionResolver {
     }
 
     /**
-     * 从已提交事实判断清洗是否仍须执行，收尾取消优先于正规换模取消。
+     * 从已提交事实判断清洗是否仍须执行；已兑现的干冰维修切换组合先于来源收尾取消。
+     * 其他来源继续使用收尾取消优先于正规换模取消的原规则。
      *
      * @param context 当前批次上下文
      * @param machineCode 清洗运行侧机台
@@ -123,6 +125,13 @@ public final class CleaningDispositionResolver {
                                    MachineCleaningWindowDTO window) {
         if (Objects.isNull(context) || Objects.isNull(window) || StringUtils.isEmpty(machineCode)) {
             return new Decision(Disposition.INDEPENDENT, null, null);
+        }
+        LhScheduleResult combinedSwitch = LhCleaningRepairOverlapPolicy.resolveCommittedSwitch(
+                context, machineCode, window);
+        if (combinedSwitch != null) {
+            return "1".equals(combinedSwitch.getIsTypeBlock())
+                    ? new Decision(Disposition.INDEPENDENT, null, null)
+                    : new Decision(Disposition.MOULD_CHANGE_CANCELLED, null, combinedSwitch.getMouldChangeStartTime());
         }
         LhScheduleResult endingResult = resolveEndingResult(context, machineCode, window);
         if (Objects.nonNull(endingResult)) {
@@ -312,6 +321,20 @@ public final class CleaningDispositionResolver {
         LhMachineOnlineInfo online = context.getMachineOnlineInfoMap().get(machineCode);
         String materialCode = window.getSourceMaterialCode();
         String productStatus = window.getSourceProductStatus();
+        if (window.isSourceFollowsMachineOccupation()) {
+            LhScheduleResult occupying = context.getScheduleResultList().stream().filter(Objects::nonNull)
+                    .filter(result -> coversMachineSide(result.getLhMachineCode(), machineCode))
+                    .filter(result -> result.getSpecEndTime() != null && window.getCleanStartTime() != null
+                            && result.getSpecEndTime().after(window.getCleanStartTime()))
+                    .filter(result -> {
+                        int first = ShiftFieldUtil.resolveFirstPlannedShiftIndex(result);
+                        Date start = first > 0 ? ShiftFieldUtil.getShiftStartTime(result, first) : null;
+                        return start != null && !start.after(window.getCleanStartTime());
+                    }).max(Comparator.comparing(result -> ShiftFieldUtil.getShiftStartTime(result,
+                            ShiftFieldUtil.resolveFirstPlannedShiftIndex(result)))).orElse(null);
+            return occupying != null && CleaningScheduleRuleUtil.shouldSkipCleaningByResultEnding(occupying)
+                    ? occupying : null;
+        }
         if (StringUtils.isEmpty(materialCode)) {
             materialCode = window.getContinuationMaterialCode();
             productStatus = window.getContinuationProductStatus();

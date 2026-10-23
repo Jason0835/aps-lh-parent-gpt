@@ -95,8 +95,39 @@ public class LhEquipmentPlanScheduleService {
     }
 
     /**
+     * 正式接受已由专用策略核验的喷砂置换精度组合，复用原安排、窗口和每日额度生命周期。
+     *
+     * @param context 续作数量计算前的排程上下文
+     * @param decision 置换当日的有效精度判定
+     * @param replacementStart 已落实的模具交接开始时间
+     * @param inspectionStart 两项准备完成后唯一首检可开始时间
+     * @param inspectionEnd 唯一置换首检真实结束时间
+     * @return 本次组合是否成为有效安排
+     */
+    public boolean acceptReplacementPrecision(LhScheduleContext context, PrecisionMaintenanceJudgeDTO decision,
+            Date replacementStart, Date inspectionStart, Date inspectionEnd) {
+        EquipmentPlanTimeline original = timelineResolver.resolvePrecision(context, decision,
+                "喷砂置换:" + decision.getMachineCode() + ":" + inspectionStart.getTime());
+        String conflict = timelineResolver.resolveAdditionalOverlapReason(context,
+                original.withInspection(inspectionStart, inspectionEnd), replacementStart);
+        if (StringUtils.isNotBlank(conflict)) {
+            this.recordUnsupported(context, original.getPhysicalMachineCode(), conflict);
+            return false;
+        }
+        // 唯一首检仍由置换容量窗口计量；公共精度只发布准备边界，不能再占用同一首检时间。
+        EquipmentPlanTimeline timeline = original.withInspection(inspectionStart, inspectionStart);
+        this.acceptTimeline(context, timeline);
+        EquipmentPlanArrangement accepted = context.getEquipmentPlanRuntimeState().getArrangementMap()
+                .get(timeline.getPrecisionPlanId());
+        return Objects.nonNull(accepted) && accepted.isEffective()
+                && Objects.equals(accepted.getTimeline().getInputVersion(), timeline.getInputVersion());
+    }
+
+    /**
      * 原机原模无切换恢复时，允许明确的SKU承接已冻结的精度首检。
      * 只返回未被实际结果消费的时间计划；普通换模/换活字块不得据此合并首检。
+     * 喷砂置换精度的首检由置换容量窗口唯一承接，本入口不再分配。
+     *
      * @param context 排程上下文
      * @param machine 当前机台
      * @param readyTime 原模恢复的就绪时刻
@@ -110,6 +141,8 @@ public class LhEquipmentPlanScheduleService {
         String physical = LhSingleControlMachineUtil.resolvePhysicalMachineCode(machine.getMachineCode());
         return context.getEquipmentPlanRuntimeState().getArrangementMap().values().stream()
                 .filter(EquipmentPlanArrangement::isEffective).map(EquipmentPlanArrangement::getTimeline)
+                .filter(timeline -> !context.getEquipmentPlanRuntimeState().getReplacementPrecisionPlanMap()
+                        .containsValue(timeline.getPrecisionPlanId()))
                 .filter(timeline -> StringUtils.equals(physical, timeline.getPhysicalMachineCode()))
                 .filter(timeline -> !readyTime.before(timeline.getProductionResumeTime()))
                 .filter(timeline -> context.getScheduleResultList().stream()
@@ -182,7 +215,9 @@ public class LhEquipmentPlanScheduleService {
     /**
      * 后置撤销了全部承接结果时，恢复独立精度首检；独立精度本身继续有效。
      * 仅扫描本批有效安排与已提交结果，不重排整批，也不恢复已由策略回退的生产账本。
-     * @param context 当前上下文 @return 是否恢复了组合约束
+     *
+     * @param context 当前上下文
+     * @return 是否恢复了组合约束
      */
     private boolean restoreUnboundParallelInspections(LhScheduleContext context) {
         long version = context.getEquipmentPlanRuntimeState().getConstraintVersion();
@@ -196,7 +231,8 @@ public class LhEquipmentPlanScheduleService {
                     .filter(result -> ShiftFieldUtil.resolveScheduledQty(result) > 0)
                     .map(result -> context.getFirstInspectionResultPlanMap().get(result)).filter(Objects::nonNull)
                     .anyMatch(plan -> Objects.equals(timeline.getPrecisionPlanId(), plan.getEquipmentPlanId()));
-            if (!bound) {
+            if (!bound && !context.getEquipmentPlanRuntimeState().getReplacementPrecisionPlanMap()
+                    .containsValue(timeline.getPrecisionPlanId())) {
                 Date inspectionStart = timeline.getMaintenanceReadyTime();
                 this.replaceInspectionTimeline(context, arrangement, timeline.withInspection(inspectionStart, inspectionStart),
                         "切换承接结果已撤销，恢复精度准备边界，首检待明确SKU后按参数分配");
@@ -498,7 +534,9 @@ public class LhEquipmentPlanScheduleService {
     }
 
     /**
-     * 撤销只移除本安排发布的窗口及额度；生产撤销由策略按消费记录完成后调用。
+     * 撤销本安排发布的窗口及额度，并恢复依赖它的置换时间投影。
+     * 生产撤销由策略按消费记录完成后调用。
+     *
      * @param context 排程上下文
      * @param planId 有效判定主键
      * @param reason 撤销原因
@@ -528,6 +566,7 @@ public class LhEquipmentPlanScheduleService {
         state.getArrangementMap().put(planId, arrangement.withStatus(EquipmentPlanArrangement.Status.REVOKED, reason));
         state.getCandidateTimelineMap().remove(timeline.getPhysicalMachineCode());
         state.getPendingPhysicalMachines().add(timeline.getPhysicalMachineCode());
+        LhSandBlastPrecisionOverlapPolicy.restoreReplacementProjection(context, planId);
         state.constraintsChanged();
         PriorityTraceLogHelper.appendProcessLog(context, "精准计划安排撤销",
                 "计划主键=" + planId + "，物理机台=" + timeline.getPhysicalMachineCode() + "，原因=" + reason);

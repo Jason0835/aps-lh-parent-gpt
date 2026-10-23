@@ -39,6 +39,7 @@ import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.mapper.MdmMaterialInfoMapper;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
 import com.zlt.aps.lh.service.ILhScheduleService;
+import com.zlt.aps.lh.service.ILhDailyPlanProgressReportService;
 import com.zlt.aps.lh.service.IScheduleSummaryReportService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
@@ -114,6 +115,12 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
 
     @Autowired
     private IScheduleSummaryReportService scheduleSummaryReportService;
+
+    /**
+     * 日排产进度报表服务
+     */
+    @Autowired
+    private ILhDailyPlanProgressReportService dailyPlanProgressReportService;
 
     @Autowired
     private MdmMaterialInfoMapper mdmMaterialInfoMapper;
@@ -1466,6 +1473,22 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         Date scheduleDate = cn.hutool.core.date.DateUtil.parse(queryVO.getScheduleDate(), "yyyy-MM-dd");
         String factoryCode = StringUtils.defaultString(queryVO.getFactoryCode(), FactoryConstant.DEFAULT_FACTORY_CODE);
         return scheduleSummaryReportService.buildScheduleSummaryExportData(scheduleDate, factoryCode);
+    }
+
+    /**
+     * 日排产进度报表导出
+     *
+     * @param queryDTO 查询条件，包含排程日期和分厂编码
+     * @param fileName 导出文件名
+     * @return Excel文件字节数组
+     */
+    @Log(title = "ui.data.column.lhScheduleResult.exportDailyPlanProgressReportLogTitle",
+            businessType = BusinessType.EXPORT)
+    @ApiOperation("日排产进度报表导出")
+    @PostMapping("/exportDailyPlanProgressReport/{fileName}")
+    public byte[] exportDailyPlanProgressReport(@RequestBody LhDailyPlanProgressReportDTO queryDTO,
+                                                @PathVariable("fileName") String fileName) {
+        return dailyPlanProgressReportService.exportDailyPlanProgressReport(queryDTO);
     }
 
 }

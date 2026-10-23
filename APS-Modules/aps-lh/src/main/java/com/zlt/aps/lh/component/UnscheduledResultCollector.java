@@ -7,6 +7,7 @@ import com.zlt.aps.lh.api.enums.UnscheduledGroupTypeEnum;
 import com.zlt.aps.lh.api.enums.UnscheduledReasonEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationRemainderFinishGroup;
+import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.engine.strategy.support.UnscheduledDemandSnapshot;
 import com.zlt.aps.lh.engine.strategy.support.UnscheduledReasonEvent;
 import com.zlt.aps.lh.engine.strategy.support.UnscheduledResultRuntime;
@@ -446,6 +447,8 @@ public class UnscheduledResultCollector {
     /**
      * 按收尾提交时冻结的合法目标核对最终缺口，不修改生产、日计划或资源账本。
      * 同源未排沿用已有原因；后续补排完成时删除同源投影，其他独立需求保持不变。
+     * 胎胚类型只汇总实机，虚拟硫化补量不抵消冻结库存份额缺口。
+     *
      * @param context 全部数量调整完成、即将保存的排程上下文
      */
     private void reconcileRemainderFinishGroups(LhScheduleContext context) {
@@ -458,13 +461,20 @@ public class UnscheduledResultCollector {
             }
             SkuScheduleDTO sku = group.getSourceSku();
             int scheduledQty = context.getScheduleResultList().stream()
+                    .filter(result -> group.getEndingType() != ContinuationRemainderFinishGroup.EndingType.EMBRYO_STOCK
+                            || !LhSingleControlMachineUtil.isVirtualMachineCode(result.getLhMachineCode()))
                     .filter(result -> StringUtils.equals(sku.getMaterialCode(), result.getMaterialCode())
                             && StringUtils.equals(sku.getProductStatus(), result.getProductStatus()))
                     .mapToInt(ShiftFieldUtil::resolveScheduledQty).sum();
             int remainingQty = Math.max(0, group.getFinalTargetQty() - scheduledQty);
-            String detail = String.format("工厂=%s, 批次=%s, 排程日期=%s, 物料=%s, 状态=%s, 合法目标=%s, 最终已排=%s, 未排=%s",
+            String detail = String.format("工厂=%s, 批次=%s, 排程日期=%s, 物料=%s, 状态=%s, 合法目标=%s, 最终已排=%s, 未排=%s, 类型=%s",
                     context.getFactoryCode(), context.getBatchNo(), context.getScheduleTargetDate(),
-                    sku.getMaterialCode(), sku.getProductStatus(), group.getFinalTargetQty(), scheduledQty, remainingQty);
+                    sku.getMaterialCode(), sku.getProductStatus(), group.getFinalTargetQty(), scheduledQty, remainingQty,
+                    group.getEndingType());
+            if (group.getEndingType() == ContinuationRemainderFinishGroup.EndingType.EMBRYO_STOCK
+                    && scheduledQty > group.getFinalTargetQty()) {
+                throw new IllegalStateException("胎胚收尾最终实机排量超过冻结份额：" + detail);
+            }
             if (remainingQty == 0) {
                 // 只移除同一原始需求，不能影响同物料的其他状态或独立日调整需求。
                 this.remove(context, sku);

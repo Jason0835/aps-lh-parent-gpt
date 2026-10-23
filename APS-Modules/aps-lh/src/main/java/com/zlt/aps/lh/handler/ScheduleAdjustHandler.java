@@ -14,6 +14,7 @@ import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
+import com.zlt.aps.lh.api.domain.vo.LhSkuSurplusVO;
 import com.zlt.aps.lh.api.enums.*;
 import com.zlt.aps.lh.component.*;
 import com.zlt.aps.lh.context.LhScheduleConfig;
@@ -1088,6 +1089,29 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
             return BigDecimal.ZERO.intValue();
         }
         return surplusCalculation.getSurplusQty();
+    }
+
+    /**
+     * 计算指定月计划记录的硫化余量与合格产量（只读计算，不修改上下文）。
+     * <p>与排程阶段 {@link #calculateSurplusQty} 完全同一口径，供日排产进度报表等只读场景复用：
+     * 余量=Max(月度计划总量-已完成量±有效上月超欠产,0)，合格产量=硫化余量计算使用的已完成量。</p>
+     *
+     * @param context 排程上下文（需已加载月计划、完成量、日计划调整等余量相关基础数据）
+     * @param plan    月生产计划记录（应传「生产月」所在月份的定稿行，与排程落库口径一致）
+     * @return 余量计算结果；计算异常返回null
+     */
+    public LhSkuSurplusVO resolveSurplusAndFinishedQty(LhScheduleContext context,
+                                                       FactoryMonthPlanProductionFinalResult plan) {
+        SurplusCalculation surplusCalculation = calculateSurplusQty(context, plan);
+        if (null == surplusCalculation) {
+            return null;
+        }
+        LhSkuSurplusVO surplusVO = new LhSkuSurplusVO();
+        surplusVO.setSurplusQty(surplusCalculation.getSurplusQty());
+        surplusVO.setFinishedQty(surplusCalculation.getActualFinishedQty());
+        surplusVO.setMonthPlanTotal(surplusCalculation.getMonthPlanTotal());
+        surplusVO.setOverdueSurplusFlag(surplusCalculation.isOverdueSurplusFlag());
+        return surplusVO;
     }
 
     /**

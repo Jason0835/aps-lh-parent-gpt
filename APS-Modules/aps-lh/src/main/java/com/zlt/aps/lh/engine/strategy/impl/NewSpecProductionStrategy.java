@@ -5,6 +5,7 @@ package com.zlt.aps.lh.engine.strategy.impl;
 
 import com.zlt.aps.lh.engine.strategy.support.RepairPlanResult;
 import com.zlt.aps.lh.service.impl.LhRepairPlanScheduleService;
+import com.zlt.aps.lh.service.impl.LhRepairEndingDeferralPolicy;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 
 import cn.hutool.core.bean.BeanUtil;
@@ -46,6 +47,7 @@ import com.zlt.aps.lh.component.UnscheduledResultCollector;
 import com.zlt.aps.lh.context.LhScheduleConfig;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.service.impl.LhCleaningScheduleService;
+import com.zlt.aps.lh.service.impl.LhCleaningRepairOverlapPolicy;
 import com.zlt.aps.lh.service.impl.ContinuationSandBlastDispositionService;
 import com.zlt.aps.lh.service.impl.NewSpecMaterialEligibilityService;
 import com.zlt.aps.lh.service.impl.PreviousAlternatePlanEligibilityService;
@@ -440,6 +442,33 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             NewSpecMachineAssignmentPlan assignment, IMachineMatchStrategy machineMatch,
             IMouldChangeBalanceStrategy mouldChange, IFirstInspectionBalanceStrategy inspection,
             ICapacityCalculateStrategy capacity) {
+        try (LhRepairEndingDeferralPolicy.Scope repairScope =
+                     LhRepairEndingDeferralPolicy.openScope(context, assignment.getCandidate().getSku(),
+                             assignment.getMatchResult().getMachine().getMachineCode(),
+                             day.getDayShifts().get(0).getShiftStartDateTime(),
+                             endingJudgmentStrategy.isCurrentWindowEnding(context, assignment.getCandidate().getSku()))) {
+            return this.executeMachineAssignmentWithRepairView(
+                    context, day, assignment, machineMatch, mouldChange, inspection, capacity);
+        }
+    }
+
+    /**
+     * 执行已经选定的单组合；与普通新增共用分量内核，失败只撤回当前组合。
+     *
+     * @param context 共享上下文
+     * @param day 当前业务日
+     * @param assignment 冻结组合及其真实时间轴
+     * @param machineMatch 公共硬匹配
+     * @param mouldChange 换模分配
+     * @param inspection 首检分配
+     * @param capacity 产能计算
+     * @return 是否形成正量结果
+     */
+    private boolean executeMachineAssignmentWithRepairView(LhScheduleContext context, DayScheduleContext day,
+            NewSpecMachineAssignmentPlan assignment, IMachineMatchStrategy machineMatch,
+            IMouldChangeBalanceStrategy mouldChange, IFirstInspectionBalanceStrategy inspection,
+            ICapacityCalculateStrategy capacity) {
+
         DayDrivenScheduleState state = new DayDrivenScheduleState(context.getNewSpecSkuList());
         context.getPreScheduledMachineBindingList().forEach(state::registerBinding);
         List<SkuScheduleDTO> compensationSkus = new ArrayList<SkuScheduleDTO>(2);
@@ -466,7 +495,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         compensationSkus.stream().filter(compensation -> context.getNewSpecSkuList().stream()
                 .noneMatch(pending -> pending == compensation)).forEach(context.getNewSpecSkuList()::add);
         return true;
-    }
+            }
 
     /**
      * 冻结即将提交的唯一新增组合，主预演外不增加捕获成本。
@@ -3662,7 +3691,10 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         List<ActiveMachineBinding> bindingList = state.getActiveBindings();
         for (ActiveMachineBinding binding : bindingList) {
             try (PreviousAlternateNormalProductionPolicy.BindingScope ignoredScope =
-                         PreviousAlternateNormalProductionPolicy.openBindingScope(context, binding)) {
+                         PreviousAlternateNormalProductionPolicy.openBindingScope(context, binding);
+                 LhRepairEndingDeferralPolicy.Scope repairScope = LhRepairEndingDeferralPolicy.openScope(
+                         context, binding.getSku(), binding.getMachineCode(),
+                         dayContext.getDayShifts().get(0).getShiftStartDateTime(), this.isEndingBinding(binding))) {
                 // 前置执行已处理的日期不再回放；后续新增仍根据统一日索引计算其它机台需求。
                 if (Objects.nonNull(binding.getPreparedThroughDate())
                         && !dayContext.getScheduleDate().isAfter(binding.getPreparedThroughDate())) {
@@ -3969,6 +4001,34 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                         boolean allowFutureQuotaConsumption,
                                         Date productionStartTime) {
         SkuScheduleDTO sku = binding.getSku();
+        try (LhRepairEndingDeferralPolicy.Scope repairScope =
+                     LhRepairEndingDeferralPolicy.openScope(context, sku, binding.getMachineCode(),
+                             productionStartTime, this.isEndingBinding(binding))) {
+            return this.appendCarryOverDayDeltaWithRepairView(context, dayContext, binding, allShifts,
+                    allowFutureQuotaConsumption, productionStartTime);
+        }
+    }
+
+    /**
+     * 在原新增结果中追加当前业务日班次增量。
+     * <p>供胚首班先继承原结果已消费后的可追加量，临时副本的分班、补量及扣账使用同一边界。</p>
+     *
+     * @param context 排程上下文
+     * @param dayContext 当前业务日
+     * @param binding 跨日在机绑定
+     * @param allShifts 完整窗口班次
+     * @param allowFutureQuotaConsumption true-提前生产阶段允许继续消费固定范围未来额度
+     * @param productionStartTime 与班次结构机台数门禁共用的真实可开产时间
+     * @return 当前日实际新增排产量
+     */
+    private int appendCarryOverDayDeltaWithRepairView(LhScheduleContext context,
+                                        DayScheduleContext dayContext,
+                                        ActiveMachineBinding binding,
+                                        List<LhShiftConfigVO> allShifts,
+                                        boolean allowFutureQuotaConsumption,
+                                        Date productionStartTime) {
+        SkuScheduleDTO sku = binding.getSku();
+
         MachineScheduleDTO machine = context.getMachineScheduleMap().get(binding.getMachineCode());
         if (Objects.isNull(machine) || Objects.isNull(productionStartTime)) {
             return 0;
@@ -4132,7 +4192,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 resolveCarryOverGroupDayCapacity(binding, maxQtyToDayEnd),
                 finalStrictBlock, actualDeltaQty);
         return actualDeltaQty;
-    }
+            }
 
     /**
      * 判断跨日在机增量是否为当前SKU的最终严格收尾块。
@@ -5280,12 +5340,49 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             IMouldChangeBalanceStrategy mouldChangeBalance, IFirstInspectionBalanceStrategy inspectionBalance,
             boolean isEnding, NewSpecProposalRoundCache proposalRoundCache, Date productionNotBeforeTime,
             boolean earliestLegalPreparation, Date occupationNotBeforeTime) {
+        if (context == null || dayContext == null || candidate == null || candidate.getSku() == null || machine == null) {
+            return null;
+        }
+        SkuScheduleDTO sku = candidate.getSku();
+        try (LhRepairEndingDeferralPolicy.Scope repairScope =
+                     LhRepairEndingDeferralPolicy.openScope(context, sku, machine.getMachineCode(),
+                             dayContext.getDayShifts().get(0).getShiftStartDateTime(), isEnding)) {
+            return this.resolveMachineDrivenAvailabilityWithRepairView(context, dayContext, candidate, machine, capacityCalculate,
+                    mouldChangeBalance, inspectionBalance, isEnding, proposalRoundCache,
+                    productionNotBeforeTime, earliestLegalPreparation, occupationNotBeforeTime);
+        }
+    }
+
+    /**
+     * 独立班次竞争在原生产门禁之外明确限制实际首检占用，准备动作仍可使用更早空闲窗口。
+     *
+     * @param context 上下文
+     * @param dayContext 当前完整业务日
+     * @param candidate 候选SKU
+     * @param machine 当前机台
+     * @param capacityCalculate 产能策略
+     * @param mouldChangeBalance 换模策略
+     * @param inspectionBalance 首检策略
+     * @param isEnding 原收尾判定
+     * @param proposalRoundCache 本资源版本缓存
+     * @param productionNotBeforeTime 原生产门禁
+     * @param earliestLegalPreparation 原选料探针标记
+     * @param occupationNotBeforeTime 本轮首检和生产不得早于的时刻
+     * @return 原内核形成的完整可用计划
+     */
+    private NewSpecMachineAvailabilityPlan resolveMachineDrivenAvailabilityWithRepairView(
+            LhScheduleContext context, DayScheduleContext dayContext, DailyNewSpecCandidate candidate,
+            MachineScheduleDTO machine, ICapacityCalculateStrategy capacityCalculate,
+            IMouldChangeBalanceStrategy mouldChangeBalance, IFirstInspectionBalanceStrategy inspectionBalance,
+            boolean isEnding, NewSpecProposalRoundCache proposalRoundCache, Date productionNotBeforeTime,
+            boolean earliestLegalPreparation, Date occupationNotBeforeTime) {
         if (Objects.isNull(context) || Objects.isNull(dayContext)
                 || Objects.isNull(candidate) || Objects.isNull(candidate.getSku())
                 || Objects.isNull(machine)) {
             return null;
         }
         SkuScheduleDTO sku = candidate.getSku();
+
         Date candidateProductionNotBeforeTime = NewSpecEmbryoAvailableTimeResolver
                 .resolveCandidateProductionNotBeforeTime(
                         context, sku, context.getScheduleWindowShifts());
@@ -5362,7 +5459,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         }
         return this.attachHistoricalResidualCapacityInfo(
                 context, sku, machine, availabilityPlan, isEnding);
-    }
+            }
 
     /**
      * 按提案实际资源竞争班次附加历史剩余产能画像。
@@ -8138,10 +8235,11 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                         mouldChangeStartTime, mouldChangeCompleteTime);
                 if (repairLogResult.isPlannedRepairAffectingSwitch()) {
                     // 仅在候选最终形成有效结果后写过程日志，避免失败候选污染批次审计记录。
+                    String switchType = "1".equals(result.getIsTypeBlock()) ? "换活字块" : "换模";
                     Date repairProductionReadyTime = repairLogResult.getProductionNotBefore();
                     StringBuilder repairTimelineDetail = new StringBuilder(256);
                     PriorityTraceLogHelper.appendLine(repairTimelineDetail,
-                            "机台=" + machineCode + ", SKU=" + sku.getMaterialCode() + ", 切换类型=换模");
+                            "机台=" + machineCode + ", SKU=" + sku.getMaterialCode() + ", 切换类型=" + switchType);
                     PriorityTraceLogHelper.appendLine(repairTimelineDetail,
                             "切换开始=" + LhScheduleTimeUtil.formatDateTime(mouldChangeStartTime)
                                     + ", 切换结束=" + LhScheduleTimeUtil.formatDateTime(mouldChangeCompleteTime));
@@ -8151,7 +8249,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                     + ", 实际首个生产=" + LhScheduleTimeUtil.formatDateTime(firstProductionStartTime)
                                     + ", 首检额外等待小时=0");
                     PriorityTraceLogHelper.appendProcessLog(
-                            context, "计划性维修与换模重叠时间轴", repairTimelineDetail.toString().trim());
+                            context, "计划性维修与" + switchType + "重叠时间轴", repairTimelineDetail.toString().trim());
                 }
                 /*
                  * 结构收尾对齐实时复核：必须在 updateMachineState 之前判断，
@@ -11266,6 +11364,13 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             Date timelineReadyTime = (earliestLegalPreparation || earliestPreviousAlternatePreparation) ? preparationReadyTime
                     : resolveLaterTimelineReadyTime(preparationReadyTime,
                     hasMachineFault ? inspectionBusinessReadyTime : formalAvailableProductionTime);
+            Date combinedInspectionReady = LhCleaningRepairOverlapPolicy.resolveForwardInspectionReady(
+                    context, machine.getMachineCode(), inspectionScheduleType, changeoverStartTime, changeoverEndTime);
+            if (combinedInspectionReady != null) {
+                // 已算出的首检完成不是下一次首检的起点，冻结时只带入原有外部门禁。
+                timelineReadyTime = this.resolveLaterTime(combinedInspectionReady,
+                        this.resolveLaterTime(productionNotBeforeTime, candidateProductionNotBeforeTime));
+            }
             // 前日交替指定承接按正规排产方式解析，量试/试制首检与正规一样包含在切换时长内倒推。
             FirstInspectionTimingMode timingMode = FirstInspectionTimingModeResolver.resolve(
                     sku, inspectionScheduleType,
@@ -11558,7 +11663,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                         changeoverStartTime, changeoverEndTime);
         List<MachineMaintenanceWindowDTO> maintenanceWindowList =
                 this.resolveMachineMaintenanceWindowList(
-                        context, machine.getMachineCode());
+                        context, machine.getMachineCode(), changeoverStartTime, changeoverEndTime);
         if (!includeFaultCapacity) {
             maintenanceWindowList = maintenanceWindowList.stream()
                     .filter(window -> !StringUtils.equals(
@@ -13776,8 +13881,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         // 计算班次上限时同步清洗专用规则，避免3天内可收尾SKU仍扣干冰/喷砂清洗产能。
         List<MachineCleaningWindowDTO> cleaningWindowList = resolveEffectiveCleaningWindowList(
                 context, machine.getMachineCode(), sku, mouldChangeStartTime, mouldChangeEndTime);
-        List<MachineMaintenanceWindowDTO> maintenanceWindowList = resolveMachineMaintenanceWindowList(
-                context, machine.getMachineCode());
+        List<MachineMaintenanceWindowDTO> maintenanceWindowList = this.resolveMachineMaintenanceWindowList(
+                context, machine.getMachineCode(), mouldChangeStartTime, mouldChangeEndTime);
         Date cursorStartTime = firstProductionStartTime;
         int dryIceLossQty = context.getParamIntValue(
                 LhScheduleParamConstant.DRY_ICE_LOSS_QTY, LhScheduleConstant.DRY_ICE_LOSS_QTY);
@@ -14018,6 +14123,25 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             return FirstInspectionAllocationPlan.invalid(preparationConflict, null, changeoverEndTime);
         }
 
+        Date repairReadyTime = this.resolveMachineMaintenanceWindowList(
+                        context, machine.getMachineCode(), changeoverStartTime, changeoverEndTime).stream()
+                .filter(MachineMaintenanceWindowDTO::isRepairCombinedWithSwitch)
+                .map(MachineMaintenanceWindowDTO::getMaintenanceEndTime)
+                .max(Date::compareTo).orElse(changeoverEndTime);
+        if (repairReadyTime.after(changeoverEndTime)) {
+            // 维修本体尚未结束时首检必须后移；短维修不改变既有含首检切换时间。
+            inspectionNotBeforeTime = this.resolveLaterTime(
+                    inspectionNotBeforeTime, repairReadyTime);
+            timingMode = FirstInspectionTimingMode.START_AT_PRODUCTION_READY;
+        }
+        Date combinedReadyTime = LhCleaningRepairOverlapPolicy.resolveForwardInspectionReady(
+                context, machine.getMachineCode(), scheduleType, changeoverStartTime, changeoverEndTime);
+        if (combinedReadyTime != null) {
+            // 三项正规换模组合从准备完成后正向首检，首检与生产共用实际首班上限。
+            // 换活字块仍允许总时长内首检，只有清洗或维修晚于切换完成时才正向重算。
+            inspectionNotBeforeTime = this.resolveLaterTime(inspectionNotBeforeTime, combinedReadyTime);
+            timingMode = FirstInspectionTimingMode.START_AT_PRODUCTION_READY;
+        }
         FirstInspectionAllocationPlan plan = FirstInspectionAllocationUtil.buildPlan(
                 context, sku, shifts, changeoverEndTime, inspectionNotBeforeTime,
                 runtimeShiftCapacity, targetQty, scheduleType,
@@ -14027,7 +14151,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         }
         Map<Integer, Integer> inspectionCapacityMap =
                 this.calculateFirstInspectionAvailableCapacityMap(
-                        context, machine, sku, plan, changeoverStartTime, plan.getInspectionEndTime(),
+                        context, machine, sku, plan, changeoverStartTime, changeoverEndTime,
                         runtimeShiftCapacity, mouldQty, scheduleType);
         return FirstInspectionAllocationUtil.buildPlan(
                 context, sku, shifts, changeoverEndTime, inspectionNotBeforeTime,
@@ -14191,8 +14315,10 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                         context, machine.getMachineCode(), sku,
                         changeoverStartTime, changeoverEndTime);
         List<MachineMaintenanceWindowDTO> maintenanceWindowList =
-                ShiftCapacityResolverUtil.resolvePrecisionInspectionCapacityWindows(
-                        context, machine.getMachineCode(), machine.getMaintenanceWindowList(), plan.getEquipmentPlanId());
+                LhRepairPlanScheduleService.adaptCapacityWindowsForSwitch(
+                        ShiftCapacityResolverUtil.resolvePrecisionInspectionCapacityWindows(
+                                context, machine.getMachineCode(), machine.getMaintenanceWindowList(),
+                                plan.getEquipmentPlanId()), changeoverStartTime, changeoverEndTime);
         int dryIceLossQty = context.getParamIntValue(
                 LhScheduleParamConstant.DRY_ICE_LOSS_QTY,
                 LhScheduleConstant.DRY_ICE_LOSS_QTY);
@@ -14388,8 +14514,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         // 结果后置修正也必须复用同一清洗过滤口径，避免日标准产量回裁时重新扣除已跳过的清洗。
         List<MachineCleaningWindowDTO> cleaningWindowList = resolveEffectiveCleaningWindowList(
                 context, result, resolveFirstPlannedShiftStartTime(result));
-        List<MachineMaintenanceWindowDTO> maintenanceWindowList = resolveMachineMaintenanceWindowList(
-                context, result.getLhMachineCode());
+        List<MachineMaintenanceWindowDTO> maintenanceWindowList =
+                this.resolveMachineMaintenanceWindowList(context, result);
         for (LhShiftConfigVO shift : shifts) {
             int shiftIndex = shift.getShiftIndex();
             int beforeQty = rawPlanQtyMap.get(shiftIndex);
@@ -18335,8 +18461,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
          */
         List<MachineCleaningWindowDTO> cleaningWindowList = resolveEffectiveCleaningWindowList(
                 context, result.getLhMachineCode(), sku, mouldChangeStartTime, mouldChangeEndTime);
-        List<MachineMaintenanceWindowDTO> maintenanceWindowList = resolveMachineMaintenanceWindowList(
-                context, result.getLhMachineCode());
+        List<MachineMaintenanceWindowDTO> maintenanceWindowList =
+                this.resolveMachineMaintenanceWindowList(context, result);
         // 无换模接管及原机原模具重启在分班前即排除；首班坐标只取原首检/开产判定。
         if (!ChangeoverFirstShiftQuantityPolicy.bind(context, sku, result, shifts,
                 firstInspectionAttributionShift, firstInspectionAllocationPlan, startTime,
@@ -19392,7 +19518,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         int shiftMaxQty = ShiftCapacityResolverUtil.resolveShiftCapacityWithDowntime(
                 context.getDevicePlanShutList(),
                 resolveMachineCleaningWindowList(context, result.getLhMachineCode()),
-                resolveMachineMaintenanceWindowList(context, result.getLhMachineCode()),
+                this.resolveMachineMaintenanceWindowList(context, result),
                 result.getLhMachineCode(),
                 control.getEffectiveStartTime(),
                 control.getEffectiveEndTime(),
@@ -20243,7 +20369,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                     context, machine.getMachineCode(), sku,
                     mouldChangeStartTime, mouldChangeCompleteTime);
             List<MachineMaintenanceWindowDTO> maintenanceWindowList =
-                    resolveMachineMaintenanceWindowList(context, machine.getMachineCode());
+                    this.resolveMachineMaintenanceWindowList(context, machine.getMachineCode(),
+                            mouldChangeStartTime, mouldChangeCompleteTime);
             if (Objects.nonNull(effectiveProductionStartTime)) {
                 netProductiveSeconds = ShiftCapacityResolverUtil.resolveNetProductiveSeconds(
                         context.getDevicePlanShutList(), cleaningWindowList, maintenanceWindowList,
@@ -20632,7 +20759,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         }
         remaining -= firstInspectionQty;
         // 首检阶段可能触发未满产换胶囊，后续常规生产必须使用已合并时间窗口的最新产能口径。
-        maintenanceWindowList = resolveMachineMaintenanceWindowList(context, result.getLhMachineCode());
+        maintenanceWindowList = this.resolveMachineMaintenanceWindowList(context, result);
         Map<Integer, ShiftRuntimeState> stateMap = context.getShiftRuntimeStateMap();
         int dryIceLossQty = context.getParamIntValue(
                 LhScheduleParamConstant.DRY_ICE_LOSS_QTY, LhScheduleConstant.DRY_ICE_LOSS_QTY);
@@ -20841,7 +20968,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 shiftQty = StructureSwitchSchedulingPolicy.capQuantity(context, sku, result, shift,
                         shiftQty, shiftMaxQty, remaining);
                 // 未满产换胶囊可能刚登记时间窗口，后续班次必须立即读取最新窗口重新计算产能。
-                maintenanceWindowList = resolveMachineMaintenanceWindowList(context, result.getLhMachineCode());
+                maintenanceWindowList = this.resolveMachineMaintenanceWindowList(context, result);
                 if (shiftQty <= 0) {
                     logNewSpecShiftSkip(result, shift, remaining, shiftCapacity,
                             physicalShiftMaxQty, shiftMaxQty, "换胶囊固定扣减后本班实际排产量为0");
@@ -21626,6 +21753,41 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         return cleaningScheduleService.resolveMachineCleaningWindowList(context, machineCode);
     }
 
+    /**
+     * 按真实切换区间投影维修容量，供候选首检及正式生产共用。
+     *
+     * @param context 排程上下文
+     * @param machineCode 运行侧机台
+     * @param switchStartTime 真实切换开始
+     * @param switchEndTime 真实切换自身完成
+     * @return 当前候选独立容量窗口
+     */
+    private List<MachineMaintenanceWindowDTO> resolveMachineMaintenanceWindowList(
+            LhScheduleContext context, String machineCode, Date switchStartTime, Date switchEndTime) {
+        return LhRepairPlanScheduleService.adaptCapacityWindowsForSwitch(
+                this.resolveMachineMaintenanceWindowList(context, machineCode), switchStartTime, switchEndTime);
+    }
+
+    /**
+     * 根据结果的真实切换身份恢复组合容量，补量和回裁不得重新应用独立维修预热。
+     *
+     * @param context 排程上下文
+     * @param result 当前排产结果
+     * @return 当前结果对应的容量窗口
+     */
+    private List<MachineMaintenanceWindowDTO> resolveMachineMaintenanceWindowList(
+            LhScheduleContext context, LhScheduleResult result) {
+        return LhRepairPlanScheduleService.adaptCapacityWindowsForResult(context, result,
+                this.resolveMachineMaintenanceWindowList(context, result.getLhMachineCode()));
+    }
+
+    /**
+     * 解析未发生切换时的独立维修及设备容量。
+     *
+     * @param context 排程上下文
+     * @param machineCode 运行侧机台
+     * @return 独立设备容量窗口
+     */
     private List<MachineMaintenanceWindowDTO> resolveMachineMaintenanceWindowList(LhScheduleContext context, String machineCode) {
         MachineScheduleDTO machine = context.getMachineScheduleMap().get(machineCode);
         List<MachineMaintenanceWindowDTO> maintenanceWindowList = machine == null
@@ -23957,6 +24119,6 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         // 保留本策略已有清洗豁免语义，复用公共入口计算容量和完成时间。
         return ResultShiftTimeUtil.resolveEndTime(context, result, shift, startTime, planQty,
                 this.resolveEffectiveCleaningWindowList(context, result, this.resolveFirstPlannedShiftStartTime(result)),
-                this.resolveMachineMaintenanceWindowList(context, result.getLhMachineCode()));
+                this.resolveMachineMaintenanceWindowList(context, result));
     }
 }

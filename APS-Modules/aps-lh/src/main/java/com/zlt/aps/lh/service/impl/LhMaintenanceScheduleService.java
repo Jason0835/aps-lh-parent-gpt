@@ -2521,6 +2521,52 @@ public class LhMaintenanceScheduleService {
     }
 
     /**
+     * 校验已落实模具置换提供的当日精度机会，不要求当前物料数量收尾。
+     * 此入口只供专用组合策略使用，所有物理侧的真实交接与占用重叠由调用方先行核验；
+     * 当日额度或日历不允许时直接返回0，不能借置换机会预约未来精度。
+     *
+     * @param context 当前排程上下文
+     * @param machine 已具备整机置换事实的运行侧
+     * @param replacementStart 原模停止生产并交接的真实时间
+     * @return 当日精度判定，不能执行时占用时长为0
+     */
+    public PrecisionMaintenanceJudgeDTO resolveReplacementPrecision(LhScheduleContext context,
+            MachineScheduleDTO machine, Date replacementStart) {
+        String machineCode = Objects.isNull(machine) ? null : machine.getMachineCode();
+        PrecisionMaintenanceJudgeDTO rejected = this.buildZeroJudgeDTO(machineCode);
+        if (Objects.isNull(context) || Objects.isNull(machine) || Objects.isNull(replacementStart)
+                || StringUtils.isBlank(machineCode) || !CollectionUtils.isEmpty(machine.getMaintenanceWindowList())) {
+            return rejected;
+        }
+        LhPrecisionPlan plan = this.resolveMaintenancePlan(context, machineCode);
+        Integer daysToDue = this.resolveDaysToDue(plan);
+        int warningDays = this.getParamInt(context, LhScheduleParamConstant.MAINTENANCE_WARNING_DAYS,
+                LhScheduleConstant.MAINTENANCE_WARNING_DAYS);
+        if (!this.isPlanUncompleted(plan) || Objects.nonNull(plan.getActualDate())
+                || Objects.isNull(daysToDue) || daysToDue > warningDays || !this.isPlanDateEligible(context, plan)) {
+            return rejected;
+        }
+        Date executeDate = LhScheduleTimeUtil.clearTime(replacementStart);
+        Date precisionStart = this.buildMaintenanceStartTime(context, executeDate);
+        if (executeDate.before(LhScheduleTimeUtil.clearTime(context.getScheduleDate()))
+                || executeDate.after(LhScheduleTimeUtil.clearTime(plan.getPlanDate()))
+                || replacementStart.after(precisionStart)) {
+            return rejected;
+        }
+        String reason = this.resolveJudgeQuotaUnavailableReason(context, executeDate, machineCode, null);
+        if (StringUtils.isEmpty(reason)) {
+            reason = this.resolveJudgeCalendarUnavailableReason(context, executeDate);
+        }
+        if (StringUtils.isNotEmpty(reason)) {
+            this.appendMaintenanceProcessLog(context, MAINTENANCE_PROCESS_LOG_TITLE, machineCode, plan,
+                    precisionStart, reason, "本次置换机会不安排精度，保留原置换，不顺延预约");
+            return rejected;
+        }
+        return this.buildSuccessJudgeDTO(context, machine, plan, executeDate, false, null,
+                "已落实同物料喷砂置换提供当日精度机会");
+    }
+
+    /**
      * 精度保养判定核心实现。
      *
      * @param context 排程上下文
@@ -2954,6 +3000,25 @@ public class LhMaintenanceScheduleService {
                                                               Date executeDate,
                                                               boolean forceDown,
                                                               Map<String, Set<String>> batchAllocatedMachineMap) {
+        return this.buildSuccessJudgeDTO(context, machine, plan, executeDate, forceDown,
+                batchAllocatedMachineMap, forceDown ? "强制下机" : "自然收尾后保养");
+    }
+
+    /**
+     * 构建有效精度判定并记录真实触发原因，置换机会不能误记为物料自然收尾。
+     *
+     * @param context 排程上下文
+     * @param machine 运行态机台
+     * @param plan 本次精度计划
+     * @param executeDate 最终执行日
+     * @param forceDown 是否强制下机
+     * @param batchAllocatedMachineMap 纯判定批内额度预留，单独机会传空
+     * @param triggerReason 实际触发依据
+     * @return 带计划主键及时间的有效判定
+     */
+    private PrecisionMaintenanceJudgeDTO buildSuccessJudgeDTO(LhScheduleContext context,
+            MachineScheduleDTO machine, LhPrecisionPlan plan, Date executeDate, boolean forceDown,
+            Map<String, Set<String>> batchAllocatedMachineMap, String triggerReason) {
         int durationHours = this.resolveMaintenanceDurationHours(context);
         Date startTime = this.buildMaintenanceStartTime(context, executeDate);
         Date endTime = LhScheduleTimeUtil.addHours(startTime, durationHours);
@@ -2976,8 +3041,8 @@ public class LhMaintenanceScheduleService {
         this.appendMaintenanceProcessLog(context, MAINTENANCE_PROCESS_LOG_TITLE, machine.getMachineCode(), plan,
                 startTime, "占用时长=" + durationHours + "小时，结束="
                         + PriorityTraceLogHelper.formatDateTime(endTime)
-                        + "（2小时首件首检由排程主流程另行追加）",
-                (forceDown ? "强制下机" : "自然收尾后保养"));
+                        + "（首检由对应排程链路分配）",
+                triggerReason);
         return judgeDTO;
     }
 }

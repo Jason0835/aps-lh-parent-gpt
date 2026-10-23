@@ -111,6 +111,22 @@ public final class CleaningPlanTimeline {
         return copy(productionResumeTime);
     }
     /**
+     * 获取冻结的新模具首检开始时间。
+     *
+     * @return 独立时间副本，尚未落实置换时为空
+     */
+    public Date getReplacementInspectionStartTime() {
+        return copy(replacementInspectionStartTime);
+    }
+    /**
+     * 获取冻结的新模具首检结束时间。
+     *
+     * @return 独立时间副本，尚未落实置换时为空
+     */
+    public Date getReplacementReadyTime() {
+        return copy(replacementReadyTime);
+    }
+    /**
      * 将置换机台准备和首检投影为公共容量内核输入，保留原清洗事实不变。
      *
      * @param window 已冻结的离机喷砂置换事件

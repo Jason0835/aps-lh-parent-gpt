@@ -34,6 +34,11 @@ public class LhCleaningScheduleService {
     @Resource
     private LhCleaningPlanFinalizer finalizer = new LhCleaningPlanFinalizer();
     /**
+     * 已落实同物料喷砂置换与精度的专用组合策略。
+     */
+    @Resource
+    private LhSandBlastPrecisionOverlapPolicy precisionOverlapPolicy = new LhSandBlastPrecisionOverlapPolicy();
+    /**
      * 原喷砂资源算法，运行态仍保存在当前上下文。
      */
     private final ContinuationSandBlastDispositionService sandBlastDispositionService =
@@ -133,21 +138,23 @@ public class LhCleaningScheduleService {
         return overlapResolver.resolveTypeBlockProductionStartTime(context, machine, switchStart, productionStart);
     }
     /**
-     * 在续作产能计算前落实原喷砂资源准备，不能延迟到最终输出。
+     * 在续作产能计算前落实喷砂资源及符合资格的置换精度组合，不能延迟到最终输出。
      *
      * @param context 当前批次
      */
     public void prepareBeforeContinuous(LhScheduleContext context) {
         sandBlastDispositionService.prepare(context);
+        precisionOverlapPolicy.prepare(context);
         this.publishCurrentEvents(context);
     }
     /**
-     * 在续作原扣账前后撤销未达到触发点的置换，不改变原执行顺序。
+     * 在续作原扣账前后撤销未达到触发点的置换及关联精度，恢复原时间并释放额度。
      *
      * @param context 当前批次
      */
     public void cancelUnreachedReplacements(LhScheduleContext context) {
         sandBlastDispositionService.cancelUnreachedReplacements(context);
+        precisionOverlapPolicy.reconcile(context);
         this.publishCurrentEvents(context);
     }
     /**
@@ -173,6 +180,7 @@ public class LhCleaningScheduleService {
      */
     public void reviewCommittedResults(LhScheduleContext context) {
         sandBlastDispositionService.reconcileCancelledEvents(context);
+        precisionOverlapPolicy.reconcile(context);
         this.publishCurrentEvents(context);
     }
     /**

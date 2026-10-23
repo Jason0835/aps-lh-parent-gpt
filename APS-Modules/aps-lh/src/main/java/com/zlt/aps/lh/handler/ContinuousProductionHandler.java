@@ -12,7 +12,6 @@ import com.zlt.aps.lh.engine.strategy.ISkuPriorityStrategy;
 import com.zlt.aps.lh.engine.strategy.ITypeBlockProductionStrategy;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchCandidateScope;
 import com.zlt.aps.lh.service.impl.LhEquipmentPlanScheduleService;
-import com.zlt.aps.lh.service.impl.SharedEmbryoEndingScheduleService;
 import com.zlt.aps.lh.service.impl.PreviousAlternatePlanReuseService;
 import com.zlt.aps.lh.service.impl.TimedMachineOffShiftService;
 import com.zlt.aps.lh.service.impl.TimedMachineOffLoadPreviewService;
@@ -36,7 +35,7 @@ import javax.annotation.Resource;
  *
  * <p>该 Handler 只负责步骤编排，具体续作目标量、换活字块匹配、同 SKU 多机台降模等规则
  * 分别下沉到 {@code ContinuousProductionStrategy} 和 {@code TypeBlockProductionStrategy}，
- * 共用胎胚收尾由 {@code SharedEmbryoEndingScheduleService} 在普通降模前独立处理。</p>
+ * 胎胚与余量收尾在现有分组阶段确定类型，并复用同一节点计算流程。</p>
  *
  * @author APS
  */
@@ -46,12 +45,6 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
 
     @Resource
     private ScheduleStrategyFactory strategyFactory;
-
-    /**
-     * 独立胎胚收尾前置服务，完整流程不再嵌入普通降模。
-     */
-    @Resource
-    private SharedEmbryoEndingScheduleService sharedEmbryoEndingScheduleService;
 
     /**
      * 在所有实机来源和历史关系就绪后统一冻结胎胚库存份额。
@@ -134,15 +127,12 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
         log.info("续作胎胚库存调整完成, 排程结果数: {}, 未排产数: {}",
                 context.getScheduleResultList().size(), context.getUnscheduledResultList().size());
 
-        // 胎胚收尾先独立确定同SKU各原机任务和真实时间轴，普通下机只处理其他对象。
-        sharedEmbryoEndingScheduleService.allocateSharedEmbryoEndingMachines(context);
-
-        // 前置续作降模只冻结余量收尾机台及硬边界，普通非收尾处理保持原有口径。
+        // 同一位置优先登记胎胚类型，再登记余量类型，保护原机并保留后续固定状态链。
         // 续作降模/停产保机
         strategy.scheduleReduceMould(context);
 
         // 历史交替正式排产前计算真实收尾，禁止后料提交后再搬动前料。
-        // SKU余量收尾错班
+        // 两类收尾按各自预算共用原单机、多机及跨日节点算法。
         strategy.calculateContinuationRemainderFinish(context);
 
         timedMachineOffCleaningHandoffService.execute(context,

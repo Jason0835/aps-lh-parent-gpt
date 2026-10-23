@@ -104,17 +104,32 @@ public class PreviousAlternatePlanReleaseEvent implements Serializable {
      */
     private Date trialHandoffWindowEndTime;
 
+    /**
+     * 附加交接服务本次验证的准备班次截止，原历史事件默认不启用。
+     */
+    private Date extensionPreparationEndTime;
+
+    /**
+     * 完整后料提案已通过的强制交接时刻，防止旧余量快照恢复自然收尾时间。
+     */
+    private Date forcedHandoffReleaseTime;
+
     /** @return 是否由终末余量整组快照确定本次交替释放及准备边界 */
     public boolean isRemainderFinishDeferred() {
         return Objects.nonNull(remainderFinishWindowEndTime);
     }
 
     /**
-     * 解析收尾、正式时间释放或指定试制量试允许的承接上限，并限制在当前准备业务日内。
+     * 解析原历史承接上限或独立扩展确认的单班截止，并限制在当前准备业务日内。
      *
      * @return 准备截止时刻，采用半开区间
      */
     public Date getPreparationDeadline() {
+        if (Objects.nonNull(extensionPreparationEndTime)) {
+            return Objects.nonNull(preparationWindowEndTime)
+                    && preparationWindowEndTime.before(extensionPreparationEndTime)
+                    ? preparationWindowEndTime : extensionPreparationEndTime;
+        }
         Date plannedEnd = this.isRemainderFinishDeferred() ? remainderFinishWindowEndTime
                 : Objects.requireNonNull(plannedShiftEndTime, "历史计划班次截止未冻结");
         if (Objects.nonNull(confirmedTimedHandoffWindowEndTime)) {

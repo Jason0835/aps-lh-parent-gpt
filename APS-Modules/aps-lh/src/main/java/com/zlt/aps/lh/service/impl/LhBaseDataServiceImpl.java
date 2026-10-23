@@ -563,19 +563,26 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     }
 
     /**
-     * 仅加载硫化余量计算所需的基础数据（供成型侧 Feign 批量余量接口复用，不执行完整排程初始化）。
+     * 仅加载硫化余量计算所需的基础数据（供成型侧 Feign 批量余量接口、日排产进度报表等只读场景复用，
+     * 不执行完整排程初始化）。
      *
      * <p>与 {@link #loadAllBaseData(LhScheduleContext)} 中"月计划、日计划调整量、月累计完成量、
      * T日班次完成量"四类数据的加载口径保持一致，按依赖顺序串行执行：
      * 定稿排产版本（月计划与 planStartDate 的前置）→ 月计划（内部设置 planStartDate）→
-     * 日计划调整量 → 月累计完成量 → T日班次完成量。</p>
+     * 日计划调整量 → 月累计完成量 → T日班次完成量 → 前日物料日完成量 → 前日排程结果 → 工作日历。</p>
+     *
+     * <p>月份范围取「排程窗口与提前生产观察期」和调用方传入的报表末端的较大者。调用方必须先把
+     * 报表末端按"可能需要覆盖的最远月份"传入（例如次月月末），加载完成后再按定稿版本判断是否裁剪；
+     * 若先裁剪再调用，次月定稿版本永远不会进入加载月份范围。</p>
      *
      * <p>调用方需先构造好 context 的日期/参数字段（scheduleDate、scheduleTargetDate、
      * windowEndDate、scheduleConfig、earlyProductionMaxDate）。</p>
      *
-     * @param context 排程上下文（日期/参数字段已就绪，仅缺余量相关数据）
+     * @param context            排程上下文（日期/参数字段已就绪，仅缺余量相关数据）
+     * @param reportRangeEndDate 报表日期末端（可为空，为空时只覆盖排程窗口与提前生产观察期）
      */
-    public void loadMonthSurplusData(LhScheduleContext context) {
+    @Override
+    public void loadMonthSurplusData(LhScheduleContext context, Date reportRangeEndDate) {
         String factoryCode = context.getFactoryCode();
         Date scheduleDate = context.getScheduleDate();
         Date targetDate = context.getScheduleTargetDate();
@@ -590,8 +597,17 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 ? LhScheduleTimeUtil.clearTime(context.getEarlyProductionMaxDate())
                 : LhScheduleTimeUtil.addDays(scheduleWindowEndDate, earlyProductionDaysThreshold);
         Date earlyProductionLookupEndDate = LhScheduleTimeUtil.addDays(earlyProductionRangeEndDate, 1);
-        // 余量计算只需覆盖窗口 + 提前生产涉及的月份
-        Map<String, LocalDate> requiredMonthMap = resolveRequiredMonthMap(startDate, earlyProductionLookupEndDate);
+        // 报表末端按右开区间参与比较：与提前生产观察期末端取较大者，
+        // 保证次月定稿版本与次月定稿行都进入加载月份范围
+        Date lookupEndDate = earlyProductionLookupEndDate;
+        if (Objects.nonNull(reportRangeEndDate)) {
+            Date reportLookupEndDate = LhScheduleTimeUtil.addDays(
+                    LhScheduleTimeUtil.clearTime(reportRangeEndDate), 1);
+            if (reportLookupEndDate.after(lookupEndDate)) {
+                lookupEndDate = reportLookupEndDate;
+            }
+        }
+        Map<String, LocalDate> requiredMonthMap = resolveRequiredMonthMap(startDate, lookupEndDate);
 
         // 主月（排程目标日所在月）
         Calendar cal = Calendar.getInstance();
@@ -613,6 +629,12 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 LhScheduleTimeUtil.addDays(scheduleDate, -1), year, month);
         // ⑤ T日排程班次完成量
         loadScheDayFinishQty(context, factoryCode, scheduleDate);
+        // ⑥ 前日物料日完成量：月累计完成量维度缺失时的余量计算兜底分支
+        loadDayFinishQty(context, factoryCode, resolvePreviousDataDate(context, targetDate));
+        // ⑦ 前日排程结果：前日完成量兜底分支
+        loadPreviousScheduleResults(context, factoryCode, targetDate);
+        // ⑧ 工作日历：目标机台数计算依赖。起始日前一天用于月初“开产首日”跨月判断，末端按右开边界
+        loadWorkCalendar(context, factoryCode, LhScheduleTimeUtil.addDays(startDate, -1), lookupEndDate);
     }
 
     /**
@@ -3073,7 +3095,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
 
     /**
      * 加载设备停机计划。
-     * <p>05/06按来源计划日期加载、不排除已回填记录；05平移至配置时刻，06保留原始时间
+     * <p>05按来源计划日期加载，06按与窗口相交加载，均不排除已回填记录；05平移至配置时刻，06保留原始时间。
      * 干冰/喷砂清洗同样按计划日期单独加载、不排除已回填记录。保证上一轮回填过排程日期但计划日期仍与本次窗口相交/落在窗口内的
      * 维修、清洗计划能重新纳入。</p>
      *
@@ -3085,13 +3107,19 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     private void loadDevicePlanShut(LhScheduleContext context, String factoryCode, Date startDate, Date endDate) {
         // 干冰/喷砂、计划性维修由下方专用查询按计划日期单独加载。
         Date cleaningCandidateStartDate = LhScheduleTimeUtil.clearTime(context.getScheduleDate());
-        // 05/06按原始计划日期加载，不排除已回填记录；时间转换由停机公共服务分流。
+        // 05保留来源日期口径；06必须覆盖窗口前已开始且尚未结束的故障，避免续作在故障中满产。
         List<MdmDevicePlanShut> repairPlanList = devicePlanShutMapper.selectList(
                 new LambdaQueryWrapper<MdmDevicePlanShut>()
                         .eq(MdmDevicePlanShut::getFactoryCode, factoryCode)
-                        .in(MdmDevicePlanShut::getMachineStopType, MachineStopTypeEnum.PLANNED_REPAIR.getCode(),
-                                MachineStopTypeEnum.TEMPORARY_FAULT.getCode())
-                        .ge(MdmDevicePlanShut::getBeginDate, cleaningCandidateStartDate)
+                        .and(stopWrapper -> stopWrapper
+                                .and(repairWrapper -> repairWrapper
+                                        .eq(MdmDevicePlanShut::getMachineStopType,
+                                                MachineStopTypeEnum.PLANNED_REPAIR.getCode())
+                                        .ge(MdmDevicePlanShut::getBeginDate, cleaningCandidateStartDate))
+                                .or(faultWrapper -> faultWrapper
+                                        .eq(MdmDevicePlanShut::getMachineStopType,
+                                                MachineStopTypeEnum.TEMPORARY_FAULT.getCode())
+                                        .gt(MdmDevicePlanShut::getEndDate, cleaningCandidateStartDate)))
                         .le(MdmDevicePlanShut::getBeginDate, endDate));
         // 清洗候选按 T 日及之后的计划开始日期单独加载，不排除已回填排程日期的记录：
         // 清洗按计划日期重排，上一轮回填过排程日期但计划日期仍落在本次窗口内的清洗计划需重新纳入。

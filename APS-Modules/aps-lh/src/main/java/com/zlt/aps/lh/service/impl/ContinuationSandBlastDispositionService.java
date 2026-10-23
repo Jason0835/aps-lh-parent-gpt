@@ -78,7 +78,8 @@ public class ContinuationSandBlastDispositionService {
         for (String machineCode : sources.keySet()) {
             MachineScheduleDTO machine = context.getMachineScheduleMap().get(machineCode);
             MachineCleaningWindowDTO window = this.resolveWindow(context, machine);
-            if (Objects.nonNull(window)) {
+            if (Objects.nonNull(window)
+                    && !LhCleaningRepairOverlapPolicy.hasPlannedSandBlastHandoff(context, window)) {
                 candidates.put(machineCode, window);
             }
         }

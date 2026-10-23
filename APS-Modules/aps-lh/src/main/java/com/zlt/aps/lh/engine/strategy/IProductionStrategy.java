@@ -55,14 +55,6 @@ public interface IProductionStrategy {
     void adjustEmbryoStock(LhScheduleContext context);
 
     /**
-     * 在普通降模及两类下机前独立分配共用胎胚收尾机台任务。
-     *
-     * @param context 已有SKU额度及原机容量的上下文
-     */
-    default void allocateSharedEmbryoEndingMachines(LhScheduleContext context) {
-    }
-
-    /**
      * 降模排产
      *
      * @param context 排程上下文
@@ -70,7 +62,8 @@ public interface IProductionStrategy {
     void scheduleReduceMould(LhScheduleContext context);
 
     /**
-     * 为前置阶段已确定的机台计算续作余量收尾，不重新选机。
+     * 按已确定的收尾类型与预算计算原机节点，不重新选机。
+     *
      * @param context 排程上下文
      */
     default void calculateContinuationRemainderFinish(LhScheduleContext context) {

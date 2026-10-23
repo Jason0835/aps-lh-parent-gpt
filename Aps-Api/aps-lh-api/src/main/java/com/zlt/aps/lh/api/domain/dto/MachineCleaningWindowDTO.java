@@ -34,6 +34,10 @@ public class MachineCleaningWindowDTO implements Serializable {
      * 来源计划校验时冻结的产品状态，避免同物料不同状态串用收尾结果。
      */
     private String sourceProductStatus;
+    /**
+     * 未指定模具的物理整机清洗，在执行时按真实运行侧占用确定物料，不能沿用已离机前料。
+     */
+    private boolean sourceFollowsMachineOccupation;
     /** 机台编码 */
     private String lhCode;
     /** 清洗类型 */

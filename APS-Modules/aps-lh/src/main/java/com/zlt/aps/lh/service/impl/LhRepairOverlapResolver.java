@@ -7,12 +7,15 @@ import com.zlt.aps.lh.engine.strategy.support.RepairPlanRuntimeState;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.util.CollectionUtils;
 
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
- * 计划性维修组合解析，仅集中已有切换规则和正式精度拒绝边界。
+ * 计划性维修组合解析，统一真实切换重叠的容量投影和正式精度拒绝边界。
  * 故障不进入组合编排，清洗及未定义多事项仍沿用原占用并集和调用顺序。
  *
  * @author APS
@@ -28,7 +31,7 @@ public final class LhRepairOverlapResolver {
 
     /**
      * 一次计算维修命中及生产下限，零预热时也保留独立命中标志。
-     * 后续维修只有进入已计算恢复区间才继续影响本次切换。
+     * 真实重叠时切换总时长覆盖预热和首检，后续独立维修仍保留自身恢复时间。
      *
      * @param context 当前批次，可为空
      * @param plans 实际停机列表
@@ -47,7 +50,9 @@ public final class LhRepairOverlapResolver {
         List<MachineMaintenanceWindowDTO> windows =
                 LhPlannedRepairResolver.resolveCapacityWindows(context, plans, machineCode);
         result.setPlannedRepairItems(windows);
-        windows.stream().map(MachineMaintenanceWindowDTO::copy).forEach(result.getCapacityWindows()::add);
+        List<MachineMaintenanceWindowDTO> capacityWindows =
+                adaptCapacityWindowsForSwitch(windows, switchStartTime, switchEndTime);
+        result.getCapacityWindows().addAll(capacityWindows);
         if (context != null) {
             result.setInputVersion(context.getRepairPlanRuntimeState().getConstraintVersion());
         }
@@ -56,7 +61,7 @@ public final class LhRepairOverlapResolver {
         }
         Date productionReadyTime = switchEndTime;
         boolean repairTimelineStarted = false;
-        for (MachineMaintenanceWindowDTO window : windows) {
+        for (MachineMaintenanceWindowDTO window : capacityWindows) {
             Date repairStartTime = window.getMaintenanceStartTime();
             Date repairResumeTime = window.getProductionResumeTime();
             // 前序生产已越过该恢复点时，不再让已完成维修影响后续切换。
@@ -75,7 +80,7 @@ public final class LhRepairOverlapResolver {
                 // 尚未进入当前恢复区间的未来维修，继续交给班次容量处理。
                 break;
             }
-            // 维修独立完成预热后与切换取最大，禁止再对切换完成点追加预热。
+            // 真实重叠使用维修原始结束与切换完成的最大值；独立维修继续等待自身预热。
             Date candidateReadyTime = repairResumeTime.after(switchEndTime) ? repairResumeTime : switchEndTime;
             if (candidateReadyTime.after(productionReadyTime)) {
                 productionReadyTime = candidateReadyTime;
@@ -85,9 +90,36 @@ public final class LhRepairOverlapResolver {
         result.setProductionNotBefore(RepairPlanRuntimeState.copyDate(productionReadyTime));
         if (repairTimelineStarted) {
             result.setOverlapStatus(RepairPlanResult.OverlapStatus.SUPPORTED);
-            result.setReason("沿用维修恢复与切换完成取最大值，首检及结构切换继续由原流程处理");
+            result.setReason("真实重叠的维修与切换使用组合准备时间，维修原始区间禁产，首检仍校验实际容量");
         }
         return result;
+    }
+
+    /**
+     * 将真实相交的05窗口投影为当前切换专用容量，保留原始维修禁产并隔离候选状态。
+     * 非相交维修、精度、故障及其他窗口原样复制；不得将该投影写回批次固定事实。
+     *
+     * @param windows 已解析的容量窗口，未提供窗口时不产生额外约束
+     * @param switchStartTime 真实切换开始时间
+     * @param switchEndTime 真实切换自身完成时间，不使用后移的生产或首检结束时间
+     * @return 当前候选持有的独立容量窗口
+     */
+    public static List<MachineMaintenanceWindowDTO> adaptCapacityWindowsForSwitch(
+            List<MachineMaintenanceWindowDTO> windows, Date switchStartTime, Date switchEndTime) {
+        if (CollectionUtils.isEmpty(windows)) {
+            return Collections.emptyList();
+        }
+        return windows.stream().map(MachineMaintenanceWindowDTO::copy).map(window -> {
+            if (StringUtils.equals(LhPlannedRepairResolver.PLANNED_REPAIR_CAPACITY_WINDOW_TYPE,
+                    window.getMaintenanceType())
+                    && overlaps(switchStartTime, switchEndTime,
+                    window.getMaintenanceStartTime(), window.getMaintenanceEndTime())) {
+                // 仅当前组合覆盖预热；维修本体仍参与不可生产区间并集，不能提前产出首检。
+                window.setRepairCombinedWithSwitch(true);
+                window.setProductionResumeTime(RepairPlanRuntimeState.copyDate(window.getMaintenanceEndTime()));
+            }
+            return window;
+        }).collect(Collectors.toList());
     }
 
     /**
