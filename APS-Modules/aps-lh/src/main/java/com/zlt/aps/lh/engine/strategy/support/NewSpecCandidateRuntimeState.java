@@ -41,6 +41,33 @@ public class NewSpecCandidateRuntimeState {
     private final Map<String, String> firstDecisionTraceMap =
             new LinkedHashMap<String, String>(16);
 
+    /**
+     * 复制候选编排进度，诊断失败及首次轨迹不作为资源进度复制。
+     *
+     * @return 当前日期池、机台机会和分类标记的独立进度副本
+     */
+    public NewSpecCandidateRuntimeState copyProgress() {
+        NewSpecCandidateRuntimeState copy = new NewSpecCandidateRuntimeState();
+        copy.restoreProgress(this);
+        return copy;
+    }
+
+    /**
+     * 恢复失败提交前的候选进度，保留本次真实失败诊断用于后续未排说明。
+     *
+     * @param snapshot 已捕获的候选进度
+     */
+    public void restoreProgress(NewSpecCandidateRuntimeState snapshot) {
+        originalPoolDate = snapshot.originalPoolDate;
+        remainingMachineCount = snapshot.remainingMachineCount;
+        lastRequiredMachineCount = snapshot.lastRequiredMachineCount;
+        machineCountInitialized = snapshot.machineCountInitialized;
+        machineCountReconciliationDate = snapshot.machineCountReconciliationDate;
+        strictEndingClearance = snapshot.strictEndingClearance;
+        specialSku = snapshot.specialSku;
+        specialSkuClassified = snapshot.specialSkuClassified;
+    }
+
     public LocalDate getOriginalPoolDate() {
         return originalPoolDate;
     }

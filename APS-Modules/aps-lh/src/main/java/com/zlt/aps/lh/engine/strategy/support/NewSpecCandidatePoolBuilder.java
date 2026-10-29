@@ -182,6 +182,8 @@ public class NewSpecCandidatePoolBuilder {
             // 收尾、固定指令等既有合法场景没有 dayN 理论台数时，仍保留一次真实尝试机会。
             requiredMachineCount = 1;
         }
+        requiredMachineCount = SkuEndingDeferredExpansionPolicy.resolveTargetMachineCount(
+                context, sku, currentDate, requiredMachineCount);
         candidate.setTargetMachineCount(requiredMachineCount);
         candidate.setScheduledMachineCount(scheduledMachineCount);
         candidate.reconcileRemainingMachineCount(

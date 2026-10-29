@@ -22,6 +22,7 @@ import com.zlt.aps.lh.service.ILhMouldChangePlanService;
 import com.zlt.aps.lh.service.impl.*;
 import com.zlt.aps.lh.util.*;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
+import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -70,6 +71,12 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     @Resource
     private SchedulePersistenceService schedulePersistenceService;
 
+    /**
+     * 只增强最终原因分析，不重算排程与资源。
+     */
+    @Resource
+    private LhShiftAnalysisRemarkService shiftAnalysisRemarkService = new LhShiftAnalysisRemarkService();
+
     /** 全部后置裁量结束后收口设备安排，再绑定最终结果摘要。 */
     @Resource
     private LhEquipmentPlanScheduleService equipmentPlanScheduleService = new LhEquipmentPlanScheduleService();
@@ -110,6 +117,11 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     /** 喷砂专用首检原因，与正常换模/换活字块首检资源和计数完全隔离 */
     private static final String SAND_BLAST_FIRST_INSPECTION_ANALYSIS = "喷砂清洗首检";
 
+    /**
+     * 收口最终数量、设备时间轴和班次说明后，原子保存本批结果及关联计划。
+     *
+     * @param context 已完成排产及后置裁量的本批上下文
+     */
     @Override
     protected void doHandle(LhScheduleContext context) {
         String scheduleOrderBusinessKey = buildScheduleOrderBusinessKey(context);
@@ -214,6 +226,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             ChangeoverFirstShiftQuantityPolicy.auditResults(context);
             equipmentPlanScheduleService.finalizeArrangements(context);
             bindMaintenanceWindowsToFinalResults(context);
+            shiftAnalysisRemarkService.appendFinalRemarks(context);
+            cleaningScheduleService.appendSandBlastRepairPrecisionAnalysis(context);
             addSummaryLog(context);
 
             // S4.6.6 保存排程结果到数据库：由持久化服务统一做目标日原子替换。
@@ -272,7 +286,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     /**
      * 校正单条结果在计划性维修预热后的首个生产班次，并追加可对账的组合原因。
      * <p>维修开始班次固定排产量的结束时间已在主链截到维修开始，因此不会被当作维修后结果；
-     * 独立维修向后对齐到预热完成，真实切换组合只校验维修本体结束，保留主链冻结的首检区间。
+     * 独立维修对齐到预热完成，真实切换组合对齐到维修及预热与切换的最晚完成点，保留主链冻结的首检区间。
      * 若该结果属于换模或换活字块，则原因中同步体现切换类型。</p>
      *
      * @param context 排程上下文
@@ -296,7 +310,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                     || !shiftEndTime.after(repairWindow.getProductionResumeTime())) {
                 continue;
             }
-            // 组合首检已由主链校验真实容量；此处不得再次套用独立预热将合法首检截短。
+            // 主链已从组合准备完成后正向首检；这里只校验同一边界，不再追加预热或首检时长。
             ShiftFieldUtil.alignShiftStartTimeNotBefore(
                     result, shiftIndex, repairWindow.getProductionResumeTime());
             String analysis = "计划性维修+预热";
@@ -2331,7 +2345,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     }
 
     /**
-     * 按成功承接结果的精确来源填写交替前物料，避免MES已上后料时生成后料到后料的计划。
+     * 按成功承接来源填写交替前物料，实际在机为第三种物料时使用真实前料。
+     * MES已上历史后料时仍保留历史前料，避免生成后料到后料的计划。
      *
      * @param context 含历史承接结果关联的上下文
      * @param result 本次换模结果
@@ -2344,11 +2359,20 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         if (Objects.nonNull(sourcePlan)) {
             plan.setBeforeMaterialCode(sourcePlan.getBeforeMaterialCode());
             plan.setBeforeMaterialDesc(sourcePlan.getBeforeMaterialDesc());
+            PreviousAlternatePlanReleaseEvent event = context.getPreviousAlternateReleaseEventMap()
+                    .get(result.getLhMachineCode());
+            if (Objects.nonNull(event) && event.getPlan() == sourcePlan
+                    && !StringUtils.equals(event.resolveBeforeMaterialCode(), sourcePlan.getBeforeMaterialCode())) {
+                // 冻结动作保留真实前料；不能将已变化的在机料重新显示为旧历史前料。
+                plan.setBeforeMaterialCode(event.resolveBeforeMaterialCode());
+                plan.setBeforeMaterialDesc(Optional.ofNullable(context.getMaterialInfoMap()
+                        .get(plan.getBeforeMaterialCode())).map(MdmMaterialInfo::getMaterialDesc).orElse(null));
+            }
             log.info("历史承接交替计划继承前物料, 工厂: {}, 批次: {}, 机台: {}, 历史计划ID: {}, "
-                            + "在机前物料: {}, 历史前物料: {}, 后物料: {}, 产品状态: {}",
+                            + "在机前物料: {}, 历史前物料: {}, 本次前物料: {}, 后物料: {}, 产品状态: {}",
                     context.getFactoryCode(), context.getBatchNo(), result.getLhMachineCode(), sourcePlan.getId(),
                     state.getCurrentMaterialCode(), sourcePlan.getBeforeMaterialCode(),
-                    result.getMaterialCode(), result.getProductStatus());
+                    plan.getBeforeMaterialCode(), result.getMaterialCode(), result.getProductStatus());
         } else {
             plan.setBeforeMaterialCode(state.getCurrentMaterialCode());
             plan.setBeforeMaterialDesc(state.getCurrentMaterialDesc());
@@ -2517,13 +2541,24 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     }
 
     /**
-     * 为原故障机台生成同物料模具下机记录，保留下机身份供当轮及历史换模配额排除。
+     * 为本轮班次内发生的故障下机生成同物料记录，保留下机身份供当轮及历史换模配额排除。
      *
      * @param context 排程上下文
      * @param event 故障迁移事件
      */
     private void appendTemporaryFaultOfflinePlan(
             LhScheduleContext context, ContinuationTemporaryFaultTransferEvent event) {
+        // 跨窗口故障继续参与禁产及迁移，但窗口前已经发生的下机动作不能在本轮重复生成。
+        LhShiftConfigVO offlineShift = LhScheduleTimeUtil.resolveShiftByTime(
+                LhScheduleTimeUtil.getScheduleShifts(context, context.getScheduleDate()), event.getFaultStartTime());
+        ShiftEnum offlineShiftType = Objects.nonNull(offlineShift) ? offlineShift.resolveShiftTypeEnum() : null;
+        if (Objects.isNull(offlineShiftType)) {
+            log.info("临时性故障下机动作不在本轮班次内，跳过交替计划, factoryCode: {}, batchNo: {}, "
+                            + "machineCode: {}, faultStartTime: {}",
+                    context.getFactoryCode(), context.getBatchNo(), event.getOriginalMachineCode(),
+                    LhScheduleTimeUtil.formatDateTime(event.getFaultStartTime()));
+            return;
+        }
         // 迁移成功后buildRemark会变为置换说明，旧机仍是仅下机动作，必须保留独立身份前缀。
         String offlineRemark = "临时性故障模具下机：" + event.getOriginalPhysicalMachineCode();
         String planRemark = StringUtils.isNotEmpty(event.getTargetMachineCode())
@@ -2545,7 +2580,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         plan.setScheduleDate(context.getScheduleTargetDate());
         plan.setPlanDate(event.getFaultStartTime());
         plan.setPlanOrder(context.getMouldChangePlanList().size() + 1);
-        plan.setClassIndex(resolvePlanShiftCode(context, event.getFaultStartTime()));
+        plan.setClassIndex(offlineShiftType.getCode());
         plan.setLhMachineCode(event.getOriginalMachineCode());
         plan.setLhMachineName(Objects.nonNull(machine) ? machine.getMachineName() : null);
         plan.setLeftRightMould(LeftRightMouldUtil.resolveLeftRightMould(

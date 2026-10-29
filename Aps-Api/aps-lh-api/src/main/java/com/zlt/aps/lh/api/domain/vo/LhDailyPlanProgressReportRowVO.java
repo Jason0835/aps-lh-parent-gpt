@@ -124,13 +124,13 @@ public class LhDailyPlanProgressReportRowVO implements Serializable {
     private Integer surplusQty;
 
     /**
-     * 高优先级
+     * 高优先级（取月计划定稿 HEIGHT_PRODUCTION_QTY 高优先级排产数量）
      */
     @ApiModelProperty(value = "高优先级", name = "heightQty")
     private Integer heightQty;
 
     /**
-     * 日产（月计划定稿日硫化量原值）
+     * 日产（= 月计划定稿单模硫化量 × 2，与排程算法「日硫化量」口径一致）
      */
     @ApiModelProperty(value = "日产", name = "dayLhQty")
     private Integer dayLhQty;

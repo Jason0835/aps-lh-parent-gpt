@@ -1,5 +1,6 @@
 package com.zlt.aps.lh.service.impl;
 
+import com.zlt.aps.lh.engine.strategy.support.SkuEndingDeferredExpansionPolicy;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import cn.hutool.core.bean.BeanUtil;
@@ -68,6 +69,13 @@ public class NewSpecScheduleCommitService {
                     || context.getUnscheduledResultList().size() > beforeUnscheduledCount
                     || (selectedSkuPendingBefore && !this.containsByIdentity(context, selectedSku));
             if (scheduledCount > 0) {
+                if (!SkuEndingDeferredExpansionPolicy.confirmCommittedFirstDates(context, selectedSku, beforeResultCount)) {
+                    snapshot.restore(context);
+                    this.rebuildStructureInMachineIndex(context);
+                    log.info("SKU收尾延期增机首日不一致，完整回滚, batchNo: {}, materialCode: {}",
+                            context.getBatchNo(), selectedSku.getMaterialCode());
+                    return NewSpecScheduleCommitResult.rolledBack();
+                }
                 return NewSpecScheduleCommitResult.resultCommitted(scheduledCount);
             }
             if (terminalStateCommitted) {
@@ -108,7 +116,8 @@ public class NewSpecScheduleCommitService {
         try {
             int scheduledCount = attemptAction.getAsInt();
             String switchFailure = StructureSwitchSchedulingPolicy.validateCommittedResults(context, beforeResultCount);
-            success = scheduledCount > 0 && StringUtils.isEmpty(switchFailure);
+            success = scheduledCount > 0 && StringUtils.isEmpty(switchFailure)
+                    && SkuEndingDeferredExpansionPolicy.confirmCommittedFirstDates(context, null, beforeResultCount);
             if (StringUtils.isNotEmpty(switchFailure)) {
                 log.info("结构切换指定组合提交拒绝, batchNo={}, reason={}", context.getBatchNo(), switchFailure);
             }

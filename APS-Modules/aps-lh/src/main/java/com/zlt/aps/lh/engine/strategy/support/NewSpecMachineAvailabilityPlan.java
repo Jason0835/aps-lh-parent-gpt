@@ -6,6 +6,7 @@ import org.springframework.util.CollectionUtils;
 
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -125,6 +126,11 @@ public class NewSpecMachineAvailabilityPlan {
      * 不包含供胚或结构名额等待，不参与实际落班；提案复制与正式复核保留同一基准。
      */
     private final Date skuSelectionStartTime;
+
+    /**
+     * 本候选被正式采纳时一起提交的局部不可变延后附件，不参与排序及缓存键。
+     */
+    private final List<LhShiftDelayEvidence> delayEvidence;
 
     public NewSpecMachineAvailabilityPlan(
             MachineScheduleDTO machine,
@@ -413,6 +419,72 @@ public class NewSpecMachineAvailabilityPlan {
             FirstInspectionTimelinePlan firstInspectionTimelinePlan,
             LhShiftConfigVO currentDayResourceShift,
             Date skuSelectionStartTime) {
+        this(machine, available, unavailableReason, occupationEndTime, machineReadyTime, changeoverStartTime,
+                changeoverEndTime, productionNotBeforeTime, candidateProductionNotBeforeTime,
+                candidateAvailableProductionTime, targetShift, firstInspectionPlan, traceChangeoverEndTime,
+                preparationAvailableTime, preparationTargetShift, preparationAvailable, formalAvailableProductionTime,
+                formalTargetShift, historicalResidualCapacityInfo, firstInspectionDeferredByClassTotalLimit,
+                sourceDayResourceShift, sourceDayCrossDayPreparation, firstInspectionTimelinePlan, currentDayResourceShift,
+                skuSelectionStartTime, Collections.emptyList());
+    }
+
+    /**
+     * 创建携带局部延后证据的同源时间计划。
+     *
+     * @param machine 候选机台
+     * @param available 原时间轴是否可用
+     * @param unavailableReason 原不可用原因
+     * @param occupationEndTime 原占用结束时间
+     * @param machineReadyTime 设备就绪时间
+     * @param changeoverStartTime 换模开始时间
+     * @param changeoverEndTime 换模结束时间
+     * @param productionNotBeforeTime 正式生产门禁
+     * @param candidateProductionNotBeforeTime 候选生产门禁
+     * @param candidateAvailableProductionTime 候选可开产时间
+     * @param targetShift 候选目标班次
+     * @param firstInspectionPlan 原首检分摊计划
+     * @param traceChangeoverEndTime 日志展示换模结束时间
+     * @param preparationAvailableTime 准备可用时间
+     * @param preparationTargetShift 准备目标班次
+     * @param preparationAvailable 准备是否可用
+     * @param formalAvailableProductionTime 正式可开产时间
+     * @param formalTargetShift 正式目标班次
+     * @param historicalResidualCapacityInfo 历史剩余产能画像
+     * @param firstInspectionDeferredByClassTotalLimit 首检是否因班量上限顺延
+     * @param sourceDayResourceShift 来源日资源班次
+     * @param sourceDayCrossDayPreparation 是否跨日准备
+     * @param firstInspectionTimelinePlan 冻结首检时间轴
+     * @param currentDayResourceShift 当前日资源班次
+     * @param skuSelectionStartTime 选料首检基准
+     * @param delayEvidence 原时间判断形成的不可变附件
+     */
+    private NewSpecMachineAvailabilityPlan(
+            MachineScheduleDTO machine,
+            boolean available,
+            String unavailableReason,
+            Date occupationEndTime,
+            Date machineReadyTime,
+            Date changeoverStartTime,
+            Date changeoverEndTime,
+            Date productionNotBeforeTime,
+            Date candidateProductionNotBeforeTime,
+            Date candidateAvailableProductionTime,
+            LhShiftConfigVO targetShift,
+            FirstInspectionAllocationPlan firstInspectionPlan,
+            Date traceChangeoverEndTime,
+            Date preparationAvailableTime,
+            LhShiftConfigVO preparationTargetShift,
+            boolean preparationAvailable,
+            Date formalAvailableProductionTime,
+            LhShiftConfigVO formalTargetShift,
+            HistoricalResidualCapacityInfo historicalResidualCapacityInfo,
+            boolean firstInspectionDeferredByClassTotalLimit,
+            LhShiftConfigVO sourceDayResourceShift,
+            boolean sourceDayCrossDayPreparation,
+            FirstInspectionTimelinePlan firstInspectionTimelinePlan,
+            LhShiftConfigVO currentDayResourceShift,
+            Date skuSelectionStartTime,
+            List<LhShiftDelayEvidence> delayEvidence) {
         this.machine = machine;
         this.available = available;
         this.unavailableReason = unavailableReason;
@@ -438,6 +510,7 @@ public class NewSpecMachineAvailabilityPlan {
         this.sourceDayCrossDayPreparation = sourceDayCrossDayPreparation;
         this.currentDayResourceShift = currentDayResourceShift;
         this.skuSelectionStartTime = skuSelectionStartTime;
+        this.delayEvidence = delayEvidence;
     }
 
     /**
@@ -458,7 +531,7 @@ public class NewSpecMachineAvailabilityPlan {
                 formalTargetShift, residualCapacityInfo,
                 firstInspectionDeferredByClassTotalLimit,
                 sourceDayResourceShift, sourceDayCrossDayPreparation, firstInspectionTimelinePlan,
-                currentDayResourceShift, skuSelectionStartTime);
+                currentDayResourceShift, skuSelectionStartTime, delayEvidence);
     }
 
     /**
@@ -503,7 +576,7 @@ public class NewSpecMachineAvailabilityPlan {
                 formalTargetShift, historicalResidualCapacityInfo,
                 firstInspectionDeferredByClassTotalLimit,
                 sourceDayResourceShift, sourceDayCrossDayPreparation, timelinePlan,
-                currentDayResourceShift, skuSelectionStartTime);
+                currentDayResourceShift, skuSelectionStartTime, delayEvidence);
     }
 
     /**
@@ -548,7 +621,7 @@ public class NewSpecMachineAvailabilityPlan {
                 committedProductionShift, historicalResidualCapacityInfo,
                 firstInspectionDeferredByClassTotalLimit,
                 sourceDayResourceShift, sourceDayCrossDayPreparation, committedTimeline,
-                currentDayResourceShift, skuSelectionStartTime);
+                currentDayResourceShift, skuSelectionStartTime, delayEvidence);
     }
 
     /**
@@ -567,7 +640,7 @@ public class NewSpecMachineAvailabilityPlan {
                 preparationTargetShift, preparationAvailable, formalAvailableProductionTime,
                 formalTargetShift, historicalResidualCapacityInfo, true,
                 sourceDayResourceShift, sourceDayCrossDayPreparation, firstInspectionTimelinePlan,
-                currentDayResourceShift, skuSelectionStartTime);
+                currentDayResourceShift, skuSelectionStartTime, delayEvidence);
     }
 
     /**
@@ -590,7 +663,7 @@ public class NewSpecMachineAvailabilityPlan {
                 preparationAvailable, formalAvailableProductionTime, formalTargetShift,
                 historicalResidualCapacityInfo, firstInspectionDeferredByClassTotalLimit,
                 resourceShift, crossDayAvailable, firstInspectionTimelinePlan,
-                currentDayResourceShift, skuSelectionStartTime);
+                currentDayResourceShift, skuSelectionStartTime, delayEvidence);
     }
 
     /**
@@ -621,7 +694,7 @@ public class NewSpecMachineAvailabilityPlan {
                 preparationTargetShift, preparationAvailable, formalAvailableProductionTime,
                 formalTargetShift, historicalResidualCapacityInfo,
                 firstInspectionDeferredByClassTotalLimit, sourceDayResourceShift,
-                sourceDayCrossDayPreparation, firstInspectionTimelinePlan, formalTargetShift, skuSelectionStartTime);
+                sourceDayCrossDayPreparation, firstInspectionTimelinePlan, formalTargetShift, skuSelectionStartTime, delayEvidence);
     }
 
     /**
@@ -639,7 +712,37 @@ public class NewSpecMachineAvailabilityPlan {
                 preparationTargetShift, preparationAvailable, formalAvailableProductionTime,
                 formalTargetShift, historicalResidualCapacityInfo, firstInspectionDeferredByClassTotalLimit,
                 sourceDayResourceShift, sourceDayCrossDayPreparation, firstInspectionTimelinePlan,
-                currentDayResourceShift, selectionStartTime);
+                currentDayResourceShift, selectionStartTime, delayEvidence);
+    }
+
+    /**
+     * 合并同一候选实际采用的约束附件，保持全部时间、数量和业务比较字段原值。
+     *
+     * @param evidence 当前局部实际采用的不可变证据
+     * @return 携带合并附件的新计划，附件为空时复用原计划
+     */
+    public NewSpecMachineAvailabilityPlan withDelayEvidence(List<LhShiftDelayEvidence> evidence) {
+        if (evidence.isEmpty()) {
+            return this;
+        }
+        return new NewSpecMachineAvailabilityPlan(
+                machine, available, unavailableReason, occupationEndTime, machineReadyTime,
+                changeoverStartTime, changeoverEndTime, productionNotBeforeTime,
+                candidateProductionNotBeforeTime, candidateAvailableProductionTime, targetShift,
+                firstInspectionPlan, traceChangeoverEndTime, preparationAvailableTime,
+                preparationTargetShift, preparationAvailable, formalAvailableProductionTime,
+                formalTargetShift, historicalResidualCapacityInfo, firstInspectionDeferredByClassTotalLimit,
+                sourceDayResourceShift, sourceDayCrossDayPreparation, firstInspectionTimelinePlan,
+                currentDayResourceShift, skuSelectionStartTime, LhShiftRemarkRuntime.merge(delayEvidence, evidence));
+    }
+
+    /**
+     * 读取当前候选的局部附件，正式成功前不进入最终备注关联。
+     *
+     * @return 不可变延后证据列表
+     */
+    public List<LhShiftDelayEvidence> getDelayEvidence() {
+        return delayEvidence;
     }
 
     /**

@@ -187,7 +187,10 @@ public class PreviousAlternatePlanEligibilityService {
         Map<String, List<LhMouldChangePlan>> index = this.buildPlanIndex(context);
         Map<String, LhMouldChangePlan> plans = new LinkedHashMap<>(machineCodes.size());
         for (String machineCode : machineCodes) {
-            List<LhMouldChangePlan> matches = index.get(this.buildKey(machineCode, materialCode));
+            List<LhMouldChangePlan> matches = index.values().stream().flatMap(List::stream)
+                    .filter(plan -> StringUtils.equals(machineCode, plan.getLhMachineCode()))
+                    .filter(plan -> this.matchesCurrentBeforeMaterial(context, plan, materialCode))
+                    .collect(Collectors.toList());
             // 同机前料多条计划不能靠ID猜测本次应承接哪一条，保持原收尾结果。
             if (CollectionUtils.isEmpty(matches) || matches.size() != 1) {
                 continue;
@@ -229,8 +232,7 @@ public class PreviousAlternatePlanEligibilityService {
         Set<String> machineCodeSet = new LinkedHashSet<String>(planIndex.size());
         planIndex.values().stream()
                 .flatMap(List::stream)
-                .filter(plan -> StringUtils.equals(
-                        sourceSku.getMaterialCode(), plan.getBeforeMaterialCode()))
+                .filter(plan -> this.matchesCurrentBeforeMaterial(context, plan, sourceSku.getMaterialCode()))
                 .filter(plan -> !StringUtils.equals(
                         sourceSku.getMaterialCode(), plan.getAfterMaterialCode()))
                 .filter(plan -> this.hasEligibleAfterMaterialDemand(
@@ -240,6 +242,23 @@ public class PreviousAlternatePlanEligibilityService {
                 .filter(StringUtils::isNotEmpty)
                 .forEach(machineCodeSet::add);
         return machineCodeSet;
+    }
+
+    /**
+     * 按已冻结的本轮实际前料匹配释放与收尾资格，历史原记录仍用于排序和追溯。
+     *
+     * @param context 已冻结历史动作的上下文
+     * @param plan 待匹配的原历史关系
+     * @param materialCode 当前续作物料
+     * @return 当前关系的实际前料与续作物料一致时为真
+     */
+    private boolean matchesCurrentBeforeMaterial(LhScheduleContext context, LhMouldChangePlan plan,
+            String materialCode) {
+        PreviousAlternatePlanReleaseEvent event = context.getPreviousAlternateReleaseEventMap()
+                .get(plan.getLhMachineCode());
+        String beforeMaterial = Objects.nonNull(event) && event.getPlan() == plan
+                ? event.resolveBeforeMaterialCode() : plan.getBeforeMaterialCode();
+        return StringUtils.equals(materialCode, beforeMaterial);
     }
 
     /**

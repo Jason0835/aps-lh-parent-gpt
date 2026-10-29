@@ -1,5 +1,6 @@
 package com.zlt.aps.lh.handler;
 
+import com.zlt.aps.lh.component.EndingDeferredCapacityLoader;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
@@ -58,6 +59,12 @@ import java.util.Objects;
 @Slf4j
 @Component
 public class DataInitHandler extends AbsScheduleStepHandler {
+
+    /**
+     * 正式基础数据之外的延期产能快照，不参与主窗口排产。
+     */
+    @Resource
+    private EndingDeferredCapacityLoader endingDeferredCapacityLoader;
 
     @Resource
     private DataValidationChain dataValidationChain;
@@ -131,6 +138,7 @@ public class DataInitHandler extends AbsScheduleStepHandler {
 
         List<LhShiftConfigVO> windowShifts = context.getScheduleWindowShifts();
         LhScheduleTimeUtil.initShiftRuntimeStateMap(context, windowShifts);
+        endingDeferredCapacityLoader.loadAndAttach(context);
         // 保留窗口基础数据，不做前批次结果继承，统一从窗口起点重新计算。
         log.info("基础数据初始化完成, 机台数量: {}, 月计划SKU数: {}",
                 context.getMachineInfoMap().size(), context.getMonthPlanList().size());

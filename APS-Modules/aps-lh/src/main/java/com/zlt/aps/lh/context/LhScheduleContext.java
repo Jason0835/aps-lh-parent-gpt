@@ -26,6 +26,8 @@ import com.zlt.aps.mdm.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
@@ -207,6 +209,15 @@ public class LhScheduleContext {
      */
     private Map<String, LocalDate> structureMaxEndingDateMap = new LinkedHashMap<>(16);
     /**
+     * SKU收尾延期只读产能快照，独立上下文不参与正式排产和持久化。
+     */
+    @ToString.Exclude
+    private EndingDeferredCapacitySnapshot endingDeferredCapacitySnapshot;
+    /**
+     * 物料及产品状态对应的本轮首次实际增机业务日，仅在正量提交成功后确认并随候选快照回滚。
+     */
+    private Map<String, LocalDate> endingDeferredFirstProductionDateMap = new LinkedHashMap<>(16);
+    /**
      * 结构名称 -> SKU排序使用的结构转产最大收尾自然日。
      * <p>S4.2按参数{@code SYS0304002}确定严格小于阈值时可能命中的日期范围，复用结构转产表
      * 的工厂、年月、排产版本、正常计划类型和结构名称查询口径，将非空END_DAY还原为完整
@@ -252,7 +263,7 @@ public class LhScheduleContext {
     private RepairPlanRuntimeState repairPlanRuntimeState = new RepairPlanRuntimeState();
 
     /**
-     * 读取本候选独立维修视图，候选外按已提交的完整收尾结果兑现等待。
+     * 读取本候选独立维修视图，候选外排除已由完整收尾证明不执行的05。
      *
      * @return 当前业务可消费的设备时间视图，固定来源保持原位
      */
@@ -450,6 +461,26 @@ public class LhScheduleContext {
      * 与硫化余量收尾标识独立，预演副本共享不可变输入，不修改库存和余量账本。
      */
     private Map<String, Set<String>> cxEmbryoEndingShiftIndex = Collections.emptyMap();
+
+    /**
+     * 交班收尾证据：上一批窗口 1-3 班存在已排程（SHIFT_SOURCE=1）收尾行的胎胚集合。
+     * <p>与成型侧 {@code filterHandoverStoppedEndings} 的判定②同源：
+     * (T-2 早班/中班、T-1 夜班) 三个班次任一行命中即视为「昨天已安排收尾」。</p>
+     */
+    private Set<String> cxHandoverEndingEmbryoSet = new LinkedHashSet<>();
+
+    /**
+     * 交班收尾证据：交班在机标识 {@code HANDOVER_ONLINE='1'}（仍在产）的胎胚集合。
+     * <p>与成型侧判定③同源：MES 只回传仍在产的胎胚并填 1，其余为空；不在本集合即视为交班已停产。</p>
+     */
+    private Set<String> cxHandoverInProdEmbryoSet = new LinkedHashSet<>();
+
+    /**
+     * 交班收尾命中：上一批已安排收尾 + 交班停产 + 胎胚余量∈(0, 一车) 同时成立、强制胎胚收尾=1 的胎胚集合。
+     * <p>供 {@code TargetScheduleQtyResolver} 按胎胚库存严格排产（只消耗库存，不再按硫化余量放大）。</p>
+     */
+    private Set<String> cxHandoverStoppedEndingEmbryoSet = new LinkedHashSet<>();
+
     /**
      * 结构切换完成后接手机台的**后结构**集合（key=structureName，= 各机台当前在产结构）。
      *
@@ -624,6 +655,20 @@ public class LhScheduleContext {
     private Map<String, String> previousAlternateReleasedSkuKeyMap = new LinkedHashMap<>(16);
     /** 历史动作与最终结果精确关联，同料同模具也必须生成交替计划。 */
     private Map<LhScheduleResult, LhMouldChangePlan> previousAlternateResultPlanMap = new IdentityHashMap<>(16);
+    /**
+     * 已成功换块且残量保留到新增流程的候选身份，仅用于冻结结果场景，不参与排程决策。
+     * 尝试快照及独立模拟复制集合外壳，禁止预演残留或相同物料的其他候选串用来源。
+     */
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
+    private Set<SkuScheduleDTO> typeBlockResidualSceneSkuSet =
+            Collections.newSetFromMap(new IdentityHashMap<SkuScheduleDTO, Boolean>(16));
+    /**
+     * 当前批次独占的局部延后证据及正式备注关联，不参与排程决策。
+     */
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
+    private LhShiftRemarkRuntime shiftRemarkRuntime = new LhShiftRemarkRuntime();
     /**
      * 成对承接结果各侧独立的历史前料展示来源，不授予历史执行、配额或结构保护资格。
      * 按结果对象身份保存，失败尝试及整批预演恢复时同步撤销。
@@ -1451,6 +1496,54 @@ public class LhScheduleContext {
      * 准入过滤前按物料及产品状态冻结的原始硫化余量，仅供历史前料下机事实核对。
      */
     private Map<String, Integer> initialMaterialStatusSurplusQtyMap = new LinkedHashMap<>();
+
+    /**
+     * T日历史前料候选，前批结果唯一证明其物料状态及模具；仅保护准入，不代表已分配生产。
+     */
+    private Map<String, LhMachineOnlineInfo> historicalBeforeMaterialCandidateMap = new LinkedHashMap<>();
+
+    /**
+     * 已确认存在收尾需求的历史前料生产身份，独立保存，不覆盖MES原始在机快照。
+     */
+    private Map<String, LhMachineOnlineInfo> historicalBeforeMaterialContinuationMap = new LinkedHashMap<>();
+
+    /**
+     * 解析续作生产身份；历史前料确认后使用其独立快照，其他机台沿用MES来源。
+     *
+     * @param machineCode 运行侧机台编码
+     * @return 本次续作来源，没有在机记录时返回null
+     */
+    public LhMachineOnlineInfo resolveContinuationOnlineInfo(String machineCode) {
+        return historicalBeforeMaterialContinuationMap.getOrDefault(machineCode, machineOnlineInfoMap.get(machineCode));
+    }
+
+    /**
+     * 判断SKU是否属于本轮已确认的历史前料续作，仅用于生产身份和前后料顺序，不赋予数量豁免。
+     *
+     * @param sku 当前SKU或同状态运行副本
+     * @return 存在同机同物料同状态历史前料身份时返回true
+     */
+    public boolean isHistoricalBeforeMaterialContinuation(SkuScheduleDTO sku) {
+        if (Objects.isNull(sku)) {
+            return false;
+        }
+        return this.isHistoricalBeforeMaterialContinuation(
+                sku.getContinuousMachineCode(), sku.getMaterialCode(), sku.getProductStatus());
+    }
+
+    /**
+     * 按运行侧、物料及状态判断结果是否来自已确认的历史前料续作。
+     *
+     * @param machineCode 运行侧机台
+     * @param materialCode 物料编码
+     * @param productStatus 产品状态
+     * @return 精确命中本轮前料身份时返回true
+     */
+    public boolean isHistoricalBeforeMaterialContinuation(String machineCode, String materialCode, String productStatus) {
+        LhMachineOnlineInfo source = historicalBeforeMaterialContinuationMap.get(machineCode);
+        return Objects.nonNull(source) && StringUtils.equals(source.getMaterialCode(), materialCode)
+                && StringUtils.equals(source.getProductStatus(), productStatus);
+    }
     /**
      * SKU减量清单四维索引，key=year|month|materialCode|productStatus。
      * 年月取自来源月计划，文本归一化后匹配；S4.2批量加载，S4.3统一过滤。

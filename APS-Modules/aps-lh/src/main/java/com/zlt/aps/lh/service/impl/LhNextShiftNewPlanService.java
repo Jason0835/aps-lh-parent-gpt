@@ -1,6 +1,7 @@
 package com.zlt.aps.lh.service.impl;
 
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchRuntimeState;
+import com.zlt.aps.lh.engine.strategy.support.ScheduleResultSceneTypeSupport;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchFirstShiftQuantityPolicy;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchSchedulingPolicy;
 
@@ -19,6 +20,7 @@ import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.StructureEndingAlignmentService;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.engine.strategy.support.LhShiftRemarkRuntime;
 import com.zlt.aps.lh.engine.factory.ScheduleStrategyFactory;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
 import com.zlt.aps.lh.engine.strategy.IFirstInspectionBalanceStrategy;
@@ -125,8 +127,9 @@ public class LhNextShiftNewPlanService {
 
         Map<String, Date> releaseTimeMap = this.resolveReleasedMachineTimeMap(
                 sourceContext, sourceEndingShift);
+        Map<SkuScheduleDTO, SkuScheduleDTO> sourceSkuCopyMap = new IdentityHashMap<>();
         List<SkuScheduleDTO> remainingSkuList = this.resolveRemainingSkuList(
-                sourceContext, targetBusinessDate);
+                sourceContext, targetBusinessDate, sourceSkuCopyMap);
         log.info("班次9候选准备完成, factoryCode: {}, scheduleDate: {}, batchNo: {}, "
                         + "targetBusinessDate: {}, targetWindow: [{}, {}), releasedMachineCount: {}, "
                         + "remainingSkuCount: {}",
@@ -143,7 +146,7 @@ public class LhNextShiftNewPlanService {
                 && !CollectionUtils.isEmpty(remainingSkuList)) {
             LhScheduleContext isolatedContext = this.buildIsolatedContext(
                     sourceContext, sourceEndingShift, businessTargetShift,
-                    targetBusinessDate, releaseTimeMap, remainingSkuList);
+                    targetBusinessDate, releaseTimeMap, remainingSkuList, sourceSkuCopyMap);
             planList = this.scheduleNextShift(
                     isolatedContext, targetBusinessDate);
             // 与原8班分开回填，只记录已执行的独立窗口；不触发任何故障业务补偿。
@@ -259,7 +262,16 @@ public class LhNextShiftNewPlanService {
     }
 
     /**
-     * 构建与原排程状态隔离的工作上下文。
+     * 构建与原排程状态隔离的工作上下文，班次备注收集域和正式关联重新创建。
+     *
+     * @param sourceContext 原八班上下文
+     * @param sourceEndingShift 原窗口末班
+     * @param businessTargetShift 独立目标班次
+     * @param targetBusinessDate 目标业务日期
+     * @param releaseTimeMap 实际机台释放时刻
+     * @param remainingSkuList 独立窗口剩余候选
+     * @param sourceSkuCopyMap 实际保留候选的原对象与副本身份映射
+     * @return 资源与备注运行态均隔离的上下文
      */
     private LhScheduleContext buildIsolatedContext(
             LhScheduleContext sourceContext,
@@ -267,9 +279,12 @@ public class LhNextShiftNewPlanService {
             LhShiftConfigVO businessTargetShift,
             LocalDate targetBusinessDate,
             Map<String, Date> releaseTimeMap,
-            List<SkuScheduleDTO> remainingSkuList) {
+            List<SkuScheduleDTO> remainingSkuList,
+            Map<SkuScheduleDTO, SkuScheduleDTO> sourceSkuCopyMap) {
         LhScheduleContext isolatedContext = new LhScheduleContext();
         BeanUtil.copyProperties(sourceContext, isolatedContext);
+        // 独立窗口不能与原8班共享备注收集域或结果身份关联。
+        isolatedContext.setShiftRemarkRuntime(new LhShiftRemarkRuntime());
         // 扩展窗口只能写独立副本的停机索引，不能污染原8班已经完成的回填范围。
         isolatedContext.setRepairPlanRuntimeState(sourceContext.getRepairPlanRuntimeState());
         // 快照恢复会重建全部可变资源；先切断机台Map引用，避免恢复时清理原上下文。
@@ -279,6 +294,7 @@ public class LhNextShiftNewPlanService {
                 .copyResourcesTo(isolatedContext);
         // 资源快照只复制可变资源；其余可写运行视图在独立服务中显式切断引用。
         this.detachIndependentViews(isolatedContext, remainingSkuList);
+        this.remapTypeBlockResidualScenes(sourceContext, isolatedContext, sourceSkuCopyMap);
         isolatedContext.setIsolatedNextShiftPlan(true);
         // 只在独立副本使用标准机台分组与动态竞争，原上下文仍停留在最终保存阶段。
         isolatedContext.setCurrentStep(ScheduleStepEnum.S4_5_NEW_PRODUCTION.getCode());
@@ -362,6 +378,25 @@ public class LhNextShiftNewPlanService {
     }
 
     /**
+     * 将换块残量的展示来源绑定到独立候选副本，避免沿用原8班可变对象。
+     *
+     * @param sourceContext 只读的原8班上下文
+     * @param isolatedContext 班次9独立上下文
+     * @param sourceSkuCopyMap 实际保留候选的原对象与副本身份映射
+     */
+    private void remapTypeBlockResidualScenes(LhScheduleContext sourceContext,
+                                              LhScheduleContext isolatedContext,
+                                              Map<SkuScheduleDTO, SkuScheduleDTO> sourceSkuCopyMap) {
+        Set<SkuScheduleDTO> copiedSceneSkus = Collections.newSetFromMap(new IdentityHashMap<>());
+        sourceSkuCopyMap.forEach((sourceSku, copiedSku) -> {
+            if (sourceContext.getTypeBlockResidualSceneSkuSet().contains(sourceSku)) {
+                copiedSceneSkus.add(copiedSku);
+            }
+        });
+        isolatedContext.setTypeBlockResidualSceneSkuSet(copiedSceneSkus);
+    }
+
+    /**
      * 将已深拷贝的提前生产视图绑定到候选副本，保留跨月身份但不复用旧日准入结果。
      *
      * @param context 独立上下文，运行视图已由资源快照深拷贝
@@ -405,6 +440,8 @@ public class LhNextShiftNewPlanService {
         context.setNextShiftNewPlanCandidateList(new ArrayList<>(skuList));
         context.setNextShiftNewPlanPoolDateMap(new LinkedHashMap<>(context.getNextShiftNewPlanPoolDateMap()));
         context.setContinuousSkuList(new ArrayList<>(0));
+        context.setEndingDeferredCapacitySnapshot(null);
+        context.setEndingDeferredFirstProductionDateMap(new LinkedHashMap<>(0));
         context.setTrialVirtualMachineCandidateList(new ArrayList<>(0));
         // 窗口内历史指定试验需求不扩散到独立班次9，也不能共享原来源对象供副本修改。
         context.setPreviousAlternateTrialDemandList(new ArrayList<>(0));
@@ -536,11 +573,13 @@ public class LhNextShiftNewPlanService {
      *
      * @param context 全部前置排产完成后的原上下文
      * @param targetBusinessDate 班次9业务日T+3
+     * @param sourceSkuCopyMap 接收实际保留候选的原对象与副本身份映射
      * @return 按原身份顺序保留的候选副本，后续由日期池分别排序
      */
     private List<SkuScheduleDTO> resolveRemainingSkuList(
             LhScheduleContext context,
-            LocalDate targetBusinessDate) {
+            LocalDate targetBusinessDate,
+            Map<SkuScheduleDTO, SkuScheduleDTO> sourceSkuCopyMap) {
         Map<String, SkuScheduleDTO> candidateMap = new LinkedHashMap<String, SkuScheduleDTO>();
         // T以引擎窗口起点为准，保存日期和晚班自然开始日期均不能替代。
         LocalDate baseDate = this.toLocalDate(context.getScheduleDate());
@@ -568,7 +607,10 @@ public class LhNextShiftNewPlanService {
             copiedSku.setPendingQty(remainingQty);
             copiedSku.setTargetScheduleQty(remainingQty);
             copiedSku.setRemainingScheduleQty(remainingQty);
-            candidateMap.putIfAbsent(skuKey, copiedSku);
+            if (Objects.isNull(candidateMap.putIfAbsent(skuKey, copiedSku))) {
+                // 只记录实际保留副本；同键候选不得把其他原对象的来源扩散给首个副本。
+                sourceSkuCopyMap.put(sourceSku, copiedSku);
+            }
             log.info("班次9剩余SKU候选, materialCode: {}, productStatus: {}, "
                             + "poolDate: {}, constructionStage: {}, embryoCode: {}, remainingQty: {}",
                     copiedSku.getMaterialCode(), copiedSku.getProductStatus(), poolDate,
@@ -643,6 +685,7 @@ public class LhNextShiftNewPlanService {
             copiedQuotaMap.put(targetBusinessDate, targetQuota);
         }
         copiedSku.setDailyPlanQuotaMap(copiedQuotaMap);
+        copiedSku.setEndingDeferredExpansion(false);
         if (Objects.nonNull(sourceSku.getMouldCodeList())) {
             copiedSku.setMouldCodeList(new ArrayList<>(sourceSku.getMouldCodeList()));
         }
@@ -775,6 +818,7 @@ public class LhNextShiftNewPlanService {
         plan.setFactoryCode(context.getFactoryCode());
         plan.setScheduleDate(LhScheduleTimeUtil.clearTime(context.getScheduleTargetDate()));
         plan.setBatchNo(context.getBatchNo());
+        plan.setSceneType(ScheduleResultSceneTypeSupport.normalizeCode(result.getSceneType()));
         plan.setMaterialCode(result.getMaterialCode());
         plan.setProductStatus(result.getProductStatus());
         plan.setConstructionStage(result.getConstructionStage());

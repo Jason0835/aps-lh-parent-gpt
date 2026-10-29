@@ -1,9 +1,12 @@
 package com.zlt.aps.lh.service.impl;
 
+import com.zlt.aps.lh.engine.strategy.support.SkuEndingDeferredExpansionPolicy;
+import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.component.EarlyProductionRuntimePlanService;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.engine.strategy.support.LhShiftRemarkRuntime;
 import com.zlt.aps.lh.engine.strategy.support.DailySchedulePhase;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchPlan;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchSchedulingPolicy;
@@ -23,6 +26,8 @@ import org.springframework.stereotype.Service;
 import org.apache.commons.lang3.StringUtils;
 
 import javax.annotation.Resource;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.LinkedHashMap;
@@ -88,6 +93,9 @@ public class SpecifiedMachineProductionService {
         }
         if (Objects.isNull(availability) || !availability.isAvailable()
                 || Objects.isNull(availability.getCompetitionTargetShift())) {
+            if (fixedMachine && availability != null) {
+                context.getShiftRemarkRuntime().includeCurrent(availability.getDelayEvidence());
+            }
             candidate.setLastFailure(Objects.isNull(availability)
                     ? "未形成有效排产时间轴" : availability.getUnavailableReason());
             return null;
@@ -182,6 +190,16 @@ public class SpecifiedMachineProductionService {
     public NewSpecScheduleCommitResult commit(
             LhScheduleContext context, DayScheduleContext dayContext,
             NewSpecMachineAssignmentPlan assignmentPlan, IntSupplier executeAction) {
+        if (assignmentPlan.getCandidate().getSku().isEndingDeferredExpansion()) {
+            LhShiftConfigVO occupationShift = assignmentPlan.getAvailabilityPlan().getProductionOccupationShift();
+            LocalDate productionDate = occupationShift == null || occupationShift.getWorkDate() == null ? null
+                    : occupationShift.getWorkDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+            if (!SkuEndingDeferredExpansionPolicy.allowsProposal(context, assignmentPlan.getCandidate().getSku(),
+                    dayContext.getScheduleDate(), productionDate)) {
+                assignmentPlan.getCandidate().setLastFailure("收尾延期增机实际生产日与首个可排日不一致");
+                return NewSpecScheduleCommitResult.rolledBack();
+            }
+        }
         IntSupplier activatedAction = () -> {
             if (dayContext.getCurrentPhase() == DailySchedulePhase.EARLY_PRODUCTION
                     && Objects.nonNull(assignmentPlan.getCandidate().getEarlyProductionPreview())) {
@@ -228,11 +246,20 @@ public class SpecifiedMachineProductionService {
                 context.setStructureSwitchAttemptPlanMap(previousPlans);
             }
         };
-        if (assignmentPlan.isPreScheduledExecution()) {
-            return newSpecScheduleCommitService.commitResultOnly(context, activatedAction);
+        int firstRemarkResult = context.getScheduleResultList().size();
+        try (LhShiftRemarkRuntime.Scope remarkScope = context.getShiftRemarkRuntime().openScope(
+                assignmentPlan.getCandidate().getSku(), assignmentPlan.getMatchResult().getMachine().getMachineCode())) {
+            remarkScope.include(assignmentPlan.getAvailabilityPlan().getDelayEvidence());
+            NewSpecScheduleCommitResult result = assignmentPlan.isPreScheduledExecution()
+                    ? newSpecScheduleCommitService.commitResultOnly(context, activatedAction)
+                    : newSpecScheduleCommitService.commit(context, assignmentPlan.getCandidate().getSku(), activatedAction);
+            if (!result.isRolledBack() && result.getScheduledCount() > 0) {
+                remarkScope.accept(context, firstRemarkResult);
+            } else if (assignmentPlan.isFixedMachineExecution()) {
+                remarkScope.retainInParent();
+            }
+            return result;
         }
-        return newSpecScheduleCommitService.commit(
-                context, assignmentPlan.getCandidate().getSku(), activatedAction);
     }
 
     /**

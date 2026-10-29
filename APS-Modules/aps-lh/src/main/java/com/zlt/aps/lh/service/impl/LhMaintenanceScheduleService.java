@@ -14,6 +14,7 @@ import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationEndingAllocationSnapshot;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationMachineFinishPlan;
+import com.zlt.aps.lh.engine.strategy.support.ContinuationSurplusCompletionSupport;
 import com.zlt.aps.lh.engine.strategy.support.PreviousAlternatePlanReleaseEvent;
 import com.zlt.aps.lh.engine.strategy.support.EquipmentPlanOverlapResult;
 import com.zlt.aps.lh.engine.strategy.support.FirstInspectionAllocationPlan;
@@ -620,7 +621,8 @@ public class LhMaintenanceScheduleService {
     }
 
     /**
-     * 读取单侧机台已知收尾时间；空闲机台以当前排程日零点表示已经就绪。
+     * 读取单侧机台已知收尾时间，普通余量组未完成时旧节点不能证明自然收尾。
+     * 空闲机台以当前排程日零点表示已经就绪。
      *
      * @param context 排程上下文
      * @param machine 运行态机台
@@ -628,6 +630,9 @@ public class LhMaintenanceScheduleService {
      */
     private Date resolveKnownEndingTime(LhScheduleContext context, MachineScheduleDTO machine) {
         if (Objects.isNull(machine)) {
+            return null;
+        }
+        if (ContinuationSurplusCompletionSupport.hasUnfinishedContinuation(context, machine)) {
             return null;
         }
         // 空闲机台没有预计收尾时间并不代表时间未知，应视为排程日开始时已经就绪。
@@ -735,6 +740,7 @@ public class LhMaintenanceScheduleService {
      * 用已提交收尾事实确认最终有量结果，生产收尾与物理释放分别核对。
      * 历史交替释放会清空当前物料和收尾标记，不能因此丢失前料真实中班收尾；
      * 强制退出、窗口未完成及被最终扣账改变的快照均不能冒充完整收尾。
+     * 普通余量还须核对整组最终完成量，单行未变化不能保留已经失效的组级完成依据。
      *
      * @param context 已完成续作最终收口的上下文
      * @param result 本轮仍保留的有量结果
@@ -743,6 +749,9 @@ public class LhMaintenanceScheduleService {
      */
     private boolean isAccuracyEndingProduction(LhScheduleContext context, LhScheduleResult result,
                                                Date endingTime) {
+        if (ContinuationSurplusCompletionSupport.isUnfinishedContinuation(context, result)) {
+            return false;
+        }
         int shiftIndex = ShiftFieldUtil.resolveLastPlannedShiftIndex(result);
         Date productionEndTime = ShiftFieldUtil.getShiftEndTime(result, shiftIndex);
         ContinuationEndingAllocationSnapshot snapshot = context.getContinuationSurplusEndingSnapshotMap().get(result);
@@ -2532,9 +2541,39 @@ public class LhMaintenanceScheduleService {
      */
     public PrecisionMaintenanceJudgeDTO resolveReplacementPrecision(LhScheduleContext context,
             MachineScheduleDTO machine, Date replacementStart) {
+        return this.resolveConfirmedDowntimePrecision(context, machine, replacementStart,
+                "已落实同物料喷砂置换提供当日精度机会");
+    }
+
+    /**
+     * 校验有效在机喷砂与05维修提供的当日精度机会，不以物料数量收尾为前提。
+     * 调用方必须先确认完整物理机台同源喷砂及维修本体真实重叠。
+     *
+     * @param context 当前排程上下文
+     * @param machine 已确认整机停机事实的运行侧
+     * @param cleaningStart 真实喷砂开始时间
+     * @return 满足原资格、额度及日历约束时返回当日精度，否则占用时长为0
+     */
+    public PrecisionMaintenanceJudgeDTO resolveSandBlastRepairPrecision(LhScheduleContext context,
+            MachineScheduleDTO machine, Date cleaningStart) {
+        return this.resolveConfirmedDowntimePrecision(context, machine, cleaningStart,
+                "在机喷砂与05维修重叠提供当日精度机会");
+    }
+
+    /**
+     * 复用已确认停机机会的精度资格，不提前占用每日额度，也不顺延预约其他执行日。
+     *
+     * @param context 当前排程上下文
+     * @param machine 已确认停机机会的机台
+     * @param downtimeStart 原物料停止生产的真实时间
+     * @param triggerReason 专用策略确认的停机机会原因
+     * @return 当日可执行精度的判定，不能执行时占用时长为0
+     */
+    private PrecisionMaintenanceJudgeDTO resolveConfirmedDowntimePrecision(LhScheduleContext context,
+            MachineScheduleDTO machine, Date downtimeStart, String triggerReason) {
         String machineCode = Objects.isNull(machine) ? null : machine.getMachineCode();
         PrecisionMaintenanceJudgeDTO rejected = this.buildZeroJudgeDTO(machineCode);
-        if (Objects.isNull(context) || Objects.isNull(machine) || Objects.isNull(replacementStart)
+        if (Objects.isNull(context) || Objects.isNull(machine) || Objects.isNull(downtimeStart)
                 || StringUtils.isBlank(machineCode) || !CollectionUtils.isEmpty(machine.getMaintenanceWindowList())) {
             return rejected;
         }
@@ -2546,11 +2585,11 @@ public class LhMaintenanceScheduleService {
                 || Objects.isNull(daysToDue) || daysToDue > warningDays || !this.isPlanDateEligible(context, plan)) {
             return rejected;
         }
-        Date executeDate = LhScheduleTimeUtil.clearTime(replacementStart);
+        Date executeDate = LhScheduleTimeUtil.clearTime(downtimeStart);
         Date precisionStart = this.buildMaintenanceStartTime(context, executeDate);
         if (executeDate.before(LhScheduleTimeUtil.clearTime(context.getScheduleDate()))
                 || executeDate.after(LhScheduleTimeUtil.clearTime(plan.getPlanDate()))
-                || replacementStart.after(precisionStart)) {
+                || downtimeStart.after(precisionStart)) {
             return rejected;
         }
         String reason = this.resolveJudgeQuotaUnavailableReason(context, executeDate, machineCode, null);
@@ -2559,11 +2598,11 @@ public class LhMaintenanceScheduleService {
         }
         if (StringUtils.isNotEmpty(reason)) {
             this.appendMaintenanceProcessLog(context, MAINTENANCE_PROCESS_LOG_TITLE, machineCode, plan,
-                    precisionStart, reason, "本次置换机会不安排精度，保留原置换，不顺延预约");
+                    precisionStart, reason, "本次停机机会不安排精度，保留原业务，不顺延预约");
             return rejected;
         }
         return this.buildSuccessJudgeDTO(context, machine, plan, executeDate, false, null,
-                "已落实同物料喷砂置换提供当日精度机会");
+                triggerReason);
     }
 
     /**

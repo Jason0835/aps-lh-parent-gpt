@@ -118,7 +118,7 @@ public class StructureMachineLimitAdmissionService {
             return this.buildDecision(
                     true, false, phase, null, formalTargetShift, machineCode,
                     sku, originalPoolDate, null, 0,
-                    "正式开产班次、班次业务日期或候选机台缺失");
+                    "正式开产班次、班次业务日期或候选机台缺失", StructureLimitRejectionCode.MISSING_SHIFT);
         }
         LocalDate businessDate = formalTargetShift.getWorkDate().toInstant()
                 .atZone(ZoneId.systemDefault()).toLocalDate();
@@ -169,13 +169,13 @@ public class StructureMachineLimitAdmissionService {
             return this.buildDecision(
                     true, false, phase, businessDate, formalTargetShift, machineCode,
                     sku, originalPoolDate, null, structureMachineLimit,
-                    "正式开产业务日无有效结构计划硫化机台数");
+                    "正式开产业务日无有效结构计划硫化机台数", StructureLimitRejectionCode.NO_STRUCTURE_PLAN);
         }
         if (Objects.isNull(context.getStructureShiftInMachineIndex())) {
             return this.buildDecision(
                     true, false, phase, businessDate, formalTargetShift, machineCode,
                     sku, originalPoolDate, null, structureMachineLimit,
-                    "结构班次在机索引未初始化");
+                    "结构班次在机索引未初始化", StructureLimitRejectionCode.MISSING_INDEX);
         }
         String statisticsKey = this.buildStatisticsKey(
                 sku.getStructureName(), formalTargetShift.getShiftIndex());
@@ -226,6 +226,15 @@ public class StructureMachineLimitAdmissionService {
                     context.isNewSpecProposalPreview(), context.isPreviousAlternateGroupPreview(),
                     Objects.nonNull(context.getTimedMachineOffActionPreviewCapture()));
         }
+        if (!allowed) {
+            Date rejectedStart = productionOccupationStartTime != null
+                    && productionOccupationStartTime.after(formalTargetShift.getShiftStartDateTime())
+                    ? productionOccupationStartTime : formalTargetShift.getShiftStartDateTime();
+            context.getShiftRemarkRuntime().record(LhShiftDelayReason.STRUCTURE_MACHINE_QUOTA,
+                    "NORMAL_STRUCTURE_MACHINE_QUOTA", machineCode, sku, rejectedStart,
+                    formalTargetShift.getShiftEndDateTime(), "count=" + effectiveMachineCount
+                            + ",delta=" + newMachineDelta + ",limit=" + structureMachineLimit);
+        }
         return new StructureMachineLimitDecision(
                 true, allowed, phase, businessDate,
                 formalTargetShift.getShiftIndex(),
@@ -235,7 +244,8 @@ public class StructureMachineLimitAdmissionService {
                 sku.getStructureName(), originalPoolDate,
                 statistics.getRawScheduledPhysicalMachineCodes(),
                 effectivePhysicalMachineCodes, newMachineDelta,
-                structureMachineLimit, reason);
+                structureMachineLimit, reason, allowed ? StructureLimitRejectionCode.NONE
+                        : StructureLimitRejectionCode.MACHINE_COUNT_LIMIT);
     }
 
     /**
@@ -367,6 +377,22 @@ public class StructureMachineLimitAdmissionService {
                 machineCompetitionBlocked);
     }
 
+    /**
+     * 构建不涉及数量超限的兼容准入结果。
+     *
+     * @param applicable 是否适用结构上限
+     * @param allowed 是否允许开产
+     * @param phase 当前排程阶段
+     * @param businessDate 实际开产业务日
+     * @param formalTargetShift 实际占用班次
+     * @param machineCode 实际机台或运行侧
+     * @param sku 当前物料状态
+     * @param originalPoolDate 原候选池日期
+     * @param statistics 原结构统计快照
+     * @param structureMachineLimit 当前班次有效机台上限
+     * @param reason 原准入原因
+     * @return 原准入结果及稳定分类
+     */
     private StructureMachineLimitDecision buildDecision(
             boolean applicable,
             boolean allowed,
@@ -379,6 +405,41 @@ public class StructureMachineLimitAdmissionService {
             StructureEarlyProductionAdmission statistics,
             int structureMachineLimit,
             String reason) {
+        return this.buildDecision(applicable, allowed, phase, businessDate, formalTargetShift, machineCode, sku,
+                originalPoolDate, statistics, structureMachineLimit, reason,
+                allowed ? StructureLimitRejectionCode.NONE : StructureLimitRejectionCode.OTHER_GATE);
+    }
+
+    /**
+     * 构建包含明确数据门禁分类的准入结果。
+     *
+     * @param applicable 是否适用结构上限
+     * @param allowed 是否允许开产
+     * @param phase 当前排程阶段
+     * @param businessDate 实际开产业务日
+     * @param formalTargetShift 实际占用班次
+     * @param machineCode 实际机台或运行侧
+     * @param sku 当前物料状态
+     * @param originalPoolDate 原候选池日期
+     * @param statistics 原结构统计快照
+     * @param structureMachineLimit 当前班次有效机台上限
+     * @param reason 原准入原因
+     * @param rejectionCode 稳定拒绝分类
+     * @return 原准入结果及分类
+     */
+    private StructureMachineLimitDecision buildDecision(
+            boolean applicable,
+            boolean allowed,
+            DailySchedulePhase phase,
+            LocalDate businessDate,
+            LhShiftConfigVO formalTargetShift,
+            String machineCode,
+            SkuScheduleDTO sku,
+            LocalDate originalPoolDate,
+            StructureEarlyProductionAdmission statistics,
+            int structureMachineLimit,
+            String reason,
+            StructureLimitRejectionCode rejectionCode) {
         Set<String> rawMachineCodes = Objects.isNull(statistics)
                 ? Collections.<String>emptySet()
                 : statistics.getRawScheduledPhysicalMachineCodes();
@@ -398,7 +459,7 @@ public class StructureMachineLimitAdmissionService {
                 Objects.isNull(sku) ? null : sku.getMaterialCode(),
                 Objects.isNull(sku) ? null : sku.getStructureName(),
                 originalPoolDate, rawMachineCodes,
-                effectiveMachineCodes, 0, structureMachineLimit, reason);
+                effectiveMachineCodes, 0, structureMachineLimit, reason, rejectionCode);
     }
 
     private String buildStatisticsKey(String structureName,

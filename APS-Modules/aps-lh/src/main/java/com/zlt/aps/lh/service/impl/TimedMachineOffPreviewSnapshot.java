@@ -54,6 +54,10 @@ final class TimedMachineOffPreviewSnapshot {
     private final Set<String> activeStopHoldMachines;
     private final Set<String> releasedStopHoldMachines;
     private final Map<String, Integer> releaseBoundaries;
+    /**
+     * 局部续作恢复会撤销旧余量释放的前料归属，失败时必须与边界同时恢复。
+     */
+    private final Map<String, Map<String, SkuScheduleDTO>> reducedBeforeSkus;
     private final Map<String, LocalDate> groupReleaseDates;
     /** 预演生成的候选、历史模具选择及零量清理不能带入正式阶段。 */
     private final List<SkuScheduleDTO> continuousSkus;
@@ -106,6 +110,9 @@ final class TimedMachineOffPreviewSnapshot {
         activeStopHoldMachines = new LinkedHashSet<>(context.getActiveContinuousStopHoldMachineCodeSet());
         releasedStopHoldMachines = new LinkedHashSet<>(context.getReleasedContinuousStopHoldMachineCodeSet());
         releaseBoundaries = new LinkedHashMap<>(context.getContinuousReducedMachineReleaseBoundaryShiftIndexMap());
+        reducedBeforeSkus = new LinkedHashMap<>();
+        context.getReducedContinuationMachineBeforeSkuMap().forEach((machine, sourcesByMaterial) ->
+                reducedBeforeSkus.put(machine, new LinkedHashMap<>(sourcesByMaterial)));
         groupReleaseDates = new LinkedHashMap<>(context.getReducedContinuationGroupLastReleaseDateMap());
         continuousSkus = new ArrayList<>(context.getContinuousSkuList());
         trialCandidates = new ArrayList<>(context.getTrialVirtualMachineCandidateList());
@@ -145,6 +152,10 @@ final class TimedMachineOffPreviewSnapshot {
         context.setActiveContinuousStopHoldMachineCodeSet(new LinkedHashSet<>(activeStopHoldMachines));
         context.setReleasedContinuousStopHoldMachineCodeSet(new LinkedHashSet<>(releasedStopHoldMachines));
         context.setContinuousReducedMachineReleaseBoundaryShiftIndexMap(new LinkedHashMap<>(releaseBoundaries));
+        Map<String, Map<String, SkuScheduleDTO>> restoredBeforeSkus = new LinkedHashMap<>();
+        reducedBeforeSkus.forEach((machine, sourcesByMaterial) ->
+                restoredBeforeSkus.put(machine, new LinkedHashMap<>(sourcesByMaterial)));
+        context.setReducedContinuationMachineBeforeSkuMap(restoredBeforeSkus);
         context.setReducedContinuationGroupLastReleaseDateMap(new LinkedHashMap<>(groupReleaseDates));
         context.setContinuousSkuList(new ArrayList<>(continuousSkus));
         context.setTrialVirtualMachineCandidateList(new ArrayList<>(trialCandidates));

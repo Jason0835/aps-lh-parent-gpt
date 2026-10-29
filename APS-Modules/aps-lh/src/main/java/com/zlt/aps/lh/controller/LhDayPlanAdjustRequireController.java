@@ -6,6 +6,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.zlt.aps.lh.api.domain.dto.LhDayPlanAdjustRequireImportDTO;
 import com.zlt.aps.lh.api.domain.entity.LhDayPlanAdjustRequire;
 import com.zlt.aps.lh.api.domain.vo.LhDayPlanAdjustRequireSummaryVo;
 import com.zlt.aps.lh.service.ILhDayPlanAdjustRequireService;
@@ -15,10 +16,15 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
 
 /**
  * 硫化日计划调整需求控制器。
@@ -92,6 +98,42 @@ public class LhDayPlanAdjustRequireController extends AbstractDocBizController<L
     @Override
     protected IDocService getDocService() {
         return lhDayPlanAdjustRequireService;
+    }
+
+    /**
+     * 导出硫化日计划调整需求。
+     *
+     * @param queryVO  查询条件，与列表一致但不分页
+     * @param fileName 导出文件名
+     * @param response 响应对象，由基类导出流程持有
+     * @return Excel 文件字节
+     * @throws IOException 文件写出异常
+     */
+    @Log(title = "ui.data.column.lhDayPlanAdjustRequire.modelName",
+            businessType = BusinessType.EXPORT)
+    @ApiOperation("导出硫化日计划调整需求")
+    @PostMapping("/exportData/{fileName}")
+    public byte[] exportData(@RequestBody LhDayPlanAdjustRequire queryVO,
+                             @PathVariable("fileName") String fileName,
+                             HttpServletResponse response) throws IOException {
+        return lhDayPlanAdjustRequireService.exportData(queryVO, fileName);
+    }
+
+    /**
+     * 导入硫化日计划调整需求。
+     *
+     * @param importDTO     导入文件上下文及页面工厂、年月
+     * @param updateSupport 已存在调整槽位是否允许覆盖
+     * @return 导入结果
+     * @throws Exception 导入日志或文件处理异常
+     */
+    @Log(title = "ui.data.column.lhDayPlanAdjustRequire.modelName",
+            businessType = BusinessType.IMPORT)
+    @ApiOperation("导入硫化日计划调整需求")
+    @PostMapping("/importData")
+    public AjaxResult importData(@RequestBody LhDayPlanAdjustRequireImportDTO importDTO,
+                                 @RequestParam("updateSupport") boolean updateSupport) throws Exception {
+        return lhDayPlanAdjustRequireService.importData(importDTO, updateSupport);
     }
 
     @Override

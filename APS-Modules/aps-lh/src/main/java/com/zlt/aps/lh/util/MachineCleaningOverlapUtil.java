@@ -22,6 +22,20 @@ import java.util.stream.Collectors;
  * @author APS
  */
 public final class MachineCleaningOverlapUtil {
+    /**
+     * 解析在机喷砂首检的真实开始时刻，组合场景与清洗本体结束分别表达。
+     *
+     * @param window 已安排的喷砂窗口
+     * @return 显式首检开始；普通喷砂沿用清洗结束，空窗口返回空
+     */
+    public static Date resolveSandBlastInspectionStartTime(MachineCleaningWindowDTO window) {
+        if (window == null) {
+            return null;
+        }
+        Date start = window.getSandBlastInspectionStartTime();
+        return start == null ? window.getCleanEndTime() : start;
+    }
+
 
     private MachineCleaningOverlapUtil() {
     }

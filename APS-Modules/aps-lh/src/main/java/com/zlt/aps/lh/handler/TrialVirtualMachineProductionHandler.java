@@ -13,6 +13,7 @@ import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.UnscheduledResultCollector;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.engine.strategy.support.ScheduleResultSceneTypeSupport;
 import com.zlt.aps.lh.engine.strategy.support.PendingSkuUnscheduledRule;
 import com.zlt.aps.lh.util.LeftRightMouldUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
@@ -290,7 +291,7 @@ public class TrialVirtualMachineProductionHandler extends AbsScheduleStepHandler
     }
 
     /**
-     * 构建虚拟机台排程结果基础字段。
+     * 构建虚拟机台排程结果基础字段，独立虚拟来源统一记录为其他场景。
      *
      * @param context 排程上下文
      * @param sku 当前SKU
@@ -347,6 +348,7 @@ public class TrialVirtualMachineProductionHandler extends AbsScheduleStepHandler
         result.setIsTrial(sku.isTrial() ? "1" : "0");
         result.setProductionStatus("0");
         result.setHasSpecialMaterial(LhSpecialMaterialUtil.resolveHasSpecialMaterial(context, sku));
+        ScheduleResultSceneTypeSupport.ensureSceneType(result);
         this.fillConstructionFormula(context, sku, result);
         return result;
     }

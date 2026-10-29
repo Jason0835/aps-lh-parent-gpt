@@ -53,7 +53,19 @@ public class LhSandBlastPrecisionOverlapPolicy {
         if (context.getContinuationSandBlastWindowMap().isEmpty()) {
             return;
         }
-        List<MachineScheduleDTO> candidates = context.getMachineScheduleMap().values().stream()
+        for (MachineScheduleDTO machine : this.resolvePriorityMachines(context)) {
+            this.prepareForMachine(context, machine);
+        }
+    }
+
+    /**
+     * 读取喷砂各类精度机会共用的优先级，避免不同组合分别占用每日额度导致顺序倒置。
+     *
+     * @param context 已加载精度计划的上下文
+     * @return 按距到期天数、计划日期及机台编码排序的候选
+     */
+    public List<MachineScheduleDTO> resolvePriorityMachines(LhScheduleContext context) {
+        return context.getMachineScheduleMap().values().stream()
                 .filter(Objects::nonNull)
                 .filter(machine -> Objects.nonNull(maintenanceScheduleService.resolveMaintenancePlan(
                         context, machine.getMachineCode())))
@@ -64,55 +76,62 @@ public class LhSandBlastPrecisionOverlapPolicy {
                                 context, machine.getMachineCode()).getPlanDate(), Comparator.nullsLast(Date::compareTo))
                         .thenComparing(MachineScheduleDTO::getMachineCode))
                 .collect(Collectors.toList());
-        for (MachineScheduleDTO machine : candidates) {
-            String physical = LhSingleControlMachineUtil.resolvePhysicalMachineCode(machine.getMachineCode());
-            if (context.getEquipmentPlanRuntimeState().getReplacementPrecisionPlanMap().containsKey(physical)) {
-                continue;
-            }
-            List<MachineCleaningWindowDTO> events = this.resolveWholeReplacement(context, physical);
-            if (events.isEmpty()) {
-                continue;
-            }
-            MachineCleaningWindowDTO source = events.get(0);
-            PrecisionMaintenanceJudgeDTO decision = maintenanceScheduleService.resolveReplacementPrecision(
-                    context, machine, source.getCleanStartTime());
-            if (decision.getDurationHours() <= 0
-                    || !source.getReplacementReadyTime().after(decision.getPrecisionStartTime())) {
-                continue;
-            }
-            Date maintenanceReady = LhScheduleTimeUtil.addMinutes(decision.getPrecisionEndTime(),
-                    LhScheduleTimeUtil.getCapsulePreheatMinutes(context));
-            Date inspectionStart = source.getReplacementReadyTime().after(maintenanceReady)
-                    ? source.getReplacementReadyTime() : maintenanceReady;
-            long inspectionMillis = source.getReplacementReadyTime().getTime()
-                    - source.getReplacementInspectionStartTime().getTime();
-            Date inspectionEnd = new Date(inspectionStart.getTime() + inspectionMillis);
-            LhShiftConfigVO countingShift = LhScheduleTimeUtil.resolveShiftByTime(
-                    context.getScheduleWindowShifts(), new Date(inspectionEnd.getTime() - 1L));
-            if (Objects.isNull(countingShift) || !equipmentPlanScheduleService.acceptReplacementPrecision(
-                    context, decision, source.getCleanStartTime(), inspectionStart, inspectionEnd)) {
-                continue;
-            }
-            EquipmentPlanRuntimeState state = context.getEquipmentPlanRuntimeState();
-            state.getReplacementPrecisionPlanMap().put(physical, decision.getPrecisionPlanId());
-            for (MachineCleaningWindowDTO event : events) {
-                state.getReplacementOriginalTimelineMap().put(event.getLhCode(), new CleaningPlanTimeline(event));
-                // 原置换总时长已含首检。组合只保留一次首检，从两项准备较晚结束时正向计量。
-                event.setReplacementInspectionStartTime(new Date(inspectionStart.getTime()));
-                event.setReplacementReadyTime(new Date(inspectionEnd.getTime()));
-                event.setReplacementInspectionShiftStartTime(countingShift.getShiftStartDateTime());
-            }
-            PriorityTraceLogHelper.appendProcessLog(context, "喷砂置换与精度组合",
-                    "工厂=" + context.getFactoryCode() + "，批次=" + context.getBatchNo()
-                            + "，物理机台=" + physical + "，计划主键=" + decision.getPrecisionPlanId()
-                            + "，物料=" + source.getContinuationMaterialCode()
-                            + "，状态=" + source.getContinuationProductStatus()
-                            + "，置换开始=" + LhScheduleTimeUtil.formatDateTime(source.getCleanStartTime())
-                            + "，精度开始=" + LhScheduleTimeUtil.formatDateTime(decision.getPrecisionStartTime())
-                            + "，精度结束=" + LhScheduleTimeUtil.formatDateTime(decision.getPrecisionEndTime())
-                            + "，唯一首检开始=" + LhScheduleTimeUtil.formatDateTime(inspectionStart)
-                            + "，正常生产恢复=" + LhScheduleTimeUtil.formatDateTime(inspectionEnd));
+    }
+
+    /**
+     * 对当前优先级位置的单机评估同物料置换精度，不改变原置换资格或时间算法。
+     *
+     * @param context 已冻结置换事实的上下文
+     * @param machine 当前精度优先级机台
+     */
+    public void prepareForMachine(LhScheduleContext context, MachineScheduleDTO machine) {
+        String physical = LhSingleControlMachineUtil.resolvePhysicalMachineCode(machine.getMachineCode());
+        if (context.getEquipmentPlanRuntimeState().getReplacementPrecisionPlanMap().containsKey(physical)) {
+            return;
         }
+        List<MachineCleaningWindowDTO> events = this.resolveWholeReplacement(context, physical);
+        if (events.isEmpty()) {
+            return;
+        }
+        MachineCleaningWindowDTO source = events.get(0);
+        PrecisionMaintenanceJudgeDTO decision = maintenanceScheduleService.resolveReplacementPrecision(
+                context, machine, source.getCleanStartTime());
+        if (decision.getDurationHours() <= 0
+                || !source.getReplacementReadyTime().after(decision.getPrecisionStartTime())) {
+            return;
+        }
+        Date maintenanceReady = LhScheduleTimeUtil.addMinutes(decision.getPrecisionEndTime(),
+                LhScheduleTimeUtil.getCapsulePreheatMinutes(context));
+        Date inspectionStart = source.getReplacementReadyTime().after(maintenanceReady)
+                ? source.getReplacementReadyTime() : maintenanceReady;
+        long inspectionMillis = source.getReplacementReadyTime().getTime()
+                - source.getReplacementInspectionStartTime().getTime();
+        Date inspectionEnd = new Date(inspectionStart.getTime() + inspectionMillis);
+        LhShiftConfigVO countingShift = LhScheduleTimeUtil.resolveShiftByTime(
+                context.getScheduleWindowShifts(), new Date(inspectionEnd.getTime() - 1L));
+        if (Objects.isNull(countingShift) || !equipmentPlanScheduleService.acceptReplacementPrecision(
+                context, decision, source.getCleanStartTime(), inspectionStart, inspectionEnd)) {
+            return;
+        }
+        EquipmentPlanRuntimeState state = context.getEquipmentPlanRuntimeState();
+        state.getReplacementPrecisionPlanMap().put(physical, decision.getPrecisionPlanId());
+        for (MachineCleaningWindowDTO event : events) {
+            state.getReplacementOriginalTimelineMap().put(event.getLhCode(), new CleaningPlanTimeline(event));
+            // 原置换总时长已含首检。组合只保留一次首检，从两项准备较晚结束时正向计量。
+            event.setReplacementInspectionStartTime(new Date(inspectionStart.getTime()));
+            event.setReplacementReadyTime(new Date(inspectionEnd.getTime()));
+            event.setReplacementInspectionShiftStartTime(countingShift.getShiftStartDateTime());
+        }
+        PriorityTraceLogHelper.appendProcessLog(context, "喷砂置换与精度组合",
+                "工厂=" + context.getFactoryCode() + "，批次=" + context.getBatchNo()
+                        + "，物理机台=" + physical + "，计划主键=" + decision.getPrecisionPlanId()
+                        + "，物料=" + source.getContinuationMaterialCode()
+                        + "，状态=" + source.getContinuationProductStatus()
+                        + "，置换开始=" + LhScheduleTimeUtil.formatDateTime(source.getCleanStartTime())
+                        + "，精度开始=" + LhScheduleTimeUtil.formatDateTime(decision.getPrecisionStartTime())
+                        + "，精度结束=" + LhScheduleTimeUtil.formatDateTime(decision.getPrecisionEndTime())
+                        + "，唯一首检开始=" + LhScheduleTimeUtil.formatDateTime(inspectionStart)
+                        + "，正常生产恢复=" + LhScheduleTimeUtil.formatDateTime(inspectionEnd));
     }
 
     /**

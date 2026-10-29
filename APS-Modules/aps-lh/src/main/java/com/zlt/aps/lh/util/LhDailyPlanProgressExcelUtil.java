@@ -2,6 +2,7 @@ package com.zlt.aps.lh.util;
 
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.lh.api.domain.vo.LhDailyPlanProgressReportRowVO;
+import com.zlt.aps.lh.api.enums.TrialStatusEnum;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.ss.usermodel.BorderStyle;
@@ -24,6 +25,7 @@ import java.io.IOException;
 import java.text.MessageFormat;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -76,6 +78,12 @@ public final class LhDailyPlanProgressExcelUtil {
     /** 日期列列宽（字符数） */
     private static final double DAY_COLUMN_WIDTH = 9.1D;
 
+    /** 内容自适应列宽：产品结构、胎胚描述、物料描述、T+2日排产信息 */
+    private static final int[] AUTO_WIDTH_COLUMN_INDEXES = {2, 6, 8, 20};
+
+    /** 内容自适应列宽上限（字符数），避免个别超长文本把列拉得过宽 */
+    private static final double AUTO_WIDTH_MAX = 40D;
+
     /** 固定列数量（模板 A~U） */
     public static final int FIXED_COLUMN_COUNT = FIXED_HEADER_KEYS.length;
 
@@ -112,6 +120,18 @@ public final class LhDailyPlanProgressExcelUtil {
     /** 分类：02-常规产品 */
     private static final String STRUCTURE_TYPE_NORMAL_KEY = "ui.data.column.dailyPlanProgressReport.structureTypeNormal";
 
+    /** 产品状态：试验（X） */
+    private static final String TRIAL_STATUS_TRIAL_KEY =
+            "ui.data.column.dailyPlanProgressReport.trialStatus.X";
+
+    /** 产品状态：量试（T） */
+    private static final String TRIAL_STATUS_MASS_TRIAL_KEY =
+            "ui.data.column.dailyPlanProgressReport.trialStatus.T";
+
+    /** 产品状态：正规（S） */
+    private static final String TRIAL_STATUS_FORMAL_KEY =
+            "ui.data.column.dailyPlanProgressReport.trialStatus.S";
+
     /** 结构类型：周期 */
     private static final String STRUCTURE_TYPE_CYCLE_CODE = "01";
 
@@ -127,14 +147,16 @@ public final class LhDailyPlanProgressExcelUtil {
     /**
      * 生成日排产进度报表 Excel。
      *
-     * @param rowList       报表行
-     * @param dayColumnList 日期列（T 日～报表末端，升序）
-     * @param today         今日（T 日，用于首行「今日是N日」）
+     * @param rowList           报表行
+     * @param dayColumnList     日期列（T 日～报表末端，升序）
+     * @param today             今日（T 日，用于首行「今日是N日」）
+     * @param trialStatusDictMap 产品状态字典（lh_trial_status）值→标签，用于转译产品状态列
      * @return Excel 字节数组
      */
     public static byte[] build(List<LhDailyPlanProgressReportRowVO> rowList,
                                List<LocalDate> dayColumnList,
-                               LocalDate today) {
+                               LocalDate today,
+                               Map<String, String> trialStatusDictMap) {
         try (XSSFWorkbook workbook = new XSSFWorkbook();
              ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet(I18nUtil.getMessage(SHEET_NAME_KEY));
@@ -185,7 +207,8 @@ public final class LhDailyPlanProgressExcelUtil {
                 int columnIndex = 0;
                 // 文本列
                 setTextCell(dataRow, columnIndex++, rowVO.getRubberType(), textLeftStyle);
-                setTextCell(dataRow, columnIndex++, rowVO.getProductStatus(), textCenterStyle);
+                setTextCell(dataRow, columnIndex++, resolveProductStatusLabel(
+                        rowVO.getProductStatus(), trialStatusDictMap), textCenterStyle);
                 setTextCell(dataRow, columnIndex++, rowVO.getStructureName(), textCenterStyle);
                 setTextCell(dataRow, columnIndex++, rowVO.getMainPattern(), textCenterStyle);
                 setNumberCell(dataRow, columnIndex++, rowVO.getMouldCavityQty(), numberStyle);
@@ -217,14 +240,16 @@ public final class LhDailyPlanProgressExcelUtil {
             }
 
             // 5. 列宽与冻结
+            double[] columnWidths = resolveFixedColumnWidths(rowList);
             for (int columnIndex = 0; columnIndex < FIXED_COLUMN_COUNT; columnIndex++) {
-                sheet.setColumnWidth(columnIndex, toColumnWidth(FIXED_COLUMN_WIDTHS[columnIndex]));
+                sheet.setColumnWidth(columnIndex, toColumnWidth(columnWidths[columnIndex]));
             }
             for (int dayIndex = 0; dayIndex < dayColumnList.size(); dayIndex++) {
                 sheet.setColumnWidth(FIXED_COLUMN_COUNT + dayIndex, toColumnWidth(DAY_COLUMN_WIDTH));
             }
-            // 冻结前 2 行与固定列，滚动日期列时表头与 SKU 信息始终可见
-            sheet.createFreezePane(FIXED_COLUMN_COUNT, 2);
+            // 只冻结表头前 2 行：固定列共 21 列，冻结宽度会超出窗口可见区域，
+            // WPS/Excel 拖动横向滚动条时会提示「冻结位置在可见区域之外，导致滚屏失效」
+            sheet.createFreezePane(0, 2);
 
             workbook.write(outputStream);
             return outputStream.toByteArray();
@@ -287,6 +312,46 @@ public final class LhDailyPlanProgressExcelUtil {
             return I18nUtil.getMessage(STRUCTURE_TYPE_NORMAL_KEY);
         }
         return StringUtils.defaultString(structureType);
+    }
+
+    /**
+     * 解析产品状态展示文本。
+     *
+     * <p>排程结果与月计划定稿里的产品状态存的是示方类型编码（S/T/X），优先按产品状态字典
+     * {@code lh_trial_status} 转译，保证与页面显示一致；字典缺失时回退语言包文案，
+     * 仍取不到则原样输出编码，避免丢信息。</p>
+     *
+     * @param productStatus      产品状态编码
+     * @param trialStatusDictMap 产品状态字典值→标签
+     * @return 展示文本
+     */
+    private static String resolveProductStatusLabel(String productStatus,
+                                                    Map<String, String> trialStatusDictMap) {
+        String trimmedProductStatus = StringUtils.trimToEmpty(productStatus);
+        if (StringUtils.isEmpty(trimmedProductStatus)) {
+            return StringUtils.EMPTY;
+        }
+        // 1. 优先取字典标签（与页面下拉/列表显示保持一致）
+        String dictLabel = Objects.isNull(trialStatusDictMap)
+                ? null : trialStatusDictMap.get(trimmedProductStatus);
+        if (StringUtils.isNotEmpty(dictLabel)) {
+            return dictLabel;
+        }
+        // 2. 字典缺失时回退语言包
+        TrialStatusEnum trialStatus = TrialStatusEnum.getByCode(trimmedProductStatus);
+        if (Objects.isNull(trialStatus)) {
+            return trimmedProductStatus;
+        }
+        switch (trialStatus) {
+            case FORMAL:
+                return I18nUtil.getMessage(TRIAL_STATUS_FORMAL_KEY);
+            case MASS_TRIAL:
+                return I18nUtil.getMessage(TRIAL_STATUS_MASS_TRIAL_KEY);
+            case TRIAL:
+                return I18nUtil.getMessage(TRIAL_STATUS_TRIAL_KEY);
+            default:
+                return trimmedProductStatus;
+        }
     }
 
     /**
@@ -391,6 +456,57 @@ public final class LhDailyPlanProgressExcelUtil {
         if (Objects.nonNull(value)) {
             cell.setCellValue(value.doubleValue());
         }
+    }
+
+    /**
+     * 计算固定列列宽：长文本列按内容自适应，其余列沿用模板列宽。
+     *
+     * <p>「产品结构」「胎胚描述」「物料描述」「T+2日排产信息」内容长度差异大，按内容最大
+     * 展示宽度（中文按 2 字符折算）加左右留白计算，并限制上限，避免模板列宽过窄导致
+     * 文本被截断或折行。</p>
+     *
+     * @param rowList 报表行
+     * @return 固定列列宽数组（字符数）
+     */
+    private static double[] resolveFixedColumnWidths(List<LhDailyPlanProgressReportRowVO> rowList) {
+        double[] columnWidths = FIXED_COLUMN_WIDTHS.clone();
+        int[] maxDisplayWidths = new int[FIXED_COLUMN_COUNT];
+        for (int columnIndex : AUTO_WIDTH_COLUMN_INDEXES) {
+            maxDisplayWidths[columnIndex] = displayWidth(I18nUtil.getMessage(FIXED_HEADER_KEYS[columnIndex]));
+        }
+        if (Objects.nonNull(rowList)) {
+            for (LhDailyPlanProgressReportRowVO rowVO : rowList) {
+                if (Objects.isNull(rowVO)) {
+                    continue;
+                }
+                maxDisplayWidths[2] = Math.max(maxDisplayWidths[2], displayWidth(rowVO.getStructureName()));
+                maxDisplayWidths[6] = Math.max(maxDisplayWidths[6], displayWidth(rowVO.getMainMaterialDesc()));
+                maxDisplayWidths[8] = Math.max(maxDisplayWidths[8], displayWidth(rowVO.getMaterialDesc()));
+                maxDisplayWidths[20] = Math.max(maxDisplayWidths[20], displayWidth(rowVO.getT2Info()));
+            }
+        }
+        for (int columnIndex : AUTO_WIDTH_COLUMN_INDEXES) {
+            columnWidths[columnIndex] = Math.max(columnWidths[columnIndex],
+                    Math.min(maxDisplayWidths[columnIndex] + 2, AUTO_WIDTH_MAX));
+        }
+        return columnWidths;
+    }
+
+    /**
+     * 计算文本展示宽度：中文等非 ASCII 字符按 2 个字符宽度折算。
+     *
+     * @param text 文本
+     * @return 展示宽度（字符数）
+     */
+    private static int displayWidth(String text) {
+        if (StringUtils.isEmpty(text)) {
+            return 0;
+        }
+        int width = 0;
+        for (int index = 0; index < text.length(); index++) {
+            width += text.charAt(index) > 0x7F ? 2 : 1;
+        }
+        return width;
     }
 
     /**

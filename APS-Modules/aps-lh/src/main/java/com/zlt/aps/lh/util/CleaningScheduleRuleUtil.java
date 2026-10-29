@@ -43,15 +43,17 @@ public final class CleaningScheduleRuleUtil {
         }
         Map<String, MachineCleaningWindowDTO> events = new LinkedHashMap<>(windows.size());
         for (MachineCleaningWindowDTO window : windows) {
+            Date inspectionStart = MachineCleaningOverlapUtil.resolveSandBlastInspectionStartTime(window);
             if (!MachineCleaningOverlapUtil.isSandBlastCleaning(window)
                     || Objects.isNull(window.getSandBlastFirstInspectionQty())
                     || window.getSandBlastFirstInspectionQty() <= 0
-                    || Objects.isNull(window.getCleanEndTime()) || Objects.isNull(window.getReadyTime())
-                    || !window.getCleanEndTime().before(window.getReadyTime())) {
+                    || Objects.isNull(inspectionStart)
+                    || Objects.isNull(window.getReadyTime())
+                    || !inspectionStart.before(window.getReadyTime())) {
                 continue;
             }
             // 已在首检中途才满足生产门禁的后料不能承接整次首检；跨标准班次的持续首检除外。
-            if (startTime.after(window.getCleanEndTime())
+            if (startTime.after(inspectionStart)
                     && !startTime.equals(window.getSandBlastInspectionShiftStartTime())) {
                 continue;
             }

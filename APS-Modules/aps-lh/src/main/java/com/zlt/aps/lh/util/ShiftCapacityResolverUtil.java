@@ -1562,10 +1562,17 @@ public final class ShiftCapacityResolverUtil {
                 LhTemporaryFaultService.resolveCapacityWindows(context, window.getLhCode()), window);
     }
 
-    /** @param windows 容量窗口 @param window 喷砂窗口 @return 扣故障后的首检量 */
+    /**
+     * 按喷砂实际首检区间扣减故障影响，组合等待不占用首检时长。
+     *
+     * @param windows 当前场景容量窗口
+     * @param window 已安排唯一首检的喷砂窗口
+     * @return 故障扣减后的首检条数
+     */
     private static int resolveSandBlastInspectionQty(List<MachineMaintenanceWindowDTO> windows,
             MachineCleaningWindowDTO window) {
-        return resolveFaultAdjustedQty(windows, window.getCleanEndTime(), window.getReadyTime(),
+        return resolveFaultAdjustedQty(windows,
+                MachineCleaningOverlapUtil.resolveSandBlastInspectionStartTime(window), window.getReadyTime(),
                 window.getSandBlastFirstInspectionQty());
     }
 
@@ -1904,9 +1911,10 @@ public final class ShiftCapacityResolverUtil {
                 continue;
             }
             long beforeSeconds = resolveNetProductiveSeconds(deviceStops, cleaningWindows, maintenanceWindows,
-                    machineCode, originalStart, inspection.getCleanEndTime());
+                    machineCode, originalStart,
+                    MachineCleaningOverlapUtil.resolveSandBlastInspectionStartTime(inspection));
             if (beforeSeconds <= 0) {
-                return inspection.getCleanEndTime();
+                return MachineCleaningOverlapUtil.resolveSandBlastInspectionStartTime(inspection);
             }
         }
         return originalStart;
@@ -1982,7 +1990,7 @@ public final class ShiftCapacityResolverUtil {
         int remainingQty = allocationQty;
         for (MachineCleaningWindowDTO inspection : inspections) {
             // 先完成首检前确实可生产的数量；默认中班场景该段为零，不能把首检当成正常生产。
-            Date inspectionStart = inspection.getCleanEndTime();
+            Date inspectionStart = MachineCleaningOverlapUtil.resolveSandBlastInspectionStartTime(inspection);
             long beforeSeconds = cursor.before(inspectionStart)
                     ? resolveNetProductiveSeconds(devicePlanShutList, cleaningWindowList, maintenanceWindowList,
                             machineCode, cursor, inspectionStart) : 0L;

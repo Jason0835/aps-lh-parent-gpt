@@ -11,6 +11,7 @@ import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
 import com.zlt.aps.lh.util.ShiftProductionControlUtil;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
+import com.zlt.aps.lh.api.enums.LhScheduleSceneTypeEnum;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.component.EmbryoEndingStructureMachineExemptionPolicy;
@@ -18,6 +19,7 @@ import com.zlt.aps.lh.util.FirstInspectionQtyUtil;
 import com.zlt.aps.lh.util.FirstInspectionAllocationUtil;
 import com.zlt.aps.lh.util.FirstInspectionTimingMode;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
+import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -71,7 +73,8 @@ public final class StructureSwitchSchedulingPolicy {
     }
 
     /**
-     * 复用原始结构切换识别，已落地切换可跨日继续执行递进限制。
+     * 识别本窗口有效供胚切换来源，已落地切换可跨日继续执行递进限制。
+     *
      * @param context 本次排程上下文
      * @param sku 候选SKU
      * @return 同一有效来源记录；非适用场景返回null
@@ -87,12 +90,14 @@ public final class StructureSwitchSchedulingPolicy {
     }
 
     /**
-     * 显式业务日的只读识别，供独立步骤冻结窗口资格，禁止为识别候选改写当前业务日。
+     * 按有效来源只读识别主窗口结构切换，供独立步骤冻结身份。
+     * 供胚班在本窗口判定范围内时，不以普通续作正量或当天结构计划机台数阻断切换。
+     * 窗口外来源及独立下一班继续使用原识别边界，普通提前生产资格由原入口独立判断。
      *
      * @param context 排程上下文
      * @param sku 候选SKU
-     * @param currentDate 需要核对的业务日
-     * @return 原规则认可的同一供胚来源
+     * @param currentDate 窗口外来源及独立下一班沿原规则核对的业务日
+     * @return 有效的同一供胚来源；未满足对应场景资格时为空
      */
     public static CxEmbryoLhTime resolveSource(LhScheduleContext context, SkuScheduleDTO sku, LocalDate currentDate) {
         if (!isEnabled(context) || context.isStructureSwitchSelectionProbe()
@@ -114,6 +119,12 @@ public final class StructureSwitchSchedulingPolicy {
         if (Objects.nonNull(state) && Objects.equals(source.getId(), state.getSourceId())) {
             return source;
         }
+        // 主窗口切换身份与提前生产资格分离；续作只参与后续分班计数，不取消切换来源。
+        if (!context.isIsolatedNextShiftPlan() && Objects.nonNull(LhScheduleTimeUtil.resolveShiftByTime(
+                StructureSwitchFirstShiftPolicy.decisionShifts(context), source.getEarliestLhTime()))) {
+            return source;
+        }
+        // 本次未扩展窗口外来源和隔离下一班的准入，保留它们原有的识别条件。
         if (NewSpecEmbryoAvailableTimeResolver.isStructureScheduledInCurrentContinuation(context, sku)) {
             return null;
         }
@@ -228,8 +239,10 @@ public final class StructureSwitchSchedulingPolicy {
         if (Objects.nonNull(firstDecision) && Objects.isNull(firstDecision.getFirstShift())) {
             return null;
         }
-        Date notBefore = Objects.isNull(firstDecision) ? requestedStart
-                : later(requestedStart, firstDecision.getFirstShift().getShiftStartDateTime());
+        Date notBefore = later(requestedStart, source.getEarliestLhTime());
+        if (Objects.nonNull(firstDecision)) {
+            notBefore = later(notBefore, firstDecision.getFirstShift().getShiftStartDateTime());
+        }
         for (LhShiftConfigVO shift : orderedShifts(context)) {
             if (!notBefore.before(shift.getShiftEndDateTime())) {
                 continue;
@@ -238,7 +251,8 @@ public final class StructureSwitchSchedulingPolicy {
             StructureSwitchPlan candidate = createPlan(context, source, null, shift, requestedStart, allowedStart)
                     .withFirstShiftDecision(firstDecision);
             // 复用预演和提交的同一计数规则，首班一台、等结果第二班两台；单控按物理机台去重。
-            if (Objects.isNull(evaluate(context, candidate, sku, machineCode, null))) {
+            StructureMachineLimitDecision decision = evaluate(context, candidate, sku, machineCode, null);
+            if (Objects.isNull(decision)) {
                 return allowedStart;
             }
         }
@@ -568,6 +582,8 @@ public final class StructureSwitchSchedulingPolicy {
 
     /**
      * 返回真实拒绝班次的准入决策，供现有候选失败键及日志复用。
+     * 只检查本提案实际占用的受限班次，既有续作超限不阻断无本班增量的后续生产。
+     *
      * @param context 排程上下文
      * @param plan 冻结切换计划
      * @param sku 当前SKU
@@ -619,31 +635,19 @@ public final class StructureSwitchSchedulingPolicy {
                 offset = FIRST_SHIFT_LIMIT;
             }
             int limit = shiftLimit(plan.getSource().getIsWaitNotify(), offset);
-            if (limit == Integer.MAX_VALUE) {
+            if (!occupies || limit == Integer.MAX_VALUE) {
                 continue;
             }
-            Set<String> machines = new LinkedHashSet<>(8);
-            if (Objects.nonNull(context.getStructureShiftInMachineIndex())) {
-                machines.addAll(context.getStructureShiftInMachineIndex()
-                        .resolveInMachinePhysicalCodes(structure, shift.getShiftIndex()));
-            }
-            // 正式提交尚未刷新索引时，合并真实正量结果；仍按物理机台去重。
-            context.getScheduleResultList().stream().filter(result -> StringUtils.equals(structure, result.getStructureName()))
-                    .filter(result -> FirstInspectionQtyUtil.hasProductionOccupation(
-                            context, result, shift.getShiftIndex()))
-                    .filter(result -> !EmbryoEndingStructureMachineExemptionPolicy.isExempt(context, structure,
-                            result.getEmbryoCode(), result.getStructureName(), shift))
-                    .map(result -> LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode()))
-                    .forEach(machines::add);
+            Set<String> machines = resolveOccupiedPhysicalMachines(context, structure, shift);
             int scheduledCount = machines.size();
             boolean candidateExempt = Objects.nonNull(sku)
                     && EmbryoEndingStructureMachineExemptionPolicy.isExempt(context, structure,
                     sku.getEmbryoCode(), sku.getStructureName(), shift);
-            if (occupies && !candidateExempt) {
+            if (!candidateExempt) {
                 machines.add(physical);
             }
             // 成型收尾豁免仅作用于数量，不改变上方规则首班及首检/生产不得提前的约束。
-            boolean allowed = (occupies && candidateExempt) || machines.size() <= limit;
+            boolean allowed = candidateExempt || machines.size() <= limit;
             log.info("结构切换分班准入, sourceId={}, structure={}, machine={}, waitNotify={}, largeInch={}, "
                             + "S0={}, P0={}, targetShift={}, scheduledCount={}, limit={}, allowed={}, "
                             + "embryoCode={}, candidateExempt={}",
@@ -654,6 +658,17 @@ public final class StructureSwitchSchedulingPolicy {
                     shift.getShiftIndex(), scheduledCount, limit, allowed,
                     Objects.isNull(sku) ? null : sku.getEmbryoCode(), candidateExempt);
             if (!allowed) {
+                if (Objects.nonNull(sku)) {
+                    Date occupationStart = plan.getProductionStart();
+                    if (inspection != null && inspection.getInspectionQty() > 0) {
+                        occupationStart = inspection.getInspectionStartTime();
+                    }
+                    Date rejectedStart = later(occupationStart, shift.getShiftStartDateTime());
+                    context.getShiftRemarkRuntime().record(
+                            LhShiftDelayReason.forStructureSwitch(plan.getSource().getIsWaitNotify()),
+                            "STRUCTURE_SWITCH_MACHINE_QUOTA", machineCode, sku, rejectedStart,
+                            shift.getShiftEndDateTime(), "count=" + machines.size() + ",limit=" + limit);
+                }
                 String reason = new StringBuilder(SHIFT_LIMIT_REJECTION_PREFIX).append("，结构=").append(structure)
                         .append("，班次=").append(shift.getShiftIndex()).append("，已排=").append(scheduledCount)
                         .append("，合计=").append(machines.size()).append("，上限=").append(limit).toString();
@@ -661,10 +676,37 @@ public final class StructureSwitchSchedulingPolicy {
                         shift.getWorkDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate(),
                         shift.getShiftIndex(), shift.getShiftStartDateTime(), shift.getShiftEndDateTime(),
                         machineCode, physical, Objects.isNull(sku) ? null : sku.getMaterialCode(), structure,
-                        null, machines, machines, machines.size() - scheduledCount, limit, reason);
+                        null, machines, machines, machines.size() - scheduledCount, limit, reason,
+                        StructureLimitRejectionCode.MACHINE_COUNT_LIMIT);
             }
         }
         return null;
+    }
+
+    /**
+     * 汇总切换受限班次的物理机台，续作与新增共用名额，保留原成型收尾豁免。
+     * 正式提交尚未刷新索引时合并真实正量，返回独立集合供准入及备注归因只读试算。
+     *
+     * @param context 当前索引和真实结果
+     * @param structure 后结构名称
+     * @param shift 受限班次
+     * @return 已占用的物理机台集合，L/R及跨SKU按物理机去重
+     */
+    public static Set<String> resolveOccupiedPhysicalMachines(LhScheduleContext context, String structure,
+            LhShiftConfigVO shift) {
+        Set<String> machines = new LinkedHashSet<>(8);
+        if (Objects.nonNull(context.getStructureShiftInMachineIndex())) {
+            machines.addAll(context.getStructureShiftInMachineIndex()
+                    .resolveInMachinePhysicalCodes(structure, shift.getShiftIndex()));
+        }
+        context.getScheduleResultList().stream()
+                .filter(result -> StringUtils.equals(structure, result.getStructureName()))
+                .filter(result -> FirstInspectionQtyUtil.hasProductionOccupation(context, result, shift.getShiftIndex()))
+                .filter(result -> !EmbryoEndingStructureMachineExemptionPolicy.isExempt(context, structure,
+                        result.getEmbryoCode(), result.getStructureName(), shift))
+                .map(result -> LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode()))
+                .forEach(machines::add);
+        return machines;
     }
 
     /**
@@ -686,7 +728,8 @@ public final class StructureSwitchSchedulingPolicy {
                 shift.getShiftIndex(), shift.getShiftStartDateTime(), shift.getShiftEndDateTime(), machineCode,
                 LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode),
                 Objects.isNull(sku) ? null : sku.getMaterialCode(), plan.getSource().getNextStructureName(),
-                null, machines, machines, 0, 0, "结构切换首班判定拒绝，" + reason);
+                null, machines, machines, 0, 0, "结构切换首班判定拒绝，" + reason,
+                StructureLimitRejectionCode.FIRST_SHIFT_UNAVAILABLE);
     }
 
     /**
@@ -905,7 +948,8 @@ public final class StructureSwitchSchedulingPolicy {
     }
 
     /**
-     * 正式分量时绑定结果与提案，首班状态仍在提交成功后登记。
+     * 正式分量时绑定结果与实际提案并记录结构场景，首班状态仍在提交成功后登记。
+     *
      * @param context 排程上下文
      * @param result 本次结果
      * @return 切换计划，非适用为空
@@ -914,6 +958,7 @@ public final class StructureSwitchSchedulingPolicy {
         StructureSwitchPlan plan = attemptPlan(context, result.getLhMachineCode());
         if (Objects.nonNull(plan)) {
             context.getStructureSwitchResultPlanMap().put(result, plan);
+            ScheduleResultSceneTypeSupport.assign(result, LhScheduleSceneTypeEnum.STRUCTURE_SWITCH);
         }
         return Objects.nonNull(plan) ? plan : context.getStructureSwitchResultPlanMap().get(result);
     }

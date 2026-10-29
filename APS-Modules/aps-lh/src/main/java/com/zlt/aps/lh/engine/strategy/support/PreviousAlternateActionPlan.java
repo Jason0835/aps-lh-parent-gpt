@@ -49,7 +49,7 @@ public final class PreviousAlternateActionPlan implements Serializable {
     private final String reason;
 
     /**
-     * 历史动作的前物料，与MES当前已上后料的身份分别保存。
+     * 本轮动作的前物料；第三种在机物料使用真实身份，MES已上历史后料仍保留历史前料。
      */
     private final String beforeMaterialCode;
 
@@ -64,7 +64,7 @@ public final class PreviousAlternateActionPlan implements Serializable {
      * @param changeMouldType 实际交替类型
      * @param originalMouldCodes 原装机模具组
      * @param reason 判定原因
-     * @param beforeMaterialCode 历史前物料
+     * @param beforeMaterialCode 本轮实际动作的前物料
      * @param beforeProductStatus 精确前物料状态，来源有歧义时为空
      */
     private PreviousAlternateActionPlan(String changeMouldType, Set<String> originalMouldCodes, String reason,
@@ -77,7 +77,7 @@ public final class PreviousAlternateActionPlan implements Serializable {
     }
 
     /**
-     * 冻结历史前料身份及实际动作，异料必须使用属于前料的完整装机组证明共模。
+     * 冻结本轮前料身份及实际动作，异料必须使用属于真实前料的完整装机组证明共模。
      * 同料历史动作继续执行原有整组、单副换模或换活字块规则。
      *
      * @param context 本次机台及物料模具关系快照
@@ -125,7 +125,7 @@ public final class PreviousAlternateActionPlan implements Serializable {
         }
         PreviousAlternateActionPlan action = new PreviousAlternateActionPlan(typeBlock
                 ? MouldChangeTypeEnum.TYPE_BLOCK.getCode() : MouldChangeTypeEnum.REGULAR.getCode(),
-                originalMoulds, reason, event.getPlan().getBeforeMaterialCode(),
+                originalMoulds, reason, event.resolveBeforeMaterialCode(),
                 resolveBeforeProductStatus(context, event));
         // 仅缓存固定输入事实；候选选定模具与资源仍由既有预演快照和重放机制维护。
         event.setActualActionPlan(action);
@@ -141,7 +141,7 @@ public final class PreviousAlternateActionPlan implements Serializable {
      */
     private static String resolveBeforeProductStatus(LhScheduleContext context,
             PreviousAlternatePlanReleaseEvent event) {
-        if (StringUtils.equals(event.getMaterialCode(), event.getPlan().getBeforeMaterialCode())) {
+        if (StringUtils.equals(event.getMaterialCode(), event.resolveBeforeMaterialCode())) {
             return event.getProductStatus();
         }
         Stream<String> scheduledStatuses = context.getAllSkuScheduleDtoMap().values().stream()

@@ -131,6 +131,9 @@ public class LhScheduleConfigResolver {
                 LhScheduleConstant.CLASS_TOTAL_QTY_UP_LIMIT, 0);
 
         // 收尾判定参数
+        this.putPositiveIntValue(resolvedParamMap, lhParamsMap,
+                LhScheduleParamConstant.SKU_ENDING_DEFERRED_EXPANSION_DAYS,
+                LhScheduleConstant.DEFAULT_SKU_ENDING_DEFERRED_EXPANSION_DAYS);
         putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.ENDING_DETECT_DAYS, LhScheduleConstant.DEFAULT_ENDING_DAYS);
         putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.STRUCTURE_ENDING_DAYS,
                 LhScheduleConstant.DEFAULT_STRUCTURE_ENDING_DAYS);

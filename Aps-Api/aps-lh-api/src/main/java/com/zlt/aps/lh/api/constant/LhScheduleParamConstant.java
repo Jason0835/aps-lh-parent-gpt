@@ -276,4 +276,8 @@ public final class LhScheduleParamConstant {
     public static final String CONTINUOUS_STOP_HOLD_EMBRYO_AVAILABLE_HOURS_THRESHOLD = "SYS0304035";
     /** 胎胚最早可供时间距机台首检开始时间的最大允许差值（小时） */
     public static final String MACHINE_SKU_EMBRYO_MAX_WAIT_HOURS = "SYS0304036";
+    /**
+     * SKU结构收尾后原机延期评估天数，默认1天。
+     */
+    public static final String SKU_ENDING_DEFERRED_EXPANSION_DAYS = "SYS0304037";
 }

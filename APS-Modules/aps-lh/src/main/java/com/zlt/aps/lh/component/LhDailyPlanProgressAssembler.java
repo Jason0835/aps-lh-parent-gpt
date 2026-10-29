@@ -9,7 +9,6 @@ import com.zlt.aps.lh.util.ShiftFieldUtil;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -32,7 +31,8 @@ import java.util.stream.Collectors;
  *   <li>基准：排程结果 class6/7/8（T+2）任一班有计划量，或该班备注为「停产保机」；</li>
  *   <li>基准机台数：按物理机台去重（K1501L/K1501R 合并），停产保机机台同样计入；</li>
  *   <li>增机：在基准时「月计划区间最大机台数 &gt; 基准机台数」，不在基准时「月计划区间最大机台数 &gt; 0」；</li>
- *   <li>延迟：在基准、月计划 T+2 机台数大于基准机台数且有余量。</li>
+ *   <li>延迟：月计划 T+2 机台数大于基准机台数，且 T+2 首班（class6）开始时仍有剩余量
+ *       （月度余量 − 1~5 班计划量 &gt; 0）；不要求已在基准，0 台→1 台也算。</li>
  * </ul>
  *
  * @author APS
@@ -53,6 +53,9 @@ public final class LhDailyPlanProgressAssembler {
 
     /** 信息片段分隔符 */
     private static final String INFO_SEPARATOR = "；";
+
+    /** 同一片段内类型词与「提前」之间的分隔符（如「新开 提前」） */
+    private static final String INFO_WORD_SEPARATOR = " ";
 
     /** 机台号分隔符 */
     private static final String MACHINE_SEPARATOR = "、";
@@ -97,7 +100,37 @@ public final class LhDailyPlanProgressAssembler {
     }
 
     /**
+     * 汇总 SKU 的 1~5 班次计划量（T+2 首班 class6 开始前已排掉的量）。
+     *
+     * <p>一份排程结果覆盖三个业务日：class1/2 属 T 日、class3/4/5 属 T+1、class6/7/8 属 T+2。
+     * 因此 1~5 班计划量合计就是从「当前余量」推进到「T+2 首班开始时余量」需要扣掉的量。</p>
+     *
+     * @param skuResultList 同一物料+产品状态的排程结果行
+     * @return 1~5 班计划量合计
+     */
+    public static int sumClass1To5PlanQty(List<LhScheduleResult> skuResultList) {
+        if (Objects.isNull(skuResultList) || skuResultList.isEmpty()) {
+            return 0;
+        }
+        int planQty = 0;
+        for (LhScheduleResult result : skuResultList) {
+            if (Objects.isNull(result)) {
+                continue;
+            }
+            planQty += nvl(result.getClass1PlanQty())
+                    + nvl(result.getClass2PlanQty())
+                    + nvl(result.getClass3PlanQty())
+                    + nvl(result.getClass4PlanQty())
+                    + nvl(result.getClass5PlanQty());
+        }
+        return planQty;
+    }
+
+    /**
      * 构建基准 SKU 映射（含 T+2 机台数、余量、合格产量）。
+     *
+     * <p>虚拟机台（V 开头，引擎内部兜底用）不计入基准：它不在机台主数据里，
+     * 明细导出与机台数统计都需要排除，否则量试/试制 SKU 会被误判成“已在产”。</p>
      *
      * @param scheduleResultList 当前排程日期的全部排程结果
      * @return key=物料|产品状态，value=基准信息；不在基准的 SKU 不会出现在返回中
@@ -116,9 +149,10 @@ public final class LhDailyPlanProgressAssembler {
         Map<String, BaselineSku> baselineMap = new LinkedHashMap<>(groupedResultMap.size());
         for (Map.Entry<String, List<LhScheduleResult>> entry : groupedResultMap.entrySet()) {
             List<LhScheduleResult> skuResultList = entry.getValue();
-            // 1. T+2 在机机台按物理机台去重（单控 L/R 合并，停产保机计入）
+            // 1. T+2 在机机台按物理机台去重（单控 L/R 合并，停产保机计入），虚拟机台不计入
             Set<String> physicalMachineSet = skuResultList.stream()
                     .filter(LhDailyPlanProgressAssembler::isT2MachineOccupied)
+                    .filter(result -> !LhSingleControlMachineUtil.isVirtualMachineCode(result.getLhMachineCode()))
                     .map(result -> LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode()))
                     .filter(StringUtils::isNotEmpty)
                     .collect(Collectors.toCollection(LinkedHashSet::new));
@@ -156,30 +190,44 @@ public final class LhDailyPlanProgressAssembler {
     /**
      * 判断是否属于「延迟」行。
      *
-     * @param inBaseline       是否在基准
-     * @param baseMachineQty   基准机台数
-     * @param t2MonthMachineQty 月计划 T+2 机台数
-     * @param surplusQty       硫化余量
+     * <p>口径：在月计划 T+2 日、T+2 首班（class6）开始时有剩余量，且 基准机台数 &lt;
+     * 月计划 T+2 机台数。不要求 SKU 已在基准：基准 0 台而月计划 T+2 要求 1 台
+     * （该新开却没排上）同样属于延迟。</p>
+     *
+     * @param baseMachineQty     基准机台数
+     * @param t2MonthMachineQty  月计划 T+2 机台数
+     * @param t2StartSurplusQty  T+2 首班（class6）开始时的剩余量 = 月度余量 − 1~5 班计划量
      * @return true-延迟
      */
-    public static boolean isDelay(boolean inBaseline, int baseMachineQty,
-                                  int t2MonthMachineQty, int surplusQty) {
-        return inBaseline && t2MonthMachineQty > baseMachineQty && surplusQty > 0;
+    public static boolean isDelay(int baseMachineQty, int t2MonthMachineQty, int t2StartSurplusQty) {
+        return t2MonthMachineQty > baseMachineQty && t2StartSurplusQty > 0;
     }
 
     /**
      * 构建「T+2日排产信息」文案。
      *
-     * <p>片段顺序：新开 → 换活字块 → 提前 → 超过月计划N台 → 延迟；片段之间用「；」分隔，
-     * 同一片段内多机台用「、」连接。月计划 T+2 机台数小于基准机台数时统一输出「提前」
-     * （不区分新开或换活字块）。</p>
+     * <p>片段顺序：新开/新开提前 → 换活字块/换活字块提前 → 延迟；
+     * 片段之间用「；」分隔，同一片段内多机台用「、」连接，机台号后接类型词。</p>
      *
-     * @param changePlanList     该 SKU 在 T+2 的换模计划
-     * @param t2MonthMachineQty  月计划 T+2 机台数
-     * @param baseMachineQty     基准机台数
-     * @param delay              是否延迟
-     * @param labels             文案词（由调用方按当前语言传入）
-     * @return 排产信息文案，无信息时返回空字符串
+     * <p>类型词规则（月计划 T+2 机台数小于基准机台数时视为「提前」，仍需保留类型词）：</p>
+     * <ul>
+     *   <li>有换模标识 且 提前 → {@code 机台号 + 新开 提前}</li>
+     *   <li>有换活字块标识 且 提前 → {@code 机台号 + 换活字块 提前}</li>
+     *   <li>有换模标识 且 未提前 → {@code 机台号 + 新开}</li>
+     *   <li>有换活字块标识 且 未提前 → {@code 机台号 + 换活字块}</li>
+     *   <li>延迟 → {@code 延迟}（统一不带机台号，避免把“当前在产机台”误读成“被延迟的机台”）</li>
+     *   <li>没有机台变化信号（只会在 T+2 之后增机）→ {@code 正常}</li>
+     * </ul>
+     *
+     * <p>没有换模计划、也不满足延迟时统一输出「正常」，表示 T+2 当天按计划执行；
+     * 不再提示「超过月计划N台」。</p>
+     *
+     * @param changePlanList    该 SKU 在 T+2 的换模计划
+     * @param t2MonthMachineQty 月计划 T+2 机台数
+     * @param baseMachineQty    基准机台数
+     * @param delay             是否延迟
+     * @param labels            文案词（由调用方按当前语言传入）
+     * @return 排产信息文案；无任何机台变化信号时返回「正常」
      */
     public static String buildT2Info(List<LhMouldChangePlan> changePlanList,
                                      int t2MonthMachineQty,
@@ -190,29 +238,25 @@ public final class LhDailyPlanProgressAssembler {
                 ? Collections.emptyList() : changePlanList;
         Set<String> regularMachineSet = collectMachines(effectivePlanList, MOULD_CHANGE_TYPE_REGULAR);
         Set<String> typeBlockMachineSet = collectMachines(effectivePlanList, MOULD_CHANGE_TYPE_TYPE_BLOCK);
-        // 月计划 T+2 机台数小于基准机台数：换模被提前，统一输出「提前」
+        // 月计划 T+2 机台数小于基准机台数：换模被提前，类型词后追加「提前」
         boolean advance = baseMachineQty > t2MonthMachineQty;
         Set<String> fragmentSet = new LinkedHashSet<>(4);
-        if (advance) {
-            Set<String> advanceMachineSet = new LinkedHashSet<>(regularMachineSet.size() + typeBlockMachineSet.size());
-            advanceMachineSet.addAll(regularMachineSet);
-            advanceMachineSet.addAll(typeBlockMachineSet);
-            if (advanceMachineSet.isEmpty()) {
-                fragmentSet.add(MessageFormat.format(labels.getExceedMonthPlanPattern(),
-                        baseMachineQty - t2MonthMachineQty));
-            } else {
-                fragmentSet.add(joinMachines(advanceMachineSet) + labels.getAdvance());
-            }
-        } else {
-            if (!regularMachineSet.isEmpty()) {
-                fragmentSet.add(joinMachines(regularMachineSet) + labels.getNewOpen());
-            }
-            if (!typeBlockMachineSet.isEmpty()) {
-                fragmentSet.add(joinMachines(typeBlockMachineSet) + labels.getTypeBlock());
-            }
+        if (!regularMachineSet.isEmpty()) {
+            fragmentSet.add(joinMachines(regularMachineSet) + labels.getNewOpen()
+                    + (advance ? INFO_WORD_SEPARATOR + labels.getAdvance() : ""));
+        }
+        if (!typeBlockMachineSet.isEmpty()) {
+            fragmentSet.add(joinMachines(typeBlockMachineSet) + labels.getTypeBlock()
+                    + (advance ? INFO_WORD_SEPARATOR + labels.getAdvance() : ""));
         }
         if (delay) {
+            // 延迟统一不带机台号：月计划不落机台号，无法列出「被延迟」的机台，
+            // 列当前在产机台容易被误读成「就是这几台延迟了」
             fragmentSet.add(labels.getDelay());
+        }
+        // 没有机台变化信号（增机发生在 T+2 之后）：统一填「正常」
+        if (fragmentSet.isEmpty()) {
+            fragmentSet.add(labels.getNormal());
         }
         return String.join(INFO_SEPARATOR, fragmentSet);
     }
@@ -317,7 +361,7 @@ public final class LhDailyPlanProgressAssembler {
         /** 延迟 */
         private String delay;
 
-        /** 超过月计划{0}台 */
-        private String exceedMonthPlanPattern;
+        /** 正常（T+2 没有机台变化信号） */
+        private String normal;
     }
 }

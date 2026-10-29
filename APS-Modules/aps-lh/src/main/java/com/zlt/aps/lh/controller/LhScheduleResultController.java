@@ -37,6 +37,8 @@ import com.zlt.aps.lh.api.enums.ReleaseStatusEnum;
 import com.zlt.aps.lh.component.ScheduleExecutionGuard;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.mapper.MdmMaterialInfoMapper;
+import com.zlt.aps.lh.api.domain.entity.LhScheduleCheckResult;
+import com.zlt.aps.lh.service.ILhScheduleCheckService;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
 import com.zlt.aps.lh.service.ILhScheduleService;
 import com.zlt.aps.lh.service.ILhDailyPlanProgressReportService;
@@ -133,6 +135,12 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
 
     @Autowired
     private LhMouldChangePlanController lhMouldChangePlanController;
+
+    /**
+     * 硫化排程结果合理性校验服务
+     */
+    @Autowired
+    private ILhScheduleCheckService lhScheduleCheckService;
 
     /**
      * 获取排程日期对象列表
@@ -375,6 +383,9 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
 
         LhChangePlanImportResult changePlanResult = getLhChangePlanImportResult(ajaxResult, lhMouldChangePlanAjaxResult, importLog);
 
+        // 导入完成后触发排程结果合理性校验，校验异常不阻断导入主流程
+        this.triggerImportScheduleCheck(result);
+
         ajaxResult.put(AjaxResult.DATA_TAG, changePlanResult.importErrorLogs);
         ajaxResult.put(AjaxResult.MSG_TAG, changePlanResult.message);
         return ajaxResult;
@@ -390,6 +401,27 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         }
     }
 
+
+    /**
+     * 导入完成后触发排程结果合理性校验。
+     *
+     * <p>校验失败只记录日志，不阻断导入主流程；工厂或排程日期缺失时跳过。</p>
+     *
+     * @param result 导入请求携带的排程结果上下文（含工厂编号与排程日期）
+     */
+    private void triggerImportScheduleCheck(LhScheduleResult result) {
+        if (result == null || StringUtils.isBlank(result.getFactoryCode()) || result.getScheduleDate() == null) {
+            log.warn("[LH_SCHEDULE_CHECK] 导入触发校验跳过：工厂编号或排程日期为空");
+            return;
+        }
+        try {
+            this.lhScheduleCheckService.execute(result.getFactoryCode(), result.getScheduleDate(),
+                    LhScheduleCheckResult.TRIGGER_TYPE_IMPORT);
+        } catch (Exception exception) {
+            log.error("[LH_SCHEDULE_CHECK] 导入触发校验失败，factoryCode={}, scheduleDate={}",
+                    result.getFactoryCode(), result.getScheduleDate(), exception);
+        }
+    }
 
     @ApiOperation(value = "模板下载", notes = "导入模板下载（不含物料描述列，物料描述通过物料编码自动带出）")
     @PostMapping("/downloadTemplate/{fileName}")

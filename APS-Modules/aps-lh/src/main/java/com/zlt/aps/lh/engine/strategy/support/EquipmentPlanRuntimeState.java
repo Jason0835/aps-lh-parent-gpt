@@ -33,6 +33,14 @@ public final class EquipmentPlanRuntimeState {
      * 组合前各运行侧的冻结置换时间，撤销时不重新读取时长参数。
      */
     private final Map<String, CleaningPlanTimeline> replacementOriginalTimelineMap = new LinkedHashMap<>();
+    /**
+     * 依赖在机喷砂及05维修机会的精度安排，按物理机台去重。
+     */
+    private final Map<String, Long> sandBlastRepairPrecisionPlanMap = new LinkedHashMap<>();
+    /**
+     * 三项组合前各运行侧的清洗时间快照，撤销时恢复原首检而不改变清洗本体。
+     */
+    private final Map<String, CleaningPlanTimeline> sandBlastRepairOriginalTimelineMap = new LinkedHashMap<>();
     /** 仅约束发布、撤销时递增，用于失效候选、容量和时间缓存。 */
     private long constraintVersion;
 
@@ -56,6 +64,8 @@ public final class EquipmentPlanRuntimeState {
         target.diagnosticKeys.addAll(diagnosticKeys);
         target.replacementPrecisionPlanMap.putAll(replacementPrecisionPlanMap);
         target.replacementOriginalTimelineMap.putAll(replacementOriginalTimelineMap);
+        target.sandBlastRepairPrecisionPlanMap.putAll(sandBlastRepairPrecisionPlanMap);
+        target.sandBlastRepairOriginalTimelineMap.putAll(sandBlastRepairOriginalTimelineMap);
         target.constraintVersion = constraintVersion;
         return target;
     }

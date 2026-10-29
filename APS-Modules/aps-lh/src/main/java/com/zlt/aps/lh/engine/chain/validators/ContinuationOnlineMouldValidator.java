@@ -151,6 +151,19 @@ public class ContinuationOnlineMouldValidator {
     }
 
     /**
+     * 只读校验候选完整模具组，历史前料选机和正式续作使用同一模具关系口径。
+     *
+     * @param context 已加载SKU模具关系的上下文
+     * @param materialCode 候选物料
+     * @param mouldCodes 来源证明的模具编码
+     * @return 模具组非空且全部属于该物料时返回true
+     */
+    public boolean isMouldGroupAllowed(LhScheduleContext context, String materialCode, Set<String> mouldCodes) {
+        return !CollectionUtils.isEmpty(mouldCodes) && this.resolveAllowedMouldCodes(
+                this.resolveSkuMouldRelList(context, materialCode)).containsAll(mouldCodes);
+    }
+
+    /**
      * 构建单条续作在机模具不匹配明细。
      *
      * <p>明细携带机台编码、物料编码和在机模具号，由 {@link LhScheduleContext#addValidationError(String)}

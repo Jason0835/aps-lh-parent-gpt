@@ -29,6 +29,15 @@ public class UnscheduledResultRuntime {
     /** 原始需求标识到真实分支原因事件。 */
     private Map<String, List<UnscheduledReasonEvent>> reasonEventMap =
             new LinkedHashMap<String, List<UnscheduledReasonEvent>>(64);
+    /**
+     * SKU 与原因到真实命中快照；列表按登记顺序保存来源，撤销时只移除对应来源。
+     */
+    private Map<String, List<EndingDiscardCandidate>> endingDiscardCandidateMap =
+            new LinkedHashMap<String, List<EndingDiscardCandidate>>(16);
+    /**
+     * 保存前最终数量收口已经开始，此后诊断更新不得登记或覆盖规则命中量。
+     */
+    private boolean endingDiscardRegistrationClosed;
     /** 原因事件递增序号。 */
     private long eventSequence;
 
@@ -53,6 +62,13 @@ public class UnscheduledResultRuntime {
             eventMap.put(key, copiedEvents);
         });
         target.setReasonEventMap(eventMap);
+        Map<String, List<EndingDiscardCandidate>> discardMap =
+                new LinkedHashMap<String, List<EndingDiscardCandidate>>(endingDiscardCandidateMap.size());
+        // 候选值不可变；复制列表即可隔离撤销操作，来源身份与既有未排回滚保留相同对象。
+        endingDiscardCandidateMap.forEach((key, value) -> discardMap.put(
+                key, new ArrayList<EndingDiscardCandidate>(value)));
+        target.setEndingDiscardCandidateMap(discardMap);
+        target.setEndingDiscardRegistrationClosed(endingDiscardRegistrationClosed);
         target.setEventSequence(eventSequence);
         return target;
     }

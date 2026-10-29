@@ -12,6 +12,7 @@ import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationEndingAllocationSnapshot;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationMachineFinishPlan;
+import com.zlt.aps.lh.engine.strategy.support.ContinuationSurplusCompletionSupport;
 import com.zlt.aps.lh.engine.strategy.support.EquipmentPlanArrangement;
 import com.zlt.aps.lh.engine.strategy.support.EquipmentPlanRuntimeState;
 import com.zlt.aps.lh.engine.strategy.support.EquipmentPlanTimeline;
@@ -75,7 +76,9 @@ public class LhEquipmentPlanScheduleService {
     }
 
     /**
-     * 续作收口后及后续真实收尾变化时受控复评；0不撤销任何有效安排。
+     * 续作收口后复评真实收尾，先撤销普通余量完成依据已经失效的自然精度安排。
+     * 普通零判定不撤销其他有效安排，强制精度继续沿原规则执行。
+     *
      * @param context 已提交当前生产事实的上下文
      * @return 是否改变约束，调用方须失效本轮候选、容量及时间缓存
      */
@@ -83,7 +86,8 @@ public class LhEquipmentPlanScheduleService {
         if (context.isTimedMachineOffLoadPreview() || context.isNewSpecProposalPreview()) {
             return false;
         }
-        boolean changed = this.restoreUnboundParallelInspections(context);
+        boolean changed = this.revokeUnfinishedSurplusArrangements(context);
+        changed = this.restoreUnboundParallelInspections(context) || changed;
         changed = this.evaluateChangedInputs(context, false) || changed;
         if (changed && context.isContinuousDailyQuotaSynced() && this.hasUnreconciledForceConstraint(context)) {
             if (Objects.isNull(continuousProductionStrategy)) {
@@ -124,9 +128,54 @@ public class LhEquipmentPlanScheduleService {
     }
 
     /**
+     * 接受在机喷砂、05维修及精度的显式组合，首检由喷砂链路唯一计量。
+     *
+     * @param context 续作排量前的排程上下文
+     * @param decision 已通过资格、日历及当日额度判断的精度
+     * @param sources 完整物理机台的同源喷砂窗口
+     * @param inspectionStart 各项准备实际完成的最晚时刻
+     * @param inspectionEnd 按喷砂参数执行唯一首检后的恢复时刻
+     * @return 完整组合通过门禁且已正式登记时返回true
+     */
+    public boolean acceptSandBlastRepairPrecision(LhScheduleContext context, PrecisionMaintenanceJudgeDTO decision,
+            List<MachineCleaningWindowDTO> sources, Date inspectionStart, Date inspectionEnd) {
+        EquipmentPlanTimeline original = timelineResolver.resolvePrecision(context, decision,
+                "喷砂维修精度:" + decision.getMachineCode() + ":" + inspectionStart.getTime());
+        if (this.hasEffectiveArrangement(context, original.getPhysicalMachineCode())) {
+            return false;
+        }
+        EquipmentPlanTimeline complete = original.withInspection(inspectionStart, inspectionEnd);
+        String conflict = LhSandBlastRepairPrecisionOverlapPolicy.resolveConflict(context, complete, sources);
+        boolean inWindow = context.getScheduleWindowShifts().stream().anyMatch(shift ->
+                shift.getShiftStartDateTime().before(inspectionEnd)
+                        && shift.getShiftEndDateTime().after(original.getMaintenanceStartTime()));
+        if (StringUtils.isNotBlank(conflict) || !inWindow) {
+            this.recordUnsupported(context, original.getPhysicalMachineCode(),
+                    StringUtils.isNotBlank(conflict) ? conflict : "三项组合不在本轮排程窗口内");
+            return false;
+        }
+        // 精度仅发布准备边界，首检恢复由喷砂窗口发布，避免相同时间被重复扣减或领取首检。
+        this.registerAcceptedTimeline(context, original.withInspection(inspectionStart, inspectionStart));
+        return true;
+    }
+
+    /**
+     * 判断本次精度首检是否已经由清洗主链统一计量。
+     *
+     * @param context 当前设备计划运行态
+     * @param planId 有效精度计划主键
+     * @return 置换或在机喷砂组合已拥有唯一首检时返回true
+     */
+    private boolean isCleaningInspectionManaged(LhScheduleContext context, Long planId) {
+        EquipmentPlanRuntimeState state = context.getEquipmentPlanRuntimeState();
+        return state.getReplacementPrecisionPlanMap().containsValue(planId)
+                || state.getSandBlastRepairPrecisionPlanMap().containsValue(planId);
+    }
+
+    /**
      * 原机原模无切换恢复时，允许明确的SKU承接已冻结的精度首检。
      * 只返回未被实际结果消费的时间计划；普通换模/换活字块不得据此合并首检。
-     * 喷砂置换精度的首检由置换容量窗口唯一承接，本入口不再分配。
+     * 喷砂置换及在机维修组合的首检均由清洗容量窗口唯一承接，本入口不再分配。
      *
      * @param context 排程上下文
      * @param machine 当前机台
@@ -141,8 +190,7 @@ public class LhEquipmentPlanScheduleService {
         String physical = LhSingleControlMachineUtil.resolvePhysicalMachineCode(machine.getMachineCode());
         return context.getEquipmentPlanRuntimeState().getArrangementMap().values().stream()
                 .filter(EquipmentPlanArrangement::isEffective).map(EquipmentPlanArrangement::getTimeline)
-                .filter(timeline -> !context.getEquipmentPlanRuntimeState().getReplacementPrecisionPlanMap()
-                        .containsValue(timeline.getPrecisionPlanId()))
+                .filter(timeline -> !this.isCleaningInspectionManaged(context, timeline.getPrecisionPlanId()))
                 .filter(timeline -> StringUtils.equals(physical, timeline.getPhysicalMachineCode()))
                 .filter(timeline -> !readyTime.before(timeline.getProductionResumeTime()))
                 .filter(timeline -> context.getScheduleResultList().stream()
@@ -231,8 +279,7 @@ public class LhEquipmentPlanScheduleService {
                     .filter(result -> ShiftFieldUtil.resolveScheduledQty(result) > 0)
                     .map(result -> context.getFirstInspectionResultPlanMap().get(result)).filter(Objects::nonNull)
                     .anyMatch(plan -> Objects.equals(timeline.getPrecisionPlanId(), plan.getEquipmentPlanId()));
-            if (!bound && !context.getEquipmentPlanRuntimeState().getReplacementPrecisionPlanMap()
-                    .containsValue(timeline.getPrecisionPlanId())) {
+            if (!bound && !this.isCleaningInspectionManaged(context, timeline.getPrecisionPlanId())) {
                 Date inspectionStart = timeline.getMaintenanceReadyTime();
                 this.replaceInspectionTimeline(context, arrangement, timeline.withInspection(inspectionStart, inspectionStart),
                         "切换承接结果已撤销，恢复精度准备边界，首检待明确SKU后按参数分配");
@@ -426,6 +473,9 @@ public class LhEquipmentPlanScheduleService {
             }
             LhScheduleResult last = results.stream().max(Comparator.comparing(
                     LhScheduleResult::getSpecEndTime, Comparator.nullsFirst(Date::compareTo))).orElse(null);
+            if (ContinuationSurplusCompletionSupport.isUnfinishedContinuation(context, last)) {
+                return null;
+            }
             ContinuationEndingAllocationSnapshot snapshot = context.getContinuationSurplusEndingSnapshotMap().get(last);
             boolean completedSnapshot = Objects.nonNull(snapshot)
                     && Objects.nonNull(snapshot.getProductionEndTime())
@@ -465,6 +515,9 @@ public class LhEquipmentPlanScheduleService {
      */
     private Date resolveConfirmedPhysicalEnding(LhScheduleContext context, MachineScheduleDTO machine) {
         for (MachineScheduleDTO side : this.physicalMachines(context, machine.getMachineCode())) {
+            if (ContinuationSurplusCompletionSupport.hasUnfinishedContinuation(context, side)) {
+                return null;
+            }
             if (StringUtils.isBlank(side.getCurrentMaterialCode())) {
                 continue;
             }
@@ -504,6 +557,16 @@ public class LhEquipmentPlanScheduleService {
             this.recordUnsupported(context, timeline.getPhysicalMachineCode(), conflict);
             return;
         }
+        this.registerAcceptedTimeline(context, timeline);
+    }
+
+    /**
+     * 发布已经完成对应场景门禁的精度安排，共用窗口、每日额度及回填生命周期。
+     *
+     * @param context 当前排程上下文
+     * @param timeline 已核验资格及实际占用的时间计划
+     */
+    private void registerAcceptedTimeline(LhScheduleContext context, EquipmentPlanTimeline timeline) {
         for (MachineScheduleDTO side : this.physicalMachines(context, timeline.getPhysicalMachineCode())) {
             side.getMaintenanceWindowList().add(timeline.toMaintenanceWindow(side.getMachineCode()));
             side.setHasMaintenancePlan(true);
@@ -567,17 +630,78 @@ public class LhEquipmentPlanScheduleService {
         state.getCandidateTimelineMap().remove(timeline.getPhysicalMachineCode());
         state.getPendingPhysicalMachines().add(timeline.getPhysicalMachineCode());
         LhSandBlastPrecisionOverlapPolicy.restoreReplacementProjection(context, planId);
+        LhSandBlastRepairPrecisionOverlapPolicy.restoreCleaningTimeline(context, planId);
         state.constraintsChanged();
         PriorityTraceLogHelper.appendProcessLog(context, "精准计划安排撤销",
                 "计划主键=" + planId + "，物理机台=" + timeline.getPhysicalMachineCode() + "，原因=" + reason);
     }
 
     /**
-     * 所有后置裁量结束后校验安排与实际窗口一致，再形成回填清单；独立安排不依赖后续SKU。
+     * 恢复原机续作之前撤销其自然精度，已被正量首检或清洗组合消费的安排不得局部拆除。
+     * 调用者在历史交接完整快照内处理拒绝，强制精度不进入撤销集合。
+     *
+     * @param context 当前设备安排及实际消费
+     * @param machineCodes 需要恢复的运行侧编码
+     * @return 全部自然精度可安全撤销时返回真；已有正式消费者时返回假且不修改安排
+     */
+    public boolean revokeNaturalPrecisionForContinuation(LhScheduleContext context, Set<String> machineCodes) {
+        Set<String> physicalCodes = machineCodes.stream()
+                .map(LhSingleControlMachineUtil::resolvePhysicalMachineCode).collect(Collectors.toSet());
+        List<EquipmentPlanArrangement> arrangements = context.getEquipmentPlanRuntimeState().getArrangementMap()
+                .values().stream().filter(EquipmentPlanArrangement::isEffective)
+                .filter(arrangement -> !arrangement.getTimeline().isForceDown()
+                        && physicalCodes.contains(arrangement.getTimeline().getPhysicalMachineCode()))
+                .collect(Collectors.toList());
+        boolean consumed = arrangements.stream().anyMatch(arrangement -> {
+            Long planId = arrangement.getTimeline().getPrecisionPlanId();
+            return this.isCleaningInspectionManaged(context, planId) || context.getScheduleResultList().stream()
+                    .filter(result -> ShiftFieldUtil.resolveScheduledQty(result) > 0)
+                    .map(context.getFirstInspectionResultPlanMap()::get).filter(Objects::nonNull)
+                    .anyMatch(inspection -> Objects.equals(planId, inspection.getEquipmentPlanId()));
+        });
+        if (consumed) {
+            return false;
+        }
+        arrangements.forEach(arrangement -> this.revokeArrangement(context,
+                arrangement.getTimeline().getPrecisionPlanId(), "历史交接后普通余量未完成，恢复原机续作"));
+        return true;
+    }
+
+    /**
+     * 在复评和保存前复核已有自然安排，不能因安排已接受而跳过整组完成依据的变化。
+     *
+     * @param context 当前最终有效生产及精度安排
+     * @return 是否撤销了失效的自然精度
+     * @throws IllegalStateException 失效安排已有正式消费者，无法脱离原生产恢复边界撤销
+     */
+    private boolean revokeUnfinishedSurplusArrangements(LhScheduleContext context) {
+        Set<String> arranged = context.getEquipmentPlanRuntimeState().getArrangementMap().values().stream()
+                .filter(EquipmentPlanArrangement::isEffective)
+                .filter(arrangement -> !arrangement.getTimeline().isForceDown())
+                .map(arrangement -> arrangement.getTimeline().getPhysicalMachineCode()).collect(Collectors.toSet());
+        if (arranged.isEmpty()) {
+            return false;
+        }
+        Set<String> machines = context.getMachineScheduleMap().values().stream()
+                .filter(machine -> arranged.contains(
+                        LhSingleControlMachineUtil.resolvePhysicalMachineCode(machine.getMachineCode())))
+                .filter(machine -> ContinuationSurplusCompletionSupport.hasUnfinishedContinuation(context, machine))
+                .map(MachineScheduleDTO::getMachineCode).collect(Collectors.toSet());
+        long version = context.getEquipmentPlanRuntimeState().getConstraintVersion();
+        if (!this.revokeNaturalPrecisionForContinuation(context, machines)) {
+            throw new IllegalStateException("普通余量未完成的失效精度已有正式消费，必须恢复原交接尝试");
+        }
+        return version != context.getEquipmentPlanRuntimeState().getConstraintVersion();
+    }
+
+    /**
+     * 后置裁量结束后校验自然收尾依据及实际窗口，再形成有效安排的日期回填清单。
+     *
      * @param context 最终结果上下文
      * @return 按有效判定主键去重的安排日期
      */
     public Map<Long, Date> finalizeArrangements(LhScheduleContext context) {
+        this.revokeUnfinishedSurplusArrangements(context);
         this.restoreUnboundParallelInspections(context);
         Map<Long, Date> result = new LinkedHashMap<>();
         for (EquipmentPlanArrangement arrangement : new ArrayList<>(

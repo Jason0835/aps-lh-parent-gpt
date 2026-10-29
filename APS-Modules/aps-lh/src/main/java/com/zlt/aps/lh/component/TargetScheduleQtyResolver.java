@@ -2,6 +2,7 @@ package com.zlt.aps.lh.component;
 
 import com.zlt.aps.lh.engine.strategy.support.RepairPlanResult;
 import com.zlt.aps.lh.service.impl.LhRepairPlanScheduleService;
+import com.zlt.aps.lh.util.FirstInspectionTimingMode;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
@@ -55,6 +56,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 
 import javax.annotation.Resource;
+import java.math.BigInteger;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -755,6 +757,11 @@ public class TargetScheduleQtyResolver {
         if (this.isExcludedFromRealMachineEmbryoAllocation(context, sku)) {
             // 未取得实机库存身份不等于需求已完成，保留原硫化需求供未排和虚拟补量对账。
             return false;
+        }
+        // 交班收尾同步：成型本批已停产收尾（与成型 filterHandoverStoppedEndings 同源），
+        // 本批无成型供给，按胎胚库存严格排产（只消耗库存，不再按硫化余量放大）
+        if (context.getCxHandoverStoppedEndingEmbryoSet().contains(sku.getEmbryoCode())) {
+            return true;
         }
         // 确保胎胚有效SKU集合已初始化，用于判断单胎胚/共用胎胚
         ensureActiveEmbryoSkuMap(context, sku);
@@ -1710,16 +1717,33 @@ public class TargetScheduleQtyResolver {
     }
 
     /**
-     * 解析结果的数量归整单位，严格目标只控制总预算，不能豁免普通双模的逐班偶数约束。
+     * 解析结果的数量归整单位，历史前料身份不改变普通双模的数量约束。
+     * 胎胚库存硬目标、单模及配置单控保留原数量单位，严格目标本身不是奇数豁免。
+     *
      * @param context 排程上下文
      * @param result 当前机台结果
      * @param mouldQty 实际使用模数
-     * @return 单模、单控或胎胚收尾为1，其余使用实际模数
+     * @return 单模、单控及胎胚库存硬目标为1，其余使用实际模数
      */
     public int resolveAllocationMultiple(LhScheduleContext context, LhScheduleResult result, int mouldQty) {
-        if (mouldQty <= 1 || this.isEmbryoStockEnding(context, result)
-                || (Objects.nonNull(result)
-                && LhSingleControlMachineUtil.isConfiguredSingleControlMachine(context, result.getLhMachineCode()))) {
+        return this.resolveAllocationMultiple(context,
+                Objects.nonNull(result) ? result.getLhMachineCode() : null,
+                mouldQty, this.isEmbryoStockEnding(context, result));
+    }
+
+    /**
+     * 按实际机台和胎胚硬目标解析数量单位，供目标、班次分配及结果校验共用。
+     *
+     * @param context 排程上下文
+     * @param machineCode 已确定的运行侧机台编码，尚未选机时为空
+     * @param mouldQty 实际使用模数
+     * @param embryoEnding 是否命中胎胚库存硬目标
+     * @return 本运行侧可分配的最小数量单位
+     */
+    private int resolveAllocationMultiple(LhScheduleContext context, String machineCode,
+            int mouldQty, boolean embryoEnding) {
+        if (mouldQty <= 1 || embryoEnding
+                || LhSingleControlMachineUtil.isConfiguredSingleControlMachine(context, machineCode)) {
             return 1;
         }
         return mouldQty;
@@ -1749,7 +1773,7 @@ public class TargetScheduleQtyResolver {
 
     /**
      * 解析班次分配量。
-     * <p>成型胎胚库存收尾必须严格按胎胚库存落地，不做模台数向上修正；其余场景沿用既有模台数规则。</p>
+     * <p>历史前料与普通续作共用模数规则，只有胎胚硬目标、单模和配置单控保留精确尾量。</p>
      *
      * @param context 排程上下文
      * @param sku SKU
@@ -1763,10 +1787,52 @@ public class TargetScheduleQtyResolver {
                                         int allocationQty,
                                         int shiftMaxQty,
                                         int mouldQty) {
-        if (isEmbryoStockEnding(context, sku)) {
+        int multiple = this.resolveAllocationMultiple(context,
+                Objects.nonNull(sku) ? sku.getContinuousMachineCode() : null,
+                mouldQty, this.isEmbryoStockEnding(context, sku));
+        if (multiple == 1) {
             return Math.max(0, allocationQty);
         }
-        return ShiftCapacityResolverUtil.normalizeAllocatedShiftQty(allocationQty, shiftMaxQty, mouldQty);
+        return ShiftCapacityResolverUtil.normalizeAllocatedShiftQty(allocationQty, shiftMaxQty, multiple);
+    }
+
+    /**
+     * 按续作实机数量单位归整硫化余量，历史前料只保留生产身份，不另设数量例外。
+     * 胎胚库存硬目标应由调用方优先进入专用目标链，本方法不将库存改写为硫化余量。
+     *
+     * @param context 已加载机台的排程上下文
+     * @param sku 当前续作物料及产品状态
+     * @return 未消费前的合法余量总目标，不修改原始余量及任何账本
+     */
+    public int resolveContinuationSurplusTargetQty(LhScheduleContext context, SkuScheduleDTO sku) {
+        MachineScheduleDTO machine = Objects.nonNull(context)
+                ? context.getMachineScheduleMap().get(sku.getContinuousMachineCode()) : null;
+        int multiple = this.resolveAllocationMultiple(context, sku.getContinuousMachineCode(),
+                this.resolveEndingMouldQty(context, sku, machine), this.isEmbryoStockEnding(context, sku));
+        return ShiftCapacityResolverUtil.roundUpQtyToMouldMultiple(Math.max(0, sku.getSurplusQty()), multiple);
+    }
+
+    /**
+     * 按实际参与机台共同数量单位建立整组余量目标，L/R整机仍需两侧同量。
+     * 同组有合法独立单模时保留其承接奇数的能力，历史前料不能将双模降为单位1。
+     *
+     * @param context 已确认来源及机台模式的排程上下文
+     * @param sku 整组余量来源
+     * @param results 已准入的续作结果，包含同一物理机台的L/R侧
+     * @return 可由整组实际数量单位表达的总目标，不写账本
+     * @throws IllegalStateException 没有实际参与机台时抛出
+     */
+    public int resolveContinuationSurplusTargetQty(LhScheduleContext context, SkuScheduleDTO sku,
+            List<LhScheduleResult> results) {
+        Map<String, List<LhScheduleResult>> physicalGroups = results.stream().collect(Collectors.groupingBy(
+                result -> LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode())));
+        BigInteger commonMultiple = physicalGroups.values().stream().map(sides -> {
+            LhScheduleResult first = sides.get(0);
+            int sideMultiple = this.resolveAllocationMultiple(context, first, first.getMouldQty());
+            return BigInteger.valueOf((long) sideMultiple * sides.size());
+        }).reduce(BigInteger::gcd).orElseThrow(() -> new IllegalStateException("余量收尾缺少实际参与机台"));
+        return ShiftCapacityResolverUtil.roundUpQtyToMouldMultiple(
+                Math.max(0, sku.getSurplusQty()), commonMultiple.intValueExact());
     }
 
     /**
@@ -2307,7 +2373,20 @@ public class TargetScheduleQtyResolver {
                         productionStartTime,
                         shiftCapacity, Math.max(sku.resolveTargetScheduleQty(), shiftCapacity),
                         scheduleType, machine.getMachineCode(), null);
-        if (precisionOverlap.isSupported() && !firstInspectionAllocationPlan.isValid()) {
+        Date combinedInspectionReady = precisionOverlap.isSupported() ? null
+                : LhRepairPlanScheduleService.resolveForwardInspectionReady(
+                        context, machine.getMachineCode(), scheduleType, switchStartTime, mouldChangeCompleteTime);
+        if (combinedInspectionReady != null) {
+            // 预演与正式分配都从组合准备完成或更晚门禁开始首检，不能用倒推首检高估后料产能。
+            Date inspectionReadyTime = firstProductionStartTime.after(combinedInspectionReady)
+                    ? firstProductionStartTime : combinedInspectionReady;
+            firstInspectionAllocationPlan = FirstInspectionAllocationUtil.buildPlan(
+                    context, sku, inspectionShifts, mouldChangeCompleteTime, inspectionReadyTime,
+                    shiftCapacity, Math.max(sku.resolveTargetScheduleQty(), shiftCapacity),
+                    scheduleType, machine.getMachineCode(), null, FirstInspectionTimingMode.START_AT_PRODUCTION_READY);
+        }
+        if ((precisionOverlap.isSupported() || combinedInspectionReady != null)
+                && !firstInspectionAllocationPlan.isValid()) {
             return 0;
         }
         if (precisionOverlap.isSupported() && StringUtils.isNotBlank(equipmentPlanTimelineResolver.resolveInspectionOverlapReason(

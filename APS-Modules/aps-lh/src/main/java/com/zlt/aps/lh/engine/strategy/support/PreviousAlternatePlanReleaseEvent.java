@@ -29,7 +29,7 @@ public class PreviousAlternatePlanReleaseEvent implements Serializable {
      */
     public enum ProductionRole {
         /**
-         * 本机仍承载历史前料，沿用既有余量收尾或时间下机。
+         * 本机承载实际前料，包括与历史前料不同的在机物料，沿用余量收尾或时间下机。
          */
         BEFORE_MATERIAL_PRODUCTION,
         /**
@@ -60,14 +60,20 @@ public class PreviousAlternatePlanReleaseEvent implements Serializable {
     private String materialCode;
     /** 下机前实际产品状态。 */
     private String productStatus;
-    /** 本机历史前料最终未排产，交替从T日历史班次起点尝试。 */
+    /**
+     * 本机历史前料最终未排产，默认从T日历史班次尝试，较早早班仅在完整承接成功后生效。
+     */
     private boolean beforeMaterialNotScheduled;
     /** 历史计划日期及班次解析出的默认下机起点；异料严格收尾可按合法班次内真实释放更新。 */
     private Date plannedShiftStartTime;
     /**
-     * 历史计划班次结束；未获收尾或正式时间下机顺延资格的动作不得开始于该时刻及之后。
+     * 原历史计划班次结束，用于历史排序及前料原下机边界，不再限制指定后料顺延。
      */
     private Date plannedShiftEndTime;
+    /**
+     * 已准入历史指定后料在本次固定排程窗口内的承接上限，不改变原历史班次和前料释放事实。
+     */
+    private Date handoffWindowEndTime;
     /** 本轮准备资源窗口截止；未来生产提案不能借此抢占尚未轮到的准备班次。 */
     private Date preparationWindowEndTime;
 
@@ -81,8 +87,17 @@ public class PreviousAlternatePlanReleaseEvent implements Serializable {
      */
     private Date confirmedTimedHandoffWindowEndTime;
 
-    /** 终末余量先在原机分配时的窗口上限；非空表示历史交替等待本组真实释放，不再强制截断前料。 */
+    /**
+     * 余量组在原机分配的窗口上限，非空表示历史交替消费本组提交的真实释放。
+     * 精确异料固定交替仍按原指定起点限制前料，其余历史关系等待原节点分配。
+     */
     private Date remainderFinishWindowEndTime;
+
+    /**
+     * 普通余量组已确认精确异料历史交替，前料按原指定起点封口，后料不得因余量分配提前准备。
+     * 由续作分组统一冻结，预演通过事件快照同步恢复；不适用于胎胚库存组或同料动作。
+     */
+    private boolean fixedHistoricalCutover;
 
     /**
      * 胎胚硬目标已完整完成后的承接窗口上限；仅延后准备截止，不改变整组余量释放流程。
@@ -120,7 +135,7 @@ public class PreviousAlternatePlanReleaseEvent implements Serializable {
     }
 
     /**
-     * 解析原历史承接上限或独立扩展确认的单班截止，并限制在当前准备业务日内。
+     * 解析本次窗口承接上限或独立扩展确认的单班截止，并限制在当前准备业务日内。
      *
      * @return 准备截止时刻，采用半开区间
      */
@@ -141,11 +156,16 @@ public class PreviousAlternatePlanReleaseEvent implements Serializable {
         if (Objects.nonNull(trialHandoffWindowEndTime)) {
             plannedEnd = trialHandoffWindowEndTime;
         }
+        if (Objects.nonNull(handoffWindowEndTime)) {
+            plannedEnd = handoffWindowEndTime;
+        }
         return Objects.nonNull(preparationWindowEndTime) && preparationWindowEndTime.before(plannedEnd)
                 ? preparationWindowEndTime : plannedEnd;
     }
 
-    /** 前料最终未排时，T日对应历史班次的承接起点。 */
+    /**
+     * 前料最终未排时默认使用T日历史班次起点，完整提前承接成功后同步为已确认的真实释放。
+     */
     private Date noProductionStartTime;
     /** 登记时为本次动作边界；异料严格收尾可更新为历史指定班次结束前的真实物理释放时刻。 */
     private Date offlineTime;
@@ -173,7 +193,21 @@ public class PreviousAlternatePlanReleaseEvent implements Serializable {
                 && StringUtils.equals(productStatus, plan.getProductStatus())) {
             return ProductionRole.AFTER_MATERIAL_PREPARATION;
         }
+        // 实际前料变化不撤销指定后料，前料数量和释放必须继续按真实在机身份处理。
+        if (!StringUtils.equals(materialCode, plan.getAfterMaterialCode())) {
+            return ProductionRole.BEFORE_MATERIAL_PRODUCTION;
+        }
         return ProductionRole.UNMATCHED;
+    }
+
+    /**
+     * 解析本轮交替的真实前料；MES已显示历史后料时仍保留原历史前料展示语义。
+     *
+     * @return 第三种在机物料或原历史前料编码
+     */
+    public String resolveBeforeMaterialCode() {
+        return this.resolveProductionRole() == ProductionRole.BEFORE_MATERIAL_PRODUCTION
+                ? materialCode : plan.getBeforeMaterialCode();
     }
 
     /**

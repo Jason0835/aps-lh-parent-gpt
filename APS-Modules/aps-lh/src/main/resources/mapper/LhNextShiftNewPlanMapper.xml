@@ -9,6 +9,7 @@
         <result property="factoryCode" column="FACTORY_CODE"/>
         <result property="scheduleDate" column="SCHEDULE_DATE"/>
         <result property="batchNo" column="BATCH_NO"/>
+        <result property="sceneType" column="SCENE_TYPE"/>
         <result property="materialCode" column="MATERIAL_CODE"/>
         <result property="productStatus" column="PRODUCT_STATUS"/>
         <result property="constructionStage" column="CONSTRUCTION_STAGE"/>
@@ -32,6 +33,7 @@
                FACTORY_CODE,
                SCHEDULE_DATE,
                BATCH_NO,
+               SCENE_TYPE,
                MATERIAL_CODE,
                PRODUCT_STATUS,
                CONSTRUCTION_STAGE,

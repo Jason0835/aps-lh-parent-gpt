@@ -5,6 +5,8 @@ import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Date;
+import java.time.LocalDate;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -135,6 +137,72 @@ public class DayDrivenScheduleState {
             }
         }
         Collections.sort(pendingSkuList, GLOBAL_ORDER_COMPARATOR);
+    }
+
+    /**
+     * 捕获收尾延期提案的本地编排进度，配合上下文资源快照恢复失败提交。
+     *
+     * @return 恢复候选生命周期、绑定及机台机会的动作，仅由本规则提交包装入口使用
+     */
+    public Runnable captureEndingDeferredAttemptRollback() {
+        List<SkuScheduleDTO> ordered = new ArrayList<>(orderedSkuList);
+        List<SkuScheduleDTO> pending = new ArrayList<>(pendingSkuSet);
+        List<SkuScheduleDTO> completed = new ArrayList<>(completedSkuSet);
+        List<SkuScheduleDTO> unscheduled = new ArrayList<>(finalUnscheduledSkuSet);
+        Map<SkuScheduleDTO, DeferredScheduleTask> deferred = new IdentityHashMap<>(deferredTaskMap);
+        Map<String, ActiveMachineBinding> bindings = new LinkedHashMap<>(activeMachineBindingMap);
+        List<Runnable> bindingRestores = new ArrayList<>();
+        this.getActiveBindings().forEach(binding -> bindingRestores.add(this.captureBindingRollback(binding)));
+        Map<SkuScheduleDTO, SkuDayScheduleOutcome> outcomes = new IdentityHashMap<>(currentDayOutcomeMap);
+        Map<SkuScheduleDTO, NewSpecCandidateRuntimeState> runtimeObjects = new IdentityHashMap<>(candidateRuntimeStateMap);
+        Map<SkuScheduleDTO, NewSpecCandidateRuntimeState> progress = new IdentityHashMap<>();
+        runtimeObjects.forEach((sku, runtime) -> progress.put(sku, runtime.copyProgress()));
+        Map<SkuScheduleDTO, MachinePriorityTraceSnapshot> traces = new IdentityHashMap<>(pendingMachinePriorityTraceMap);
+        List<SkuScheduleDTO> hits = new ArrayList<>(machinePriorityTraceHitSkuSet);
+        return () -> {
+            orderedSkuList.clear();
+            orderedSkuList.addAll(ordered);
+            pendingSkuSet.clear();
+            pendingSkuSet.addAll(pending);
+            completedSkuSet.clear();
+            completedSkuSet.addAll(completed);
+            finalUnscheduledSkuSet.clear();
+            finalUnscheduledSkuSet.addAll(unscheduled);
+            deferredTaskMap.clear();
+            deferredTaskMap.putAll(deferred);
+            activeMachineBindingMap.clear();
+            activeMachineBindingMap.putAll(bindings);
+            bindingRestores.forEach(Runnable::run);
+            currentDayOutcomeMap.clear();
+            currentDayOutcomeMap.putAll(outcomes);
+            candidateRuntimeStateMap.clear();
+            candidateRuntimeStateMap.putAll(runtimeObjects);
+            runtimeObjects.forEach((sku, runtime) -> runtime.restoreProgress(progress.get(sku)));
+            pendingMachinePriorityTraceMap.clear();
+            pendingMachinePriorityTraceMap.putAll(traces);
+            machinePriorityTraceHitSkuSet.clear();
+            machinePriorityTraceHitSkuSet.addAll(hits);
+        };
+    }
+
+    /**
+     * 保存既有绑定的可变元数据，结果和SKU字段由上下文原快照恢复。
+     *
+     * @param binding 失败提案前已存在的绑定
+     * @return 恢复原绑定对象身份及其时间元数据的动作
+     */
+    private Runnable captureBindingRollback(ActiveMachineBinding binding) {
+        Date originalEnd = binding.getEstimatedEndTime();
+        Date ending = originalEnd == null ? null : new Date(originalEnd.getTime());
+        LocalDate demandDate = binding.getMachineDemandStartDate();
+        LocalDate preparedDate = binding.getPreparedThroughDate();
+        boolean switching = binding.isStructureSwitchBinding();
+        return () -> {
+            binding.setEstimatedEndTime(ending == null ? null : new Date(ending.getTime()));
+            binding.setMachineDemandStartDate(demandDate);
+            binding.setPreparedThroughDate(preparedDate);
+            binding.setStructureSwitchBinding(switching);
+        };
     }
 
     /**

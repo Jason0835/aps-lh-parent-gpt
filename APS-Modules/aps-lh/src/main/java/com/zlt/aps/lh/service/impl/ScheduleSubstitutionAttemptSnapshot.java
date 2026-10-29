@@ -21,6 +21,7 @@ import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.context.EmbryoStockConsumeLedger;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.engine.strategy.support.LhShiftRemarkRuntime;
 import com.zlt.aps.lh.component.StructureEarlyProductionAdmission;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.StructureShiftInMachineIndex;
@@ -47,6 +48,7 @@ import com.zlt.aps.lh.engine.strategy.support.ContinuousProductionConsumption;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
@@ -107,6 +109,10 @@ final class ScheduleSubstitutionAttemptSnapshot {
     private Map<LhScheduleResult, LhScheduleResult> scheduleResultStateMap;
     /** 置换前结果来源 SKU 映射 */
     private Map<LhScheduleResult, SkuScheduleDTO> scheduleResultSourceSkuMap;
+    /**
+     * 收尾延期增机首次实际生产日，失败预演或提交必须与结果和资源一起撤销。
+     */
+    private Map<String, LocalDate> endingDeferredFirstProductionDateMap;
     /** 置换前机台结果分配 */
     private Map<String, List<LhScheduleResult>> machineAssignmentMap;
     /** 置换前全部机台运行态 */
@@ -295,6 +301,14 @@ final class ScheduleSubstitutionAttemptSnapshot {
     /** 正式交替结果标记，避免失败结果残留影响同料计划生成。 */
     private Map<LhScheduleResult, LhMouldChangePlan> previousAlternateResultPlanMap;
     /**
+     * 换块成功残量来源随候选尝试恢复，保留候选对象身份并隔离集合本身。
+     */
+    private Set<SkuScheduleDTO> typeBlockResidualSceneSkuSet;
+    /**
+     * 备注的正式关联和精确历史任务待确认附件随业务尝试恢复。
+     */
+    private LhShiftRemarkRuntime shiftRemarkRuntime;
+    /**
      * 成对承接的前料展示来源快照，恢复时保持原结果对象身份且不残留预演关联。
      */
     private Map<LhScheduleResult, LhMouldChangePlan> previousAlternateBeforeMaterialSourceMap;
@@ -353,6 +367,10 @@ final class ScheduleSubstitutionAttemptSnapshot {
         snapshot.previousAlternateReleasedSkuKeyMap = new LinkedHashMap<>(context.getPreviousAlternateReleasedSkuKeyMap());
         snapshot.previousAlternateCandidateAvailableTimeMap = new IdentityHashMap<>(context.getPreviousAlternateCandidateAvailableTimeMap());
         snapshot.previousAlternateResultPlanMap = new IdentityHashMap<>(context.getPreviousAlternateResultPlanMap());
+        snapshot.typeBlockResidualSceneSkuSet =
+                Collections.newSetFromMap(new IdentityHashMap<SkuScheduleDTO, Boolean>(16));
+        snapshot.typeBlockResidualSceneSkuSet.addAll(context.getTypeBlockResidualSceneSkuSet());
+        snapshot.shiftRemarkRuntime = context.getShiftRemarkRuntime().snapshot();
         snapshot.previousAlternateBeforeMaterialSourceMap =
                 new IdentityHashMap<>(context.getPreviousAlternateBeforeMaterialSourceMap());
         snapshot.previousAlternateAdditionalMachineDemandMap =
@@ -381,6 +399,8 @@ final class ScheduleSubstitutionAttemptSnapshot {
                 snapshot.scheduleResultStateMap.putIfAbsent(result, copyBean(result, LhScheduleResult.class)));
         snapshot.scheduleResultSourceSkuMap =
                 new IdentityHashMap<LhScheduleResult, SkuScheduleDTO>(context.getScheduleResultSourceSkuMap());
+        snapshot.endingDeferredFirstProductionDateMap =
+                new LinkedHashMap<>(context.getEndingDeferredFirstProductionDateMap());
         snapshot.machineAssignmentMap = copyResultListMap(context.getMachineAssignmentMap());
         snapshot.machineScheduleStateMap = copyMachineScheduleMap(context.getMachineScheduleMap());
         snapshot.machineShiftCapacityMap = copyIntArrayMap(context.getMachineShiftCapacityMap());
@@ -638,11 +658,20 @@ final class ScheduleSubstitutionAttemptSnapshot {
      * @param restoreSourceObjects 是否恢复原结果和SKU对象
      */
     private void restore(LhScheduleContext context, boolean restoreSourceObjects) {
+        // 班次9使用新实例；原窗口回滚保留外层局部收集域，只恢复可发布关联。
+        if (restoreSourceObjects) {
+            context.getShiftRemarkRuntime().restore(shiftRemarkRuntime);
+        } else {
+            context.setShiftRemarkRuntime(new LhShiftRemarkRuntime());
+        }
         // 每次恢复再次复制，避免重试、嵌套回滚或班次9副本反向修改快照。
         context.setStructureShiftInMachineIndex(Objects.isNull(structureShiftInMachineIndex)
                 ? null : structureShiftInMachineIndex.copy());
         context.setStructureSwitchRuntimeMap(new LinkedHashMap<>(structureSwitchRuntimeMap));
         context.setStructureSwitchResultPlanMap(new IdentityHashMap<>(structureSwitchResultPlanMap));
+        context.setTypeBlockResidualSceneSkuSet(
+                Collections.newSetFromMap(new IdentityHashMap<SkuScheduleDTO, Boolean>(16)));
+        context.getTypeBlockResidualSceneSkuSet().addAll(typeBlockResidualSceneSkuSet);
         context.setFirstInspectionResultPlanMap(new IdentityHashMap<>(firstInspectionResultPlanMap));
 
         context.setPreScheduledMachineBindingList(new ArrayList<>(preScheduledMachineBindingList));
@@ -664,6 +693,7 @@ final class ScheduleSubstitutionAttemptSnapshot {
         context.setScheduleResultSourceSkuMap(
                 new IdentityHashMap<LhScheduleResult, SkuScheduleDTO>(scheduleResultSourceSkuMap));
         context.setCommittedWholeSingleControlPairMap(new IdentityHashMap<>(committedWholeSingleControlPairMap));
+        context.setEndingDeferredFirstProductionDateMap(new LinkedHashMap<>(endingDeferredFirstProductionDateMap));
         context.setMachineAssignmentMap(copyResultListMap(machineAssignmentMap));
         restoreMachineScheduleMap(context);
         context.setMachineShiftCapacityMap(copyIntArrayMap(machineShiftCapacityMap));

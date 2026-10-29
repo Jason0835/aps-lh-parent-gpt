@@ -3405,6 +3405,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         }
         MouldResourceAllocationResult previewResult = mouldResourceContext.previewAllocate(
                 sku.getMaterialCode(), machine.getMachineCode(), this.resolveMouldReferenceTime(context, machine));
+        context.getShiftRemarkRuntime().recordMould(context, sku, previewResult, "MACHINE_MATCH_MOULD_PRECHECK");
         return previewResult.isAllowed();
     }
 

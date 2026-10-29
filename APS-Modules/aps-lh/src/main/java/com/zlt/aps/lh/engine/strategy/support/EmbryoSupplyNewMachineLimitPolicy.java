@@ -6,6 +6,7 @@ import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.component.EmbryoEndingStructureMachineExemptionPolicy;
 import com.zlt.aps.lh.util.FirstInspectionQtyUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
@@ -14,6 +15,7 @@ import com.zlt.aps.lh.util.ShiftFieldUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 
+import java.util.Collections;
 import java.util.Date;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -69,6 +71,101 @@ public final class EmbryoSupplyNewMachineLimitPolicy {
     }
 
     /**
+     * 为同时命中换模满额和供胚限台的局部附件优先保留结构切换展示原因。
+     * 只读取当前候选时点的正量名额，原换模落点、额度及候选成功绑定流程保持不变。
+     * 已由独立切换接管的来源按续作与新增合计，其他来源保留原新增名额口径。
+     *
+     * @param context 当前候选的排程上下文
+     * @param sku 当前物料及产品状态
+     * @param machineCode 当前候选机台或运行侧
+     * @param evidenceList 原换模内核形成的不可变拒绝附件
+     * @return 按同时点供胚名额归因的不可变附件，原次数事实保存在附件中
+     */
+    public static List<LhShiftDelayEvidence> prioritizeQuotaDelayEvidence(LhScheduleContext context,
+            SkuScheduleDTO sku, String machineCode, List<LhShiftDelayEvidence> evidenceList) {
+        if (evidenceList.isEmpty()) {
+            return evidenceList;
+        }
+        CxEmbryoLhTime switchSource = StructureSwitchSchedulingPolicy.resolveSource(context, sku);
+        CxEmbryoLhTime source = Objects.nonNull(switchSource) ? switchSource : resolveSource(context, sku);
+        if (Objects.isNull(source) || StringUtils.isBlank(machineCode)
+                || (Objects.isNull(switchSource) && baselineMachines(context, source).contains(physical(machineCode)))) {
+            return evidenceList;
+        }
+        StructureSwitchFirstShiftDecision firstDecision = Objects.isNull(switchSource) ? null
+                : StructureSwitchFirstShiftPolicy.resolve(context, source, sku, machineCode);
+        if (Objects.nonNull(switchSource)
+                && (Objects.isNull(firstDecision) || Objects.isNull(firstDecision.getFirstShift()))) {
+            return evidenceList;
+        }
+        return Collections.unmodifiableList(evidenceList.stream()
+                .map(evidence -> prioritizeQuotaDelayEvidence(context, source, sku, machineCode, firstDecision, evidence))
+                .collect(Collectors.toList()));
+    }
+
+    /**
+     * 核对原拒绝班次的供胚名额，独立切换读取其规则首班及合计机台，其他来源保持原口径。
+     *
+     * @param context 当前候选时点的正量结果
+     * @param source 当前入口的有效供胚来源
+     * @param sku 当前候选的物料、结构及胎胚身份
+     * @param machineCode 当前候选物理机台或运行侧
+     * @param firstDecision 独立切换首班判定；普通供胚新增策略为空
+     * @param evidence 原次数拒绝的身份、班次区间及事实
+     * @return 同班确已满额时的结构切换附件，其他场景返回原附件
+     */
+    private static LhShiftDelayEvidence prioritizeQuotaDelayEvidence(LhScheduleContext context,
+            CxEmbryoLhTime source, SkuScheduleDTO sku, String machineCode,
+            StructureSwitchFirstShiftDecision firstDecision, LhShiftDelayEvidence evidence) {
+        if (evidence.getReason() != LhShiftDelayReason.CHANGEOVER_QUOTA) {
+            return evidence;
+        }
+        LhShiftConfigVO shift = LhScheduleTimeUtil.resolveShiftByTime(
+                StructureSwitchSchedulingPolicy.orderedShifts(context), new Date(evidence.getBlockedFrom()));
+        long blockedFrom = Math.max(evidence.getBlockedFrom(), source.getEarliestLhTime().getTime());
+        if (Objects.isNull(shift) || blockedFrom >= evidence.getBlockedUntil()
+                || evidence.getBlockedUntil() > shift.getShiftEndDateTime().getTime()) {
+            return evidence;
+        }
+        int shiftLimit = limit(context, source, shift);
+        if (Objects.nonNull(firstDecision)) {
+            if (EmbryoEndingStructureMachineExemptionPolicy.isExempt(context, source.getNextStructureName(),
+                    sku.getEmbryoCode(), sku.getStructureName(), shift)) {
+                return evidence;
+            }
+            LhShiftConfigVO first = firstDecision.getFirstShift();
+            LhShiftConfigVO second = StructureSwitchSchedulingPolicy.nextShift(context, first.getShiftStartDateTime());
+            int offset = 2;
+            if (Objects.equals(first.getShiftStartDateTime(), shift.getShiftStartDateTime())) {
+                offset = 0;
+            } else if (Objects.nonNull(second)
+                    && Objects.equals(second.getShiftStartDateTime(), shift.getShiftStartDateTime())) {
+                offset = 1;
+            }
+            shiftLimit = StructureSwitchSchedulingPolicy.shiftLimit(source.getIsWaitNotify(), offset);
+        }
+        if (shiftLimit == Integer.MAX_VALUE) {
+            return evidence;
+        }
+        Set<String> machines = Objects.isNull(firstDecision) ? newMachines(context, source, shift)
+                : StructureSwitchSchedulingPolicy.resolveOccupiedPhysicalMachines(
+                        context, source.getNextStructureName(), shift);
+        machines.add(physical(machineCode));
+        if (machines.size() <= shiftLimit) {
+            return evidence;
+        }
+        // 准备配额先行后移时，首班限台仍是独立阻断；保留原次数来源，避免丢失重叠事实。
+        String facts = "sourceId=" + source.getId()
+                + (Objects.isNull(firstDecision) ? ",newMachines=" : ",structureMachines=") + machines.size()
+                + ",limit=" + shiftLimit + ",changeoverSource=" + evidence.getSource()
+                + ",changeoverFacts=" + evidence.getFacts();
+        return new LhShiftDelayEvidence(evidence.getAttemptId(),
+                LhShiftDelayReason.forStructureSwitch(source.getIsWaitNotify()), "EMBRYO_SUPPLY_NEW_MACHINE_QUOTA",
+                evidence.getMachineCode(), evidence.getMaterialCode(), evidence.getProductStatus(),
+                blockedFrom, evidence.getBlockedUntil(), facts);
+    }
+
+    /**
      * 按供胚及新增名额后移首检占用起点，准备动作仍由原时间轴管理。
      *
      * @param context 排程上下文
@@ -95,6 +192,11 @@ public final class EmbryoSupplyNewMachineLimitPolicy {
             if (machines.size() <= limit(context, source, shift)) {
                 return notBefore.after(shift.getShiftStartDateTime()) ? notBefore : shift.getShiftStartDateTime();
             }
+            Date rejectedStart = notBefore.after(shift.getShiftStartDateTime()) ? notBefore : shift.getShiftStartDateTime();
+            context.getShiftRemarkRuntime().record(
+                    LhShiftDelayReason.forStructureSwitch(source.getIsWaitNotify()),
+                    "EMBRYO_SUPPLY_NEW_MACHINE_QUOTA", machineCode, sku, rejectedStart, shift.getShiftEndDateTime(),
+                    "newMachines=" + machines.size() + ",sourceId=" + source.getId());
         }
         return null;
     }
@@ -111,6 +213,22 @@ public final class EmbryoSupplyNewMachineLimitPolicy {
      */
     public static String validatePlan(LhScheduleContext context, SkuScheduleDTO sku, String machineCode,
             FirstInspectionAllocationPlan inspection, Date productionStart) {
+        StructureGateDiagnostic diagnostic = validatePlanDiagnostic(context, sku, machineCode, inspection, productionStart);
+        return diagnostic == null ? null : diagnostic.getReason();
+    }
+
+    /**
+     * 使用同一次原判断返回供胚时间或新增数量名额的明确拒绝分类。
+     *
+     * @param context 排程上下文
+     * @param sku 当前物料
+     * @param machineCode 实际机台
+     * @param inspection 原冻结首检
+     * @param productionStart 原正式生产起点
+     * @return 原拒绝及分类，通过时为空
+     */
+    public static StructureGateDiagnostic validatePlanDiagnostic(LhScheduleContext context, SkuScheduleDTO sku, String machineCode,
+            FirstInspectionAllocationPlan inspection, Date productionStart) {
         CxEmbryoLhTime source = resolveSource(context, sku);
         if (Objects.isNull(source) || baselineMachines(context, source).contains(physical(machineCode))) {
             return null;
@@ -118,7 +236,8 @@ public final class EmbryoSupplyNewMachineLimitPolicy {
         Date occupationStart = Objects.nonNull(inspection) && inspection.isValid() && inspection.getInspectionQty() > 0
                 ? inspection.getInspectionStartTime() : productionStart;
         if (Objects.nonNull(occupationStart) && occupationStart.before(source.getEarliestLhTime())) {
-            return "供胚新增机台首检或生产早于最早供胚时间";
+            return new StructureGateDiagnostic("供胚新增机台首检或生产早于最早供胚时间",
+                    StructureLimitRejectionCode.WAITING_TIME);
         }
         for (LhShiftConfigVO shift : StructureSwitchSchedulingPolicy.orderedShifts(context)) {
             boolean inspectionOccupies = Objects.nonNull(inspection) && inspection.isValid()
@@ -129,7 +248,14 @@ public final class EmbryoSupplyNewMachineLimitPolicy {
                 Set<String> machines = newMachines(context, source, shift);
                 machines.add(physical(machineCode));
                 if (machines.size() > limit(context, source, shift)) {
-                    return rejection(source, shift, machines);
+                    Date rejectedStart = occupationStart != null && occupationStart.after(shift.getShiftStartDateTime())
+                            ? occupationStart : shift.getShiftStartDateTime();
+                    context.getShiftRemarkRuntime().record(
+                            LhShiftDelayReason.forStructureSwitch(source.getIsWaitNotify()),
+                            "EMBRYO_SUPPLY_NEW_MACHINE_QUOTA", machineCode, sku, rejectedStart,
+                            shift.getShiftEndDateTime(), "newMachines=" + machines.size() + ",sourceId=" + source.getId());
+                    return new StructureGateDiagnostic(rejection(source, shift, machines),
+                            StructureLimitRejectionCode.MACHINE_COUNT_LIMIT);
                 }
             }
         }

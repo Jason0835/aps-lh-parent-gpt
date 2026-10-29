@@ -1,6 +1,7 @@
 package com.zlt.aps.lh.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
@@ -57,6 +58,15 @@ public class LhNextShiftNewPlan extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "批次号")
     @TableField(value = "BATCH_NO")
     private String batchNo;
+
+    /**
+     * 排程结果的业务来源场景，编码01至08；未知来源使用08，不参与排程决策。
+     */
+    @ApiModelProperty(value = "场景类型：01续作、02换活字块、03历史交替计划、04结构切换、05普通完全新增、06续作新增、07换活字块新增、08其他",
+        name = "sceneType", readOnly = true)
+    @EqualsAndHashCode.Exclude
+    @TableField(value = "SCENE_TYPE", insertStrategy = FieldStrategy.NOT_NULL, updateStrategy = FieldStrategy.NOT_NULL)
+    private String sceneType;
 
     /**
      * 物料编码

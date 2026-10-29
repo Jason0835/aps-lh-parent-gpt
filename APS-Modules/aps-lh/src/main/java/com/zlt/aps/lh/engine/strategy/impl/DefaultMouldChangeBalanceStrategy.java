@@ -7,7 +7,12 @@ import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.enums.MachineStopTypeEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IMouldChangeBalanceStrategy;
+import com.zlt.aps.lh.engine.strategy.support.EmbryoSupplyNewMachineLimitPolicy;
 import com.zlt.aps.lh.engine.strategy.support.PreviousAlternatePlanReleaseEvent;
+import com.zlt.aps.lh.engine.strategy.support.LhConstraintTimeDecision;
+import com.zlt.aps.lh.engine.strategy.support.LhShiftDelayReason;
+import com.zlt.aps.lh.engine.strategy.support.LhShiftRemarkRuntime;
+import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.PriorityTraceLogHelper;
@@ -132,7 +137,19 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
                 sku, actionType, businessDayEndTime, null);
     }
 
-    /** 按真实准备边界正式分配，参数及返回值含义见策略接口。 */
+    /**
+     * 按真实准备边界正式分配，仅将原额度判断附件交给当前提交域。
+     *
+     * @param context 本轮上下文
+     * @param machineCode 实际机台
+     * @param endingTime 前料结束时刻
+     * @param switchDurationHours 原动作时长
+     * @param sku 当前后物料
+     * @param actionType 原动作类型
+     * @param businessDayEndTime 原业务日日终
+     * @param preparationBeforeTime 原跨日准备边界
+     * @return 原分配落点，无法落地时为空
+     */
     @Override
     public Date allocateMouldChange(LhScheduleContext context, String machineCode, Date endingTime,
             int switchDurationHours, SkuScheduleDTO sku, String actionType,
@@ -144,9 +161,10 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
             this.clearBlockedReason(context, sku);
         }
         // 所有预演和正式分配只使用同一个只读决策内核；此处是唯一真实次数登记入口。
-        Date allocatedTime = this.resolveMouldChangeStart(context, machineCode, endingTime,
-                switchDurationHours, businessDayEndTime,
-                context.getDailyMouldChangeCountMap());
+        LhConstraintTimeDecision decision = this.resolveMouldChangeDecision(context, machineCode, endingTime,
+                switchDurationHours, businessDayEndTime, context.getDailyMouldChangeCountMap(), sku);
+        context.getShiftRemarkRuntime().includeCurrent(decision.getDelayEvidence());
+        Date allocatedTime = decision.getStartTime();
         this.recordMouldChangeDecision(context, machineCode, endingTime, switchDurationHours,
                 sku, businessDayEndTime, allocatedTime);
         if (Objects.isNull(allocatedTime)) {
@@ -190,14 +208,85 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
                 sku, actionType, businessDayEndTime, null);
     }
 
-    /** 按真实准备边界只读预演，参数及返回值含义见策略接口。 */
+    /**
+     * 按真实准备边界只读预演，局部附件不修改真实次数账本。
+     *
+     * @param context 本轮上下文
+     * @param machineCode 实际机台
+     * @param endingTime 原机台可交接时刻
+     * @param switchDurationHours 原动作时长
+     * @param sku 当前后物料
+     * @param actionType 原动作类型
+     * @param businessDayEndTime 原业务日日终
+     * @param preparationBeforeTime 原跨日准备边界
+     * @return 原预演落点，无法落地时为空
+     */
     @Override
     public Date previewMouldChange(LhScheduleContext context, String machineCode, Date endingTime,
             int switchDurationHours, SkuScheduleDTO sku, String actionType,
             Date businessDayEndTime, Date preparationBeforeTime) {
-        return Objects.isNull(context) ? null : this.resolveMouldChangeStart(context, machineCode, endingTime,
-                switchDurationHours, businessDayEndTime,
-                context.getDailyMouldChangeCountMap());
+        if (Objects.isNull(context)) {
+            return null;
+        }
+        LhConstraintTimeDecision decision = this.resolveMouldChangeDecision(context, machineCode, endingTime,
+                switchDurationHours, businessDayEndTime, context.getDailyMouldChangeCountMap(), sku);
+        context.getShiftRemarkRuntime().includeCurrent(decision.getDelayEvidence());
+        return decision.getStartTime();
+    }
+
+    /**
+     * 返回原时间内核的落点及局部额度附件，重叠限台时仅调整备注归因。
+     * 原换模起点和次数事实保持，外部 Date/null 接口兼容。
+     *
+     * @param context 本轮上下文
+     * @param machineCode 实际机台
+     * @param readyTime 原请求时刻
+     * @param durationHours 原动作时长
+     * @param dayEnd 原业务日日终
+     * @param countMap 原次数快照
+     * @param sku 当前物料状态
+     * @return 原落点及已按同时点供胚名额归因的局部拒绝附件
+     */
+    private LhConstraintTimeDecision resolveMouldChangeDecision(LhScheduleContext context, String machineCode,
+            Date readyTime, int durationHours, Date dayEnd, Map<String, int[]> countMap, SkuScheduleDTO sku) {
+        if (context == null) {
+            return new LhConstraintTimeDecision(null, java.util.Collections.emptyList());
+        }
+        try (LhShiftRemarkRuntime.Scope scope = context.getShiftRemarkRuntime().openScope(sku, machineCode)) {
+            Date start = this.resolveMouldChangeStart(context, machineCode, readyTime, durationHours, dayEnd, countMap);
+            // 备注在候选局部时点归因；供胚限台与次数满额重叠不改变原准备落点。
+            return new LhConstraintTimeDecision(start,
+                    EmbryoSupplyNewMachineLimitPolicy.prioritizeQuotaDelayEvidence(
+                            context, sku, machineCode, scope.freeze()));
+        }
+    }
+
+    /**
+     * 仅记录被额度判断实际跳过的可换模班，夜班禁换模和停机不归入额度原因。
+     *
+     * @param context 当前班次窗口
+     * @param machineCode 实际机台
+     * @param from 额度拒绝起点
+     * @param until 原算法跳到的边界
+     * @param source 实际额度分支编码
+     * @param used 原分支已用次数
+     * @param limit 原分支有效上限
+     */
+    private void recordQuotaDelay(LhScheduleContext context, String machineCode, Date from, Date until, String source,
+            int used, int limit) {
+        if (CollectionUtils.isEmpty(context.getScheduleWindowShifts())) {
+            return;
+        }
+        for (LhShiftConfigVO shift : context.getScheduleWindowShifts()) {
+            if ((!shift.isMorningShift() && !shift.isAfternoonShift())
+                    || !shift.getShiftStartDateTime().before(until) || !from.before(shift.getShiftEndDateTime())) {
+                continue;
+            }
+            Date start = from.after(shift.getShiftStartDateTime()) ? from : shift.getShiftStartDateTime();
+            Date end = until.before(shift.getShiftEndDateTime()) ? until : shift.getShiftEndDateTime();
+            context.getShiftRemarkRuntime().record(LhShiftDelayReason.CHANGEOVER_QUOTA, source,
+                    machineCode, null, start, end, "used=" + used + ",limit=" + limit);
+        }
     }
 
     /**
@@ -232,7 +321,7 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
                 LhSingleControlMachineUtil.resolvePhysicalMachineCode(event.getMachineCode()))
                 ? event.getPreparationDeadline() : null;
         for (int attempt = 0; attempt < MAX_ALLOCATION_ATTEMPTS; attempt++) {
-            // 历史指定交替只能在计划班次及之前开始；顺延、停机避让及额度判断共用此截止。
+            // 历史指定交替允许顺延；停机避让及额度判断共用当前准备日与本次窗口的有效截止。
             if (Objects.nonNull(historicalDeadline) && !cursor.before(historicalDeadline)) {
                 return null;
             }
@@ -252,6 +341,9 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
             String dateKey = this.formatDateKey(cursor);
             int[] counts = countMap.getOrDefault(dateKey, new int[]{0, 0});
             if (strictLimits && this.getTotalUsed(counts) >= this.getDailyLimit(context, dateKey)) {
+                this.recordQuotaDelay(context, machineCode, cursor,
+                        this.getNextCalendarDayMorningStart(context, cursor), "CHANGEOVER_DAILY_QUOTA",
+                        this.getTotalUsed(counts), this.getDailyLimit(context, dateKey));
                 if (this.isOnOrAfterScheduleTargetDate(context, cursor)) {
                     return null;
                 }
@@ -263,6 +355,9 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
                 if (counts[IDX_MORNING] < this.getMorningLimit(context, dateKey)) {
                     return cursor;
                 }
+                this.recordQuotaDelay(context, machineCode, cursor,
+                        LhScheduleTimeUtil.getAfternoonShiftStart(context, cursor), "CHANGEOVER_MORNING_QUOTA",
+                        counts[IDX_MORNING], this.getMorningLimit(context, dateKey));
                 if (!strictLimits) {
                     // 关闭态保持原正式行为：早班满后从中班起点继续避让，不附加新日终限制。
                     cursor = LhScheduleTimeUtil.getAfternoonShiftStart(context, cursor);
@@ -278,6 +373,13 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
             } else if (LhScheduleTimeUtil.isAfternoonShift(context, cursor)
                     && counts[IDX_AFTERNOON] < this.getAfternoonLimit(context, dateKey)) {
                 return cursor;
+            }
+            if (counts[IDX_AFTERNOON] >= this.getAfternoonLimit(context, dateKey)) {
+                Date afternoonStart = LhScheduleTimeUtil.isAfternoonShift(context, cursor)
+                        ? cursor : LhScheduleTimeUtil.getAfternoonShiftStart(context, cursor);
+                this.recordQuotaDelay(context, machineCode, afternoonStart,
+                        this.getNextCalendarDayMorningStart(context, cursor), "CHANGEOVER_AFTERNOON_QUOTA",
+                        counts[IDX_AFTERNOON], this.getAfternoonLimit(context, dateKey));
             }
             if (strictLimits && this.isOnOrAfterScheduleTargetDate(context, cursor)) {
                 return null;
@@ -517,8 +619,8 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
             Date switchReadyTime, int switchDurationHours, SkuScheduleDTO sku, String actionType,
             Date businessDayEndTime, Map<String, int[]> simulatedCountMap) {
         // 内核不修改Map，失败时不会留下空日期或部分次数；成功才计入组内模拟账本。
-        Date time = this.resolveMouldChangeStart(context, machineCode, switchReadyTime,
-                switchDurationHours, businessDayEndTime, simulatedCountMap);
+        Date time = this.resolveMouldChangeDecision(context, machineCode, switchReadyTime,
+                switchDurationHours, businessDayEndTime, simulatedCountMap, sku).getStartTime();
         if (Objects.nonNull(time)) {
             this.registerMouldChangeCount(context, time, simulatedCountMap);
         }

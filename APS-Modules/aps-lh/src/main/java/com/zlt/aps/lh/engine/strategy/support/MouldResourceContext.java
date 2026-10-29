@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -56,6 +57,11 @@ public class MouldResourceContext {
     private final Map<String, LinkedHashSet<String>> machineBoundMouldCodeMap;
     /** 本次排程已被SKU实际占用的模具号集合 */
     private final LinkedHashSet<String> occupiedMouldCodeSet;
+
+    /**
+     * 当前资源日期版本的台账诊断缓存，首次拒绝时按SKU创建，刷新可用性后清空。
+     */
+    private final Map<String, Set<MouldResourceDiagnosticCause>> skuDiagnosticCauseMap = new HashMap<>();
 
     private MouldResourceContext(LhScheduleContext scheduleContext,
                                  Map<String, List<String>> skuAvailableMouldCodeMap,
@@ -126,6 +132,7 @@ public class MouldResourceContext {
         skuUnavailableMouldCodeMap.putAll(refreshedUnavailableMap);
         skuUnavailableModelInfoMap.clear();
         skuUnavailableModelInfoMap.putAll(refreshedUnavailableModelInfoMap);
+        skuDiagnosticCauseMap.clear();
         log.debug("模具资源可用性按业务日刷新, scheduleDate: {}, availableSkuCount: {}, "
                         + "occupiedMouldQty: {}, boundMachineCount: {}",
                 context.getCurrentScheduleDate(), skuAvailableMouldCodeMap.size(),
@@ -313,6 +320,7 @@ public class MouldResourceContext {
                     skuUnavailableMouldCodeMap.get(materialCode),
                     resolveInsufficientReason(materialCode));
             rejectedResult.setMachineCode(machineCode);
+            this.attachRejectionDiagnostic(rejectedResult, materialCode, resourceReferenceTime, true, false);
             return rejectedResult;
         }
         Set<String> releasableMouldCodeSet = machineBoundMouldCodeMap.get(machineCode);
@@ -373,6 +381,16 @@ public class MouldResourceContext {
                     occupiedForcedMouldCodeList, skuUnavailableMouldCodeMap.get(materialCode),
                     resolveInsufficientReason(materialCode));
             rejectedResult.setMachineCode(machineCode);
+            List<MdmSkuMouldRel> relations = CollectionUtils.isEmpty(scheduleContext.getSkuMouldRelMap())
+                    ? null : scheduleContext.getSkuMouldRelMap().get(materialCode);
+            Set<String> definedCodes = CollectionUtils.isEmpty(relations) ? Collections.emptySet() : relations.stream()
+                    .filter(Objects::nonNull).map(MdmSkuMouldRel::getMouldCode).filter(StringUtils::isNotBlank)
+                    .map(String::trim).collect(java.util.stream.Collectors.toSet());
+            this.attachRejectionDiagnostic(rejectedResult, materialCode, resourceReferenceTime,
+                    forcedMouldCodeSet.size() != requiredMouldQty
+                            || (!CollectionUtils.isEmpty(availableMouldCodeList)
+                            && !availableMouldCodeList.containsAll(forcedMouldCodeSet)),
+                    !definedCodes.containsAll(forcedMouldCodeSet));
             return rejectedResult;
         }
         List<String> releasedMouldCodeList = CollectionUtils.isEmpty(releasableMouldCodeSet)
@@ -446,6 +464,7 @@ public class MouldResourceContext {
                     occupiedSkuMouldCodeList, skuUnavailableMouldCodeMap.get(materialCode),
                     resolveNoAvailableReason(materialCode));
             rejectedResult.setMachineCode(machineCode);
+            this.attachRejectionDiagnostic(rejectedResult, materialCode, resourceReferenceTime, false, false);
             return rejectedResult;
         }
         if (remainingAvailableMouldQty < requiredMouldQty) {
@@ -454,6 +473,7 @@ public class MouldResourceContext {
                     occupiedSkuMouldCodeList, skuUnavailableMouldCodeMap.get(materialCode),
                     resolveInsufficientReason(materialCode));
             rejectedResult.setMachineCode(machineCode);
+            this.attachRejectionDiagnostic(rejectedResult, materialCode, resourceReferenceTime, false, false);
             return rejectedResult;
         }
         List<String> allocatedMouldCodeList = new ArrayList<String>(requiredMouldQty);
@@ -474,6 +494,7 @@ public class MouldResourceContext {
                     occupiedSkuMouldCodeList, skuUnavailableMouldCodeMap.get(materialCode),
                     resolveInsufficientReason(materialCode));
             rejectedResult.setMachineCode(machineCode);
+            this.attachRejectionDiagnostic(rejectedResult, materialCode, resourceReferenceTime, false, false);
             return rejectedResult;
         }
         List<String> releasedMouldCodeList = CollectionUtils.isEmpty(releasableMouldCodeSet)
@@ -582,6 +603,93 @@ public class MouldResourceContext {
                         + "mouldCodes: {}",
                 materialCode, machineCode, selectedMouldCodes);
         return selectedMouldCodes;
+    }
+
+    /**
+     * 从本次已有拒绝及资源事实补充子因，不重做分配、不写占用账本。
+     * 有效模具本身足量而被占用时，即使另有异常台账也保留明确的数量短缺证据。
+     *
+     * @param result 原拒绝结果
+     * @param materialCode 目标物料
+     * @param referenceTime 原资源请求时刻
+     * @param exactMismatch 指定数量或限定组合不符
+     * @param invalidExactCodes 指定模具不在有效关系集合
+     */
+    private void attachRejectionDiagnostic(MouldResourceAllocationResult result, String materialCode,
+            Date referenceTime, boolean exactMismatch, boolean invalidExactCodes) {
+        Set<MouldResourceDiagnosticCause> causes = EnumSet.noneOf(MouldResourceDiagnosticCause.class);
+        result.setResourceReferenceTime(new Date(referenceTime.getTime()));
+        if (exactMismatch) {
+            causes.add(MouldResourceDiagnosticCause.EXACT_COMBINATION_MISMATCH);
+        }
+        if (invalidExactCodes) {
+            causes.add(MouldResourceDiagnosticCause.RELATION_MISMATCH);
+        }
+        for (String mouldCode : result.getOccupiedMouldCodeList()) {
+            causes.add(this.isBeforeCommittedRelease(mouldCode, referenceTime)
+                    ? MouldResourceDiagnosticCause.RELEASE_NOT_REACHED : MouldResourceDiagnosticCause.OCCUPIED);
+        }
+        causes.addAll(skuDiagnosticCauseMap.computeIfAbsent(materialCode, this::resolveUnavailableDiagnosticCauses));
+        boolean validStockBlocked = result.getAvailableMouldQty() >= result.getRequiredMouldQty()
+                && result.getRemainingAvailableMouldQty() < result.getRequiredMouldQty();
+        boolean unexplainedByData = !causes.contains(MouldResourceDiagnosticCause.MODEL_INFO_MISSING)
+                && !causes.contains(MouldResourceDiagnosticCause.DISABLED)
+                && !causes.contains(MouldResourceDiagnosticCause.RELATION_MISMATCH);
+        boolean shortage = !exactMismatch && !invalidExactCodes && (validStockBlocked || unexplainedByData);
+        if (shortage) {
+            causes.add(MouldResourceDiagnosticCause.QUANTITY_SHORTAGE);
+        }
+        result.setQuantityShortage(shortage);
+        if (shortage) {
+            List<Date> unreleasedTimes = result.getOccupiedMouldCodeList().stream()
+                    .map(code -> scheduleContext.getPreScheduledMouldReleaseTimeMap().get(code))
+                    .filter(Objects::nonNull).filter(time -> time.after(referenceTime))
+                    .collect(java.util.stream.Collectors.toList());
+            // 即便其他占用全部立即释放，这些已提交的未来释放仍足以阻断所需数量时才跨班。
+            if (result.getAvailableMouldQty() - unreleasedTimes.size() < result.getRequiredMouldQty()
+                    && !unreleasedTimes.isEmpty()) {
+                result.setShortageBlockedUntil(unreleasedTimes.stream().min(Date::compareTo)
+                        .map(time -> new Date(time.getTime())).orElse(null));
+            }
+        }
+        result.setDiagnosticCauses(Collections.unmodifiableSet(causes));
+    }
+
+    /**
+     * 仅在当前资源版本首次拒绝该SKU时区分缺失、禁用和未到货，候选重复扫描复用缓存。
+     *
+     * @param materialCode 目标物料
+     * @return 只读台账及关系子因
+     */
+    private Set<MouldResourceDiagnosticCause> resolveUnavailableDiagnosticCauses(String materialCode) {
+        Set<MouldResourceDiagnosticCause> causes = EnumSet.noneOf(MouldResourceDiagnosticCause.class);
+        List<MdmSkuMouldRel> relations = CollectionUtils.isEmpty(scheduleContext.getSkuMouldRelMap())
+                    ? null : scheduleContext.getSkuMouldRelMap().get(materialCode);
+        boolean hasDefinedMould = false;
+        if (!CollectionUtils.isEmpty(relations)) {
+            for (MdmSkuMouldRel relation : relations) {
+                if (relation == null || StringUtils.isBlank(relation.getMouldCode())) {
+                    continue;
+                }
+                hasDefinedMould = true;
+                String mouldCode = relation.getMouldCode().trim();
+                MdmModelInfo model = scheduleContext.getModelInfoMap() == null
+                        ? null : scheduleContext.getModelInfoMap().get(mouldCode);
+                if (model != null && !MouldStatusUtil.isEnabled(model.getMouldStatus())) {
+                    causes.add(MouldResourceDiagnosticCause.DISABLED);
+                } else if (model == null && relation.getBoardingDate() != null
+                        && (scheduleContext.getCurrentScheduleDate() == null
+                        || relation.getBoardingDate().after(scheduleContext.getCurrentScheduleDate()))) {
+                    causes.add(MouldResourceDiagnosticCause.NOT_ARRIVED);
+                } else if (model == null && relation.getBoardingDate() == null) {
+                    causes.add(MouldResourceDiagnosticCause.MODEL_INFO_MISSING);
+                }
+            }
+        }
+        if (!hasDefinedMould) {
+            causes.add(MouldResourceDiagnosticCause.RELATION_MISMATCH);
+        }
+        return Collections.unmodifiableSet(causes);
     }
 
     private int resolveRequiredMouldQty(String machineCode) {

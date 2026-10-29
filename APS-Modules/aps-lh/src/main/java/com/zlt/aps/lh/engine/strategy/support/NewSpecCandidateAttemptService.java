@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Date;
 import java.util.Collections;
 import java.util.Objects;
@@ -172,6 +173,15 @@ public class NewSpecCandidateAttemptService {
             }
             return null;
         }
+        if (candidate.getSku().isEndingDeferredExpansion()) {
+            LocalDate actualProductionDate = productionOccupationShift.getWorkDate() == null ? null
+                    : productionOccupationShift.getWorkDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+            if (!SkuEndingDeferredExpansionPolicy.allowsProposal(context, candidate.getSku(),
+                    dayContext.getScheduleDate(), actualProductionDate)) {
+                candidate.setLastFailure("收尾延期增机需在首个实际可排业务日参与竞争");
+                return null;
+            }
+        }
         LhShiftConfigVO competitionTargetShift =
                 availabilityPlan.getCompetitionTargetShift();
         if (actualAvailableTimeMode
@@ -237,11 +247,16 @@ public class NewSpecCandidateAttemptService {
         // 历史指定、独立结构竞争及普通提案复核共用冻结的准备后最早首检时间。
         String selectionFailure = StructureSwitchSelectionTimePolicy.validate(
                 context, candidate.getSku(), availabilityPlan);
+        StructureLimitRejectionCode selectionCode = StructureLimitRejectionCode.WAITING_TIME;
         if (StringUtils.isEmpty(selectionFailure)) {
             // 普通新增也检查供胚新增名额，正式开产在中班不能掩盖早班首检正量。
-            selectionFailure = EmbryoSupplyNewMachineLimitPolicy.validatePlan(
+            StructureGateDiagnostic diagnostic = EmbryoSupplyNewMachineLimitPolicy.validatePlanDiagnostic(
                     context, candidate.getSku(), matchResult.getMachine().getMachineCode(),
                     availabilityPlan.getFirstInspectionPlan(), availabilityPlan.getFormalAvailableProductionTime());
+            if (diagnostic != null) {
+                selectionFailure = diagnostic.getReason();
+                selectionCode = diagnostic.getCode();
+            }
         }
         if (StringUtils.isNotEmpty(selectionFailure)) {
             return new StructureMachineLimitDecision(true, false, dayContext.getCurrentPhase(),
@@ -250,7 +265,7 @@ public class NewSpecCandidateAttemptService {
                     matchResult.getMachine().getMachineCode(),
                     LhSingleControlMachineUtil.resolvePhysicalMachineCode(matchResult.getMachine().getMachineCode()),
                     candidate.getSku().getMaterialCode(), candidate.getSku().getStructureName(), poolDate,
-                    Collections.emptySet(), Collections.emptySet(), 0, 0, selectionFailure);
+                    Collections.emptySet(), Collections.emptySet(), 0, 0, selectionFailure, selectionCode);
         }
         // 新增分班限制叠加原准入，实际顺延后以冻结时间轴重新校验。
         StructureMachineLimitDecision switchDecision = StructureSwitchSchedulingPolicy.evaluate(context,

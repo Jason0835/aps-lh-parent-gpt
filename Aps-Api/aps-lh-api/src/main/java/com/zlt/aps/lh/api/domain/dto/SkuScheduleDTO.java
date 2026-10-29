@@ -165,6 +165,10 @@ public class SkuScheduleDTO {
     private Set<String> temporaryFaultSourceMachineCodeSet = new LinkedHashSet<String>(2);
     /** 续作增机台补偿SKU首次允许新增机台生效的业务日期 */
     private LocalDate firstAddMachineProductionDate;
+    /**
+     * 由结构收尾延期评估生成的普通续作补偿，仅允许本轮首个实际可排业务日新开机台。
+     */
+    private boolean endingDeferredExpansion;
     /** 续作增机台补偿SKU生成时已有的续作机台数 */
     private int continuationActiveMachineCount;
     /** 续作增机台补偿SKU生成时 dayN 要求的最小机台数 */

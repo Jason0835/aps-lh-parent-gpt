@@ -1,5 +1,6 @@
 package com.zlt.aps.lh.service.impl;
 
+import com.zlt.aps.lh.engine.strategy.support.SkuEndingDeferredExpansionPolicy;
 import org.apache.commons.lang3.StringUtils;
 
 import com.zlt.aps.lh.api.domain.dto.SkuDailyPlanQuotaDTO;
@@ -174,6 +175,10 @@ public class NewSpecMaterialEligibilityService {
             SkuScheduleDTO sku, LocalDate date, boolean specifiedTrial) {
         DailyNewSpecCandidate candidate = new DailyNewSpecCandidate(
                 MonthPlanDateResolver.buildMaterialStatusKey(sku.getMaterialCode(), sku.getProductStatus()), sku);
+        if (!SkuEndingDeferredExpansionPolicy.allowsExpansion(context, sku, date)) {
+            candidate.setLastFailure("SKU收尾延期增机仅在首个实际可排日且仍有延期产能缺口时允许追加");
+            return candidate;
+        }
         if (StructureSwitchCandidateScope.shouldDefer(context, sku)) {
             candidate.setLastFailure("结构切换候选由独立结构切换步骤统一排产");
             return candidate;

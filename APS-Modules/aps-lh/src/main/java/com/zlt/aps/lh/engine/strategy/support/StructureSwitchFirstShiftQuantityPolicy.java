@@ -4,6 +4,7 @@ import com.zlt.aps.cx.entity.config.CxEmbryoLhTime;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
+import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
@@ -74,6 +75,8 @@ public final class StructureSwitchFirstShiftQuantityPolicy {
 
     /**
      * 读取冻结来源，后续回裁不重新推导场景；无冻结计划的普通结果不扩大适用范围。
+     * 普通续作仅参与结构机台与已用量统计，不因来源识别扩展而回裁既有数量。
+     *
      * @param context 当前上下文
      * @param result 当前结果
      * @return 已确认的切换来源，无切换身份为空
@@ -83,8 +86,24 @@ public final class StructureSwitchFirstShiftQuantityPolicy {
         if (Objects.nonNull(plan)) {
             return plan.getSource();
         }
+        if (isOrdinaryContinuation(context, result)) {
+            return null;
+        }
         SkuScheduleDTO sku = context.getScheduleResultSourceSkuMap().get(result);
         return Objects.isNull(sku) ? null : StructureSwitchSchedulingPolicy.resolveSource(context, sku);
+    }
+
+    /**
+     * 判断未绑定切换计划的普通续作，保留其原生产数量处理。
+     *
+     * @param context 当前切换计划绑定关系
+     * @param result 待判断的结果
+     * @return 未绑定切换计划且不是换活字块的续作结果时为 true
+     */
+    private static boolean isOrdinaryContinuation(LhScheduleContext context, LhScheduleResult result) {
+        return !context.getStructureSwitchResultPlanMap().containsKey(result)
+                && StringUtils.equals(ScheduleTypeEnum.CONTINUOUS.getCode(), result.getScheduleType())
+                && !StringUtils.equals("1", result.getIsTypeBlock());
     }
 
     /**
@@ -167,6 +186,8 @@ public final class StructureSwitchFirstShiftQuantityPolicy {
 
     /**
      * 限制本次普通生产增量，当前结果已写首检只参与一次累计与最终模数归整。
+     * 未绑定切换计划的普通续作保持原增量，不因同结构新候选进入切换而追加数量限制。
+     *
      * @param context 当前上下文
      * @param sku 当前SKU
      * @param result 当前候选结果
@@ -176,6 +197,9 @@ public final class StructureSwitchFirstShiftQuantityPolicy {
      */
     public static int capIncrement(LhScheduleContext context, SkuScheduleDTO sku, LhScheduleResult result,
             LhShiftConfigVO shift, int proposed) {
+        if (isOrdinaryContinuation(context, result)) {
+            return Math.max(0, proposed);
+        }
         CxEmbryoLhTime source = resolveSource(context, result);
         if (Objects.isNull(source)) {
             source = StructureSwitchSchedulingPolicy.resolveSource(context, sku);

@@ -24,6 +24,16 @@ public class MachineCleaningWindowDTO implements Serializable {
     /** 首检结束归属班次的标准开始时间，用于跨班边界识别 */
     private Date sandBlastInspectionShiftStartTime;
 
+    /**
+     * 在机喷砂的实际首检开始时间；组合准备晚于清洗结束时单独保存，普通喷砂为空。
+     */
+    private Date sandBlastInspectionStartTime;
+
+    /**
+     * 与本次在机喷砂、05维修共同执行的有效精度计划主键。
+     */
+    private Long sandBlastRepairPrecisionPlanId;
+
     /** 来源设备停机计划主键，用于最终处置阶段精确回填排程日期 */
     private Long sourcePlanId;
     /**

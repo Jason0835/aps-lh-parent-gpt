@@ -56,12 +56,12 @@ public final class RepairPlanRuntimeState {
     private long constraintVersion;
 
     /**
-     * 当前候选持有的维修等待投影，退出作用域后恢复外层视图。
+     * 当前候选持有的维修执行视图，完整收尾排除对应05，退出作用域后恢复外层视图。
      */
     private List<MdmDevicePlanShut> scopedStopPlans;
 
     /**
-     * 已兑现等待投影对应的固定实际来源列表，仅用于当前批次视图复用。
+     * 已确认执行视图对应的固定实际来源列表，仅用于当前批次视图复用。
      */
     private List<MdmDevicePlanShut> committedStopSource;
     /**

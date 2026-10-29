@@ -2,6 +2,7 @@ package com.zlt.aps.lh.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.zlt.aps.lh.api.domain.entity.LhNextShiftNewPlan;
+import com.zlt.aps.lh.engine.strategy.support.ScheduleResultSceneTypeSupport;
 import com.zlt.aps.lh.mapper.LhNextShiftNewPlanMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -100,6 +101,7 @@ public class LhNextShiftNewPlanPersistenceService {
                     plan.setUpdateBy(actualOperator);
                     plan.setUpdateTime(now);
                     plan.setIsDelete(0);
+                    plan.setSceneType(ScheduleResultSceneTypeSupport.normalizeCode(plan.getSceneType()));
                 });
         for (LhNextShiftNewPlan plan : planList) {
             nextShiftNewPlanMapper.insert(plan);

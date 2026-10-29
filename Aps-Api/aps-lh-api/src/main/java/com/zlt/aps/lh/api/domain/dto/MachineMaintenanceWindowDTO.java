@@ -45,7 +45,7 @@ public class MachineMaintenanceWindowDTO {
     /** 仅05容量窗口使用：每个来源维修日期的早班起止，跨日合并维修仍保留各自固定量班别。 */
     private Map<Date, Date> repairFixedQtyShiftWindowMap = new LinkedHashMap<>(3);
     /**
-     * 仅05候选容量投影使用：已与真实切换区间相交，预热由组合准备覆盖，后料不沿用维修前固定量。
+     * 仅05候选容量投影使用：已与真实切换相交，保留一次维修预热并等待组合准备，后料不沿用维修前固定量。
      */
     private boolean repairCombinedWithSwitch;
     /** 当前生产截止时间；公共编排使用判定返回的维护开始，旧窗口保持原契约。 */

@@ -75,8 +75,9 @@ public class LhDeviceStopPlanScheduleService {
     }
 
     /**
-     * 回填已确认的来源日期，也供班次9复用其独立保存事务。
-     * @param scheduleDates 来源计划主键到实际执行日期
+     * 回填实际执行日期，或清除因完整收尾取消维修的旧安排日期；班次9沿用同一事务入口。
+     *
+     * @param scheduleDates 来源计划主键到实际执行日期，空值表示本轮取消后的旧日期清理
      * @return 实际更新条数
      */
     public int batchFillStopScheduleDates(Map<Long, Date> scheduleDates) {
@@ -86,7 +87,16 @@ public class LhDeviceStopPlanScheduleService {
             update.setId(entry.getKey());
             update.setScheduleDate(entry.getValue());
             // 仅更新来源日期，更新条数异常只记录应用日志，不把校验升级为排程中断。
-            int affectedRows = mdmDevicePlanShutMapper.updateById(update);
+            int affectedRows;
+            if (entry.getValue() == null) {
+                // updateById会忽略空字段，取消本轮维修须显式清除旧执行日期。
+                affectedRows = mdmDevicePlanShutMapper.update(null,
+                        new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<MdmDevicePlanShut>()
+                                .eq(MdmDevicePlanShut::getId, entry.getKey())
+                                .set(MdmDevicePlanShut::getScheduleDate, null));
+            } else {
+                affectedRows = mdmDevicePlanShutMapper.updateById(update);
+            }
             if (affectedRows != 1) {
                 log.warn("设备停机排程日期回填条数异常，不阻断排程, 计划ID: {}, 排程日期: {}, 更新条数: {}",
                         entry.getKey(), entry.getValue(), affectedRows);
@@ -97,9 +107,10 @@ public class LhDeviceStopPlanScheduleService {
     }
 
     /**
-     * 计算本轮已锁定设备窗口的回填日期。无SKU产出也可实际安排维修或发生故障。
+     * 计算本轮设备窗口的回填日期；无SKU产出也可实际安排维修或发生故障。
+     *
      * @param context 完成排程的上下文
-     * @return 来源计划ID到实际开始日期，不使用本次请求日期替代
+     * @return 来源计划ID到回填日期；05取实际开始日，06取与本轮班次交集的开始日
      */
     public Map<Long, Date> resolveScheduledStopDates(LhScheduleContext context) {
         return repairPlanScheduleService.finalizeResults(context).getScheduleDateFillMap();

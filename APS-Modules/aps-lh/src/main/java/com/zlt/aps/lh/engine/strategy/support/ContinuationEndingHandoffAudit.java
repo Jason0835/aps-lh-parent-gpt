@@ -41,6 +41,7 @@ public final class ContinuationEndingHandoffAudit {
 
     /**
      * 所有后料、首检和后置裁量完成后，对照续作提交快照。
+     * 普通余量组未完成时核对继续生产及独立硬退出，不把旧收尾节点作为错开下机验收依据。
      *
      * @param context 最终排程上下文
      * @return 存在差异的结果行数与生产收尾异常组数，供聚焦回归复核
@@ -69,9 +70,13 @@ public final class ContinuationEndingHandoffAudit {
         int differences = 0;
         for (LhScheduleResult original : originals) {
             ContinuationEndingAllocationSnapshot snapshot = context.getContinuationSurplusEndingSnapshotMap().get(original);
+            boolean unfinishedGroup = ContinuationSurplusCompletionSupport.hasIncompleteGroup(context, original);
             // 零量06点释放也有业务约束，必须在跳过无生产结果前核对。
-            boolean tDayValid = auditTDayConstraint(context, original, snapshot, finalResults);
-            boolean nightValid = auditNightConstraint(context, original, snapshot, finalResults);
+            // 未完成组不再推导旧收尾角色；仍携带显式节点约束的硬退出继续核对原约束。
+            boolean tDayValid = (unfinishedGroup && Objects.isNull(snapshot.getTDayFinishConstraint()))
+                    || auditTDayConstraint(context, original, snapshot, finalResults);
+            boolean nightValid = (unfinishedGroup && Objects.isNull(snapshot.getNightFinishConstraint()))
+                    || auditNightConstraint(context, original, snapshot, finalResults);
             if (!tDayValid || !nightValid) {
                 differences++;
                 invalidProductionGroups.add(snapshot.getGroupKey());
@@ -80,9 +85,20 @@ public final class ContinuationEndingHandoffAudit {
                 continue;
             }
             String machine = LhSingleControlMachineUtil.resolvePhysicalMachineCode(original.getLhMachineCode());
-            expectedGroups.computeIfAbsent(snapshot.getGroupKey(), key -> new HashSet<String>(4)).add(machine);
+            if (!unfinishedGroup) {
+                expectedGroups.computeIfAbsent(snapshot.getGroupKey(), key -> new HashSet<String>(4)).add(machine);
+            }
             LhScheduleResult following = findFollowing(context, original, snapshot, byMachine.get(machine));
             List<String> reasons = inspectResult(context, original, snapshot, following);
+            if (unfinishedGroup) {
+                PriorityTraceLogHelper.appendProcessLog(context, "续作余量未完成组核对",
+                        "组=" + snapshot.getGroupKey() + "，机台=" + machine + "，状态=" + snapshot.getFinishState()
+                                + "，结论=整组余量未排完，不适用余量收尾错开下机验收，继续核对实际生产与硬退出");
+                if (snapshot.getFinishState() == ContinuationMachineFinishPlan.FinishState.SURPLUS_COMPLETED
+                        && ContinuationSurplusCompletionSupport.isUnfinishedContinuation(context, original)) {
+                    reasons.add("普通余量组未完成仍保留已完成收尾快照");
+                }
+            }
             if (Objects.nonNull(snapshot.getHistoricalFinishPlanId())) {
                 boolean roleValid = StringUtils.equals(machine, snapshot.getFinishRoleMachineCode())
                         && Objects.nonNull(snapshot.getFinishDeadline())
@@ -453,7 +469,15 @@ public final class ContinuationEndingHandoffAudit {
                 .min(Comparator.comparing(LhScheduleResult::getMouldChangeStartTime)).orElse(null);
     }
 
-    /** @param context 上下文 @param result 最终前料 @param snapshot 提交快照 @param following 正式后料 @return 只读差异原因 */
+    /**
+     * 核对最终前后料时间轴、提交快照及历史指定边界，不能用一致的错误快照代替业务约束。
+     *
+     * @param context 最终排程上下文
+     * @param result 最终前料结果
+     * @param snapshot 提交时的逐机快照
+     * @param following 正式后料，无后续生产时为空
+     * @return 数量、时间及实际交替的差异原因
+     */
     private static List<String> inspectResult(LhScheduleContext context, LhScheduleResult result,
             ContinuationEndingAllocationSnapshot snapshot, LhScheduleResult following) {
         List<String> reasons = new ArrayList<>(6);
@@ -461,6 +485,13 @@ public final class ContinuationEndingHandoffAudit {
             reasons.add("后续阶段改变了已提交班次量或跨日归属");
         }
         Date finalEnd = lastEnd(result);
+        PreviousAlternatePlanReleaseEvent historicalEvent = context.getPreviousAlternateReleaseEventMap()
+                .get(result.getLhMachineCode());
+        boolean fixedCutover = Objects.nonNull(historicalEvent) && historicalEvent.isFixedHistoricalCutover();
+        if (fixedCutover && Objects.nonNull(finalEnd)
+                && finalEnd.after(historicalEvent.getPlannedShiftStartTime())) {
+            reasons.add("前料实际生产越过历史指定交替起点");
+        }
         if (!Objects.equals(snapshot.getProductionEndTime(), finalEnd)) {
             reasons.add("后置时间轴与续作提交快照不同");
         }
@@ -468,6 +499,12 @@ public final class ContinuationEndingHandoffAudit {
             return reasons;
         }
         Date change = following.getMouldChangeStartTime();
+        if (fixedCutover && Objects.nonNull(change)
+                && StringUtils.equals(historicalEvent.getPlan().getAfterMaterialCode(), following.getMaterialCode())
+                && StringUtils.equals(historicalEvent.getPlan().getProductStatus(), following.getProductStatus())
+                && change.before(historicalEvent.getPlannedShiftStartTime())) {
+            reasons.add("指定后料实际准备早于历史指定交替起点");
+        }
         if ((Objects.nonNull(finalEnd) && change.before(finalEnd))
                 || (Objects.nonNull(snapshot.getReleaseTime()) && change.before(snapshot.getReleaseTime()))) {
             reasons.add("实际交替早于前料生产结束或物理释放边界");

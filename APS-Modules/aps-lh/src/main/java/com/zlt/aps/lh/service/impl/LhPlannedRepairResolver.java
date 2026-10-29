@@ -189,12 +189,6 @@ public final class LhPlannedRepairResolver {
                 for (LhShiftConfigVO shift : LhScheduleTimeUtil.getScheduleShifts(
                         context, context.getScheduleDate())) {
                     if (ShiftEnum.MORNING_SHIFT == shift.resolveShiftTypeEnum()
-                            && devicePlanShutList.stream().noneMatch(plan ->
-                            Objects.equals(plan.getBeginDate(), repairInterval[0])
-                                    && StringUtils.equals(
-                                    LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode),
-                                    LhSingleControlMachineUtil.resolvePhysicalMachineCode(plan.getMachineCode()))
-                                    && LhRepairEndingDeferralPolicy.isDeferred(context, plan))
                             && hasRepairStartingOnWorkDate(
                             devicePlanShutList, machineCode, repairInterval, shift.getWorkDate())) {
                         repairWindow.getRepairFixedQtyShiftWindowMap().put(

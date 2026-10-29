@@ -96,8 +96,10 @@ public class LhCleaningPlanFinalizer {
                 continue;
             }
             boolean combinedWithTypeBlock = this.applySandBlastTypeBlockAnalysis(context, machineCode, window);
+            Date countingTime = window.getSandBlastRepairPrecisionPlanId() == null
+                    ? window.getReadyTime() : window.getSandBlastInspectionShiftStartTime();
             LhShiftConfigVO shift = LhScheduleTimeUtil.resolveShiftByTime(
-                    context.getScheduleWindowShifts(), window.getReadyTime());
+                    context.getScheduleWindowShifts(), countingTime);
             if (Objects.isNull(shift)) {
                 continue;
             }
@@ -246,6 +248,7 @@ public class LhCleaningPlanFinalizer {
                                                 LhShiftConfigVO shift, MachineScheduleDTO machine,
                                                 MachineCleaningWindowDTO window, boolean combinedWithTypeBlock) {
         int shiftIndex = shift.getShiftIndex();
+        Date inspectionStart = MachineCleaningOverlapUtil.resolveSandBlastInspectionStartTime(window);
         int planQty = ShiftFieldUtil.getShiftPlanQty(result, shiftIndex);
         Date originalStart = ShiftFieldUtil.getShiftStartTime(result, shiftIndex);
         // 默认喷砂结束班次在首检前没有生产；确有清洗前生产时保留原起点。
@@ -256,7 +259,7 @@ public class LhCleaningPlanFinalizer {
                 machine.getMaintenanceWindowList());
         long beforeSeconds = ShiftCapacityResolverUtil.resolveNetProductiveSeconds(
                 context.getDevicePlanShutList(), cleaningWindows, maintenanceWindows,
-                result.getLhMachineCode(), originalStart, window.getCleanEndTime());
+                result.getLhMachineCode(), originalStart, inspectionStart);
         int baseCapacity = ShiftCapacityResolverUtil.resolveActualShiftPlanQty(
                 Objects.isNull(result.getSingleMouldShiftQty()) ? 0 : result.getSingleMouldShiftQty(), shift,
                 ShiftCapacityResolverUtil.resolveOddShiftCapacityPlusShiftType(context), result.getScheduleType());
@@ -268,7 +271,7 @@ public class LhCleaningPlanFinalizer {
                 ShiftCapacityResolverUtil.resolveSandBlastInspectionQty(context, window));
         if (beforeSeconds <= 0) {
             ShiftFieldUtil.setShiftPlanQty(result, shiftIndex, planQty,
-                    window.getCleanEndTime(), ShiftFieldUtil.getShiftEndTime(result, shiftIndex));
+                    inspectionStart, ShiftFieldUtil.getShiftEndTime(result, shiftIndex));
         }
         // 组合事件已在准备班次展示，实际首检数量和时间核验继续执行，仅抑制同源重复备注。
         if (!combinedWithTypeBlock) {
@@ -281,7 +284,7 @@ public class LhCleaningPlanFinalizer {
                 result.getLhMachineCode(), result.getMaterialCode(), window.getSandBlastSequence(),
                 LhScheduleTimeUtil.formatDateTime(window.getCleanStartTime()),
                 LhScheduleTimeUtil.formatDateTime(window.getCleanEndTime()),
-                LhScheduleTimeUtil.formatDateTime(window.getCleanEndTime()),
+                LhScheduleTimeUtil.formatDateTime(inspectionStart),
                 LhScheduleTimeUtil.formatDateTime(window.getReadyTime()), inspectionQty,
                 Math.max(0, planQty - beforeQty - inspectionQty), planQty, shiftIndex);
     }

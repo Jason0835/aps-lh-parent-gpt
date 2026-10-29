@@ -6,6 +6,10 @@ import java.util.Date;
 /** 一台物理机台的余量收尾计算结果，零量释放不伪造生产班次。 */
 @Data
 public class ContinuationMachineFinishPlan {
+    /**
+     * 精确历史指定交替前缀，独立于普通错峰收尾节点。
+     */
+    public static final String HISTORICAL_CUTOVER_RULE = "历史指定交替前缀";
     /** 物理机台合计计划量。 */
     private int planQty;
     /** 最后正产量班次，零量时为空。 */

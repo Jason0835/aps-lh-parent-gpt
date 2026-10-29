@@ -22,9 +22,13 @@ public final class CleaningPlanTimeline {
      */
     private final Date cleanStartTime;
     /**
-     * 实际清洗结束时间，也是普通在机喷砂首检开始时间。
+     * 实际清洗结束时间，不随维修、精度及首检等待后移。
      */
     private final Date cleanEndTime;
+    /**
+     * 已显式安排的在机喷砂首检开始时间，未组合时为空。
+     */
+    private final Date inspectionStartTime;
     /**
      * 普通在机喷砂首检结束时间；离机喷砂不承接机台首检。
      */
@@ -51,6 +55,7 @@ public final class CleaningPlanTimeline {
         this.sourcePlanEndTime = copy(window.getSourcePlanEndTime());
         this.cleanStartTime = copy(window.getCleanStartTime());
         this.cleanEndTime = copy(window.getCleanEndTime());
+        this.inspectionStartTime = copy(window.getSandBlastInspectionStartTime());
         this.inspectionEndTime = !window.isOffMachineCleaning()
                 && CleaningTypeEnum.SAND_BLAST.getCode().equals(window.getCleanType())
                 ? copy(window.getReadyTime()) : null;
@@ -87,12 +92,20 @@ public final class CleaningPlanTimeline {
         return copy(cleanStartTime);
     }
     /**
-     * 获取实际清洗结束时间，也是普通在机喷砂首检开始时间的独立副本。
+     * 获取实际清洗结束时间的独立副本。
      *
      * @return 时间副本，未形成该时间时为空
      */
     public Date getCleanEndTime() {
         return copy(cleanEndTime);
+    }
+    /**
+     * 获取显式安排的在机喷砂首检开始时间。
+     *
+     * @return 独立日期副本，普通未组合喷砂为空
+     */
+    public Date getInspectionStartTime() {
+        return copy(inspectionStartTime);
     }
     /**
      * 获取普通在机喷砂首检结束时间；离机喷砂不承接机台首检的独立副本。

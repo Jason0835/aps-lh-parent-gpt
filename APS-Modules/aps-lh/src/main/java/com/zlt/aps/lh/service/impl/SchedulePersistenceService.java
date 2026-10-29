@@ -23,6 +23,7 @@ import com.zlt.aps.lh.engine.strategy.support.StructureSwitchPlan;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchSchedulingPolicy;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchFirstShiftPolicy;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchRuntimeState;
+import com.zlt.aps.lh.engine.strategy.support.ScheduleResultSceneTypeSupport;
 import com.zlt.aps.lh.exception.ScheduleErrorCode;
 import com.zlt.aps.lh.exception.ScheduleException;
 import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
@@ -32,6 +33,7 @@ import com.zlt.aps.lh.mapper.LhUnscheduledResultMapper;
 import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
 import com.zlt.aps.lh.service.ILhPrecisionPlanService;
+import com.zlt.aps.lh.service.ILhEndingDiscardService;
 import com.zlt.aps.lh.util.LhMouldCodeUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
@@ -126,6 +128,12 @@ public class SchedulePersistenceService {
     private ILhPrecisionPlanService precisionPlanService;
 
     /**
+     * 最终未排确认后的舍弃记录，与主结果同事务替换。
+     */
+    @Resource
+    private ILhEndingDiscardService endingDiscardService;
+
+    /**
      * 以事务方式原子替换目标日排程结果。
      *
      * <p>处理流程：</p>
@@ -134,7 +142,7 @@ public class SchedulePersistenceService {
      *   <li>删除同工厂同目标日旧排程结果、未排结果和换模计划；</li>
      *   <li>按旧批次号删除旧过程日志；</li>
      *   <li>补齐新结果审计字段和班次收尾标记；</li>
-     *   <li>批量写入新结果、未排结果、换模计划和过程日志。</li>
+     *   <li>批量写入新结果、未排结果、换模计划和过程日志，并统一替换收尾舍弃记录。</li>
      * </ol>
      *
      * @param context 排程上下文
@@ -216,6 +224,8 @@ public class SchedulePersistenceService {
             fillNewSpecMonthPlanRemark(context, context.getScheduleResultList());
             // 回填结构切换规则首班描述，并按最终正计划量在实际首产班追加结构续作原因。
             fillStructureSwitchInfo(context, context.getScheduleResultList());
+            // 仅规范来源编码，保留生成或绑定阶段确认的场景，不在保存时重新识别业务。
+            context.getScheduleResultList().forEach(ScheduleResultSceneTypeSupport::ensureSceneType);
             scheduleResultMapper.insertBatch(context.getScheduleResultList());
         }
         if (!context.getUnscheduledResultList().isEmpty()) {
@@ -250,6 +260,9 @@ public class SchedulePersistenceService {
         if (!precisionScheduleDates.isEmpty()) {
             precisionPlanService.fillArrangedScheduleDates(factoryCode, precisionScheduleDates);
         }
+
+        // 所有主排程及最终数量处理已经结束，舍弃记录不得由具体排产策略提前写库。
+        endingDiscardService.replaceForSchedule(context);
 
         log.info("目标日排程原子替换完成, 工厂: {}, 日期: {}, 删除结果: {}, 删除未排: {}, 删除换模: {}, 删除日志: {}, 新结果: {}, 新未排: {}, 新换模: {}, 新日志: {}",
                 factoryCode, LhScheduleTimeUtil.formatDate(targetDate),

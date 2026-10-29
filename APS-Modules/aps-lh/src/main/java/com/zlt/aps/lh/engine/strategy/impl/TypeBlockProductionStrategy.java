@@ -25,6 +25,7 @@ import com.zlt.aps.lh.api.enums.ConstructionStageEnum;
 import com.zlt.aps.lh.api.enums.MachineStopTypeEnum;
 import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
+import com.zlt.aps.lh.api.enums.LhScheduleSceneTypeEnum;
 import com.zlt.aps.lh.api.enums.SkuScheduleSourceTypeEnum;
 import com.zlt.aps.lh.api.enums.UnscheduledReasonEnum;
 import com.zlt.aps.lh.component.CapsuleReplacementRuleService;
@@ -36,8 +37,9 @@ import com.zlt.aps.lh.component.StructureEndingAlignmentService;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.component.UnscheduledResultCollector;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.engine.strategy.support.LhShiftRemarkRuntime;
+import com.zlt.aps.lh.engine.strategy.support.ScheduleResultSceneTypeSupport;
 import com.zlt.aps.lh.service.impl.LhCleaningScheduleService;
-import com.zlt.aps.lh.service.impl.LhCleaningRepairOverlapPolicy;
 import com.zlt.aps.lh.engine.strategy.support.TimedMachineOffActionPreviewCapture;
 import com.zlt.aps.lh.component.LhMachineSupplyStructureRule;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
@@ -447,6 +449,34 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                                            SkuScheduleDTO sku, List<LhShiftConfigVO> shifts,
                                            List<MachineScheduleDTO> activeMachines, List<SkuScheduleDTO> candidateSkus,
                                            String matchedLayer, String triggerSource) {
+        int firstRemarkResult = context.getScheduleResultList().size();
+        try (LhShiftRemarkRuntime.Scope remarkScope = context.getShiftRemarkRuntime().openScope(sku, machine.getMachineCode())) {
+            boolean remarkResult = this.tryTypeBlockCandidateWithEvidence(context, machine, sku, shifts, activeMachines,
+                    candidateSkus, matchedLayer, triggerSource);
+            if (remarkResult) {
+                remarkScope.accept(context, firstRemarkResult);
+            }
+            return remarkResult;
+        }
+    }
+
+    /**
+     * 按原内核执行换活字块，只有真实成功结果采用局部延后证据。
+     *
+     * @param context 本轮排程上下文
+     * @param machine 实际候选机台
+     * @param sku 当前物料状态
+     * @param shifts 原可排班次
+     * @param activeMachines 原候选机台
+     * @param candidateSkus 原候选物料
+     * @param matchedLayer 原匹配层级
+     * @param triggerSource 原触发来源
+     * @return 原执行结果及其局部只读附件
+     */
+    private boolean tryTypeBlockCandidateWithEvidence(LhScheduleContext context, MachineScheduleDTO machine,
+                                           SkuScheduleDTO sku, List<LhShiftConfigVO> shifts,
+                                           List<MachineScheduleDTO> activeMachines, List<SkuScheduleDTO> candidateSkus,
+                                           String matchedLayer, String triggerSource) {
         Date typeBlockSwitchStartTime = allocateTypeBlockSwitchStartTime(
                 context, machine, sku, machine.getEstimatedEndTime());
         Date typeBlockStartTime = resolveTypeBlockProductionStartTime(
@@ -589,6 +619,35 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
 
     @Override
     public SpecifiedMachineScheduleResult tryScheduleSpecialMaterialSubstitution(
+            LhScheduleContext context,
+            MachineScheduleDTO machine,
+            SkuScheduleDTO sku,
+            Date earliestSwitchTime) {
+        if (context == null) {
+            return this.tryScheduleSpecialMaterialSubstitutionWithEvidence(context, machine, sku, earliestSwitchTime);
+        }
+        int firstRemarkResult = context.getScheduleResultList().size();
+        try (LhShiftRemarkRuntime.Scope remarkScope = context.getShiftRemarkRuntime().openScope(
+                sku, machine == null ? null : machine.getMachineCode())) {
+            SpecifiedMachineScheduleResult remarkResult = this.tryScheduleSpecialMaterialSubstitutionWithEvidence(context,
+                    machine, sku, earliestSwitchTime);
+            if (remarkResult.isSuccess()) {
+                remarkScope.accept(context, firstRemarkResult);
+            }
+            return remarkResult;
+        }
+    }
+
+    /**
+     * 按原特殊材料提交结果决定附件是否生效，失败不发布候选证据。
+     *
+     * @param context 本轮排程上下文
+     * @param machine 实际候选机台
+     * @param sku 当前物料状态
+     * @param earliestSwitchTime 原最早切换时间
+     * @return 原执行结果及其局部只读附件
+     */
+    private SpecifiedMachineScheduleResult tryScheduleSpecialMaterialSubstitutionWithEvidence(
             LhScheduleContext context,
             MachineScheduleDTO machine,
             SkuScheduleDTO sku,
@@ -980,6 +1039,34 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                                                  List<LhShiftConfigVO> shifts,
                                                  Map<String, Boolean> completedMachineMap,
                                                  List<MachineScheduleDTO> activeMachines) {
+        int firstRemarkResult = context.getScheduleResultList().size();
+        try (LhShiftRemarkRuntime.Scope remarkScope = context.getShiftRemarkRuntime().openScope(specifySku, machine.getMachineCode())) {
+            boolean remarkResult = this.appendSpecifyTypeBlockResultWithEvidence(context, machine, specifySku, shifts,
+                    completedMachineMap, activeMachines);
+            if (remarkResult) {
+                remarkScope.accept(context, firstRemarkResult);
+            }
+            return remarkResult;
+        }
+    }
+
+    /**
+     * 按原内核执行换活字块，只有真实成功结果采用局部延后证据。
+     *
+     * @param context 本轮排程上下文
+     * @param machine 实际候选机台
+     * @param specifySku 原定点物料
+     * @param shifts 原可排班次
+     * @param completedMachineMap 原机台完成状态
+     * @param activeMachines 原候选机台
+     * @return 原执行结果及其局部只读附件
+     */
+    private boolean appendSpecifyTypeBlockResultWithEvidence(LhScheduleContext context,
+                                                 MachineScheduleDTO machine,
+                                                 SkuScheduleDTO specifySku,
+                                                 List<LhShiftConfigVO> shifts,
+                                                 Map<String, Boolean> completedMachineMap,
+                                                 List<MachineScheduleDTO> activeMachines) {
         Date typeBlockSwitchStartTime = allocateTypeBlockSwitchStartTime(
                 context, machine, specifySku, machine.getEstimatedEndTime());
         Date typeBlockStartTime = resolveTypeBlockProductionStartTime(
@@ -1089,6 +1176,10 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             if (sku == null || StringUtils.isEmpty(sku.getMaterialCode()) || sku.resolveTargetScheduleQty() <= 0) {
                 continue;
             }
+            if (sku.isEndingDeferredExpansion()) {
+                // 首个可排日需要普通换模与换活字块按日共同竞争，不能在全窗口扫描中提前锁未来日。
+                continue;
+            }
             // 已成功换活字块的补机残量由 S4.5 统一竞争，定点直选不得绕过阶段衔接。
             if (Objects.nonNull(DailyMachineExpansionPlanner.resolveTypeBlockAddMachineDate(
                     this.lhDailyMouldCalcService, context, sku))) {
@@ -1134,6 +1225,11 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                                                            MachineScheduleDTO machine) {
         List<SkuScheduleDTO> candidateList = new ArrayList<>(context.getNewSpecSkuList().size());
         for (SkuScheduleDTO sku : context.getNewSpecSkuList()) {
+            if (sku != null && sku.isEndingDeferredExpansion()) {
+                // 保留候选，由S4.5按天换活字块反选及普通新增链共同确定最早实际生产日。
+                continue;
+            }
+
             /*
              * 普通新增和续作增机补偿在 S4.4 已成功换活字块后，剩余物理机台缺口
              * 必须交回 S4.5 统一 Machine-SKU 竞争，避免同一 SKU 在 S4.4 连续抢占资源。
@@ -1604,8 +1700,8 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         if (plannedRepairAffectingSwitch) {
             /*
              * 计划性维修与换活字块允许并行，维修独立完成SYS0307009预热后，与换活字块完成点取最大值。
-             * 预热完成时刻只作为正式生产下限；首检时间区间仍以真实换活字块完成点为终点
-             * 向前倒推，不再沿用精度保养重叠的额外1小时等待。
+             * 组合准备完成后执行一次真实计件首检，正式生产等待首检完成，
+             * 不在维修时间链中额外追加固定1小时。
              */
             productionStartTime = repairPlanResult.getProductionNotBefore();
             log.info("换活字块计划性维修时间轴生效, machineCode: {}, switchStartTime: {}, "
@@ -1682,7 +1778,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
      * 解析换活字块后试制生产门禁使用的兼容基准时刻。
      * <p>该方法只服务试制固定中班开产例外：命中计划性维修时按
      * max(维修结束+SYS0307009, 换活字块自身完成时间) 确定正式生产下限。普通首检数量、计数班次
-     * 和跨班分摊不读取该时刻，始终以真实换活字块完成时间为首检区间终点。</p>
+     * 和跨班分摊由正式首检链确定；真实维修组合从准备完成下限正向执行。</p>
      *
      * @param context 排程上下文
      * @param machine 机台
@@ -2331,7 +2427,8 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
      * 收口已经成功形成结果的换活字块 SKU。
      *
      * <p>普通换活字块与续作增机补偿均按业务日检查统一 Map 目标物理机台缺口。
-     * 部分成功且窗口内仍有机台缺口时保留到 S4.5 统一竞争；完整成功或无缺口时退出。</p>
+     * 部分成功且窗口内仍有机台缺口时保留到 S4.5 统一竞争，并只登记独立的结果场景来源；
+     * 完整成功或无缺口时退出。场景来源不回写参与业务决策的 sourceType。</p>
      *
      * @param context 排程上下文
      * @param machine 已成功承接的机台
@@ -2359,6 +2456,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             LocalDate requeueDate = forcedRequeueTime.toInstant()
                     .atZone(ZoneId.systemDefault()).toLocalDate();
             sku.setFirstAddMachineProductionDate(requeueDate);
+            ScheduleResultSceneTypeSupport.recordTypeBlockResidual(context, sku);
             this.appendTypeBlockPartialResidualProcessLog(
                     context, machine, sku, adoptedTargetQty, scheduledQty, remainingQty,
                     TYPE_BLOCK_PARTIAL_NEXT_ACTION_S4_5, requeueDate,
@@ -2383,6 +2481,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                     context, sku.getMaterialCode(), sku.getProductStatus(), requiredDate);
             int currentMachineCount = DailyMachineExpansionPlanner.countCommittedMachineDemand(
                     context, sku, firstAddMachineDate);
+            ScheduleResultSceneTypeSupport.recordTypeBlockResidual(context, sku);
             this.appendTypeBlockPartialResidualProcessLog(
                     context, machine, sku, adoptedTargetQty, scheduledQty, remainingQty,
                     TYPE_BLOCK_PARTIAL_NEXT_ACTION_S4_5, firstAddMachineDate, targetMachineCount, currentMachineCount);
@@ -4368,20 +4467,19 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
     }
 
     /**
-     * 构建排程结果，分配各班次计划量。
+     * 构建换活字块流程的结果并分配班次数量，记录当前直接换块来源。
      *
-     * @param context 排程上下文
-     * @param machine 机台
-     * @param sku SKU
-     * @param startTime 开产时间
-     * @param switchStartTime 切换开始时间
-     * @param shifts 班次
-     * @param mouldQty 模台数
-     * @param isEnding 是否收尾
+     * @param context 当前排程上下文
+     * @param machine 实际承接机台
+     * @param sku 换活字块后物料候选
+     * @param startTime 实际生产开始时间
+     * @param switchStartTime 实际换活字块开始时间
+     * @param shifts 允许分配的班次窗口
+     * @param mouldQty 实际使用模数
+     * @param isEnding 是否采用收尾口径
      * @param earliestEmbryoAvailableTime 结构切换提前命中的最早胎胚可供时间；其他换活字块为 null
-     * @param firstInspectionAllocationPlanOutput 返回本次实际写入结果的首检分摊计划，容量固定为1；
-     *                                            供调用方在结果最终提交后写过程日志
-     * @return 排程结果
+     * @param firstInspectionAllocationPlanOutput 输出实际首检分摊方案，容量固定为1，供最终提交后记录过程日志
+     * @return 有效换块结果，首检分摊失败时返回空
      */
     private LhScheduleResult buildScheduleResult(LhScheduleContext context,
                                                   MachineScheduleDTO machine,
@@ -4432,6 +4530,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         result.setDataSource(AUTO_DATA_SOURCE);
         result.setIsDelete(0);
         result.setScheduleType(ScheduleTypeEnum.TYPE_BLOCK.getCode());
+        ScheduleResultSceneTypeSupport.assign(result, LhScheduleSceneTypeEnum.TYPE_BLOCK);
         result.setIsTypeBlock(YES_FLAG);
         // 保存真实动作起点，后续补量及时间校正据此恢复维修组合，不使用后移的生产时刻。
         result.setMouldChangeStartTime(switchStartTime);
@@ -4525,10 +4624,12 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                         runtimeShiftCapacity, refinedTargetQty,
                         ScheduleTypeEnum.TYPE_BLOCK.getCode(),
                         machine.getMachineCode(), null);
-        Date supplyOccupationBoundary = LhCleaningRepairOverlapPolicy.resolveForwardInspectionReady(
+        Date supplyOccupationBoundary = LhRepairPlanScheduleService.resolveForwardInspectionReady(
                 context, machine.getMachineCode(), ScheduleTypeEnum.TYPE_BLOCK.getCode(), switchStartTime,
                 LhScheduleTimeUtil.addHours(switchStartTime, LhScheduleTimeUtil.getTypeBlockChangeTotalHours(context)));
         if (!largeTimelineRequired && !precisionOverlap.isSupported() && supplyOccupationBoundary != null) {
+            // 维修组合准备不能覆盖已确认的更晚供胚、班次管控或试制生产下限。
+            supplyOccupationBoundary = this.resolveLaterDate(supplyOccupationBoundary, startTime);
             firstInspectionAllocationPlan = FirstInspectionAllocationUtil.buildPlan(
                     context, sku, shifts, switchCompleteTime, supplyOccupationBoundary,
                     runtimeShiftCapacity, refinedTargetQty, ScheduleTypeEnum.TYPE_BLOCK.getCode(),
@@ -4637,6 +4738,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                 return null;
             }
             context.getStructureSwitchResultPlanMap().put(result, switchPlan);
+            ScheduleResultSceneTypeSupport.assign(result, LhScheduleSceneTypeEnum.STRUCTURE_SWITCH);
         }
         LhShiftConfigVO firstInspectionAttributionShift =
                 firstInspectionAllocationPlan.getCountingShift();

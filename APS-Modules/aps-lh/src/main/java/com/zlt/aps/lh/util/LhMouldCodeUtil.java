@@ -41,7 +41,7 @@ public final class LhMouldCodeUtil {
     }
 
     /**
-     * 解析机台硫化在机实际模具号集合。
+     * 解析本次续作生产身份的完整装机模具，历史前料使用已确认来源，其余沿用MES。
      *
      * @param context 排程上下文
      * @param machineCode 机台编码
@@ -53,7 +53,7 @@ public final class LhMouldCodeUtil {
                 || CollectionUtils.isEmpty(context.getMachineOnlineInfoMap())) {
             return new LinkedHashSet<String>(0);
         }
-        LhMachineOnlineInfo onlineInfo = context.getMachineOnlineInfoMap().get(machineCode);
+        LhMachineOnlineInfo onlineInfo = context.resolveContinuationOnlineInfo(machineCode);
         if (Objects.isNull(onlineInfo)) {
             return new LinkedHashSet<String>(0);
         }

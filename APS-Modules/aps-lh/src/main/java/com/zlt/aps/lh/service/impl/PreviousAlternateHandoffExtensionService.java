@@ -8,9 +8,12 @@ import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.TrialStatusEnum;
 import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
 import com.zlt.aps.lh.api.enums.ShiftEnum;
+import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.DayScheduleContext;
+import com.zlt.aps.lh.engine.strategy.support.LhShiftRemarkRuntime;
+import com.zlt.aps.lh.engine.strategy.support.LhShiftDelayReason;
 import com.zlt.aps.lh.engine.strategy.support.PreviousAlternatePlanReleaseEvent;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.PriorityTraceLogHelper;
@@ -58,8 +61,8 @@ public class PreviousAlternateHandoffExtensionService {
         Map<String, List<LhScheduleResult>> results = context.getScheduleResultList().stream()
                 .collect(Collectors.groupingBy(LhScheduleResult::getLhMachineCode));
         List<PreviousAlternatePlanReleaseEvent> events = context.getPreviousAlternateReleaseEventMap().values()
-                .stream().filter(event -> !event.isBeforeMaterialNotScheduled()
-                        && !Objects.equals(event.getPlan().getBeforeMaterialCode(), event.getPlan().getAfterMaterialCode())
+                .stream().filter(event -> !Objects.equals(
+                        event.resolveBeforeMaterialCode(), event.getPlan().getAfterMaterialCode())
                         && !submitted.contains(event.getPlan().getId()))
                 .sorted(Comparator.comparing(PreviousAlternatePlanReleaseEvent::getPlannedShiftStartTime))
                 .collect(Collectors.toList());
@@ -70,6 +73,9 @@ public class PreviousAlternateHandoffExtensionService {
                     || own.stream().anyMatch(result -> context.hasTimedMachineOffRequest(result)
                     || context.getTimedMachineOffDecisionMap().containsKey(result)
                     || !Objects.equals(result.getMaterialCode(), event.getMaterialCode()))) {
+                continue;
+            }
+            if (!this.reconcileBeforeProductionIdentity(context, event, own)) {
                 continue;
             }
             boolean accepted = false;
@@ -90,6 +96,38 @@ public class PreviousAlternateHandoffExtensionService {
                         .collect(Collectors.groupingBy(LhScheduleResult::getLhMachineCode));
             }
         }
+    }
+
+    /**
+     * 用最终同机同物料状态的正量及实际消费凭证纠正过期未排标志，不改变任何数量或资源边界。
+     * 时间下机及保机保护先由调用方排除；胎胚硬目标和分摊仍交给原释放入口校验。
+     *
+     * @param context 已完成续作扣账的正式上下文
+     * @param event 当前尚未兑现的精确历史事件
+     * @param own 本运行侧最终保留结果
+     * @return 前料原本参与生产或已有真实消费证明时为真
+     */
+    private boolean reconcileBeforeProductionIdentity(LhScheduleContext context,
+            PreviousAlternatePlanReleaseEvent event, List<LhScheduleResult> own) {
+        if (!event.isBeforeMaterialNotScheduled()) {
+            return true;
+        }
+        boolean hasConsumedProduction = event.resolveProductionRole()
+                == PreviousAlternatePlanReleaseEvent.ProductionRole.BEFORE_MATERIAL_PRODUCTION
+                && own.stream()
+                .filter(result -> ScheduleTypeEnum.CONTINUOUS.getCode().equals(result.getScheduleType())
+                        && Objects.equals(event.getMaterialCode(), result.getMaterialCode())
+                        && Objects.equals(event.getProductStatus(), result.getProductStatus())
+                        && ShiftFieldUtil.resolveScheduledQty(result) > 0)
+                .map(context.getContinuousProductionConsumptionMap()::get)
+                .filter(Objects::nonNull)
+                .anyMatch(consumption -> consumption.getProductionQty() > 0);
+        if (hasConsumedProduction) {
+            // 只修正资格标志，原余量快照、时间下机决定、胎胚份额及真实释放时刻均不重算。
+            event.setBeforeMaterialNotScheduled(false);
+            this.trace(context, event, event.getOfflineTime(), "实际前料已有正量和消费凭证，纠正初始化未排标志");
+        }
+        return hasConsumedProduction;
     }
 
     /**
@@ -215,18 +253,41 @@ public class PreviousAlternateHandoffExtensionService {
     private boolean trySlots(LhScheduleContext context, PreviousAlternatePlanReleaseEvent event, Date earliest,
             BiPredicate<PreviousAlternatePlanReleaseEvent, Date> release,
             BiPredicate<PreviousAlternatePlanReleaseEvent, DayScheduleContext> attempt) {
-        boolean quotaDelayed = false;
+        SkuScheduleDTO remarkSku = new SkuScheduleDTO();
+        remarkSku.setMaterialCode(event.getPlan().getAfterMaterialCode());
+        remarkSku.setProductStatus(event.getPlan().getProductStatus());
+        try (LhShiftRemarkRuntime.Scope scope = context.getShiftRemarkRuntime().openScope(remarkSku, event.getMachineCode())) {
+            boolean success = this.trySlotsWithEvidence(context, event, earliest, release, attempt);
+            if (success) {
+                context.getShiftRemarkRuntime().retainHistorical(event.getPlan(), scope.freeze());
+            }
+            return success;
+        }
+    }
+
+    /**
+     * 在本次窗口的合法早中班扫描附加历史交接，允许因资源约束越过原历史班次。
+     * 原额度拒绝分支仍采集额度附件，其他失败不得冒充额度不足。
+     *
+     * @param context 实时资源上下文
+     * @param event 精确历史来源
+     * @param earliest 原首次允许时刻
+     * @param release 原释放动作
+     * @param attempt 原提交动作
+     * @return 原交接是否成功
+     */
+    private boolean trySlotsWithEvidence(LhScheduleContext context, PreviousAlternatePlanReleaseEvent event, Date earliest,
+            BiPredicate<PreviousAlternatePlanReleaseEvent, Date> release,
+            BiPredicate<PreviousAlternatePlanReleaseEvent, DayScheduleContext> attempt) {
         for (LhShiftConfigVO shift : context.getScheduleWindowShifts()) {
             if ((!shift.isMorningShift() && !shift.isAfternoonShift())
                     || !shift.getShiftEndDateTime().after(earliest)) {
                 continue;
             }
-            if (!shift.getShiftStartDateTime().before(event.getPlannedShiftEndTime()) && !quotaDelayed) {
-                break;
-            }
             Date cutoff = earliest.after(shift.getShiftStartDateTime()) ? earliest : shift.getShiftStartDateTime();
             if (this.isQuotaFull(context, shift)) {
-                quotaDelayed = true;
+                context.getShiftRemarkRuntime().record(LhShiftDelayReason.CHANGEOVER_QUOTA,
+                        "HISTORICAL_HANDOFF_QUOTA", event.getMachineCode(), null, cutoff, shift.getShiftEndDateTime());
                 this.trace(context, event, cutoff, "额度不足，继续后续允许班次");
                 continue;
             }
@@ -236,10 +297,7 @@ public class PreviousAlternateHandoffExtensionService {
             if (this.trySlot(context, event, shift, cutoff, release, attempt)) {
                 return true;
             }
-            if (!quotaDelayed) {
-                // 原指定区间内仍可继续尝试；其他资源失败不能单独获得越过历史截止的资格。
-                this.trace(context, event, cutoff, "完整提案未通过，已恢复原生产和资源");
-            }
+            this.trace(context, event, cutoff, "完整提案未通过，已恢复原生产和资源，继续本窗口后续允许班次");
         }
         this.trace(context, event, earliest, "本窗口无合法完整承接，保留原安排");
         return false;

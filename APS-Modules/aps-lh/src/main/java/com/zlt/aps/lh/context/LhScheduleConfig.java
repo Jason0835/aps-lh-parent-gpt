@@ -323,6 +323,16 @@ public class LhScheduleConfig {
                 LhScheduleConstant.CLASS_TOTAL_QTY_UP_LIMIT));
     }
 
+    /**
+     * 获取SKU收尾延期评估的正整数业务日天数。
+     *
+     * @return 已解析延期天数，未配置时为1
+     */
+    public int getSkuEndingDeferredExpansionDays() {
+        return getParamIntValue(LhScheduleParamConstant.SKU_ENDING_DEFERRED_EXPANSION_DAYS,
+                LhScheduleConstant.DEFAULT_SKU_ENDING_DEFERRED_EXPANSION_DAYS);
+    }
+
     public int getEndingDetectDays() {
         return getParamIntValue(LhScheduleParamConstant.ENDING_DETECT_DAYS, LhScheduleConstant.DEFAULT_ENDING_DAYS);
     }

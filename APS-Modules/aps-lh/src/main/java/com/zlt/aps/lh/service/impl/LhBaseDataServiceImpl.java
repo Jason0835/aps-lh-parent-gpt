@@ -6,6 +6,7 @@ import com.google.common.collect.Maps;
 import com.zlt.aps.common.engine.domain.LhDayPlanAdjustVo;
 import com.zlt.aps.common.engine.domain.LhMonthStartDayResult;
 import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
+import com.zlt.aps.cx.constant.ScheduleConstants;
 import com.zlt.aps.cx.entity.CxStock;
 import com.zlt.aps.cx.entity.config.CxEmbryoLhTime;
 import com.zlt.aps.cx.entity.schedule.CxEmbryoEndingShift;
@@ -271,6 +272,81 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     }
 
     /**
+     * 加载交班收尾证据（与成型侧 {@code ScheduleServiceImpl#filterHandoverStoppedEndings} 的判定②③同源）。
+     *
+     * <p>判定②：上一批窗口 1-3 班存在 {@code SHIFT_SOURCE=1} 的已排程收尾行——
+     * 即「D-2 早班(02)、D-2 中班(03)、D-1 夜班(01)」三个班次键任一命中；
+     * 夜班归属日取结束日，与收尾班次表写入口径一致。</p>
+     *
+     * <p>判定③：交班在机标识 {@code HANDOVER_ONLINE='1'}（仍在产）的胎胚集合；
+     * T/T-1 两天一起加载，任一命中即视为在产（与成型侧在机加载窗口一致）。</p>
+     *
+     * @param context      排程上下文
+     * @param factoryCode  工厂编码
+     * @param scheduleDate 排程日（窗口 T 日）
+     */
+    private void loadCxHandoverStoppedEndingEvidence(LhScheduleContext context, String factoryCode,
+                                                     Date scheduleDate) {
+        Date tDay = LhScheduleTimeUtil.clearTime(scheduleDate);
+        Date yesterday = LhScheduleTimeUtil.addDays(tDay, -1);
+        Date beforeYesterday = LhScheduleTimeUtil.addDays(tDay, -2);
+        // 1. 判定②：上一批窗口 1-3 班（D-2 早、D-2 中、D-1 夜）的已排程收尾行，按胎胚归集
+        //    （兼容历史「胎胚+产品状态」行：本判定只关心胎胚维度）
+        List<CxEmbryoEndingShift> endingRows = cxEmbryoEndingShiftMapper.selectList(
+                new LambdaQueryWrapper<CxEmbryoEndingShift>()
+                        .eq(CxEmbryoEndingShift::getFactoryCode, factoryCode)
+                        .eq(CxEmbryoEndingShift::getShiftSource, "1")
+                        .in(CxEmbryoEndingShift::getShiftDate, beforeYesterday, yesterday)
+                        .in(CxEmbryoEndingShift::getShiftIndex, Arrays.asList("01", "02", "03")));
+        Set<String> endingEmbryoSet = endingRows.stream()
+                .filter(row -> Objects.nonNull(row.getShiftDate()) && Objects.nonNull(row.getShiftIndex()))
+                .filter(row -> isHandoverEndingShiftKey(row.getShiftDate(), row.getShiftIndex(),
+                        beforeYesterday, yesterday))
+                .map(CxEmbryoEndingShift::getEmbryoCode)
+                .filter(StringUtils::isNotEmpty)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        context.setCxHandoverEndingEmbryoSet(endingEmbryoSet);
+        // 2. 判定③：交班在机（HANDOVER_ONLINE='1'）的胎胚集合；在机表 MATERIAL_CODE 字段实际存胎胚号
+        List<CxMachineOnlineInfo> onlineInfos = cxMachineOnlineInfoMapper.selectList(
+                new LambdaQueryWrapper<CxMachineOnlineInfo>()
+                        .eq(CxMachineOnlineInfo::getFactoryCode, factoryCode)
+                        .in(CxMachineOnlineInfo::getOnlineDate, yesterday, tDay)
+                        .eq(CxMachineOnlineInfo::getHandoverOnline, HANDOVER_ONLINE_FLAG_ON));
+        Set<String> inProdEmbryoSet = onlineInfos.stream()
+                .map(CxMachineOnlineInfo::getMaterialCode)
+                .filter(StringUtils::isNotEmpty)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        context.setCxHandoverInProdEmbryoSet(inProdEmbryoSet);
+        log.info("交班收尾证据加载, factoryCode: {}, scheduleDate: {}, 收尾行数: {}, 收尾行胎胚数: {}, 交班在产胎胚数: {}",
+                factoryCode, LhScheduleTimeUtil.formatDate(tDay),
+                endingRows.size(), endingEmbryoSet.size(), inProdEmbryoSet.size());
+    }
+
+    /**
+     * 判断收尾行是否属于「上一批窗口 1-3 班」：D-2 早班(02)/中班(03)、D-1 夜班(01)。
+     *
+     * @param shiftDate       收尾班次归属日（夜班取结束日）
+     * @param shiftIndex      班次类型编码（01-夜班、02-早班、03-中班）
+     * @param beforeYesterday D-2 日
+     * @param yesterday       D-1 日
+     * @return true=命中上一批窗口 1-3 班
+     */
+    static boolean isHandoverEndingShiftKey(Date shiftDate, String shiftIndex,
+                                            Date beforeYesterday, Date yesterday) {
+        if (Objects.isNull(shiftDate) || StringUtils.isEmpty(shiftIndex)) {
+            return false;
+        }
+        String shiftDateText = LhScheduleTimeUtil.formatDate(shiftDate);
+        if (Objects.isNull(shiftDateText)) {
+            return false;
+        }
+        if (shiftDateText.equals(LhScheduleTimeUtil.formatDate(beforeYesterday))) {
+            return "02".equals(shiftIndex) || "03".equals(shiftIndex);
+        }
+        return shiftDateText.equals(LhScheduleTimeUtil.formatDate(yesterday)) && "01".equals(shiftIndex);
+    }
+
+    /**
      * 初始化本工厂排程基础数据，等待所有输入完成后再计算派生账本。
      * 成型收尾索引与原硫化收尾标识分别加载，后续排产只读冻结输入。
      *
@@ -461,6 +537,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 this.runDataInitTaskAsync("成型胎胚收尾班次",
                         () -> this.loadCxEmbryoEndingShifts(context, factoryCode, startDate),
                         () -> this.sizeOf(context.getCxEmbryoEndingShiftIndex())),
+                this.runDataInitTaskAsync("交班收尾证据",
+                        () -> this.loadCxHandoverStoppedEndingEvidence(context, factoryCode, startDate),
+                        () -> context.getCxHandoverEndingEmbryoSet().size()),
                 continuationReduceDimensionMonthPlanFuture,
                 yearMonthLhDayAdjustFuture,
                 structureEndingDateFuture,
@@ -2424,7 +2503,25 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
             }
         }
 
-        // 3. 判定收尾标识：结构切换完成强制收尾 > 主销参与情况下的余量判定
+        // 2.5 交班收尾同步（与成型 filterHandoverStoppedEndings 判定同源）：
+        //     ② 上一批窗口 1-3 班已排程收尾行、③ 交班不在产（已在基础数据阶段加载为证据集合），
+        //     ① 胎胚余量 ∈ (0, 一车)（严格小于一车；等于一车按正常整车继续排）。
+        //     三条同时成立 → 强制胎胚收尾=1，并让硫化按胎胚库存严格排产（只消耗库存）。
+        Map<String, Integer> embryoRemainMap = new LinkedHashMap<>();
+        for (Map.Entry<String, Integer> entry : embryoSurplusMap.entrySet()) {
+            int stockQty = context.getEmbryoRealtimeStockMap().getOrDefault(entry.getKey(), 0);
+            embryoRemainMap.put(entry.getKey(), entry.getValue() - stockQty);
+        }
+        Map<String, Integer> tripCapMap = this.buildEmbryoTripCapMap(context);
+        Set<String> handoverStoppedEndingEmbryoSet = resolveHandoverStoppedEndingEmbryos(
+                embryoRemainMap, tripCapMap,
+                context.getCxHandoverEndingEmbryoSet(), context.getCxHandoverInProdEmbryoSet());
+        context.setCxHandoverStoppedEndingEmbryoSet(handoverStoppedEndingEmbryoSet);
+        log.info("【交班收尾同步】命中胎胚 {} 个: {}, 证据集合: 上一批收尾行胎胚={}, 交班在产胎胚={}",
+                handoverStoppedEndingEmbryoSet.size(), handoverStoppedEndingEmbryoSet,
+                context.getCxHandoverEndingEmbryoSet().size(), context.getCxHandoverInProdEmbryoSet().size());
+
+        // 3. 判定收尾标识：交班收尾同步 > 结构切换完成 > 前结构已结束 > 主销参与情况下的余量判定
         Map<String, Integer> embryoStockMap = context.getEmbryoRealtimeStockMap();
         for (Map.Entry<String, Integer> entry : embryoSurplusMap.entrySet()) {
             String embryoCode = entry.getKey();
@@ -2433,16 +2530,10 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
             int embryoRemainQty = mergedSurplusQty - embryoStock;
             boolean hasMain = embryoHasMainMap.getOrDefault(embryoCode, Boolean.FALSE);
             int threshold = hasMain ? MAIN_PRODUCT_ENDING_THRESHOLD : NON_MAIN_PRODUCT_ENDING_THRESHOLD;
-            int endingFlag;
-            if (switchedStructureEmbryoSet.contains(embryoCode)) {
-                // 结构切换完成（在机双结构）：前结构胎胚不再成型，无论余量多少都视为收尾
-                endingFlag = EMBRYO_ENDING_FLAG_YES;
-            } else if (prevStructureEndedResult.getEndedEmbryoCodeSet().contains(embryoCode)) {
-                // 前结构已结束（交班在机 + 配置时间线）：前结构胎胚不再成型，无论余量多少都视为收尾
-                endingFlag = EMBRYO_ENDING_FLAG_YES;
-            } else {
-                endingFlag = embryoRemainQty <= threshold ? EMBRYO_ENDING_FLAG_YES : EMBRYO_ENDING_FLAG_NO;
-            }
+            int endingFlag = resolveEmbryoEndingFlag(embryoRemainQty, threshold,
+                    handoverStoppedEndingEmbryoSet.contains(embryoCode),
+                    switchedStructureEmbryoSet.contains(embryoCode),
+                    prevStructureEndedResult.getEndedEmbryoCodeSet().contains(embryoCode));
             embryoEndingFlagMap.put(embryoCode, endingFlag);
         }
 
@@ -2454,10 +2545,95 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 .filter(v -> v == EMBRYO_ENDING_FLAG_YES)
                 .sum();
         log.info("胎胚收尾标识加载完成, 胎胚数量: {}, 主销产品数量: {}, 收尾胎胚数量: {}, 结构切换完成胎胚数量: {}, "
-                        + "结构切换完成的后结构: {}, 前结构已结束: {}, 前结构已结束胎胚数量: {}",
+                        + "结构切换完成的后结构: {}, 前结构已结束: {}, 前结构已结束胎胚数量: {}, 交班收尾同步胎胚数量: {}",
                 embryoSurplusMap.size(), mainProductCodes.size(), endingCount,
                 switchedStructureEmbryoSet.size(), switchDetectionResult.getNextStructureNameSet(),
-                prevStructureEndedResult.getEndedStructureSet(), prevStructureEndedResult.getEndedEmbryoCodeSet().size());
+                prevStructureEndedResult.getEndedStructureSet(), prevStructureEndedResult.getEndedEmbryoCodeSet().size(),
+                handoverStoppedEndingEmbryoSet.size());
+    }
+
+    /**
+     * 交班收尾命中判定（与成型侧 {@code ScheduleServiceImpl#filterHandoverStoppedEndings} 三条件同源）。
+     *
+     * <p>命中条件：胎胚余量 &gt; 0 且<b>严格小于一车</b> + 上一批窗口 1-3 班有已排程收尾行 + 交班不在产。
+     * 余量正好等于一车时不判定：成型侧按正常整车继续排，硫化侧也不强制收尾。</p>
+     *
+     * @param embryoRemainMap 胎胚余量（Σ硫化余量 − 胎胚库存）
+     * @param tripCapMap      胎胚一车条数（结构+胎胚配置，缺失按默认 12）
+     * @param endingEmbryoSet 上一批已安排收尾的胎胚集合
+     * @param inProdEmbryoSet 交班仍在产的胎胚集合
+     * @return 命中强制收尾的胎胚集合
+     */
+    static Set<String> resolveHandoverStoppedEndingEmbryos(Map<String, Integer> embryoRemainMap,
+                                                           Map<String, Integer> tripCapMap,
+                                                           Set<String> endingEmbryoSet,
+                                                           Set<String> inProdEmbryoSet) {
+        Set<String> handoverStoppedEndingEmbryos = new LinkedHashSet<>();
+        if (CollectionUtils.isEmpty(embryoRemainMap) || CollectionUtils.isEmpty(endingEmbryoSet)) {
+            return handoverStoppedEndingEmbryos;
+        }
+        Set<String> inProdEmbryos = Objects.isNull(inProdEmbryoSet)
+                ? Collections.emptySet() : inProdEmbryoSet;
+        for (Map.Entry<String, Integer> entry : embryoRemainMap.entrySet()) {
+            String embryoCode = entry.getKey();
+            Integer remainQty = entry.getValue();
+            if (StringUtils.isEmpty(embryoCode) || Objects.isNull(remainQty) || remainQty <= 0) {
+                continue;
+            }
+            Integer configuredTripCap = Objects.isNull(tripCapMap) ? null : tripCapMap.get(embryoCode);
+            int tripCap = Objects.nonNull(configuredTripCap) && configuredTripCap > 0
+                    ? configuredTripCap : ScheduleConstants.DEFAULT_TRIP_CAPACITY;
+            if (remainQty < tripCap && endingEmbryoSet.contains(embryoCode)
+                    && !inProdEmbryos.contains(embryoCode)) {
+                handoverStoppedEndingEmbryos.add(embryoCode);
+            }
+        }
+        return handoverStoppedEndingEmbryos;
+    }
+
+    /**
+     * 胎胚收尾标识判定（优先级：交班收尾同步 &gt; 结构切换完成 &gt; 前结构已结束 &gt; 余量阈值）。
+     *
+     * @param embryoRemainQty       胎胚余量（Σ硫化余量 − 胎胚库存）
+     * @param threshold             余量阈值（主销 0 / 非主销 2）
+     * @param handoverStoppedEnding 交班收尾同步命中
+     * @param switchedStructure     结构切换完成（在机双结构）
+     * @param prevStructureEnded    前结构已结束
+     * @return 1-收尾；0-非收尾
+     */
+    static int resolveEmbryoEndingFlag(int embryoRemainQty, int threshold,
+                                       boolean handoverStoppedEnding, boolean switchedStructure,
+                                       boolean prevStructureEnded) {
+        if (handoverStoppedEnding || switchedStructure || prevStructureEnded) {
+            return EMBRYO_ENDING_FLAG_YES;
+        }
+        return embryoRemainQty <= threshold ? EMBRYO_ENDING_FLAG_YES : EMBRYO_ENDING_FLAG_NO;
+    }
+
+    /**
+     * 构建胎胚一车条数映射：结构+胎胚匹配 {@code T_CX_STRUCTURE_TREAD_CONFIG}，缺失时由判定方按默认 12 兜底。
+     *
+     * @param context 排程上下文
+     * @return 胎胚编码 → 一车条数
+     */
+    private Map<String, Integer> buildEmbryoTripCapMap(LhScheduleContext context) {
+        Map<String, Integer> tripCapMap = new LinkedHashMap<>();
+        Map<String, Map<String, Integer>> structureTreadCountMap = context.getStructureTreadCountMap();
+        if (CollectionUtils.isEmpty(structureTreadCountMap)) {
+            return tripCapMap;
+        }
+        Map<String, String> embryoStructureMap = this.buildEmbryoStructureMap(context);
+        for (Map.Entry<String, String> entry : embryoStructureMap.entrySet()) {
+            Map<String, Integer> embryoTreadCountMap = structureTreadCountMap.get(entry.getValue());
+            if (CollectionUtils.isEmpty(embryoTreadCountMap)) {
+                continue;
+            }
+            Integer treadCount = embryoTreadCountMap.get(entry.getKey());
+            if (Objects.nonNull(treadCount) && treadCount > 0) {
+                tripCapMap.put(entry.getKey(), treadCount);
+            }
+        }
+        return tripCapMap;
     }
 
     /**

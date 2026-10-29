@@ -155,7 +155,7 @@ public final class DailyMachineExpansionPlanner {
     }
 
     /**
-     * 前置复用已经满足目标时统一阻止其他入口新开机台，保留原绑定的跨日生产。
+     * 前置复用满足目标时停止普通增机；收尾延期补偿统一复核首个可排日及剩余产能缺口。
      * 正式时间决定后的精确历史动作使用已登记且生效的指定目标，时间负荷预演及普通候选沿用原目标。
      *
      * @param service 统一目标机台查询服务
@@ -168,6 +168,10 @@ public final class DailyMachineExpansionPlanner {
                                                                LhScheduleContext context,
                                                                SkuScheduleDTO sku,
                                                                LocalDate productionDate) {
+        if (sku != null && sku.isEndingDeferredExpansion()) {
+            return !SkuEndingDeferredExpansionPolicy.allowsExpansion(context, sku, productionDate);
+        }
+
         // 精确历史补侧只使用已落实物理机的另一侧；与指定复用共用完成状态，不被名额复核再次拦截。
         if (PreviousAlternateTrialSideAdmissionPolicy.canCompleteSpecifiedSide(context, sku)) {
             return false;
@@ -268,7 +272,7 @@ public final class DailyMachineExpansionPlanner {
 
     /**
      * 普通换活字块与续作增机补偿共用的窗口内首次补机日期。
-     * 已排结果和消费账本保持原样，比较同一业务日的统一 Map 与已落实机台需求。
+     * 已排及消费账本保持原样；普通来源比较统一Map，收尾延期补偿返回首日确认前的尝试日期或已确认首日。
      *
      * @param service 统一目标机台查询服务
      * @param context 排程上下文
@@ -294,6 +298,9 @@ public final class DailyMachineExpansionPlanner {
                                                             LhScheduleContext context,
                                                             SkuScheduleDTO sku,
                                                             EarlyProductionRuntimePlan previewPlan) {
+        if (sku != null && sku.isEndingDeferredExpansion()) {
+            return SkuEndingDeferredExpansionPolicy.resolveAttemptDate(context, sku, null);
+        }
         if (!hasTypeBlockScheduledResult(context, sku) || sku.getRemainingScheduleQty() <= 0
                 || Objects.isNull(context.getScheduleDate()) || Objects.isNull(context.getWindowEndDate())) {
             return null;
@@ -314,7 +321,10 @@ public final class DailyMachineExpansionPlanner {
             // Map 缺失继续由统一查询入口记录，不以余量或产能推算目标台数。
             int targetCount = service.getRequiredMachineCount(
                     context, sku.getMaterialCode(), sku.getProductStatus(), requiredDate);
-            if (targetCount > countCommittedMachineDemand(context, sku, productionDate)) {
+            int committedMachineCount = countCommittedMachineDemand(context, sku, productionDate);
+            if (targetCount > committedMachineCount
+                    && isNextDayMachineDemandUnmet(service, context, sku, requiredDate,
+                    committedMachineCount, previewPlan)) {
                 return productionDate;
             }
         }
@@ -501,6 +511,13 @@ public final class DailyMachineExpansionPlanner {
      * @return true-需要继续增机台；false-当前机台已满足规则
      */
     public static boolean needMoreMachine(LhScheduleContext context, SkuScheduleDTO sku) {
+        if (sku != null && sku.isEndingDeferredExpansion()) {
+            EndingDeferredExpansionDecision decision = SkuEndingDeferredExpansionPolicy.evaluate(context, sku);
+            // 尚未确认首日时这里只判断需求未清，不用T日容量截断后续日候选；日期门禁统一做实际日评估。
+            return SkuEndingDeferredExpansionPolicy.resolveFirstProductionDate(context, sku) == null
+                    ? decision.isApplicable() && decision.getRemainingQty() > 0 : decision.needsExpansion();
+        }
+
         if (isSmallShortageRollingSatisfied(context, sku)) {
             // 欠产未超过阈值且后续日计划已被当前产能覆盖时，停止继续追加机台。
             return false;
@@ -640,8 +657,9 @@ public final class DailyMachineExpansionPlanner {
 
     /**
      * 从统一目标机台数Map解析首次需要增加机台的自然日。
-     * <p>保留原T+3跨窗口判断，但目标总机台数只读取初始化阶段快照，不再根据日计划量、
-     * 日标准产能、历史欠产或窗口剩余目标量重复推算。</p>
+     * <p>窗口内已有机台只有当天与次日均存在目标台数缺口时才允许增机，避免补回MES已提前减少的机台。
+     * 保留原T+3及窗口外提前生产来源判断，目标总机台数仍只读取初始化阶段快照，
+     * 不根据日计划量、日标准产能、历史欠产或窗口剩余目标量重复推算。</p>
      *
      * @param dailyMouldCalcService 目标机台数统一查询服务
      * @param context 排程上下文
@@ -700,8 +718,9 @@ public final class DailyMachineExpansionPlanner {
     /**
      * 从统一目标机台数Map解析首次需要增加机台的自然日（支持指定扫描截止日）。
      *
-     * <p>普通新增和既有逐日判断继续使用窗口结束后一天；续作增机提前由调用方显式
-     * 传入固定提前生产截止日，避免扩大其他入口的后看范围。</p>
+     * <p>收尾延期补偿先由独立公共策略判断首个可排日缺口；其他来源按当天及次日统一Map判断。
+     * 普通新增保留窗口结束后一天的扫描范围；续作增机提前由调用方显式传入固定提前生产截止日，
+     * 窗口外需求来源继续使用原提前生产准入，不扩大本次普通增机规则的作用范围。</p>
      *
      * @param dailyMouldCalcService 目标机台数统一查询服务
      * @param context 排程上下文
@@ -720,6 +739,9 @@ public final class DailyMachineExpansionPlanner {
             String scheduleType,
             LocalDate startDate,
             LocalDate specifiedScanEndDate) {
+        if (sku != null && sku.isEndingDeferredExpansion()) {
+            return SkuEndingDeferredExpansionPolicy.resolveAttemptDate(context, sku, startDate);
+        }
         if (Objects.isNull(dailyMouldCalcService) || Objects.isNull(context) || Objects.isNull(sku)
                 || StringUtils.isEmpty(sku.getMaterialCode()) || StringUtils.isEmpty(sku.getProductStatus())
                 || Math.max(0, activeMachineCount) <= 0 || Objects.isNull(context.getScheduleDate())
@@ -747,7 +769,9 @@ public final class DailyMachineExpansionPlanner {
             }
             int targetMachineCount = dailyMouldCalcService.getRequiredMachineCount(
                     context, sku.getMaterialCode(), sku.getProductStatus(), productionDate);
-            boolean addMachine = targetMachineCount > Math.max(0, activeMachineCount);
+            boolean addMachine = targetMachineCount > Math.max(0, activeMachineCount)
+                    && isNextDayMachineDemandUnmet(dailyMouldCalcService, context, sku,
+                    productionDate, activeMachineCount, null);
             log.info("统一Map增机台逐日判断, factoryCode: {}, batchNo: {}, materialCode: {}, productStatus: {}, "
                             + "scheduleType: {}, productionDate: {}, targetMachineCount: {}, "
                             + "currentEffectiveMachineCount: {}, addMachine: {}",
@@ -758,6 +782,54 @@ public final class DailyMachineExpansionPlanner {
             }
         }
         return null;
+    }
+
+    /**
+     * 核对窗口内普通增机的次日需求，防止仅凭当天目标差额恢复MES已提前减少的机台。
+     * 首台、已批准的提前生产和窗口外计划来源仍由原准入处理；次日Map缺失时不授予普通增机资格。
+     *
+     * @param service 统一目标机台数查询服务
+     * @param context 排程上下文
+     * @param sku 当前物料及产品状态
+     * @param productionDate 目标需求业务日
+     * @param activeMachineCount 当前已落实的有效物理机台数
+     * @param previewPlan 当前已批准的提前生产预览，普通增机时为空
+     * @return 次日仍缺机或本次不属于窗口内普通增机时返回true
+     */
+    private static boolean isNextDayMachineDemandUnmet(ILhDailyMouldCalcService service,
+                                                       LhScheduleContext context,
+                                                       SkuScheduleDTO sku,
+                                                       LocalDate productionDate,
+                                                       int activeMachineCount,
+                                                       EarlyProductionRuntimePlan previewPlan) {
+        EarlyProductionRuntimePlan runtimePlan = context.getEarlyProductionRuntimePlan(sku);
+        if (Objects.nonNull(previewPlan) || (Objects.nonNull(runtimePlan) && runtimePlan.isActive())) {
+            // 已批准的提前生产按冻结来源日及投影执行，不能重新按窗口内普通需求推迟或撤销。
+            return true;
+        }
+        LocalDate windowEndDate = context.getWindowEndDate().toInstant()
+                .atZone(ZoneId.systemDefault()).toLocalDate();
+        if (activeMachineCount <= 0 || productionDate.isAfter(windowEndDate)) {
+            return true;
+        }
+        LocalDate nextDate = productionDate.plusDays(1);
+        if (!service.hasRequiredMachineCount(
+                context, sku.getMaterialCode(), sku.getProductStatus(), nextDate)) {
+            // 缺失维度不是零需求，沿统一入口记录警告，不能凭当天差额自行补机。
+            service.getRequiredMachineCount(context, sku.getMaterialCode(), sku.getProductStatus(), nextDate);
+            return false;
+        }
+        int nextTargetMachineCount = service.getRequiredMachineCount(
+                context, sku.getMaterialCode(), sku.getProductStatus(), nextDate);
+        boolean unmet = nextTargetMachineCount > activeMachineCount;
+        if (!unmet && log.isInfoEnabled()) {
+            log.info("普通增机次日需求已满足，保留已有机台, factoryCode: {}, batchNo: {}, materialCode: {}, "
+                            + "productStatus: {}, productionDate: {}, nextDate: {}, "
+                            + "nextTargetMachineCount: {}, currentEffectiveMachineCount: {}, addMachine: false",
+                    context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(), sku.getProductStatus(),
+                    productionDate, nextDate, nextTargetMachineCount, activeMachineCount);
+        }
+        return unmet;
     }
 
     /**

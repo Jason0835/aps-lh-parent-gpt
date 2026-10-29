@@ -3,14 +3,26 @@ package com.zlt.aps.lh.service.impl;
 import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.google.common.collect.Lists;
+import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
+import com.ruoyi.api.gateway.system.domain.ImportLog;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.api.gateway.system.service.IImportErrorLogService;
+import com.ruoyi.api.gateway.system.service.IImportLogService;
 import com.ruoyi.common.constant.HttpStatus;
+import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.SecurityUtils;
+import com.ruoyi.common.core.utils.poi.ExcelUtil;
+import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.core.web.domain.RowStateEnum;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.engine.domain.LhDayPlanAdjustVo;
 import com.zlt.aps.constant.FactoryConstant;
+import com.zlt.aps.lh.api.domain.dto.LhDayPlanAdjustRequireImportDTO;
 import com.zlt.aps.lh.api.domain.entity.LhDayPlanAdjustRequire;
+import com.zlt.aps.lh.api.domain.vo.LhDayPlanAdjustRequireExportVo;
+import com.zlt.aps.lh.api.domain.vo.LhDayPlanAdjustRequireImportVo;
 import com.zlt.aps.lh.api.domain.vo.LhDayPlanAdjustRequireSummaryVo;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.lh.mapper.FactoryMonthPlanProductionFinalResultMapper;
@@ -23,17 +35,24 @@ import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.utils.BeanCopyUtils;
 import com.zlt.bill.common.service.AbstractDocService;
+import com.zlt.common.utils.ImportExcelUtils;
+import com.zlt.common.utils.ImportExcelValidatedUtils;
 import com.zlt.sysdef.domain.SysDocType;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.poi.ss.usermodel.Workbook;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.text.MessageFormat;
 import java.time.YearMonth;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -53,6 +72,14 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
     private static final String ADJUST_REASON_FIELD_TEMPLATE = "adjustReason%d";
     private static final String ADJUSTER_FIELD_TEMPLATE = "adjuster%d";
     private static final String ADJUST_TIME_FIELD_TEMPLATE = "adjustTime%d";
+    /** 导入 Excel 第一条数据所在行号，第 1 行为表头 */
+    private static final int IMPORT_FIRST_DATA_ROW = 2;
+    /** 导入重复校验使用的业务唯一字段，工厂取页面工厂不参与 Excel 重复判断 */
+    private static final String[] IMPORT_REPEAT_FIELDS = {"yearMonth", "materialCode", "productStatus"};
+    /** 年月位数 */
+    private static final int YEAR_MONTH_LENGTH = 6;
+    /** 无登录人时的兜底操作人 */
+    private static final String SYSTEM_USER = "system";
 
     @Resource
     private LhDayPlanAdjustRequireMapper lhDayPlanAdjustRequireMapper;
@@ -65,6 +92,12 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
 
     @Resource
     private MdmRawMaterialConversionEntityMapper rawMaterialConversionMapper;
+
+    @Resource
+    private IImportLogService importLogService;
+
+    @Resource
+    private IImportErrorLogService importErrorLogService;
 
     /**
      * 查询月计划基础行，并批量回填调整明细和胎面胶 TD。
@@ -161,6 +194,480 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
             this.validateAdjustSlot(entity.getMaterialCode(), adjustIndex, adjustQty, adjustReason);
             this.saveAdjustSlot(entity, sourcePlan, adjustIndex, adjustQty, adjustReason);
         }
+    }
+
+    /**
+     * 按查询条件导出全部匹配行。
+     *
+     * <p>导出复用列表的归并口径：先确定有效定稿版本，再按物料和产品状态归并行，
+     * 然后回填三次调整。导出不分页、不应用调整量排序，导出列与导入模板保持同一套紧凑列。</p>
+     *
+     * @param queryVO 查询条件，与列表一致
+     * @param fileName 导出文件名
+     * @return Excel 文件字节
+     */
+    @Override
+    public byte[] exportData(LhDayPlanAdjustRequire queryVO, String fileName) {
+        this.normalizeQuery(queryVO);
+        List<LhDayPlanAdjustRequireExportVo> exportRows = this.buildExportRows(queryVO);
+        ExcelUtil<LhDayPlanAdjustRequireExportVo> excelUtil =
+                new ExcelUtil<LhDayPlanAdjustRequireExportVo>(LhDayPlanAdjustRequireExportVo.class);
+        try (Workbook workbook = excelUtil.exportExcelFromList(exportRows, fileName);
+             ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            workbook.write(outputStream);
+            return outputStream.toByteArray();
+        } catch (IOException exception) {
+            throw new IllegalStateException(I18nUtil.getMessage(
+                    "ui.data.alert.lhDayPlanAdjustRequire.exportFailed"), exception);
+        }
+    }
+
+    /**
+     * 构建导出数据。
+     *
+     * @param queryVO 查询条件
+     * @return 导出行，无有效版本或月计划时返回空列表
+     */
+    private List<LhDayPlanAdjustRequireExportVo> buildExportRows(LhDayPlanAdjustRequire queryVO) {
+        String productionVersion = this.resolveFinalProductionVersion(queryVO);
+        if (StringUtils.isBlank(productionVersion)) {
+            return new ArrayList<LhDayPlanAdjustRequireExportVo>(0);
+        }
+        List<FactoryMonthPlanProductionFinalResult> monthPlanList = this.queryMonthPlanList(queryVO, productionVersion);
+        List<LhDayPlanAdjustRequire> allRows = this.aggregateMonthPlanRows(queryVO, productionVersion, monthPlanList);
+        if (CollectionUtils.isEmpty(allRows)) {
+            return new ArrayList<LhDayPlanAdjustRequireExportVo>(0);
+        }
+        this.fillAdjustRows(allRows);
+        this.fillTreadGlueTd(allRows, queryVO.getFactoryCode());
+        allRows.forEach(this::calculateAdjustedTotalQty);
+        return allRows.stream().map(this::toExportVo).collect(Collectors.toList());
+    }
+
+    /**
+     * 列表行转换为导出行，列顺序与导入模板保持一致。
+     *
+     * @param row 列表行
+     * @return 导出行
+     */
+    private LhDayPlanAdjustRequireExportVo toExportVo(LhDayPlanAdjustRequire row) {
+        LhDayPlanAdjustRequireExportVo exportVo = new LhDayPlanAdjustRequireExportVo();
+        exportVo.setYearMonth(this.formatYearMonth(row.getYearMonth()));
+        exportVo.setMaterialCode(row.getMaterialCode());
+        exportVo.setProductStatus(row.getProductStatus());
+        exportVo.setAdjustQty1(row.getAdjustQty1());
+        exportVo.setAdjustReason1(row.getAdjustReason1());
+        exportVo.setAdjustQty2(row.getAdjustQty2());
+        exportVo.setAdjustReason2(row.getAdjustReason2());
+        exportVo.setAdjustQty3(row.getAdjustQty3());
+        exportVo.setAdjustReason3(row.getAdjustReason3());
+        exportVo.setFactoryCode(row.getFactoryCode());
+        return exportVo;
+    }
+
+    /**
+     * 把 YYYYMM 格式年月转换为 yyyy-MM 文本。
+     *
+     * @param yearMonth 年月
+     * @return 展示文本，空值返回空字符串
+     */
+    private String formatYearMonth(Integer yearMonth) {
+        if (Objects.isNull(yearMonth)) {
+            return StringUtils.EMPTY;
+        }
+        String yearMonthText = String.valueOf(yearMonth);
+        if (yearMonthText.length() != YEAR_MONTH_LENGTH) {
+            return yearMonthText;
+        }
+        return yearMonthText.substring(0, 4) + "-" + yearMonthText.substring(4);
+    }
+
+    /**
+     * 导入硫化日计划调整需求。
+     *
+     * <p>导入只维护已存在月计划 SKU 的三次调整，不允许通过导入新增月计划外的 SKU。
+     * 判断链：行级先校验 SKU 是否在有效月计划中，槽位级再看是否存在未删除记录，
+     * 最后按页面 updateSupport 决定已存在槽位是否允许覆盖。</p>
+     *
+     * @param importDTO 导入文件上下文及页面工厂、年月
+     * @param updateSupport 已存在调整槽位是否允许覆盖
+     * @return 导入结果
+     * @throws Exception 导入日志或文件处理异常
+     */
+    @Override
+    public AjaxResult importData(LhDayPlanAdjustRequireImportDTO importDTO, boolean updateSupport) throws Exception {
+        this.validateImportRequest(importDTO);
+        ImportContext importContext = importDTO.getImportContext();
+        Date beginTime = DateUtils.getNowDate();
+        ImportLog importLog = ImportExcelUtils.getImportLogAndUploadFile(importContext.getFileBytes(),
+                importContext.getImportFilePath(), importContext.getProcedureCode(), importContext.getFunctionName(),
+                importContext.getOriFileName(), 1);
+        importLog = this.importLogService.add(importLog);
+        Date endTime;
+        AjaxResult ajaxResult;
+        int rowCount = 0;
+        try {
+            List<LhDayPlanAdjustRequireImportVo> importRows =
+                    new ExcelUtil<>(LhDayPlanAdjustRequireImportVo.class).importExcel(
+                            new ByteArrayInputStream(importContext.getFileBytes()));
+            rowCount = CollectionUtils.size(importRows);
+            ajaxResult = this.doImport(importRows, importDTO, updateSupport, importLog.getId());
+        } catch (RuntimeException exception) {
+            ajaxResult = AjaxResult.error(exception.getMessage());
+        }
+        endTime = DateUtils.getNowDate();
+        importLog.setRowCount(rowCount);
+        importLog.setBeginTime(beginTime);
+        importLog.setEndTime(endTime);
+        importLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
+        ImportExcelUtils.updateImportLogAndFormatMsg(importLog, ajaxResult, this.importLogService);
+        ImportExcelUtils.saveImportErrorLogs(ajaxResult, this.importErrorLogService);
+        return ajaxResult;
+    }
+
+    /**
+     * 校验导入请求的文件和页面上下文。
+     *
+     * @param importDTO 导入请求
+     */
+    private void validateImportRequest(LhDayPlanAdjustRequireImportDTO importDTO) {
+        if (Objects.isNull(importDTO) || Objects.isNull(importDTO.getImportContext())
+                || Objects.isNull(importDTO.getImportContext().getFileBytes())
+                || importDTO.getImportContext().getFileBytes().length == 0) {
+            throw new IllegalArgumentException(I18nUtil.getMessage(
+                    "ui.data.alert.lhDayPlanAdjustRequire.importFileRequired"));
+        }
+        if (StringUtils.isBlank(importDTO.getFactoryCode())) {
+            throw new IllegalArgumentException(I18nUtil.getMessage(
+                    "ui.data.alert.lhDayPlanAdjustRequire.factoryRequired"));
+        }
+        if (Objects.isNull(importDTO.getYearMonth())) {
+            throw new IllegalArgumentException(I18nUtil.getMessage(
+                    "ui.data.alert.lhDayPlanAdjustRequire.yearMonthRequired"));
+        }
+    }
+
+    /**
+     * 执行导入的两轮校验和写入。
+     *
+     * @param importRows    解析出的导入行
+     * @param importDTO     导入请求
+     * @param updateSupport 已存在槽位是否允许覆盖
+     * @param importLogId   导入日志 ID
+     * @return 导入结果
+     */
+    private AjaxResult doImport(List<LhDayPlanAdjustRequireImportVo> importRows,
+                                LhDayPlanAdjustRequireImportDTO importDTO,
+                                boolean updateSupport,
+                                Long importLogId) {
+        if (CollectionUtils.isEmpty(importRows)) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhDayPlanAdjustRequire.importFileEmpty"));
+        }
+        // Excel 年月必须与页面搜索年月一致，避免一个文件误覆盖其他月份数据
+        this.validateImportYearMonth(importRows, importDTO.getYearMonth());
+
+        int successNum = 0;
+        int failureNum = 0;
+        List<ImportErrorLog> importErrorLogs = new ArrayList<ImportErrorLog>();
+        List<LhDayPlanAdjustRequire> insertList = new ArrayList<LhDayPlanAdjustRequire>();
+        List<LhDayPlanAdjustRequire> updateList = new ArrayList<LhDayPlanAdjustRequire>();
+        // 第一轮失败行号集合，第二轮只处理第一轮通过的行
+        Set<Integer> invalidRowIndexSet = new HashSet<Integer>();
+
+        // 第一轮：导入 VO 字段注解必填校验、字典型校验、数值校验和 Excel 内重复校验
+        for (int i = 0; i < importRows.size(); i++) {
+            int errorNum = i + IMPORT_FIRST_DATA_ROW;
+            LhDayPlanAdjustRequireImportVo importVo = importRows.get(i);
+            List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, importVo);
+            ImportExcelValidatedUtils.validatedRepeat(importRows, importVo, i, IMPORT_FIRST_DATA_ROW,
+                    importLogId, validated, IMPORT_REPEAT_FIELDS);
+            if (CollectionUtils.isNotEmpty(validated)) {
+                failureNum++;
+                invalidRowIndexSet.add(i);
+                importErrorLogs.addAll(validated);
+            }
+        }
+
+        // 第二轮前批量预取有效月计划 SKU 集合和已存在调整槽位，循环中不再查库
+        Set<String> monthPlanSkuKeys = this.loadMonthPlanSkuKeys(importDTO);
+        Map<String, LhDayPlanAdjustRequire> existSlotMap =
+                this.loadExistSlotMap(importDTO.getFactoryCode(), importDTO.getYearMonth());
+        String currentUser = StringUtils.defaultIfBlank(SecurityUtils.getUsername(), SYSTEM_USER);
+        Date currentTime = new Date();
+
+        // 第二轮：业务校验与写入收集
+        for (int i = 0; i < importRows.size(); i++) {
+            if (invalidRowIndexSet.contains(i)) {
+                continue;
+            }
+            int errorNum = i + IMPORT_FIRST_DATA_ROW;
+            LhDayPlanAdjustRequireImportVo importVo = importRows.get(i);
+            String materialCode = StringUtils.trim(importVo.getMaterialCode());
+            String productStatus = StringUtils.trim(importVo.getProductStatus());
+            StringBuilder rowMessage = new StringBuilder();
+            // 行级校验：SKU 必须存在于当前有效定稿月计划，导入不允许新增月计划外 SKU
+            String skuKey = this.buildMaterialStatusKey(materialCode, productStatus);
+            if (!monthPlanSkuKeys.contains(skuKey)) {
+                rowMessage.append(I18nUtil.getMessage("ui.data.alert.lhDayPlanAdjustRequire.monthPlanMissing"));
+            }
+            // 槽位级校验：数量与原因必须同时填写，两者都为空表示该槽位不参与导入
+            boolean hasAdjustmentValue = false;
+            for (int adjustIndex = 1; adjustIndex <= ADJUST_SLOT_COUNT; adjustIndex++) {
+                BigDecimal adjustQty = this.getImportAdjustQty(importVo, adjustIndex);
+                String adjustReason = StringUtils.trim(this.getImportAdjustReason(importVo, adjustIndex));
+                if (Objects.isNull(adjustQty) && StringUtils.isBlank(adjustReason)) {
+                    continue;
+                }
+                hasAdjustmentValue = true;
+                if (Objects.isNull(adjustQty)) {
+                    rowMessage.append(MessageFormat.format(I18nUtil.getMessage(
+                            "ui.data.alert.lhDayPlanAdjustRequire.adjustQtyRequired"), materialCode, adjustIndex));
+                    continue;
+                }
+                if (StringUtils.isBlank(adjustReason)) {
+                    rowMessage.append(MessageFormat.format(I18nUtil.getMessage(
+                            "ui.data.alert.lhDayPlanAdjustRequire.adjustReasonRequired"), materialCode, adjustIndex));
+                }
+            }
+            if (rowMessage.length() > 0) {
+                failureNum++;
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorNum, rowMessage.toString(),
+                        importErrorLogs);
+                continue;
+            }
+            if (!hasAdjustmentValue) {
+                continue;
+            }
+            // 槽位级写入判断：无记录则新增，有记录按 updateSupport 决定覆盖或记失败
+            boolean rowSuccess = this.collectSlotWrites(importVo, importDTO, existSlotMap, updateSupport,
+                    currentUser, currentTime, importLogId, errorNum, insertList, updateList,
+                    importErrorLogs);
+            if (rowSuccess) {
+                successNum++;
+            } else {
+                failureNum++;
+            }
+        }
+
+        if (CollectionUtils.isNotEmpty(insertList)) {
+            insertList.forEach(row -> row.setRowState(RowStateEnum.ADDED));
+            successNum += baseDao.saveBatch(insertList);
+        }
+        updateList.forEach(lhDayPlanAdjustRequireMapper::updateById);
+        if (failureNum > 0) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + ","
+                    + successNum + "," + failureNum, importErrorLogs);
+        }
+        return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
+    }
+
+    /**
+     * 校验 Excel 年月与页面搜索年月是否整批一致。
+     *
+     * @param importRows 导入行
+     * @param yearMonth  页面搜索年月
+     */
+    private void validateImportYearMonth(List<LhDayPlanAdjustRequireImportVo> importRows, Integer yearMonth) {
+        String pageYearMonth = this.formatYearMonth(yearMonth);
+        String firstRowYearMonth = importRows.stream()
+                .map(LhDayPlanAdjustRequireImportVo::getYearMonth)
+                .filter(StringUtils::isNotBlank)
+                .map(this::normalizeYearMonthText)
+                .findFirst()
+                .orElse(pageYearMonth);
+        if (!StringUtils.equals(pageYearMonth, firstRowYearMonth)) {
+            throw new IllegalArgumentException(MessageFormat.format(I18nUtil.getMessage(
+                    "ui.data.alert.lhDayPlanAdjustRequire.importYearMonthMismatch"),
+                    pageYearMonth, firstRowYearMonth));
+        }
+    }
+
+    /**
+     * 把导入的年月文本统一成 yyyy-MM，兼容 yyyyMM 和 yyyy-MM 两种写法。
+     *
+     * @param yearMonthText 导入年月文本
+     * @return yyyy-MM 文本
+     */
+    private String normalizeYearMonthText(String yearMonthText) {
+        String trimmed = StringUtils.remove(StringUtils.trim(yearMonthText), "-");
+        if (trimmed.length() != YEAR_MONTH_LENGTH || !StringUtils.isNumeric(trimmed)) {
+            return StringUtils.trim(yearMonthText);
+        }
+        return trimmed.substring(0, 4) + "-" + trimmed.substring(4);
+    }
+
+    /**
+     * 批量预取当前工厂和年月有效定稿月计划中的 SKU 集合。
+     *
+     * @param importDTO 导入请求
+     * @return SKU 键集合，键为 materialCode|productStatus
+     */
+    private Set<String> loadMonthPlanSkuKeys(LhDayPlanAdjustRequireImportDTO importDTO) {
+        LhDayPlanAdjustRequire normalizedQuery = new LhDayPlanAdjustRequire();
+        normalizedQuery.setFactoryCode(importDTO.getFactoryCode());
+        normalizedQuery.setYearMonth(importDTO.getYearMonth());
+        this.normalizeQuery(normalizedQuery);
+        String productionVersion = this.resolveFinalProductionVersion(normalizedQuery);
+        if (StringUtils.isBlank(productionVersion)) {
+            throw new IllegalArgumentException(I18nUtil.getMessage(
+                    "ui.data.alert.lhDayPlanAdjustRequire.finalVersionMissing"));
+        }
+        List<FactoryMonthPlanProductionFinalResult> monthPlanList =
+                this.queryMonthPlanList(normalizedQuery, productionVersion);
+        return monthPlanList.stream()
+                .filter(Objects::nonNull)
+                .filter(plan -> StringUtils.isNotBlank(plan.getMaterialCode()))
+                .map(plan -> this.buildMaterialStatusKey(
+                        StringUtils.trim(plan.getMaterialCode()), StringUtils.trim(plan.getProductStatus())))
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * 批量预取当前工厂和年月已存在的调整槽位。
+     *
+     * @param factoryCode 工厂编码
+     * @param yearMonth   年月
+     * @return 槽位键到调整记录的映射，槽位键为 materialCode|productStatus|adjustCount
+     */
+    private Map<String, LhDayPlanAdjustRequire> loadExistSlotMap(String factoryCode, Integer yearMonth) {
+        List<LhDayPlanAdjustRequire> existList = lhDayPlanAdjustRequireMapper.selectList(
+                new LambdaQueryWrapper<LhDayPlanAdjustRequire>()
+                        .eq(LhDayPlanAdjustRequire::getFactoryCode, factoryCode)
+                        .eq(LhDayPlanAdjustRequire::getYearMonth, yearMonth)
+                        .orderByDesc(LhDayPlanAdjustRequire::getUpdateTime)
+                        .orderByDesc(LhDayPlanAdjustRequire::getId));
+        return existList.stream()
+                .filter(adjust -> Objects.nonNull(adjust.getAdjustCount()))
+                .collect(Collectors.toMap(
+                        adjust -> this.buildImportSlotKey(adjust.getMaterialCode(),
+                                adjust.getProductStatus(), adjust.getAdjustCount()),
+                        Function.identity(),
+                        (first, second) -> first));
+    }
+
+    /**
+     * 收集单个导入行三个槽位的写入动作。
+     *
+     * @param importVo      导入行
+     * @param importDTO     导入请求
+     * @param existSlotMap  已存在槽位映射
+     * @param updateSupport 已存在槽位是否允许覆盖
+     * @param currentUser   当前登录人
+     * @param currentTime   当前时间
+     * @param importLogId   导入日志 ID
+     * @param errorNum      Excel 行号
+     * @param insertList    待新增列表
+     * @param updateList    待更新列表
+     * @param importErrorLogs 导入错误日志
+     * @return 当前行是否存在被拒绝的槽位
+     */
+    private boolean collectSlotWrites(LhDayPlanAdjustRequireImportVo importVo,
+                                      LhDayPlanAdjustRequireImportDTO importDTO,
+                                      Map<String, LhDayPlanAdjustRequire> existSlotMap,
+                                      boolean updateSupport,
+                                      String currentUser,
+                                      Date currentTime,
+                                      Long importLogId,
+                                      int errorNum,
+                                      List<LhDayPlanAdjustRequire> insertList,
+                                      List<LhDayPlanAdjustRequire> updateList,
+                                      List<ImportErrorLog> importErrorLogs) {
+        String materialCode = StringUtils.trim(importVo.getMaterialCode());
+        String productStatus = StringUtils.trim(importVo.getProductStatus());
+        int yearMonth = importDTO.getYearMonth();
+        boolean rowSuccess = true;
+        for (int adjustIndex = 1; adjustIndex <= ADJUST_SLOT_COUNT; adjustIndex++) {
+            BigDecimal adjustQty = this.getImportAdjustQty(importVo, adjustIndex);
+            String adjustReason = StringUtils.trim(this.getImportAdjustReason(importVo, adjustIndex));
+            // 数量与原因都为空表示不修改该槽位，导入不承担清空职责
+            if (Objects.isNull(adjustQty) && StringUtils.isBlank(adjustReason)) {
+                continue;
+            }
+            String slotKey = this.buildImportSlotKey(materialCode, productStatus, adjustIndex);
+            LhDayPlanAdjustRequire existing = existSlotMap.get(slotKey);
+            if (Objects.isNull(existing)) {
+                LhDayPlanAdjustRequire insertRow = new LhDayPlanAdjustRequire();
+                insertRow.setFactoryCode(importDTO.getFactoryCode());
+                insertRow.setYear(yearMonth / 100);
+                insertRow.setMonth(yearMonth % 100);
+                insertRow.setYearMonth(yearMonth);
+                insertRow.setProductStatus(productStatus);
+                insertRow.setMaterialCode(materialCode);
+                insertRow.setAdjustCount(adjustIndex);
+                insertRow.setPlanQty(adjustQty);
+                insertRow.setReason(adjustReason);
+                insertRow.setAdjuster(currentUser);
+                insertRow.setCreateBy(currentUser);
+                insertRow.setCreateTime(currentTime);
+                insertRow.setUpdateBy(currentUser);
+                insertRow.setUpdateTime(currentTime);
+                insertRow.setIsDelete(0);
+                insertList.add(insertRow);
+                existSlotMap.put(slotKey, insertRow);
+                continue;
+            }
+            if (!updateSupport) {
+                // 未勾选允许更新已有数据时，已存在槽位按唯一性冲突记失败
+                rowSuccess = false;
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorNum,
+                        MessageFormat.format(I18nUtil.getMessage("import.validated.unique"), errorNum),
+                        importErrorLogs);
+                continue;
+            }
+            existing.setPlanQty(adjustQty);
+            existing.setReason(adjustReason);
+            existing.setAdjuster(currentUser);
+            existing.setUpdateBy(currentUser);
+            existing.setUpdateTime(currentTime);
+            updateList.add(existing);
+        }
+        return rowSuccess;
+    }
+
+    /**
+     * 读取指定序号的导入调整量。
+     *
+     * @param importVo    导入行
+     * @param adjustIndex 调整序号
+     * @return 调整量
+     */
+    private BigDecimal getImportAdjustQty(LhDayPlanAdjustRequireImportVo importVo, int adjustIndex) {
+        if (adjustIndex == 1) {
+            return importVo.getAdjustQty1();
+        }
+        if (adjustIndex == 2) {
+            return importVo.getAdjustQty2();
+        }
+        return importVo.getAdjustQty3();
+    }
+
+    /**
+     * 读取指定序号的导入调整原因。
+     *
+     * @param importVo    导入行
+     * @param adjustIndex 调整序号
+     * @return 调整原因
+     */
+    private String getImportAdjustReason(LhDayPlanAdjustRequireImportVo importVo, int adjustIndex) {
+        if (adjustIndex == 1) {
+            return importVo.getAdjustReason1();
+        }
+        if (adjustIndex == 2) {
+            return importVo.getAdjustReason2();
+        }
+        return importVo.getAdjustReason3();
+    }
+
+    /**
+     * 生成导入调整槽位键。
+     *
+     * @param materialCode  物料编码
+     * @param productStatus 产品状态
+     * @param adjustCount   调整序号
+     * @return 槽位键
+     */
+    private String buildImportSlotKey(String materialCode, String productStatus, int adjustCount) {
+        return this.buildMaterialStatusKey(materialCode, productStatus) + "|" + adjustCount;
     }
 
     /**

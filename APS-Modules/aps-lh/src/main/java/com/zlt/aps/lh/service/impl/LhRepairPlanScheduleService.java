@@ -162,6 +162,35 @@ public class LhRepairPlanScheduleService {
     }
 
     /**
+     * 统一维修切换及已有清洗组合的正向首检下限，供候选、正式排量和冻结时间轴共用。
+     * 仅05本体与真实切换严格相交时启用维修组合；准备完成后首检仍受原有更晚门禁约束。
+     *
+     * @param context 当前批次固定维修和清洗事实
+     * @param machineCode 当前运行侧机台
+     * @param scheduleType 实际换模或换活字块类型
+     * @param switchStartTime 真实切换开始时间
+     * @param switchEndTime 真实切换自身完成时间
+     * @return 需要正向首检时的准备完成下限，否则为空
+     */
+    public static Date resolveForwardInspectionReady(LhScheduleContext context, String machineCode,
+            String scheduleType, Date switchStartTime, Date switchEndTime) {
+        if (context == null || StringUtils.isEmpty(machineCode) || switchStartTime == null || switchEndTime == null
+                || (!ScheduleTypeEnum.NEW_SPEC.getCode().equals(scheduleType)
+                && !ScheduleTypeEnum.TYPE_BLOCK.getCode().equals(scheduleType))) {
+            return null;
+        }
+        Date readyTime = LhCleaningRepairOverlapPolicy.resolveForwardInspectionReady(
+                context, machineCode, scheduleType, switchStartTime, switchEndTime);
+        RepairPlanResult repair = LhRepairOverlapResolver.resolveSwitch(context, context.getDevicePlanShutList(),
+                machineCode, null, switchStartTime, switchEndTime);
+        if (repair.getCapacityWindows().stream().anyMatch(MachineMaintenanceWindowDTO::isRepairCombinedWithSwitch)
+                && (readyTime == null || repair.getProductionNotBefore().after(readyTime))) {
+            readyTime = repair.getProductionNotBefore();
+        }
+        return RepairPlanRuntimeState.copyDate(readyTime);
+    }
+
+    /**
      * 按结果记录的真实切换动作恢复组合容量，不用正式生产开始时间扩大重叠范围。
      *
      * @param context 当前批次
@@ -253,7 +282,7 @@ public class LhRepairPlanScheduleService {
      * 计算本轮已锁定设备窗口的回填日期。无SKU产出也可实际安排维修或发生故障。
      *
      * @param context 完成排程的上下文
-     * @return 来源计划ID到实际开始日期，不使用本次请求日期替代
+     * @return 来源计划ID到回填日期；05取实际开始日，06取与本轮班次交集的开始日
      */
     private Map<Long, Date> resolveScheduledStopDates(LhScheduleContext context) {
         Map<Long, MdmDevicePlanShut> sources = new LinkedHashMap<>(context.getPlannedRepairSourcePlanMap());
@@ -276,10 +305,13 @@ public class LhRepairPlanScheduleService {
             boolean repair = StringUtils.equals(
                     MachineStopTypeEnum.PLANNED_REPAIR.getCode(), source.getMachineStopType());
             MdmDevicePlanShut actual = repair ? LhPlannedRepairResolver.buildActualRepairPlan(context, source) : source;
-            if (repair) {
-                // 完整收尾已兑现时读取同一实际时间投影，不能回填成原早班已经执行维修。
+            if (repair && actual != null) {
+                // 被完整收尾排除的05不执行；来源旧安排日期也必须随本轮替换清理。
                 actual = context.getDevicePlanShutList().stream()
-                        .filter(plan -> Objects.equals(source.getId(), plan.getId())).findFirst().orElse(actual);
+                        .filter(plan -> Objects.equals(source.getId(), plan.getId())).findFirst().orElse(null);
+                if (actual == null) {
+                    dates.put(source.getId(), null);
+                }
             }
             if (Objects.isNull(actual)) {
                 continue;
@@ -288,13 +320,17 @@ public class LhRepairPlanScheduleService {
                     LhSingleControlMachineUtil.resolvePhysicalMachineCode(source.getMachineCode()));
             Date actualStart = actual.getBeginDate();
             Date actualEnd = actual.getEndDate();
-            boolean inWindow = shifts.stream()
-                    .anyMatch(shift -> actualStart.before(shift.getShiftEndDateTime())
-                            && actualEnd.after(shift.getShiftStartDateTime()));
-            if (!machineExists || !inWindow) {
+            Date firstIntersectionStart = shifts.stream()
+                    .filter(shift -> actualStart.before(shift.getShiftEndDateTime())
+                            && actualEnd.after(shift.getShiftStartDateTime()))
+                    .map(shift -> actualStart.after(shift.getShiftStartDateTime())
+                            ? actualStart : shift.getShiftStartDateTime())
+                    .min(Date::compareTo).orElse(null);
+            if (!machineExists || Objects.isNull(firstIntersectionStart)) {
                 continue;
             }
-            Date scheduleDate = LhScheduleTimeUtil.clearTime(actual.getBeginDate());
+            // 06原始故障时间用于禁产和迁移，来源回填只记录本轮实际覆盖的最早日期。
+            Date scheduleDate = LhScheduleTimeUtil.clearTime(repair ? actualStart : firstIntersectionStart);
             dates.put(source.getId(), scheduleDate);
             Date readyTime = repair ? LhScheduleTimeUtil.addMinutes(actual.getEndDate(),
                     LhScheduleTimeUtil.getCapsulePreheatMinutes(context)) : actual.getEndDate();

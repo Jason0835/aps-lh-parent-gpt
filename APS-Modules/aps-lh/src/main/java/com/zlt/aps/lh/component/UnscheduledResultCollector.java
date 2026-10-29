@@ -7,6 +7,8 @@ import com.zlt.aps.lh.api.enums.UnscheduledGroupTypeEnum;
 import com.zlt.aps.lh.api.enums.UnscheduledReasonEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationRemainderFinishGroup;
+import com.zlt.aps.lh.engine.strategy.support.EndingDiscardCandidate;
+import com.zlt.aps.lh.engine.strategy.support.SmallEndingSurplusSkipRule;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.engine.strategy.support.UnscheduledDemandSnapshot;
 import com.zlt.aps.lh.engine.strategy.support.UnscheduledReasonEvent;
@@ -25,6 +27,8 @@ import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -32,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Predicate;
 
 /**
  * 硫化未排结果公共收集器。
@@ -214,6 +219,7 @@ public class UnscheduledResultCollector {
                 result.getUnscheduledReasonDetail());
         this.applyGroupType(context, result);
         context.getUnscheduledResultList().add(result);
+        this.registerEndingDiscardCandidate(context, result);
     }
 
     /**
@@ -259,6 +265,15 @@ public class UnscheduledResultCollector {
         }
         context.getUnscheduledResultList().removeIf(result ->
                 Objects.nonNull(result) && this.isSameDemand(context, sku, result));
+        String demandKey = context.getUnscheduledResultRuntime().getDemandKeyBySku().get(sku);
+        this.removeEndingDiscardCandidates(context, candidate -> {
+            if (StringUtils.isNotEmpty(demandKey) && StringUtils.isNotEmpty(candidate.getDemandKey())) {
+                return StringUtils.equals(demandKey, candidate.getDemandKey());
+            }
+            return StringUtils.equals(sku.getMaterialCode(), candidate.getMaterialCode())
+                    && StringUtils.equals(StringUtils.trimToEmpty(sku.getProductStatus()),
+                    StringUtils.trimToEmpty(candidate.getProductStatus()));
+        });
     }
 
     /**
@@ -271,7 +286,18 @@ public class UnscheduledResultCollector {
         if (Objects.isNull(context) || Objects.isNull(result)) {
             return;
         }
-        context.getUnscheduledResultList().remove(result);
+        List<LhUnscheduledResult> results = context.getUnscheduledResultList();
+        // 两条数值相同的未排也可能来自不同试算，必须按对象身份撤销指定来源。
+        for (int index = 0; index < results.size(); index++) {
+            if (results.get(index) == result) {
+                results.remove(index);
+                break;
+            }
+        }
+        // 在事件列表为空时也必须撤销数量快照；同 SKU 其他来源的有效命中继续保留。
+        if (results.stream().noneMatch(existing -> existing == result)) {
+            this.removeEndingDiscardCandidates(context, candidate -> candidate.getSourceResult() == result);
+        }
         List<UnscheduledReasonEvent> events = context.getUnscheduledResultRuntime()
                 .getReasonEventMap().get(result.getRuntimeDemandKey());
         if (CollectionUtils.isEmpty(events)) {
@@ -366,6 +392,7 @@ public class UnscheduledResultCollector {
         this.applyReason(result, effectiveReason, reasonSummary, reasonDetail);
         this.applyGroupType(context, result);
         this.recordReasonEvent(context, result.getRuntimeDemandKey(), effectiveReason, reasonDetail);
+        this.registerEndingDiscardCandidate(context, result);
     }
 
     /**
@@ -385,6 +412,10 @@ public class UnscheduledResultCollector {
      * @param context 即将持久化的最终八班上下文
      */
     public void finalizeBeforePersistence(LhScheduleContext context) {
+        // 后续只核对最终诊断数量，禁止将回写数量误当作新的规则命中余量。
+        if (Objects.nonNull(context)) {
+            context.getUnscheduledResultRuntime().setEndingDiscardRegistrationClosed(true);
+        }
         // 指定试制量试完成实机和虚拟补量后，按最终全部产量补齐未排。
         this.reconcilePreviousAlternateTrials(context);
         this.finalizeResults(context, true);
@@ -505,7 +536,12 @@ public class UnscheduledResultCollector {
      * @param reconcileFinalQty 是否已经完成全部后置数量调整
      */
     private void finalizeResults(LhScheduleContext context, boolean reconcileFinalQty) {
-        if (Objects.isNull(context) || CollectionUtils.isEmpty(context.getUnscheduledResultList())) {
+        if (Objects.isNull(context)) {
+            return;
+        }
+        // 部分既有流程直接清理未排行；在归并前撤销失去真实投影来源的舍弃候选。
+        this.retainActiveEndingDiscardCandidates(context);
+        if (CollectionUtils.isEmpty(context.getUnscheduledResultList())) {
             return;
         }
         Map<String, List<LhUnscheduledResult>> resultGroupMap =
@@ -556,9 +592,11 @@ public class UnscheduledResultCollector {
             primaryResult.setUnscheduledReasonStage(finalReason.getStage());
             primaryResult.setUnscheduledReasonDetail(this.buildFinalReasonDetail(
                     context, entry.getKey(), finalReason, primaryResult, entry.getValue()));
+            this.rebindEndingDiscardCandidates(context, entry.getValue(), primaryResult);
             finalizedResults.add(primaryResult);
         }
         context.setUnscheduledResultList(finalizedResults);
+        this.retainActiveEndingDiscardCandidates(context);
         Map<Integer, Long> groupCountMap = finalizedResults.stream().collect(
                 java.util.stream.Collectors.groupingBy(
                         LhUnscheduledResult::getGroupType, LinkedHashMap::new,
@@ -882,7 +920,8 @@ public class UnscheduledResultCollector {
                 || StringUtils.equals(reason, "试制量试当日不可排产")) {
             return UnscheduledReasonEnum.TRIAL_MASS_TRIAL_BLOCKED;
         }
-        if (StringUtils.contains(reason, "小余量")) {
+        if (StringUtils.equals(reason, SmallEndingSurplusSkipRule.UNSCHEDULED_REASON)
+                || StringUtils.contains(reason, "小余量")) {
             return UnscheduledReasonEnum.SMALL_ENDING_SURPLUS;
         }
         if (StringUtils.contains(reason, "共用胎胚") && StringUtils.contains(reason, "余量为0")) {
@@ -965,6 +1004,70 @@ public class UnscheduledResultCollector {
             return UnscheduledReasonEnum.WINDOW_FINAL_UNSCHEDULED;
         }
         return UnscheduledReasonEnum.OTHER;
+    }
+
+    /**
+     * 仅在真实未排新增或原因更新时冻结两类舍弃规则已计算的实际余量。
+     *
+     * @param context 当前排程上下文
+     * @param result 已写入真实未排的规则结果
+     */
+    private void registerEndingDiscardCandidate(LhScheduleContext context, LhUnscheduledResult result) {
+        UnscheduledReasonEnum reason = UnscheduledReasonEnum.fromCode(result.getUnscheduledReasonCode());
+        if (context.getUnscheduledResultRuntime().isEndingDiscardRegistrationClosed()
+                || (reason != UnscheduledReasonEnum.SMALL_ENDING_SURPLUS
+                && reason != UnscheduledReasonEnum.HISTORY_SHORTAGE_SKIPPED)
+                || Objects.isNull(result.getUnscheduledQty()) || result.getUnscheduledQty() <= 0) {
+            return;
+        }
+        List<EndingDiscardCandidate> candidates = context.getUnscheduledResultRuntime()
+                .getEndingDiscardCandidateMap().computeIfAbsent(
+                        EndingDiscardCandidate.buildSkuReasonKey(result), key -> new ArrayList<>(2));
+        // 同一来源的重入只作幂等确认，不能用后来归并后的数量覆盖原规则实际余量。
+        if (candidates.stream().noneMatch(candidate -> candidate.getSourceResult() == result)) {
+            candidates.add(new EndingDiscardCandidate(result));
+        }
+    }
+
+    /**
+     * 清除既有直接移除未排行路径留下的候选，不推测或重建任何规则数量。
+     *
+     * @param context 归并前或归并后的未排上下文
+     */
+    private void retainActiveEndingDiscardCandidates(LhScheduleContext context) {
+        Set<LhUnscheduledResult> activeResults = Collections.newSetFromMap(new IdentityHashMap<>());
+        activeResults.addAll(context.getUnscheduledResultList());
+        this.removeEndingDiscardCandidates(context, candidate -> !activeResults.contains(candidate.getSourceResult()));
+    }
+
+    /**
+     * 正常归并时转移候选的投影关联，避免把多条归为一条误认为业务撤销。
+     *
+     * @param context 当前排程上下文
+     * @param sources 同一原始需求的阶段投影
+     * @param primaryResult 归并后保留的投影
+     */
+    private void rebindEndingDiscardCandidates(LhScheduleContext context,
+            List<LhUnscheduledResult> sources, LhUnscheduledResult primaryResult) {
+        Set<LhUnscheduledResult> sourceIdentities = Collections.newSetFromMap(new IdentityHashMap<>());
+        sourceIdentities.addAll(sources);
+        context.getUnscheduledResultRuntime().getEndingDiscardCandidateMap().values().forEach(candidates ->
+                candidates.replaceAll(candidate -> sourceIdentities.contains(candidate.getSourceResult())
+                        ? candidate.rebindTo(primaryResult) : candidate));
+    }
+
+    /**
+     * 清除被撤销来源或已解决需求的候选，保留同组其他真实命中。
+     *
+     * @param context 当前排程上下文
+     * @param predicate 本次需撤销的来源条件
+     */
+    private void removeEndingDiscardCandidates(LhScheduleContext context,
+            Predicate<EndingDiscardCandidate> predicate) {
+        Map<String, List<EndingDiscardCandidate>> candidates = context.getUnscheduledResultRuntime()
+                .getEndingDiscardCandidateMap();
+        candidates.values().forEach(values -> values.removeIf(predicate));
+        candidates.entrySet().removeIf(entry -> entry.getValue().isEmpty());
     }
 
     private void recordReasonEvent(LhScheduleContext context,

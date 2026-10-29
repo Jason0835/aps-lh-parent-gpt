@@ -7,7 +7,12 @@ import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.MachineStopTypeEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.engine.strategy.support.RepairPlanRuntimeState;
+import com.zlt.aps.lh.engine.strategy.support.ContinuationRemainderFinishGroup;
+import com.zlt.aps.lh.engine.strategy.support.ContinuationEndingMachineProfile;
+import com.zlt.aps.lh.engine.strategy.support.ContinuationFinishScheduleResult;
+import com.zlt.aps.lh.engine.strategy.support.ContinuationMachineFinishPlan;
 import com.zlt.aps.lh.util.CleaningScheduleRuleUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
@@ -31,11 +36,12 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.HashSet;
 import java.util.stream.Collectors;
 
 /**
- * 维修当周收尾等待规则，候选以扣维修前的合法容量证明，正式结果以真实收尾时间兑现。
- * 原始05来源和06故障保持不变，作用域内只发布独立时间投影，不扣减任何数量账本。
+ * 收尾优先规则，完整收尾时跳过对应05，候选和续作均以独立容量视图证明。
+ * 原始05来源和06故障保持不变，作用域内只发布独立执行视图，不扣减任何数量账本。
  *
  * @author APS
  * @date 2026/10/23
@@ -49,7 +55,7 @@ public final class LhRepairEndingDeferralPolicy {
     }
 
     /**
-     * 为一个机台候选建立独立维修等待视图，失败、异常和预演退出均恢复外层事实。
+     * 为一个机台候选建立独立维修跳过视图，失败、异常和预演退出均恢复外层事实。
      *
      * @param context 当前排程上下文
      * @param sku 当前收尾物料
@@ -70,11 +76,11 @@ public final class LhRepairEndingDeferralPolicy {
     }
 
     /**
-     * 用已提交的整机完整收尾结果还原维修等待时间，供后续SKU及保存阶段共用。
+     * 用已提交的完整收尾结果排除对应05，供后续SKU、容量校正及保存阶段共用。
      *
      * @param context 已提交结果及其来源身份
      * @param plans 原始实际维修列表
-     * @return 无等待时复用原列表，有等待时返回独立时间投影
+     * @return 无跳过时复用原列表，有完整收尾时返回排除对应05的独立列表
      */
     public static List<MdmDevicePlanShut> resolveCommittedPlans(LhScheduleContext context,
             List<MdmDevicePlanShut> plans) {
@@ -89,10 +95,11 @@ public final class LhRepairEndingDeferralPolicy {
         List<MdmDevicePlanShut> projected = new ArrayList<>(plans.size());
         boolean changed = false;
         for (MdmDevicePlanShut plan : plans) {
-            Date finish = resolveCommittedEnding(context, plan);
-            MdmDevicePlanShut actual = finish == null ? plan : moveRepair(plan, finish);
-            projected.add(actual);
-            changed |= actual != plan;
+            if (resolveCommittedEnding(context, plan) == null) {
+                projected.add(plan);
+            } else {
+                changed = true;
+            }
         }
         List<MdmDevicePlanShut> view = changed ? projected : plans;
         boolean sourceChanged = state.getCommittedStopSource() != plans || state.getCommittedStopKey() == null
@@ -110,7 +117,7 @@ public final class LhRepairEndingDeferralPolicy {
 
     /**
      * 一次轻量扫描提取维修相关整机的数量与时间事实，不为每条维修反复扫描全量结果。
-     * 快照只含不可变值，因此同数量行数下的就地改量、换料及结果回滚也会失效。
+     * 快照只含不可变值，因此同数量行数下的就地改量、换料、目标变化及结果回滚也会失效。
      *
      * @param context 当前已提交结果
      * @param plans 当前实际停机列表
@@ -132,17 +139,38 @@ public final class LhRepairEndingDeferralPolicy {
         List<Object> sides = machines.stream().map(context.getMachineScheduleMap()::containsKey)
                 .collect(Collectors.toList());
         List<Object> results = new ArrayList<>();
+        Set<String> occupyingSkus = new HashSet<>();
         for (LhScheduleResult result : context.getScheduleResultList()) {
             if (result == null || !machines.contains(result.getLhMachineCode())) {
                 continue;
             }
             int first = ShiftFieldUtil.resolveFirstPlannedShiftIndex(result);
+            Date start = first > 0 ? ShiftFieldUtil.getShiftStartTime(result, first) : null;
             results.add(Arrays.asList(result.getLhMachineCode(), result.getMaterialCode(), result.getProductStatus(),
-                    result.getMouldSurplusQty(), ShiftFieldUtil.resolveScheduledQty(result),
-                    first > 0 ? millis(ShiftFieldUtil.getShiftStartTime(result, first)) : null,
-                    millis(result.getSpecEndTime())));
+                    result.getMouldSurplusQty(), ShiftFieldUtil.resolveScheduledQty(result), millis(start),
+                    millis(result.getSpecEndTime()), result.getIsEmbryoEnding()));
+            if (start != null && result.getSpecEndTime() != null && plans.stream().anyMatch(plan ->
+                    isRepair(plan) && samePhysical(plan.getMachineCode(), result.getLhMachineCode())
+                            && start.before(plan.getBeginDate()) && result.getSpecEndTime().after(plan.getBeginDate()))) {
+                occupyingSkus.add(MonthPlanDateResolver.buildMaterialStatusKey(
+                        result.getMaterialCode(), result.getProductStatus()));
+            }
         }
-        return Arrays.asList(sources, sides, results);
+        // 整组完成依赖同SKU其他机台的数量；无关SKU不参与指纹，避免每次读维修视图都反射全厂八班。
+        List<Object> peers = context.getScheduleResultList().stream().filter(Objects::nonNull)
+                .filter(result -> !machines.contains(result.getLhMachineCode()))
+                .filter(result -> occupyingSkus.contains(MonthPlanDateResolver.buildMaterialStatusKey(
+                        result.getMaterialCode(), result.getProductStatus())))
+                .map(result -> Arrays.asList(result.getMaterialCode(), result.getProductStatus(),
+                        ShiftFieldUtil.resolveScheduledQty(result))).collect(Collectors.toList());
+        List<Object> targets = context.getContinuationRemainderFinishGroups().stream()
+                .map(group -> Arrays.asList(group.getSourceSku().getMaterialCode(),
+                        group.getSourceSku().getProductStatus(), group.getFinalTargetQty(),
+                        group.getOriginalMachineFinishPlan() == null ? null
+                                : group.getOriginalMachineFinishPlan().getRemainingQty()))
+                .collect(Collectors.toList());
+        return Arrays.asList(sources, sides, results, peers, targets,
+                new java.util.HashMap<>(context.getSharedEmbryoStockEndingInitialQuotaMap()));
     }
 
     /**
@@ -180,49 +208,64 @@ public final class LhRepairEndingDeferralPolicy {
     }
 
     /**
-     * 判断05是否已由当前视图推迟，原始来源时刻只用于比对，不反向覆盖投影。
+     * 为续作收尾组打开扣05前的独立试算，其他设备约束保持原位。
+     * 正式提交前必须按真实分配恢复未能证明完整收尾的维修来源。
      *
-     * @param context 当前批次
-     * @param plan 当前实际时间投影
-     * @return 当前开始晚于原实际维修开始时返回true
+     * @param context 本轮上下文
+     * @param group 已冻结目标和原机身份的收尾组
+     * @return 自动恢复外层视图的试算作用域
      */
-    public static boolean isDeferred(LhScheduleContext context, MdmDevicePlanShut plan) {
-        MdmDevicePlanShut source = context == null || plan == null ? null
-                : context.getPlannedRepairSourcePlanMap().get(plan.getId());
-        MdmDevicePlanShut original = source == null ? null
-                : LhPlannedRepairResolver.buildActualRepairPlan(context, source);
-        return original != null && plan.getBeginDate() != null
-                && plan.getBeginDate().after(original.getBeginDate());
+    public static Scope openContinuationScope(LhScheduleContext context, ContinuationRemainderFinishGroup group) {
+        List<MdmDevicePlanShut> original = context.getDevicePlanShutList();
+        Set<String> machines = group.getParticipatingResults().stream()
+                .map(result -> LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode()))
+                .collect(Collectors.toSet());
+        List<MdmDevicePlanShut> projected = original.stream()
+                .filter(plan -> !isRepair(plan) || !machines.contains(
+                        LhSingleControlMachineUtil.resolvePhysicalMachineCode(plan.getMachineCode())))
+                .collect(Collectors.toList());
+        return new Scope(context, projected, original);
     }
 
     /**
-     * 在结果和过程日志保存前绑定已兑现的维修等待说明，不改变生产时间、数量或来源。
+     * 将不执行05的原因绑定到直接承接后料的首个有量班次，并记录来源证据。
      *
-     * @param context 已完成最终数量与收尾标记刷新的上下文
+     * @param context 已完成最终数量及时间校正的上下文
      */
     public static void appendCommittedAnalysis(LhScheduleContext context) {
-        for (MdmDevicePlanShut actual : context.getDevicePlanShutList()) {
-            if (!isDeferred(context, actual)) {
+        List<MdmDevicePlanShut> actualPlans = context.getDevicePlanShutList();
+        for (MdmDevicePlanShut source : context.getPlannedRepairSourcePlanMap().values()) {
+            MdmDevicePlanShut repair = LhPlannedRepairResolver.buildActualRepairPlan(context, source);
+            Date finish = repair == null ? null : resolveCommittedEnding(context, repair);
+            if (finish == null || actualPlans.stream().anyMatch(plan -> Objects.equals(plan.getId(), source.getId()))) {
                 continue;
             }
-            MdmDevicePlanShut source = context.getPlannedRepairSourcePlanMap().get(actual.getId());
+            Date nextSwitch = context.getScheduleResultList().stream()
+                    .filter(result -> samePhysical(source.getMachineCode(), result.getLhMachineCode()))
+                    .map(LhScheduleResult::getMouldChangeStartTime).filter(Objects::nonNull)
+                    .filter(start -> !start.before(finish)).min(Date::compareTo).orElse(null);
             context.getScheduleResultList().stream()
                     .filter(result -> samePhysical(source.getMachineCode(), result.getLhMachineCode()))
-                    .filter(result -> "1".equals(result.getIsEnd())
-                            && Objects.equals(actual.getBeginDate(), result.getSpecEndTime()))
-                    .forEach(result -> ShiftFieldUtil.appendShiftAnalysis(result,
-                            ShiftFieldUtil.resolveLastPlannedShiftIndex(result), "计划性维修等待收尾"));
-            PriorityTraceLogHelper.appendProcessLog(context, "计划性维修等待收尾",
+                    .filter(result -> nextSwitch != null && nextSwitch.equals(result.getMouldChangeStartTime()))
+                    .filter(result -> ShiftFieldUtil.resolveFirstPlannedShiftIndex(result) > 0)
+                    .forEach(result -> {
+                        int first = ShiftFieldUtil.resolveFirstPlannedShiftIndex(result);
+                        ShiftFieldUtil.appendShiftAnalysis(result, first, "收尾+计划性维修");
+                        if ("1".equals(result.getIsChangeMould()) && !"1".equals(result.getIsTypeBlock())) {
+                            ShiftFieldUtil.appendShiftAnalysis(result, first, "换模");
+                        }
+                    });
+            PriorityTraceLogHelper.appendProcessLog(context, "收尾跳过计划性维修",
                     "工厂=" + context.getFactoryCode() + ", 批次=" + context.getBatchNo()
                             + ", 来源=" + source.getId() + ", 物理机台=" + source.getMachineCode()
-                            + ", 原开始=" + LhScheduleTimeUtil.formatDateTime(source.getBeginDate())
-                            + ", 收尾后实际开始=" + LhScheduleTimeUtil.formatDateTime(actual.getBeginDate())
-                            + ", 维修结束=" + LhScheduleTimeUtil.formatDateTime(actual.getEndDate()));
+                            + ", 原实际开始=" + LhScheduleTimeUtil.formatDateTime(repair.getBeginDate())
+                            + ", 实际收尾=" + LhScheduleTimeUtil.formatDateTime(finish)
+                            + ", 处理=05不执行且不追加预热，后料按实际切换首检");
         }
     }
 
     /**
-     * 在维修本体发生前已完成准备的收尾候选，按整机全部侧位的真实净容量验证完整剩余量。
+     * 在维修本体发生前已完成准备的收尾候选，按整机全部侧位的真实净容量验证完整目标。
      * 只使用本轮已加载的合法班次；没有完整容量证据时继续保留原维修。
      *
      * @param context 已加载资源与班次
@@ -230,7 +273,7 @@ public final class LhRepairEndingDeferralPolicy {
      * @param machineCode 运行侧
      * @param notBefore 生产下限
      * @param plans 当前维修视图
-     * @return 候选持有的独立维修投影
+     * @return 候选持有的独立维修执行视图
      */
     private static List<MdmDevicePlanShut> projectCandidate(LhScheduleContext context, SkuScheduleDTO sku,
             String machineCode, Date notBefore, List<MdmDevicePlanShut> plans) {
@@ -239,9 +282,17 @@ public final class LhRepairEndingDeferralPolicy {
             return plans;
         }
         Integer ledgerRemaining = context.getSkuProductionRemainingQtyMap().get(
-                com.zlt.aps.lh.component.MonthPlanDateResolver.buildMaterialStatusKey(
+                MonthPlanDateResolver.buildMaterialStatusKey(
                         sku.getMaterialCode(), sku.getProductStatus()));
-        int remaining = ledgerRemaining == null ? sku.getSurplusQty() : Math.max(0, ledgerRemaining);
+        Integer embryoQuota = context.getSharedEmbryoStockEndingInitialQuotaMap().get(
+                MonthPlanDateResolver.buildMaterialStatusKey(
+                        sku.getMaterialCode(), sku.getProductStatus()));
+        int remaining;
+        if (embryoQuota != null) {
+            remaining = Math.max(0, embryoQuota);
+        } else {
+            remaining = ledgerRemaining == null ? sku.getSurplusQty() : Math.max(0, ledgerRemaining);
+        }
         if (remaining <= 0 || sku.getEmbryoStock() < remaining) {
             return plans;
         }
@@ -251,15 +302,16 @@ public final class LhRepairEndingDeferralPolicy {
             Date finish = null;
             if (isRepair(plan) && samePhysical(machineCode, plan.getMachineCode())) {
                 Date start = resolveProductionStart(context, sku, machine, notBefore);
-                // 真正与当前切换重叠的维修继续沿用组合规则，不能作为收尾等待取消本体禁产。
+                // 真正与当前切换重叠的维修继续沿用组合规则，不能借后料收尾身份取消本体禁产。
                 if (start != null && start.before(plan.getBeginDate())) {
                     finish = previewEnding(context, sku, machine, start, plan, plans, remaining);
                 }
             }
-            MdmDevicePlanShut actual = finish != null && finish.after(plan.getBeginDate())
-                    ? moveRepair(plan, finish) : plan;
-            projected.add(actual);
-            changed |= actual != plan;
+            if (finish != null && finish.after(plan.getBeginDate())) {
+                changed = true;
+            } else {
+                projected.add(plan);
+            }
         }
         return changed ? projected : plans;
     }
@@ -311,9 +363,9 @@ public final class LhRepairEndingDeferralPolicy {
      * @param sku 当前收尾SKU
      * @param machine 当前运行侧
      * @param start 保守的可生产起点
-     * @param repair 本次唯一允许等待的维修
+     * @param repair 本次唯一允许跳过的维修
      * @param plans 当前设备停机视图
-     * @param remaining 本轮中心账本的真实剩余量
+     * @param remaining 本轮中心账本或冻结份额的真实目标
      * @return 完整余量可在维修当周完成时的保守完成点，否则为空
      */
     private static Date previewEnding(LhScheduleContext context, SkuScheduleDTO sku, MachineScheduleDTO machine,
@@ -364,7 +416,7 @@ public final class LhRepairEndingDeferralPolicy {
     }
 
     /**
-     * 仅以维修时刻正在生产的最终SKU及整机侧位完成证明兑现等待，不借用更早前料。
+     * 仅以维修时刻正在生产的当前SKU及整机侧位完成证明跳过05，不借用更早前料。
      *
      * @param context 已提交结果
      * @param plan 原实际维修
@@ -379,11 +431,7 @@ public final class LhRepairEndingDeferralPolicy {
                 .filter(result -> result.getSpecEndTime() != null
                         && result.getSpecEndTime().after(plan.getBeginDate())
                         && !result.getSpecEndTime().after(weekEnd(plan.getBeginDate())))
-                .filter(result -> {
-                    int first = ShiftFieldUtil.resolveFirstPlannedShiftIndex(result);
-                    Date begin = first > 0 ? ShiftFieldUtil.getShiftStartTime(result, first) : null;
-                    return begin != null && begin.before(plan.getBeginDate());
-                }).collect(Collectors.toList());
+                .filter(result -> startsBefore(result, plan.getBeginDate())).collect(Collectors.toList());
         if (occupying.isEmpty()) {
             return null;
         }
@@ -393,39 +441,73 @@ public final class LhRepairEndingDeferralPolicy {
                 .filter(result -> StringUtils.equals(last.getMaterialCode(), result.getMaterialCode())
                         && StringUtils.equals(last.getProductStatus(), result.getProductStatus()))
                 .collect(Collectors.toList());
-        int target = group.stream().map(LhScheduleResult::getMouldSurplusQty)
-                .filter(Objects::nonNull).max(Integer::compareTo).orElse(0);
-        int completed = group.stream().mapToInt(ShiftFieldUtil::resolveScheduledQty).sum();
+        int target = resolveEndingTarget(context, last, group);
+        int completed = context.getScheduleResultList().stream()
+                .filter(result -> !LhSingleControlMachineUtil.isVirtualMachineCode(result.getLhMachineCode()))
+                .filter(result -> StringUtils.equals(last.getMaterialCode(), result.getMaterialCode())
+                        && StringUtils.equals(last.getProductStatus(), result.getProductStatus()))
+                .mapToInt(ShiftFieldUtil::resolveScheduledQty).sum();
         // 最终isEnd统一刷新晚于维修时间校正，完整数量证明不能依赖尚未刷新的展示标记。
         if (target <= 0 || completed < target) {
             return null;
         }
         String pair = LhSingleControlMachineUtil.resolvePairMachineCode(last.getLhMachineCode());
         if (StringUtils.isNotEmpty(pair) && context.getMachineScheduleMap().containsKey(pair)
-                && occupying.stream().noneMatch(result -> StringUtils.equals(pair, result.getLhMachineCode())
-                && StringUtils.equals(last.getMaterialCode(), result.getMaterialCode())
-                && StringUtils.equals(last.getProductStatus(), result.getProductStatus()))) {
+                && context.getScheduleResultList().stream().noneMatch(result ->
+                StringUtils.equals(pair, result.getLhMachineCode())
+                        && StringUtils.equals(last.getMaterialCode(), result.getMaterialCode())
+                        && StringUtils.equals(last.getProductStatus(), result.getProductStatus())
+                        && result.getSpecEndTime() != null && !result.getSpecEndTime().after(last.getSpecEndTime())
+                        && startsBefore(result, plan.getBeginDate()))) {
             return null;
         }
         return last.getSpecEndTime();
     }
 
     /**
-     * 平移独立05维修，保留原时长与来源主键。
+     * 核验首个真实有量生产段是否早于设备事件，零量占位不得作为在机证据。
      *
-     * @param plan 原实际维修
-     * @param start 等待收尾后的实际开始
-     * @return 独立维修副本
+     * @param result 待核验的结果
+     * @param boundary 原设备事件起点
+     * @return 存在正量且开产早于边界时返回true
      */
-    private static MdmDevicePlanShut moveRepair(MdmDevicePlanShut plan, Date start) {
-        MdmDevicePlanShut moved = RepairPlanRuntimeState.copySource(plan);
-        moved.setBeginDate((Date) start.clone());
-        moved.setEndDate(new Date(start.getTime() + plan.getEndDate().getTime() - plan.getBeginDate().getTime()));
-        return moved;
+    private static boolean startsBefore(LhScheduleResult result, Date boundary) {
+        int first = ShiftFieldUtil.resolveFirstPlannedShiftIndex(result);
+        Date start = first > 0 ? ShiftFieldUtil.getShiftStartTime(result, first) : null;
+        return start != null && start.before(boundary);
     }
 
     /**
-     * 判断有效05来源，不把故障及其他设备事件纳入等待。
+     * 按已确认的收尾身份读取冻结目标，胎胚份额不得回退成原始硫化余量。
+     *
+     * @param context 本轮已冻结目标
+     * @param result 维修时刻的当前物料
+     * @param physicalResults 同物料状态的物理机台结果
+     * @return 冻结的合法收尾总量，缺少胎胚份额时为零
+     */
+    private static int resolveEndingTarget(LhScheduleContext context, LhScheduleResult result,
+            List<LhScheduleResult> physicalResults) {
+        Integer target = context.getContinuationRemainderFinishGroups().stream()
+                .filter(group -> StringUtils.equals(result.getMaterialCode(), group.getSourceSku().getMaterialCode())
+                        && StringUtils.equals(result.getProductStatus(), group.getSourceSku().getProductStatus()))
+                .map(group -> group.getOriginalMachineFinishPlan() == null
+                        || group.getOriginalMachineFinishPlan().getRemainingQty() > 0
+                        ? Integer.valueOf(0) : group.getFinalTargetQty())
+                .filter(Objects::nonNull).findFirst().orElse(null);
+        if (target != null) {
+            return target;
+        }
+        if ("1".equals(result.getIsEmbryoEnding())) {
+            return context.getSharedEmbryoStockEndingInitialQuotaMap().getOrDefault(
+                    MonthPlanDateResolver.buildMaterialStatusKey(
+                            result.getMaterialCode(), result.getProductStatus()), 0);
+        }
+        return physicalResults.stream().map(LhScheduleResult::getMouldSurplusQty)
+                .filter(Objects::nonNull).max(Integer::compareTo).orElse(0);
+    }
+
+    /**
+     * 判断有效05来源，不把故障及其他设备事件纳入收尾跳过。
      *
      * @param plan 设备计划
      * @return 是否为有效05维修
@@ -473,6 +555,10 @@ public final class LhRepairEndingDeferralPolicy {
          * 外层候选持有的独立时间视图。
          */
         private final List<MdmDevicePlanShut> previous;
+        /**
+         * 本次试算前的完整有效视图，用于逐条恢复缺少收尾证据的05。
+         */
+        private final List<MdmDevicePlanShut> original;
 
         /**
          * 发布本次候选视图。
@@ -481,9 +567,88 @@ public final class LhRepairEndingDeferralPolicy {
          * @param plans 本次独立时间投影
          */
         private Scope(LhScheduleContext context, List<MdmDevicePlanShut> plans) {
+            this(context, plans, Collections.emptyList());
+        }
+
+        /**
+         * 保存试算前来源并发布本次视图。
+         *
+         * @param context 本轮上下文
+         * @param plans 试算设备视图
+         * @param original 本次试算前的完整有效设备视图
+         */
+        private Scope(LhScheduleContext context, List<MdmDevicePlanShut> plans,
+                List<MdmDevicePlanShut> original) {
             this.context = context;
+            this.original = original;
             previous = context.getRepairPlanRuntimeState().getScopedStopPlans();
             context.getRepairPlanRuntimeState().setScopedStopPlans(plans);
+        }
+
+        /**
+         * 按本次实际分配恢复不满足条件的05；每轮只增加约束，至多恢复全部来源。
+         *
+         * @param profiles 与收尾分配逐机对应的合法容量画像
+         * @param calculated 尚未扣账的真实收尾计划
+         * @return 有来源恢复时返回true，调用方必须重算后再提交
+         */
+        public boolean restoreUnprovenRepairs(List<ContinuationEndingMachineProfile> profiles,
+                ContinuationFinishScheduleResult calculated) {
+            List<MdmDevicePlanShut> current = context.getDevicePlanShutList();
+            List<MdmDevicePlanShut> restored = original.stream()
+                    .filter(plan -> !current.contains(plan))
+                    .filter(plan -> !this.provesEnding(plan, profiles, calculated)).collect(Collectors.toList());
+            if (restored.isEmpty()) {
+                return false;
+            }
+            List<MdmDevicePlanShut> next = new ArrayList<>(current);
+            next.addAll(restored);
+            context.getRepairPlanRuntimeState().setScopedStopPlans(next);
+            return true;
+        }
+
+        /**
+         * 用整组清量及本物理机台的真实生产段证明收尾跨过维修起点，零量释放不取得豁免。
+         *
+         * @param repair 本次拟跳过的05
+         * @param profiles 合法容量画像
+         * @param calculated 尚未提交的分配
+         * @return 本机全部运行侧均具备完整生产证据时返回true
+         */
+        private boolean provesEnding(MdmDevicePlanShut repair, List<ContinuationEndingMachineProfile> profiles,
+                ContinuationFinishScheduleResult calculated) {
+            if (calculated.getRemainingQty() > 0) {
+                return false;
+            }
+            for (int index = 0; index < profiles.size(); index++) {
+                ContinuationEndingMachineProfile profile = profiles.get(index);
+                if (profile.getOriginals().stream().noneMatch(result -> samePhysical(
+                        result.getLhMachineCode(), repair.getMachineCode()))) {
+                    continue;
+                }
+                ContinuationMachineFinishPlan plan = calculated.getMachinePlans().get(index);
+                if (plan.getPlanQty() <= 0 || plan.getFinishTime() == null
+                        || !plan.getFinishTime().after(repair.getBeginDate())
+                        || plan.getFinishTime().after(weekEnd(repair.getBeginDate()))) {
+                    return false;
+                }
+                List<LhScheduleResult> proposed = profile.getOriginals().stream()
+                        .map(result -> new LhScheduleResult()).collect(Collectors.toList());
+                profile.writePlan(proposed, plan.getPlanQty());
+                for (int side = 0; side < proposed.size(); side++) {
+                    String code = profile.getOriginals().get(side).getLhMachineCode();
+                    String pair = LhSingleControlMachineUtil.resolvePairMachineCode(code);
+                    if (StringUtils.isNotEmpty(pair) && context.getMachineScheduleMap().containsKey(pair)
+                            && profile.getOriginals().stream().noneMatch(result -> pair.equals(result.getLhMachineCode()))) {
+                        return false;
+                    }
+                    if (!startsBefore(proposed.get(side), repair.getBeginDate())) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+            return false;
         }
 
         /**

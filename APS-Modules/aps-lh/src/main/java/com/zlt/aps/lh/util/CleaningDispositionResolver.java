@@ -114,7 +114,7 @@ public final class CleaningDispositionResolver {
 
     /**
      * 从已提交事实判断清洗是否仍须执行；已兑现的干冰维修切换组合先于来源收尾取消。
-     * 其他来源继续使用收尾取消优先于正规换模取消的原规则。
+     * 无替换模具的离机喷砂核实来源真实收尾后独立保留，其他来源继续使用收尾取消优先于正规换模取消的原规则。
      *
      * @param context 当前批次上下文
      * @param machineCode 清洗运行侧机台
@@ -136,6 +136,11 @@ public final class CleaningDispositionResolver {
         LhScheduleResult endingResult = resolveEndingResult(context, machineCode, window);
         if (Objects.nonNull(endingResult)) {
             return new Decision(Disposition.ENDING_CANCELLED, endingResult, null);
+        }
+        // 无替换模具的原模具已经离机，后料换模只占用机台，不能撤销其清洗等待、迁移身份及两端交替事实。
+        if (window.isOffMachineCleaning() && MachineCleaningOverlapUtil.isSandBlastCleaning(window)
+                && StringUtils.isEmpty(window.getReplacementMouldCode())) {
+            return new Decision(Disposition.INDEPENDENT, null, null);
         }
         Date changeStart = context.getScheduleResultList().stream()
                 .filter(Objects::nonNull)

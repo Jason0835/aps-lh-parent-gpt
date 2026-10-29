@@ -398,6 +398,7 @@ public final class ResultDowntimeSummaryUtil {
      * @param cleaningWindowList 清洗窗口
      * @param maintenanceWindowList 精度保养窗口
      * @param devicePlanShutList 设备停机窗口
+     * @param scheduleWindowShifts 当前排程窗口的标准班次
      */
     private static void appendSandBlastDowntimeAnalysis(LhScheduleResult result,
                                                         List<MachineCleaningWindowDTO> cleaningWindowList,
@@ -409,6 +410,10 @@ public final class ResultDowntimeSummaryUtil {
         }
         for (MachineCleaningWindowDTO cleaningWindow : cleaningWindowList) {
             if (!isSandBlastWindow(cleaningWindow)) {
+                continue;
+            }
+            if (cleaningWindow.getSandBlastRepairPrecisionPlanId() != null) {
+                // 三项组合只在最终首检承接班次展示一次，不再生成两两组合的拆分原因。
                 continue;
             }
             // 喷砂与精度保养窗口实际相交时，产能扣减走并行取最大，原因写入最后一个重叠班次。

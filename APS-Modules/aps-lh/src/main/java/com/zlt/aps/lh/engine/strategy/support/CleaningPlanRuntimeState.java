@@ -118,6 +118,7 @@ public final class CleaningPlanRuntimeState {
         target.setCleanStartTime(copyDate(source.getCleanStartTime()));
         target.setCleanEndTime(copyDate(source.getCleanEndTime()));
         target.setReadyTime(copyDate(source.getReadyTime()));
+        target.setSandBlastInspectionStartTime(copyDate(source.getSandBlastInspectionStartTime()));
         target.setReplacementInspectionStartTime(copyDate(source.getReplacementInspectionStartTime()));
         target.setReplacementReadyTime(copyDate(source.getReplacementReadyTime()));
         target.setReplacementInspectionShiftStartTime(copyDate(source.getReplacementInspectionShiftStartTime()));

@@ -39,6 +39,12 @@ public class LhCleaningScheduleService {
     @Resource
     private LhSandBlastPrecisionOverlapPolicy precisionOverlapPolicy = new LhSandBlastPrecisionOverlapPolicy();
     /**
+     * 在机喷砂、05维修与精度的专用组合策略。
+     */
+    @Resource
+    private LhSandBlastRepairPrecisionOverlapPolicy repairPrecisionOverlapPolicy =
+            new LhSandBlastRepairPrecisionOverlapPolicy();
+    /**
      * 原喷砂资源算法，运行态仍保存在当前上下文。
      */
     private final ContinuationSandBlastDispositionService sandBlastDispositionService =
@@ -138,13 +144,16 @@ public class LhCleaningScheduleService {
         return overlapResolver.resolveTypeBlockProductionStartTime(context, machine, switchStart, productionStart);
     }
     /**
-     * 在续作产能计算前落实喷砂资源及符合资格的置换精度组合，不能延迟到最终输出。
+     * 在续作产能计算前落实喷砂资源，按统一精度优先级评估置换及在机维修组合。
      *
      * @param context 当前批次
      */
     public void prepareBeforeContinuous(LhScheduleContext context) {
         sandBlastDispositionService.prepare(context);
-        precisionOverlapPolicy.prepare(context);
+        for (MachineScheduleDTO machine : precisionOverlapPolicy.resolvePriorityMachines(context)) {
+            precisionOverlapPolicy.prepareForMachine(context, machine);
+            repairPrecisionOverlapPolicy.prepareForMachine(context, machine);
+        }
         this.publishCurrentEvents(context);
     }
     /**
@@ -155,6 +164,7 @@ public class LhCleaningScheduleService {
     public void cancelUnreachedReplacements(LhScheduleContext context) {
         sandBlastDispositionService.cancelUnreachedReplacements(context);
         precisionOverlapPolicy.reconcile(context);
+        repairPrecisionOverlapPolicy.reconcile(context);
         this.publishCurrentEvents(context);
     }
     /**
@@ -181,6 +191,7 @@ public class LhCleaningScheduleService {
     public void reviewCommittedResults(LhScheduleContext context) {
         sandBlastDispositionService.reconcileCancelledEvents(context);
         precisionOverlapPolicy.reconcile(context);
+        repairPrecisionOverlapPolicy.reconcile(context);
         this.publishCurrentEvents(context);
     }
     /**
@@ -322,8 +333,18 @@ public class LhCleaningScheduleService {
     public void finalizeArrangements(LhScheduleContext context) {
         finalizer.finalizeCleaningDisposition(context);
         if (context != null) {
+            repairPrecisionOverlapPolicy.reconcile(context);
             this.publishCurrentEvents(context);
         }
+    }
+
+    /**
+     * 在清洗、维修及精度最终摘要绑定后输出三项组合的唯一班次说明。
+     *
+     * @param context 已完成最终时间和数量收口的上下文
+     */
+    public void appendSandBlastRepairPrecisionAnalysis(LhScheduleContext context) {
+        repairPrecisionOverlapPolicy.appendFinalAnalysis(context);
     }
     /**
      * 诊断周日手工喷砂是否满足交替计划条数阈值。

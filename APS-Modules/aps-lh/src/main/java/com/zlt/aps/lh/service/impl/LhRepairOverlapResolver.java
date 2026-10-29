@@ -31,7 +31,7 @@ public final class LhRepairOverlapResolver {
 
     /**
      * 一次计算维修命中及生产下限，零预热时也保留独立命中标志。
-     * 真实重叠时切换总时长覆盖预热和首检，后续独立维修仍保留自身恢复时间。
+     * 真实重叠时维修及一次预热与切换并行，准备完成后再执行首检。
      *
      * @param context 当前批次，可为空
      * @param plans 实际停机列表
@@ -80,7 +80,7 @@ public final class LhRepairOverlapResolver {
                 // 尚未进入当前恢复区间的未来维修，继续交给班次容量处理。
                 break;
             }
-            // 真实重叠使用维修原始结束与切换完成的最大值；独立维修继续等待自身预热。
+            // 维修及一次预热与切换并行取最晚完成，准备下限不代表首检已经完成。
             Date candidateReadyTime = repairResumeTime.after(switchEndTime) ? repairResumeTime : switchEndTime;
             if (candidateReadyTime.after(productionReadyTime)) {
                 productionReadyTime = candidateReadyTime;
@@ -90,13 +90,13 @@ public final class LhRepairOverlapResolver {
         result.setProductionNotBefore(RepairPlanRuntimeState.copyDate(productionReadyTime));
         if (repairTimelineStarted) {
             result.setOverlapStatus(RepairPlanResult.OverlapStatus.SUPPORTED);
-            result.setReason("真实重叠的维修与切换使用组合准备时间，维修原始区间禁产，首检仍校验实际容量");
+            result.setReason("维修及一次预热与切换并行取最晚完成点，准备完成后按真实容量正向首检");
         }
         return result;
     }
 
     /**
-     * 将真实相交的05窗口投影为当前切换专用容量，保留原始维修禁产并隔离候选状态。
+     * 将真实相交的05窗口投影为当前切换专用容量，准备完成前禁产并隔离候选状态。
      * 非相交维修、精度、故障及其他窗口原样复制；不得将该投影写回批次固定事实。
      *
      * @param windows 已解析的容量窗口，未提供窗口时不产生额外约束
@@ -114,9 +114,11 @@ public final class LhRepairOverlapResolver {
                     window.getMaintenanceType())
                     && overlaps(switchStartTime, switchEndTime,
                     window.getMaintenanceStartTime(), window.getMaintenanceEndTime())) {
-                // 仅当前组合覆盖预热；维修本体仍参与不可生产区间并集，不能提前产出首检。
+                // 组合后料不继承维修前固定量；维修及预热不能被含首检切换时长抵消。
                 window.setRepairCombinedWithSwitch(true);
-                window.setProductionResumeTime(RepairPlanRuntimeState.copyDate(window.getMaintenanceEndTime()));
+                if (switchEndTime.after(window.getProductionResumeTime())) {
+                    window.setProductionResumeTime(RepairPlanRuntimeState.copyDate(switchEndTime));
+                }
             }
             return window;
         }).collect(Collectors.toList());

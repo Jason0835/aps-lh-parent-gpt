@@ -21,9 +21,12 @@ import com.zlt.aps.lh.context.LhScheduleConfig;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IEndingJudgmentStrategy;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionChecker;
+import com.zlt.aps.lh.engine.strategy.support.DailyMachineExpansionPlanner;
+import com.zlt.aps.lh.engine.strategy.support.ContinuationSkuMatcher;
 import com.zlt.aps.lh.engine.strategy.support.PendingSkuUnscheduledRule;
 import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
 import com.zlt.aps.lh.service.impl.PreviousAlternateTrialDemandService;
+import com.zlt.aps.lh.service.impl.HistoricalBeforeMaterialContinuationService;
 import com.zlt.aps.lh.util.*;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
@@ -161,6 +164,12 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     private DayPlanAdjustRequireAssembler dayPlanAdjustRequireAssembler;
 
     /**
+     * 在准入过滤前保留T日历史前料身份，数量与资源仍由续作主链统一处理。
+     */
+    @Resource
+    private HistoricalBeforeMaterialContinuationService historicalBeforeMaterialContinuationService;
+
+    /**
      * 归集需求并完成续作、新增准入，库存份额延后至实机与历史来源就绪后统一冻结。
      *
      * @param context 当前批次原始月计划及运行态需求
@@ -190,6 +199,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         context.setInactiveFutureDemandQtySnapshotMap(Collections.emptyMap());
 
         // S4.3.2 按产品结构归集SKU，计算硫化余量
+        historicalBeforeMaterialContinuationService.prepareCandidates(context);
         gatherSkuByStructure(context);
 
         // S4.3.3 标注收尾SKU（3天内可收尾）
@@ -305,10 +315,11 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
             }
             /*
              * 目标量已经归零的纯历史欠产/收尾遗留SKU原本也不会进入续作或新增排产，
-             * 遗留阶段下线后不再为该非失败场景生成“无目标量”未排记录。
+             * 退出前按公共顺序登记符合小余量或仅历史欠产规则的净余量，其余不生成“无目标量”未排记录。
              */
             if (!exactOnlineContinuation && targetScheduleQty <= 0
                     && PendingSkuUnscheduledRule.shouldExcludeLegacyOnlyNewSku(context, dto)) {
+                this.recordNoPlanEndingDiscard(context, dto);
                 log.info("历史欠产/收尾遗留零目标SKU不进入结构待排池, factoryCode: {}, batchNo: {}, "
                                 + "materialCode: {}, productStatus: {}, reason: {}",
                         context.getFactoryCode(), context.getBatchNo(), dto.getMaterialCode(),
@@ -388,8 +399,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     }
 
     /**
-     * 判断SKU是否为可排机台上的MES精确在机续作候选。
-     * <p>只做物料编码和产品状态精确匹配；在机状态为空时沿用续作匹配的正规状态口径。</p>
+     * 判断SKU是否具有可排机台上的精确续作来源，包含已证明的T日历史前料候选。
+     * <p>物料和状态必须精确匹配；候选仅保护准入，真实收尾需求随后单独确认。</p>
      *
      * @param context 排程上下文
      * @param sku     待归集SKU
@@ -405,6 +416,12 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         String materialCode = StringUtils.trim(sku.getMaterialCode());
         String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(
                 materialCode, normalizeOnlineProductStatus(sku.getProductStatus()));
+        boolean historicalBeforeCandidate = context.getHistoricalBeforeMaterialCandidateMap().values().stream()
+                .anyMatch(source -> StringUtils.equals(skuKey, MonthPlanDateResolver.buildMaterialStatusKey(
+                        source.getMaterialCode(), source.getProductStatus())));
+        if (historicalBeforeCandidate) {
+            return true;
+        }
         for (Map.Entry<String, LhMachineOnlineInfo> entry : context.getMachineOnlineInfoMap().entrySet()) {
             LhMachineOnlineInfo onlineInfo = entry.getValue();
             if (Objects.isNull(onlineInfo)
@@ -2324,13 +2341,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         List<SkuScheduleDTO> newSpecSkuList = new ArrayList<>();
         List<SkuScheduleDTO> blockedDailyPlanSkuList = new ArrayList<SkuScheduleDTO>(8);
         List<SkuScheduleDTO> excludedLegacySkuList = new ArrayList<SkuScheduleDTO>(8);
-        Map<String, List<SkuScheduleDTO>> skuByMaterialMap = buildSkuByMaterialMap(context);
-        Map<String, SkuScheduleDTO> continuousTemplateMap = new LinkedHashMap<String, SkuScheduleDTO>(16);
-
-        // 第一轮仅做“物料+产品状态”精确匹配，先为所有机台保留可精确命中的月计划SKU。
-        assignContinuousSkus(context, skuByMaterialMap, continuousTemplateMap, continuousSkuList, false);
-        // 第二轮才沿用既有物料降级，避免未知状态机台抢占后续可精确匹配的S/T/X月计划SKU。
-        assignContinuousSkus(context, skuByMaterialMap, continuousTemplateMap, continuousSkuList, true);
+        historicalBeforeMaterialContinuationService.activate(context);
+        this.assignContinuousSkus(context, continuousSkuList);
 
         /*
          * 共用/非共用胎胚零余量门禁仅适用于续作阶段：必须使用上方已完成MES在机匹配的真实
@@ -2369,9 +2381,10 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                 /*
                  * 历史欠产/收尾遗留阶段下线后，正规新增SKU若窗口内及后续完整原始计划
                  * 都没有正计划量，应在进入S4.4换活字块和S4.5新增排产前直接移出待排池。
-                 * 该场景不是排产失败，不生成未排记录，也不允许前日交替计划兜底放行。
+                 * 符合小余量或仅历史欠产规则的净余量按公共顺序登记舍弃，其余保持静默出队，不允许前日交替计划兜底放行。
                  */
                 if (PendingSkuUnscheduledRule.shouldExcludeLegacyOnlyNewSku(context, sku)) {
+                    this.recordNoPlanEndingDiscard(context, sku);
                     excludedLegacySkuList.add(sku);
                     continue;
                 }
@@ -2405,8 +2418,10 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                                 Math.max(0, sku.getSurplusQty()));
                         continue;
                     }
-                    this.preserveNoDailyPlanTrialVirtualCandidate(context, sku);
-                    unscheduledResultCollector.add(context, sku, dailyPlanUnscheduledResult);
+                    if (!this.recordNoPlanEndingDiscard(context, sku)) {
+                        this.preserveNoDailyPlanTrialVirtualCandidate(context, sku);
+                        unscheduledResultCollector.add(context, sku, dailyPlanUnscheduledResult);
+                    }
                     blockedDailyPlanSkuList.add(sku);
                     continue;
                 }
@@ -2817,6 +2832,41 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     }
 
     /**
+     * 在无计划SKU出队和目标量清零前，按小余量优先、历史欠产其次登记舍弃。
+     * <p>正规SKU复用公共待排判断及相同收尾、胎胚硬目标和有效余量口径；试制量试及减量清单维持原退出原因。
+     * 公共收集器冻结真实余量，后续清理目标量不会覆盖舍弃数量。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 已确定退出待排池的SKU
+     * @return 已登记真实小余量或历史欠产未排时返回true，否则返回false
+     */
+    private boolean recordNoPlanEndingDiscard(LhScheduleContext context, SkuScheduleDTO sku) {
+        if (!StringUtils.equals(ConstructionStageEnum.FORMAL.getCode(), sku.getConstructionStage())
+                || sku.getSurplusQty() <= 0 || sku.isContinuousCompensationSku()
+                || skuDecrementChecker.isDecrementHit(context, sku)) {
+            return false;
+        }
+        LocalDate scheduleDate = this.toLocalDate(context.getScheduleDate());
+        FactoryMonthPlanProductionFinalResult plan = MonthPlanDateResolver.resolvePlan(
+                context, sku.getMaterialCode(), sku.getProductStatus(), scheduleDate);
+        // 历史传导缓存已下线，出队记录独立核对原始计划与完成量，不恢复传导量或改写SKU目标。
+        MonthlyShortageSummary history = this.calculateCurrentMonthShortageSummary(
+                context, plan, scheduleDate.withDayOfMonth(MIN_DAY_OF_MONTH), scheduleDate.minusDays(1));
+        TargetScheduleQtyResolver resolver = this.getTargetScheduleQtyResolver();
+        boolean ending = endingJudgmentStrategy.isCurrentWindowEnding(context, sku)
+                || DailyMachineExpansionPlanner.isForceEndingByNoFuturePlan(context, sku);
+        boolean embryoEnding = resolver.isEmbryoStockEnding(context, sku);
+        int ruleQty = EarlyProductionQuantityCalculator.resolveSmallEndingRuleQty(context, sku, resolver);
+        LhUnscheduledResult result = PendingSkuUnscheduledRule.evaluate(
+                context, sku, ending, embryoEnding, ruleQty, history.getShortageQty());
+        if (Objects.isNull(result)) {
+            return false;
+        }
+        unscheduledResultCollector.add(context, sku, result);
+        return true;
+    }
+
+    /**
      * 清理已判定不进入新增排产的SKU运行态数据。
      * <p>该方法必须在结构SKU遍历完成后调用，避免遍历过程中修改结构集合。清理后SKU不会进入新增、
      * 换活字块、空闲产能补排或胎胚动态分配入口。无日计划但有硫化余量的试制/量试若已登记
@@ -2918,30 +2968,33 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
 
 
     /**
-     * 按精确优先、降级在后的顺序分配MES在机续作SKU。
+     * 将只读身份匹配结果一次性登记为续作，保留首台原对象及后续机台共享账本副本。
      *
-     * @param context               排程上下文
-     * @param skuByMaterialMap      物料编码到待匹配SKU列表
-     * @param continuousTemplateMap 已命中产品状态的续作模板
-     * @param continuousSkuList     续作SKU结果列表
-     * @param allowMaterialFallback 是否允许产品状态未命中时按物料降级
+     * @param context 已确认历史前料身份的上下文
+     * @param continuousSkuList 本次续作结果列表
      */
-    private void assignContinuousSkus(LhScheduleContext context,
-                                      Map<String, List<SkuScheduleDTO>> skuByMaterialMap,
-                                      Map<String, SkuScheduleDTO> continuousTemplateMap,
-                                      List<SkuScheduleDTO> continuousSkuList,
-                                      boolean allowMaterialFallback) {
-        // 保持MES最近快照顺序消费，按在机物料承接续作SKU。
-        Map<String, MachineScheduleDTO> schedulableMachineMap = context.getMachineScheduleMap();
-        for (Map.Entry<String, LhMachineOnlineInfo> entry : context.getMachineOnlineInfoMap().entrySet()) {
-            if (CollectionUtils.isEmpty(schedulableMachineMap)
-                    || !schedulableMachineMap.containsKey(entry.getKey())) {
-                continue;
+    private void assignContinuousSkus(LhScheduleContext context, List<SkuScheduleDTO> continuousSkuList) {
+        context.getStructureSkuMap().values().stream().flatMap(List::stream).forEach(sku -> {
+            sku.setScheduleType(null);
+            sku.setContinuousMachineCode(null);
+        });
+        Map<String, SkuScheduleDTO> matches = ContinuationSkuMatcher.resolve(
+                context, context::resolveContinuationOnlineInfo);
+        Set<SkuScheduleDTO> assignedTemplates = Collections.newSetFromMap(new IdentityHashMap<>());
+        matches.forEach((machineCode, sourceSku) -> {
+            SkuScheduleDTO matchedSku = assignedTemplates.add(sourceSku) ? sourceSku
+                    : this.copySkuForContinuousMachine(context, sourceSku, machineCode);
+            matchedSku.setScheduleType(ScheduleTypeEnum.CONTINUOUS.getCode());
+            matchedSku.setContinuousMachineCode(machineCode);
+            continuousSkuList.add(matchedSku);
+            LhMachineOnlineInfo source = context.resolveContinuationOnlineInfo(machineCode);
+            if (!StringUtils.equals(this.normalizeOnlineProductStatus(source.getProductStatus()),
+                    StringUtils.trim(matchedSku.getProductStatus()))) {
+                log.warn("续作SKU产品状态未精确匹配，降级按物料编码匹配, machineCode: {}, materialCode: {}, "
+                                + "onlineProductStatus: {}, fallbackProductStatus: {}",
+                        machineCode, matchedSku.getMaterialCode(), source.getProductStatus(), matchedSku.getProductStatus());
             }
-            assignContinuousSku(context, entry.getKey(), entry.getValue().getMaterialCode(),
-                    entry.getValue().getProductStatus(), skuByMaterialMap,
-                    continuousTemplateMap, continuousSkuList, allowMaterialFallback);
-        }
+        });
     }
 
     /**
@@ -3093,97 +3146,6 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     }
 
     /**
-     * 按物料编码归集待排SKU，保持原有归集顺序供机台依次消费。
-     * <p>匹配时先在同物料列表中查找产品状态一致的SKU，未命中再按列表顺序降级承接同物料SKU。</p>
-     *
-     * @param context 排程上下文
-     * @return 物料编码 -> 待匹配SKU列表
-     */
-    private Map<String, List<SkuScheduleDTO>> buildSkuByMaterialMap(LhScheduleContext context) {
-        Map<String, List<SkuScheduleDTO>> skuByMaterialMap = new LinkedHashMap<>();
-        for (List<SkuScheduleDTO> skuList : context.getStructureSkuMap().values()) {
-            for (SkuScheduleDTO sku : skuList) {
-                sku.setScheduleType(null);
-                sku.setContinuousMachineCode(null);
-                String materialCode = StringUtils.trim(sku.getMaterialCode());
-                if (StringUtils.isEmpty(materialCode)) {
-                    continue;
-                }
-                skuByMaterialMap.computeIfAbsent(materialCode, key -> new ArrayList<>()).add(sku);
-            }
-        }
-        return skuByMaterialMap;
-    }
-
-    /**
-     * 按机台最近在机记录匹配续作SKU。
-     * <p>先按物料编码与产品状态精确匹配；精确匹配失败后，再降级按物料编码匹配。</p>
-     *
-     * @param machineCode           机台编码
-     * @param materialCode          在机物料编码
-     * @param productStatus         在机产品状态
-     * @param skuByMaterialMap      物料编码 -> 待匹配SKU列表
-     * @param continuousTemplateMap 已精确匹配的物料状态续作模板
-     * @param continuousSkuList     续作SKU列表
-     * @param allowMaterialFallback 是否允许按物料编码降级
-     */
-    private void assignContinuousSku(LhScheduleContext context,
-                                     String machineCode,
-                                     String materialCode,
-                                     String productStatus,
-                                     Map<String, List<SkuScheduleDTO>> skuByMaterialMap,
-                                     Map<String, SkuScheduleDTO> continuousTemplateMap,
-                                     List<SkuScheduleDTO> continuousSkuList,
-                                     boolean allowMaterialFallback) {
-        String normalizedMaterialCode = StringUtils.trim(materialCode);
-        if (StringUtils.isEmpty(machineCode) || StringUtils.isEmpty(normalizedMaterialCode)) {
-            return;
-        }
-        // 先保留实际续作身份；历史交替按日期统一释放，不能提前删除整窗续作。
-        // 同一机台已被分配时，不得再次降级匹配其他状态SKU。
-        for (SkuScheduleDTO continuousSku : continuousSkuList) {
-            if (Objects.nonNull(continuousSku)
-                    && StringUtils.equals(machineCode, continuousSku.getContinuousMachineCode())) {
-                return;
-            }
-        }
-        String normalizedProductStatus = normalizeOnlineProductStatus(productStatus);
-        String exactSkuKey = MonthPlanDateResolver.buildMaterialStatusKey(
-                normalizedMaterialCode, normalizedProductStatus);
-        SkuScheduleDTO templateSku = continuousTemplateMap.get(exactSkuKey);
-        if (Objects.nonNull(templateSku)) {
-            SkuScheduleDTO matchedSku = copySkuForContinuousMachine(context, templateSku, machineCode);
-            matchedSku.setScheduleType(ScheduleTypeEnum.CONTINUOUS.getCode());
-            continuousSkuList.add(matchedSku);
-            return;
-        }
-        List<SkuScheduleDTO> matchedSkuList = skuByMaterialMap.get(normalizedMaterialCode);
-        int matchedSkuIndex = resolveProductStatusMatchedSkuIndex(matchedSkuList, normalizedProductStatus);
-        if (matchedSkuIndex < 0 && !allowMaterialFallback) {
-            return;
-        }
-        if (matchedSkuIndex < 0) {
-            if (CollectionUtils.isEmpty(matchedSkuList)) {
-                return;
-            }
-            // 精确候选已全部预留后，非空未知状态继续沿用既有物料编码降级行为。
-            matchedSkuIndex = 0;
-            log.warn("续作SKU产品状态未精确匹配，降级按物料编码匹配, machineCode: {}, materialCode: {}, "
-                            + "onlineProductStatus: {}, fallbackProductStatus: {}",
-                    machineCode, normalizedMaterialCode, normalizedProductStatus,
-                    matchedSkuList.get(matchedSkuIndex).getProductStatus());
-        }
-        // 首台机台消费真实SKU并登记模板；后续同状态机台通过模板副本共享同一日计划额度账本。
-        SkuScheduleDTO matchedSku = matchedSkuList.remove(matchedSkuIndex);
-        matchedSku.setScheduleType(ScheduleTypeEnum.CONTINUOUS.getCode());
-        matchedSku.setContinuousMachineCode(machineCode);
-        continuousSkuList.add(matchedSku);
-        String matchedSkuKey = MonthPlanDateResolver.buildMaterialStatusKey(
-                matchedSku.getMaterialCode(), matchedSku.getProductStatus());
-        continuousTemplateMap.putIfAbsent(matchedSkuKey, matchedSku);
-    }
-
-    /**
      * 归一化MES在机产品状态。
      * <p>业务明确规定在机产品状态为空时属于正规SKU，因此空值统一转换为S。</p>
      *
@@ -3194,28 +3156,6 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         String normalizedProductStatus = StringUtils.trim(productStatus);
         return StringUtils.isEmpty(normalizedProductStatus)
                 ? TrialStatusEnum.FORMAL.getCode() : normalizedProductStatus;
-    }
-
-    /**
-     * 查找同物料SKU列表中产品状态一致的候选位置。
-     *
-     * @param matchedSkuList 同物料待匹配SKU列表
-     * @param productStatus  MES在机产品状态
-     * @return 状态一致的SKU位置；未匹配返回-1
-     */
-    private int resolveProductStatusMatchedSkuIndex(List<SkuScheduleDTO> matchedSkuList, String productStatus) {
-        String normalizedProductStatus = StringUtils.trim(productStatus);
-        if (CollectionUtils.isEmpty(matchedSkuList) || StringUtils.isEmpty(normalizedProductStatus)) {
-            return -1;
-        }
-        for (int index = 0; index < matchedSkuList.size(); index++) {
-            SkuScheduleDTO sku = matchedSkuList.get(index);
-            if (Objects.nonNull(sku) && StringUtils.equals(
-                    normalizedProductStatus, StringUtils.trim(sku.getProductStatus()))) {
-                return index;
-            }
-        }
-        return -1;
     }
 
     /**

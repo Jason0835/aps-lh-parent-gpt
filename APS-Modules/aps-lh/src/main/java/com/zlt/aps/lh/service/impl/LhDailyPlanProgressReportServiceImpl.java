@@ -1,6 +1,8 @@
 package com.zlt.aps.lh.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
+import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.engine.utils.MonthPlanSurplusCalculator;
@@ -120,9 +122,18 @@ public class LhDailyPlanProgressReportServiceImpl implements ILhDailyPlanProgres
     private static final String INFO_DELAY_KEY =
             "ui.data.column.dailyPlanProgressReport.info.delay";
 
-    /** T+2日排产信息：超过月计划{0}台 */
-    private static final String INFO_EXCEED_MONTH_PLAN_KEY =
-            "ui.data.column.dailyPlanProgressReport.info.exceedMonthPlan";
+    /** T+2日排产信息：正常（没有机台变化信号） */
+    private static final String INFO_NORMAL_KEY =
+            "ui.data.column.dailyPlanProgressReport.info.normal";
+
+    /** 产品状态字典类型（示方类型：S-正规、T-量试、X-试验） */
+    private static final String TRIAL_STATUS_DICT_TYPE = "lh_trial_status";
+
+    /**
+     * 字典缓存服务（产品状态字典转译用）
+     */
+    @Resource
+    private ISysDictDataCacheService sysDictDataCacheService;
 
     /**
      * 排程上下文时间轴初始化器
@@ -213,6 +224,8 @@ public class LhDailyPlanProgressReportServiceImpl implements ILhDailyPlanProgres
         }
         Map<String, LhDailyPlanProgressAssembler.BaselineSku> baselineMap =
                 LhDailyPlanProgressAssembler.buildBaseline(scheduleResultList);
+        // 5.1 T+2 首班（class6）开始前已排掉的量 = 1~5 班计划量合计（延迟判定用）
+        Map<String, Integer> class1To5PlanQtyMap = this.buildClass1To5PlanQtyMap(scheduleResultList);
 
         // 6. 月计划定稿行索引：物料|产品状态 → 年月 → 定稿行
         Map<String, Map<YearMonth, FactoryMonthPlanProductionFinalResult>> planIndex =
@@ -239,13 +252,15 @@ public class LhDailyPlanProgressReportServiceImpl implements ILhDailyPlanProgres
         // 9. 胶种映射：物料+胎胚+示方类型 → AQT 原材料描述
         Map<String, String> rubberTypeMap = this.buildRubberTypeMap(factoryCode, planIndex);
 
-        // 10. 组装报表行（基准 ∪ 增机 ∪ 延迟）
+        // 10. 组装报表行（主体：增机 ∪ 延迟；纯基准无增机无延迟的行不成行）
         LhDailyPlanProgressAssembler.T2InfoLabels infoLabels = this.buildT2InfoLabels();
         List<LhDailyPlanProgressReportRowVO> rowList = new ArrayList<>();
+        // 行来源统计：规则2（在基准且区间最大>基准）、规则3（不在基准且区间最大>0）、延迟、仅基准
+        RowSourceCounter rowSourceCounter = new RowSourceCounter();
         for (String skuKey : this.collectCandidateSkuKeys(baselineMap, planIndex)) {
             LhDailyPlanProgressReportRowVO rowVO = this.buildRow(context, skuKey, baselineMap, planIndex,
-                    mouldChangePlanMap, rubberTypeMap, t2MachineQtyMap, maxMachineQtyMap,
-                    dayColumnList, t2YearMonth, infoLabels);
+                    mouldChangePlanMap, rubberTypeMap, t2MachineQtyMap, maxMachineQtyMap, class1To5PlanQtyMap,
+                    dayColumnList, t2YearMonth, infoLabels, rowSourceCounter);
             if (Objects.nonNull(rowVO)) {
                 rowList.add(rowVO);
             }
@@ -255,15 +270,52 @@ public class LhDailyPlanProgressReportServiceImpl implements ILhDailyPlanProgres
                         + "次月定稿: {}, 日期列数: {}, 基准SKU数: {}, 输出行数: {}",
                 factoryCode, this.formatDate(scheduleTargetDate), today, t2Date, reportEndDate,
                 nextMonthFinal, dayColumnList.size(), baselineMap.size(), rowList.size());
+        log.info("日排产进度报表行来源统计, 基准SKU: {}, 增机行: {}(其中在基准: {}, 不在基准: {}), "
+                        + "其中延迟行: {}, T+2信息为正常行数: {}",
+                baselineMap.size(),
+                rowSourceCounter.increaseInBaseline + rowSourceCounter.increaseNotInBaseline,
+                rowSourceCounter.increaseInBaseline, rowSourceCounter.increaseNotInBaseline,
+                rowSourceCounter.delay, rowSourceCounter.normalT2Info);
 
-        // 11. 生成 Excel
-        return LhDailyPlanProgressExcelUtil.build(rowList, dayColumnList, today);
+        // 11. 生成 Excel（产品状态按 lh_trial_status 字典转译）
+        return LhDailyPlanProgressExcelUtil.build(rowList, dayColumnList, today,
+                this.loadTrialStatusDictMap());
+    }
+
+    /**
+     * 加载产品状态字典（lh_trial_status）值→标签映射。
+     *
+     * <p>报表产品状态列与页面显示保持同一口径：取字典标签而不是语言包硬编码；
+     * 字典缺失时返回空 Map，由 Excel 生成层回退语言包文案。</p>
+     *
+     * @return 字典值→标签；取不到字典时返回空 Map
+     */
+    private Map<String, String> loadTrialStatusDictMap() {
+        List<SysDictData> dictList = sysDictDataCacheService.getType(TRIAL_STATUS_DICT_TYPE);
+        if (CollectionUtils.isEmpty(dictList)) {
+            log.warn("日排产进度报表：未取到产品状态字典 {}，导出回退语言包文案", TRIAL_STATUS_DICT_TYPE);
+            return Collections.emptyMap();
+        }
+        return dictList.stream()
+                .filter(dict -> Objects.nonNull(dict) && StringUtils.isNotEmpty(dict.getDictValue()))
+                .collect(Collectors.toMap(
+                        SysDictData::getDictValue,
+                        // 标签为空时退回字典值，避免 Collectors.toMap 因 null 值抛 NPE
+                        dict -> StringUtils.defaultIfBlank(dict.getDictLabel(), dict.getDictValue()),
+                        (existing, replacement) -> existing,
+                        LinkedHashMap::new));
     }
 
     /**
      * 组装单行报表数据。
      *
-     * @return 行 VO；不满足「基准 ∪ 增机 ∪ 延迟」条件时返回 null
+     * <p>行主体口径：只输出「增机」或「延迟」的 SKU ——
+     * 增机 = 月计划 T+2~月底最大硫化机台数 &gt; 基准机台数（不在基准的 SKU 基准按 0 计）；
+     * 延迟 = 在月计划 T+2 日、T+2 首班（class6）开始时仍有剩余量且 基准机台数 &lt; 月计划 T+2 机台数，
+     * 其中「T+2 首班剩余量」= 月度余量 − 1~5 班计划量。
+     * 纯基准、既无增机也无延迟的 SKU 不再输出。</p>
+     *
+     * @return 行 VO；既不增机也不延迟时返回 null
      */
     private LhDailyPlanProgressReportRowVO buildRow(LhScheduleContext context,
                                                     String skuKey,
@@ -273,9 +325,11 @@ public class LhDailyPlanProgressReportServiceImpl implements ILhDailyPlanProgres
                                                     Map<String, String> rubberTypeMap,
                                                     Map<String, Integer> t2MachineQtyMap,
                                                     Map<String, Integer> maxMachineQtyMap,
+                                                    Map<String, Integer> class1To5PlanQtyMap,
                                                     List<LocalDate> dayColumnList,
                                                     YearMonth t2YearMonth,
-                                                    LhDailyPlanProgressAssembler.T2InfoLabels infoLabels) {
+                                                    LhDailyPlanProgressAssembler.T2InfoLabels infoLabels,
+                                                    RowSourceCounter rowSourceCounter) {
         LhDailyPlanProgressAssembler.BaselineSku baselineSku = baselineMap.get(skuKey);
         boolean inBaseline = Objects.nonNull(baselineSku);
         int baseMachineQty = inBaseline ? baselineSku.getMachineQty() : 0;
@@ -285,11 +339,16 @@ public class LhDailyPlanProgressReportServiceImpl implements ILhDailyPlanProgres
         FactoryMonthPlanProductionFinalResult surplusPlan = this.resolveSurplusPlanRow(context, planIndex, skuKey);
         LhSkuSurplusVO surplusVO = this.resolveSurplusSafely(context, skuKey, surplusPlan);
         int surplusQty = Objects.isNull(surplusVO) ? 0 : this.nvl(surplusVO.getSurplusQty());
+        // T+2 首班（class6）开始时的剩余量 = 月度余量 − 1~5 班已排计划量（延迟判定用）
+        int t2StartSurplusQty = surplusQty - this.nvl(class1To5PlanQtyMap.get(skuKey));
         boolean delay = LhDailyPlanProgressAssembler.isDelay(
-                inBaseline, baseMachineQty, t2MonthMachineQty, surplusQty);
+                baseMachineQty, t2MonthMachineQty, t2StartSurplusQty);
 
-        // 行集合：基准全量；非基准仅在月计划区间有排产（增机）时纳入
-        if (!inBaseline && !LhDailyPlanProgressAssembler.isIncrease(false, 0, maxMonthMachineQty)) {
+        // 行主体：只输出「增机」或「延迟」的 SKU（纯基准、无增机无延迟的行不输出）；
+        // 增机 = 月计划 T+2~月底最大机台数 > 基准机台数（不在基准的 SKU 基准按 0 计）
+        boolean increase = LhDailyPlanProgressAssembler.isIncrease(
+                inBaseline, baseMachineQty, maxMonthMachineQty);
+        if (!increase && !delay) {
             return null;
         }
 
@@ -320,8 +379,11 @@ public class LhDailyPlanProgressReportServiceImpl implements ILhDailyPlanProgres
             rowVO.setStructureType(StringUtils.isBlank(fixedPlan.getStructureType())
                     ? this.resolveStructureTypeByProductStatus(fixedPlan.getProductStatus())
                     : fixedPlan.getStructureType());
-            rowVO.setHeightQty(fixedPlan.getHeightQty());
-            rowVO.setDayLhQty(fixedPlan.getDayVulcanizationQty());
+            // 高优先级取定稿表「高优先级排产数量」HEIGHT_PRODUCTION_QTY，
+            // 不是「高优先级数量/净需求」HEIGHT_QTY
+            rowVO.setHeightQty(fixedPlan.getHeightProductionQty());
+            // 日产 = 单模硫化量 × 2，与排程算法「日硫化量 = 单模硫化量 * 2」口径一致
+            rowVO.setDayLhQty(this.resolveDayVulcanizationQty(fixedPlan.getDayVulcanizationQty()));
         } else {
             // 基准行完全没有定稿行时，用基准信息补齐物料维度并记录告警
             materialCode = this.resolveMaterialCodeFromKey(skuKey);
@@ -333,6 +395,26 @@ public class LhDailyPlanProgressReportServiceImpl implements ILhDailyPlanProgres
                 this.resolveT2MouldChangePlanList(mouldChangePlanMap, materialCode, rowVO.getProductStatus()),
                 t2MonthMachineQty, baseMachineQty, delay, infoLabels));
         rowVO.setDayQtyList(this.buildDayQtyList(planIndex, skuKey, dayColumnList));
+
+        // 行来源统计与逐 SKU 明细日志：增机决定「是否成行」，延迟只是其中一类标记，
+        // T+2日排产信息是否有变化由四类机台变化信号另外决定
+        if (inBaseline) {
+            rowSourceCounter.increaseInBaseline++;
+        } else {
+            rowSourceCounter.increaseNotInBaseline++;
+        }
+        if (delay) {
+            rowSourceCounter.delay++;
+        }
+        if (StringUtils.equals(rowVO.getT2Info(), infoLabels.getNormal())) {
+            rowSourceCounter.normalT2Info++;
+        }
+        log.debug("日排产进度报表行来源, skuKey: {}, 在基准: {}, 基准机台数: {}, 月计划T+2机台数: {}, "
+                        + "月计划区间最大机台数: {}, 增机: {}, 月度余量: {}, 1~5班计划量: {}, "
+                        + "T+2首班余量: {}, 延迟: {}, T+2信息: [{}]",
+                skuKey, inBaseline, baseMachineQty, t2MonthMachineQty, maxMonthMachineQty,
+                increase, surplusQty, this.nvl(class1To5PlanQtyMap.get(skuKey)),
+                t2StartSurplusQty, delay, rowVO.getT2Info());
         return rowVO;
     }
 
@@ -531,6 +613,31 @@ public class LhDailyPlanProgressReportServiceImpl implements ILhDailyPlanProgres
                     skuKey, surplusPlan.getYear(), surplusPlan.getMonth(), e);
             return null;
         }
+    }
+
+    /**
+     * 构建「物料|产品状态 → 1~5 班计划量」映射。
+     *
+     * <p>一份排程结果覆盖三个业务日：class1/2 属 T 日、class3/4/5 属 T+1、class6/7/8 属 T+2。
+     * 因此 1~5 班计划量合计就是「当前月度余量」推进到「T+2 首班（class6）开始时余量」的扣减量。</p>
+     *
+     * @param scheduleResultList 当前排程日期的全部排程结果
+     * @return key=物料|产品状态，value=1~5 班计划量合计
+     */
+    private Map<String, Integer> buildClass1To5PlanQtyMap(List<LhScheduleResult> scheduleResultList) {
+        Map<String, Integer> class1To5PlanQtyMap = new LinkedHashMap<>();
+        if (CollectionUtils.isEmpty(scheduleResultList)) {
+            return class1To5PlanQtyMap;
+        }
+        scheduleResultList.stream()
+                .filter(result -> Objects.nonNull(result) && StringUtils.isNotEmpty(result.getMaterialCode()))
+                .collect(Collectors.groupingBy(
+                        result -> LhDailyPlanProgressAssembler.buildSkuKey(
+                                result.getMaterialCode(), result.getProductStatus()),
+                        LinkedHashMap::new, Collectors.toList()))
+                .forEach((skuKey, skuResultList) -> class1To5PlanQtyMap.put(
+                        skuKey, LhDailyPlanProgressAssembler.sumClass1To5PlanQty(skuResultList)));
+        return class1To5PlanQtyMap;
     }
 
     /**
@@ -818,7 +925,7 @@ public class LhDailyPlanProgressReportServiceImpl implements ILhDailyPlanProgres
         infoLabels.setTypeBlock(I18nUtil.getMessage(INFO_TYPE_BLOCK_KEY));
         infoLabels.setAdvance(I18nUtil.getMessage(INFO_ADVANCE_KEY));
         infoLabels.setDelay(I18nUtil.getMessage(INFO_DELAY_KEY));
-        infoLabels.setExceedMonthPlanPattern(I18nUtil.getMessage(INFO_EXCEED_MONTH_PLAN_KEY));
+        infoLabels.setNormal(I18nUtil.getMessage(INFO_NORMAL_KEY));
         return infoLabels;
     }
 
@@ -840,6 +947,22 @@ public class LhDailyPlanProgressReportServiceImpl implements ILhDailyPlanProgres
     private String resolveStructureTypeByProductStatus(String productStatus) {
         return StringUtils.equals(TrialStatusEnum.FORMAL.getCode(), productStatus)
                 ? STRUCTURE_TYPE_NORMAL : STRUCTURE_TYPE_CYCLE;
+    }
+
+    /**
+     * 解析日产（日硫化量）：定稿表单模硫化量 × 2。
+     *
+     * <p>排程算法中「日硫化量 = 单模硫化量 * 2」（见 MpAdjustDailyCapacityLimit#getDayVulcanizationQty），
+     * 报表展示沿用同一口径；单模量为空时保持空，避免虚增 0。</p>
+     *
+     * @param singleMouldDayQty 单模硫化量（定稿 DAY_VULCANIZATION_QTY）
+     * @return 日硫化量；入参为空时返回 null
+     */
+    private Integer resolveDayVulcanizationQty(Integer singleMouldDayQty) {
+        if (Objects.isNull(singleMouldDayQty)) {
+            return null;
+        }
+        return Math.max(0, singleMouldDayQty) * 2;
     }
 
     /**
@@ -920,5 +1043,27 @@ public class LhDailyPlanProgressReportServiceImpl implements ILhDailyPlanProgres
      */
     private int nvl(Integer value) {
         return Objects.isNull(value) ? 0 : value;
+    }
+
+    /**
+     * 报表行来源统计。
+     *
+     * <p>仅用于日志核对「行是怎么被纳入报表的」，不参与任何导出内容：
+     * 增机决定行是否出现（延迟行本身也是增机行），T+2日排产信息是否有变化
+     * 由四类机台变化信号（新开/换活字块/提前/延迟）决定，都没有信号时显示「正常」。</p>
+     */
+    private static class RowSourceCounter {
+
+        /** 增机行：在基准 且 月计划 T+2~月底最大机台数 &gt; 基准机台数 */
+        private int increaseInBaseline;
+
+        /** 增机行：不在基准（基准机台数按 0 计）且 月计划 T+2~月底最大机台数 &gt; 0 */
+        private int increaseNotInBaseline;
+
+        /** 延迟行（T+2 有余量且月计划 T+2 机台数 &gt; 基准机台数） */
+        private int delay;
+
+        /** T+2日排产信息为「正常」的行（T+2 当天无机台变化信号） */
+        private int normalT2Info;
     }
 }

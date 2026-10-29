@@ -54,6 +54,11 @@ public final class StructureMachineLimitDecision {
     private final String reason;
 
     /**
+     * 只读拒绝分类，不参与原准入判断。
+     */
+    private final StructureLimitRejectionCode rejectionCode;
+
+    /**
      * 创建结构机台上限准入结果。
      *
      * @param applicable 是否适用结构上限
@@ -92,6 +97,53 @@ public final class StructureMachineLimitDecision {
             int newMachineDelta,
             int structureMachineLimit,
             String reason) {
+        this(applicable, allowed, phase, businessDate, formalTargetShiftIndex, shiftStartTime, shiftEndTime, machineCode,
+                physicalMachineCode, materialCode, structureName, originalPoolDate, rawPhysicalMachineCodes,
+                effectivePhysicalMachineCodes, newMachineDelta, structureMachineLimit, reason,
+                allowed ? StructureLimitRejectionCode.NONE : StructureLimitRejectionCode.OTHER_GATE);
+    }
+
+    /**
+     * 创建带稳定拒绝分类的结构准入结果，其他参数与兼容构造方法一致。
+     *
+     * @param applicable 是否适用结构上限
+     * @param allowed 是否允许开产
+     * @param phase 当前排程阶段
+     * @param businessDate 实际开产业务日
+     * @param formalTargetShiftIndex 实际占用班次序号
+     * @param shiftStartTime 班次开始时刻
+     * @param shiftEndTime 班次结束时刻
+     * @param machineCode 实际机台或运行侧
+     * @param physicalMachineCode 物理机台编码
+     * @param materialCode 当前物料编码
+     * @param structureName 当前产品结构
+     * @param originalPoolDate 原候选池日期
+     * @param rawPhysicalMachineCodes 原始在机物理机台集合
+     * @param effectivePhysicalMachineCodes 有效在机物理机台集合
+     * @param newMachineDelta 候选新增物理机台增量
+     * @param structureMachineLimit 当前班次有效机台上限
+     * @param reason 原准入原因
+     * @param rejectionCode 稳定拒绝分类
+     */
+    public StructureMachineLimitDecision(
+            boolean applicable,
+            boolean allowed,
+            DailySchedulePhase phase,
+            LocalDate businessDate,
+            Integer formalTargetShiftIndex,
+            Date shiftStartTime,
+            Date shiftEndTime,
+            String machineCode,
+            String physicalMachineCode,
+            String materialCode,
+            String structureName,
+            LocalDate originalPoolDate,
+            Set<String> rawPhysicalMachineCodes,
+            Set<String> effectivePhysicalMachineCodes,
+            int newMachineDelta,
+            int structureMachineLimit,
+            String reason,
+            StructureLimitRejectionCode rejectionCode) {
         this.applicable = applicable;
         this.allowed = allowed;
         this.phase = phase;
@@ -110,6 +162,7 @@ public final class StructureMachineLimitDecision {
         this.newMachineDelta = Math.max(0, newMachineDelta);
         this.structureMachineLimit = Math.max(0, structureMachineLimit);
         this.reason = reason;
+        this.rejectionCode = rejectionCode;
     }
 
     /** @return 结构班次原始物理机台数 */

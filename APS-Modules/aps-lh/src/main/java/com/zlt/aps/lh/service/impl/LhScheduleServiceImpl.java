@@ -39,6 +39,7 @@ import com.zlt.aps.lh.engine.observer.ScheduleEventPublisher;
 import com.zlt.aps.lh.exception.ScheduleException;
 import com.zlt.aps.lh.mapper.*;
 import com.zlt.aps.lh.service.ILhMouldChangePlanService;
+import com.zlt.aps.lh.service.ILhScheduleCheckService;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
 import com.zlt.aps.lh.service.ILhScheduleService;
 import com.zlt.aps.lh.util.*;
@@ -209,6 +210,12 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     @Resource
     private MdmWorkCalendarMapper mdmWorkCalendarMapper;
 
+    /**
+     * 排程结果合理性校验服务（排程成功/数据导入后触发，失败不阻断主流程）
+     */
+    @Resource
+    private ILhScheduleCheckService lhScheduleCheckService;
+
     @Override
     public LhScheduleResponseDTO executeSchedule(LhScheduleRequestDTO request) {
         log.info("接收排程请求, 工厂: {}, 日期: {}, 月计划版本: {}, 生产版本: {}",
@@ -220,6 +227,12 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             log.info("排程服务执行完成, 工厂: {}, 批次号: {}, 成功: {}, 排程结果数: {}, 未排产数: {}, 模具计划数: {}",
                     context.getFactoryCode(), response.getBatchNo(), response.isSuccess(),
                     response.getScheduleResultCount(), response.getUnscheduledCount(), response.getMouldChangePlanCount());
+            // 排程成功后同步触发结果合理性校验（幂等替换，最后一次即终态），异常不阻断排程返回
+            // 校验键必须与排程结果落库日期一致：结果行按 scheduleTargetDate 写入，页面也按该日期查询
+            if (response.isSuccess()) {
+                this.triggerScheduleCheck(context.getFactoryCode(), context.getScheduleTargetDate(),
+                        LhScheduleCheckResult.TRIGGER_TYPE_SCHEDULE);
+            }
             return response;
         } catch (ScheduleException e) {
             log.warn("排程请求被拒绝, 工厂: {}, 日期: {}, 原因: {}",
@@ -230,6 +243,57 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                     context.getFactoryCode(), LhScheduleTimeUtil.formatDate(context.getScheduleTargetDate()), e);
             return LhScheduleResponseDTO.fail(context.getBatchNo(),
                     I18nUtil.getMessage("ui.data.column.lhScheduleResult.scheduleExecuteError") + e.getMessage());
+        }
+    }
+
+    /**
+     * 通用导入入口：导入排程结果后触发合理性校验。
+     *
+     * <p>导入为覆盖式写入，一次导入可能涉及多个「工厂 + 业务排程日」，按组合去重后逐个触发。</p>
+     *
+     * @param list 导入的排程结果
+     * @param updateSupport 是否支持更新已存在数据
+     * @param importLogId 导入日志ID
+     * @return 导入结果
+     */
+    @Override
+    public AjaxResult importData(List<LhScheduleResult> list, boolean updateSupport, Long importLogId) {
+        AjaxResult ajaxResult = super.importData(list, updateSupport, importLogId);
+        if (list == null || list.isEmpty()) {
+            return ajaxResult;
+        }
+        // 按工厂 + 业务排程日去重后触发校验
+        Map<String, LhScheduleResult> factoryDateMap = new LinkedHashMap<>();
+        for (LhScheduleResult result : list) {
+            if (StringUtils.isBlank(result.getFactoryCode()) || result.getScheduleDate() == null) {
+                continue;
+            }
+            String uniqueKey = result.getFactoryCode() + "|" + DateUtil.formatDate(result.getScheduleDate());
+            factoryDateMap.putIfAbsent(uniqueKey, result);
+        }
+        for (LhScheduleResult sample : factoryDateMap.values()) {
+            this.triggerScheduleCheck(sample.getFactoryCode(), sample.getScheduleDate(),
+                    LhScheduleCheckResult.TRIGGER_TYPE_IMPORT);
+        }
+        return ajaxResult;
+    }
+
+    /**
+     * 触发排程结果合理性校验（异常仅记录日志，不阻断主流程）。
+     *
+     * @param factoryCode 工厂编号
+     * @param scheduleDate 排程日期（与排程结果行落库的 SCHEDULE_DATE 一致，即页面排程目标日）
+     * @param triggerType 触发类型
+     */
+    private void triggerScheduleCheck(String factoryCode, Date scheduleDate, String triggerType) {
+        if (StringUtils.isBlank(factoryCode) || scheduleDate == null) {
+            return;
+        }
+        try {
+            lhScheduleCheckService.execute(factoryCode, scheduleDate, triggerType);
+        } catch (Exception e) {
+            log.error("触发硫化排程结果校验失败, factoryCode={}, scheduleDate={}, triggerType={}",
+                    factoryCode, LhScheduleTimeUtil.formatDate(scheduleDate), triggerType, e);
         }
     }
 

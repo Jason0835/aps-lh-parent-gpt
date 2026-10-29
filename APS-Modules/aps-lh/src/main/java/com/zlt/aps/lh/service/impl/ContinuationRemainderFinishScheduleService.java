@@ -226,6 +226,128 @@ public class ContinuationRemainderFinishScheduleService {
     }
 
     /**
+     * 先为精确历史指定机台保留交替前的合法生产前缀，再由其余原机按既有节点规则消化余量。
+     * 固定机台不参与收尾角色交换，总预算不足时只生产真实余量，设备及单控物理边界仍优先。
+     *
+     * @param context 已冻结历史释放身份的上下文
+     * @param machines 与结果顺序一致的真实物理机台画像
+     * @param shifts 完整排程班次
+     * @param remainQty 本组尚可分配的合法预算
+     * @param shiftQty 标准单台班产
+     * @param dateOffset 原整组容量确定的收尾日，无固定交替时沿用
+     * @return 固定前缀与剩余机台合并后的守恒计划，不消费账本
+     * @throws IllegalArgumentException 机台、班次或数量输入不完整时抛出
+     */
+    public ContinuationFinishScheduleResult calculateWithFixedHistoricalCutovers(LhScheduleContext context,
+            List<ContinuationEndingMachineProfile> machines, List<LhShiftConfigVO> shifts,
+            int remainQty, int shiftQty, int dateOffset) {
+        if (CollectionUtils.isEmpty(machines) || CollectionUtils.isEmpty(shifts)
+                || remainQty < 0 || shiftQty <= 0 || dateOffset < 0) {
+            throw new IllegalArgumentException("历史指定余量收尾计算输入不完整");
+        }
+        List<ContinuationEndingMachineProfile> fixed = machines.stream()
+                .filter(profile -> Objects.nonNull(this.resolveFixedHistoricalCutover(context, profile)))
+                .sorted(Comparator.comparing(profile -> this.resolveFixedHistoricalCutover(context, profile)))
+                .collect(Collectors.toList());
+        if (fixed.isEmpty()) {
+            return this.calculate(machines, shifts, remainQty, shiftQty, dateOffset);
+        }
+        Date windowEnd = shifts.get(shifts.size() - 1).getShiftEndDateTime();
+        int[] fixedQuantities = new int[fixed.size()];
+        Date[] deadlines = new Date[fixed.size()];
+        int remaining = remainQty;
+        for (int position = 0; position < fixed.size(); position++) {
+            ContinuationEndingMachineProfile profile = fixed.get(position);
+            Date cutoff = this.resolveFixedHistoricalCutover(context, profile);
+            Date equipmentDeadline = profile.getReleaseDeadline();
+            deadlines[position] = Objects.nonNull(equipmentDeadline) && equipmentDeadline.before(cutoff)
+                    ? equipmentDeadline : cutoff;
+            profile.restrictToReleaseDeadline(deadlines[position]);
+            fixedQuantities[position] = profile.floorQuantity(Math.min(remaining, profile.quantityUntil(windowEnd)));
+            remaining -= fixedQuantities[position];
+        }
+        // 固定前缀的上下限相同，不允许归整器或后置历史匹配把它挪给其他机台。
+        ContinuationFinishScheduleResult fixedPlan = this.buildResult(fixed, shifts, fixedQuantities,
+                fixedQuantities, fixedQuantities, deadlines, remainQty - remaining, null);
+        List<ContinuationEndingMachineProfile> remainingMachines = machines.stream()
+                .filter(profile -> !fixed.contains(profile)).collect(Collectors.toList());
+        ContinuationFinishScheduleResult remainderPlan = new ContinuationFinishScheduleResult();
+        remainderPlan.setMachinePlans(java.util.Collections.emptyList());
+        remainderPlan.setRemainingQty(remaining);
+        if (!remainingMachines.isEmpty()) {
+            int remainingDateOffset = this.resolveCapacityDateOffset(remainingMachines, shifts, remaining);
+            remainderPlan = this.calculate(remainingMachines, shifts, remaining, shiftQty, remainingDateOffset);
+        }
+        for (int position = 0; position < fixed.size(); position++) {
+            ContinuationMachineFinishPlan plan = fixedPlan.getMachinePlans().get(position);
+            // 完成身份描述整组预算是否闭合，固定角色另由规则及机台标识保护。
+            plan.setFinishState(remainderPlan.getRemainingQty() == 0
+                    ? ContinuationMachineFinishPlan.FinishState.SURPLUS_COMPLETED
+                    : ContinuationMachineFinishPlan.FinishState.FORCED_RELEASE);
+            plan.setFinishRule(ContinuationMachineFinishPlan.HISTORICAL_CUTOVER_RULE);
+            plan.setFinishRoleMachineCode(LhSingleControlMachineUtil.resolvePhysicalMachineCode(
+                    fixed.get(position).getOriginals().get(0).getLhMachineCode()));
+        }
+        List<ContinuationMachineFinishPlan> mergedPlans = new ArrayList<>(machines.size());
+        for (ContinuationEndingMachineProfile profile : machines) {
+            int fixedPosition = fixed.indexOf(profile);
+            mergedPlans.add(fixedPosition >= 0 ? fixedPlan.getMachinePlans().get(fixedPosition)
+                    : remainderPlan.getMachinePlans().get(remainingMachines.indexOf(profile)));
+        }
+        ContinuationFinishScheduleResult merged = new ContinuationFinishScheduleResult();
+        merged.setMachinePlans(mergedPlans);
+        merged.setRemainingQty(remainderPlan.getRemainingQty());
+        merged.setDiagnostic(remainderPlan.getDiagnostic());
+        LhScheduleResult source = machines.get(0).getOriginals().get(0);
+        String detail = String.format("工厂=%s, 批次=%s, 物料=%s, 状态=%s, 总预算=%s, 指定机台=%s, "
+                        + "前缀量=%s, 剩余原机预算=%s, 未完成=%s",
+                context.getFactoryCode(), context.getBatchNo(), source.getMaterialCode(), source.getProductStatus(),
+                remainQty, fixed.stream().map(profile -> profile.getOriginals().get(0).getLhMachineCode())
+                        .collect(Collectors.toList()),
+                Arrays.toString(fixedQuantities), remaining, merged.getRemainingQty());
+        PriorityTraceLogHelper.appendProcessLog(context, "历史指定交替前缀分配", detail);
+        log.info("历史指定交替前缀分配, {}", detail);
+        return merged;
+    }
+
+    /**
+     * 读取本物理机台已经冻结的历史前料截止，成对生产取较早侧边界，禁止任一侧越过指定动作。
+     *
+     * @param context 本轮历史事件
+     * @param profile 本物理机台及其运行侧
+     * @return 历史指定起点；未命中固定交替时为空
+     */
+    private Date resolveFixedHistoricalCutover(LhScheduleContext context, ContinuationEndingMachineProfile profile) {
+        return profile.getOriginals().stream()
+                .map(result -> context.getPreviousAlternateReleaseEventMap().get(result.getLhMachineCode()))
+                .filter(Objects::nonNull).filter(PreviousAlternatePlanReleaseEvent::isFixedHistoricalCutover)
+                .map(PreviousAlternatePlanReleaseEvent::getPlannedShiftStartTime)
+                .filter(Objects::nonNull).min(Date::compareTo).orElse(null);
+    }
+
+    /**
+     * 固定机台退出后按剩余原机真实容量重新确定收尾日，不能沿用包含固定前缀的整组日期。
+     *
+     * @param machines 剩余原机画像
+     * @param shifts 完整班次
+     * @param remainingQty 尚待分配余量
+     * @return 首个容量足够的日期偏移；窗口不足时返回末日
+     */
+    private int resolveCapacityDateOffset(List<ContinuationEndingMachineProfile> machines,
+            List<LhShiftConfigVO> shifts, int remainingQty) {
+        long capacity = 0;
+        for (int position = 0; position < shifts.size(); position++) {
+            for (ContinuationEndingMachineProfile profile : machines) {
+                capacity += profile.getCapacities()[position];
+            }
+            if (capacity >= remainingQty) {
+                return shifts.get(position).getDateOffset();
+            }
+        }
+        return shifts.get(shifts.size() - 1).getDateOffset();
+    }
+
+    /**
      * 复用既有节点规则，在已绑定的真实机台上一次计算数量和历史释放先后。
      *
      * @param machines 固定释放角色对应的真实画像

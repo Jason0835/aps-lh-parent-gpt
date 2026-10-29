@@ -1,10 +1,14 @@
 package com.zlt.aps.lh.engine.strategy.support;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Date;
+import java.util.Set;
 
 /**
  * 增机台模具资源分配结果。
@@ -36,6 +40,30 @@ public class MouldResourceAllocationResult {
     private List<String> unavailableMouldCodeList = new ArrayList<String>(0);
     /** 不允许增加时的跳过原因 */
     private MouldResourceSkipReason skipReason;
+    /**
+     * 原分配请求的资源时刻，不等同下一次调度日期。
+     */
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
+    private Date resourceReferenceTime;
+    /**
+     * 已提交释放事实能够证明的最早解除边界；无充分依据时为空。
+     */
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
+    private Date shortageBlockedUntil;
+    /**
+     * 只读精确子因，不替换原 allowed 或 skipReason。
+     */
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
+    private Set<MouldResourceDiagnosticCause> diagnosticCauses = Collections.emptySet();
+    /**
+     * 原返回值是否明确证明数量不足；关系、台账及指定组合异常不单独作为数量证据。
+     */
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
+    private boolean quantityShortage;
 
     /**
      * 构建允许分配结果。
