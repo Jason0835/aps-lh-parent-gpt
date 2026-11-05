@@ -16,6 +16,9 @@ public enum ScheduleProcessLogSection {
     /** 计划量计算分区。 */
     PLAN_QTY_CALCULATION("计划量计算"),
 
+    /** 跨班窗口机台绑定分区（S3.1窗口模拟，一次绑定适用于全部班次，与各班当班落位口径区分）。 */
+    WINDOW_MACHINE_BINDING("跨班窗口机台绑定"),
+
     /** 机台过滤与选择分区。 */
     MACHINE_SELECTION("机台过滤与选择"),
 

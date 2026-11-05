@@ -66,7 +66,7 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
     private static final String FINAL_FLAG = "1";
     private static final int DEFAULT_PAGE_NUM = 1;
     private static final int DEFAULT_PAGE_SIZE = 20;
-    private static final int ADJUST_SLOT_COUNT = 3;
+    private static final int ADJUST_SLOT_COUNT = 4;
     private static final String ADJUST_ID_FIELD_TEMPLATE = "adjustId%d";
     private static final String ADJUST_QTY_FIELD_TEMPLATE = "adjustQty%d";
     private static final String ADJUST_REASON_FIELD_TEMPLATE = "adjustReason%d";
@@ -115,7 +115,7 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
 
         List<FactoryMonthPlanProductionFinalResult> monthPlanList = this.queryMonthPlanList(queryVO, productionVersion);
         List<LhDayPlanAdjustRequire> allRows = this.aggregateMonthPlanRows(queryVO, productionVersion, monthPlanList);
-        boolean sortAdjustQty = Arrays.asList("adjustQty1", "adjustQty2", "adjustQty3")
+        boolean sortAdjustQty = Arrays.asList("adjustQty1", "adjustQty2", "adjustQty3", "adjustQty4")
                 .contains(queryVO.getOrderByColumn())
                 && Arrays.asList("asc", "desc").contains(queryVO.getIsAsc());
         if (sortAdjustQty) {
@@ -139,7 +139,7 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
      * 汇总当前查询条件下全部月计划行的调整量。
      *
      * @param queryVO 查询条件
-     * @return 调整1、调整2、调整3和调整后总合计
+     * @return 调整1、调整2、调整3、调整4和调整后总合计
      */
     @Override
     public LhDayPlanAdjustRequireSummaryVo summary(LhDayPlanAdjustRequire queryVO) {
@@ -156,17 +156,19 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
             summaryVo.setAdjustQty1(BigDecimalUtils.add(summaryVo.getAdjustQty1(), row.getAdjustQty1()));
             summaryVo.setAdjustQty2(BigDecimalUtils.add(summaryVo.getAdjustQty2(), row.getAdjustQty2()));
             summaryVo.setAdjustQty3(BigDecimalUtils.add(summaryVo.getAdjustQty3(), row.getAdjustQty3()));
+            summaryVo.setAdjustQty4(BigDecimalUtils.add(summaryVo.getAdjustQty4(), row.getAdjustQty4()));
             summaryVo.setAdjustedTotalQty(BigDecimalUtils.add(
                     summaryVo.getAdjustedTotalQty(),
                     BigDecimalUtils.add(row.getMonthPlanQty(),
                             BigDecimalUtils.add(row.getAdjustQty1(),
-                                    BigDecimalUtils.add(row.getAdjustQty2(), row.getAdjustQty3())))));
+                                    BigDecimalUtils.add(row.getAdjustQty2(),
+                                            BigDecimalUtils.add(row.getAdjustQty3(), row.getAdjustQty4()))))));
         }
         return summaryVo;
     }
 
     /**
-     * 保存当前列表行的三个调整槽位。
+     * 保存当前列表行的四个调整槽位。
      *
      * @param entity 当前行数据
      */
@@ -200,7 +202,7 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
      * 按查询条件导出全部匹配行。
      *
      * <p>导出复用列表的归并口径：先确定有效定稿版本，再按物料和产品状态归并行，
-     * 然后回填三次调整。导出不分页、不应用调整量排序，导出列与导入模板保持同一套紧凑列。</p>
+     * 然后回填四次调整。导出不分页、不应用调整量排序，导出列与导入模板保持同一套紧凑列。</p>
      *
      * @param queryVO 查询条件，与列表一致
      * @param fileName 导出文件名
@@ -261,6 +263,8 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
         exportVo.setAdjustReason2(row.getAdjustReason2());
         exportVo.setAdjustQty3(row.getAdjustQty3());
         exportVo.setAdjustReason3(row.getAdjustReason3());
+        exportVo.setAdjustQty4(row.getAdjustQty4());
+        exportVo.setAdjustReason4(row.getAdjustReason4());
         exportVo.setFactoryCode(row.getFactoryCode());
         return exportVo;
     }
@@ -285,7 +289,7 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
     /**
      * 导入硫化日计划调整需求。
      *
-     * <p>导入只维护已存在月计划 SKU 的三次调整，不允许通过导入新增月计划外的 SKU。
+     * <p>导入只维护已存在月计划 SKU 的四次调整，不允许通过导入新增月计划外的 SKU。
      * 判断链：行级先校验 SKU 是否在有效月计划中，槽位级再看是否存在未删除记录，
      * 最后按页面 updateSupport 决定已存在槽位是否允许覆盖。</p>
      *
@@ -546,7 +550,7 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
     }
 
     /**
-     * 收集单个导入行三个槽位的写入动作。
+     * 收集单个导入行四个槽位的写入动作。
      *
      * @param importVo      导入行
      * @param importDTO     导入请求
@@ -638,7 +642,10 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
         if (adjustIndex == 2) {
             return importVo.getAdjustQty2();
         }
-        return importVo.getAdjustQty3();
+        if (adjustIndex == 3) {
+            return importVo.getAdjustQty3();
+        }
+        return importVo.getAdjustQty4();
     }
 
     /**
@@ -655,7 +662,10 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
         if (adjustIndex == 2) {
             return importVo.getAdjustReason2();
         }
-        return importVo.getAdjustReason3();
+        if (adjustIndex == 3) {
+            return importVo.getAdjustReason3();
+        }
+        return importVo.getAdjustReason4();
     }
 
     /**
@@ -851,7 +861,7 @@ public class LhDayPlanAdjustRequireServiceImpl extends AbstractDocService<LhDayP
     }
 
     /**
-     * 批量回填当前页三次调整。
+     * 批量回填当前页四次调整。
      *
      * @param pageRows 当前页月计划行
      */

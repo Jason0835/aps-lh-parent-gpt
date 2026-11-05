@@ -46,9 +46,11 @@ public class LhMonthStartServiceImpl implements ILhMonthStartService {
             findStartDateList.add(currentMonthPlan.getStockCaptureDate());
         }
         YearMonth nextMonth = yearMonth.plusMonths(BigDecimal.ONE.longValue());
+        Date nextMonthPlanDate = null;
         FactoryMonthPlanProductionFinalResult nextMonthPlan = getAnyOne(factory, nextMonth);
         if (null != nextMonthPlan && null != nextMonthPlan.getStockCaptureDate()) {
-            findStartDateList.add(nextMonthPlan.getStockCaptureDate());
+            nextMonthPlanDate = nextMonthPlan.getStockCaptureDate();
+            findStartDateList.add(nextMonthPlanDate);
         }
         if (CollectionUtils.isEmpty(findStartDateList)) {
             return LhMonthStartDayResult.EMPTY;
@@ -62,10 +64,10 @@ public class LhMonthStartServiceImpl implements ILhMonthStartService {
             //20260910+ 去除时分秒
             LocalDate maxDateLocal = SkuMonthPlanCalculator.getDate(maxDate);
             maxDate = DateUtil.getDate(maxDateLocal.getYear(), maxDateLocal.getMonthValue(), maxDateLocal.getDayOfMonth());
-            return new LhMonthStartDayResult(maxDate, false);
+            return new LhMonthStartDayResult(maxDate, nextMonthPlanDate, false);
         }
         Date startDate = SkuMonthPlanCalculator.getDate(yearMonth.atDay(BigDecimal.ONE.intValue()));
-        return new LhMonthStartDayResult(startDate, true);
+        return new LhMonthStartDayResult(startDate, nextMonthPlanDate, true);
     }
 
     /**

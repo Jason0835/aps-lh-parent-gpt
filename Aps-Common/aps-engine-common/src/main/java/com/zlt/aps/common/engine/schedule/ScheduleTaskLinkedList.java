@@ -43,6 +43,30 @@ public class ScheduleTaskLinkedList<T> implements IScheduleTaskLinkedList<T> {
         return result;
     }
 
+    /**
+     * 静默追加节点：只维护链接关系、归属和序号，不重新编号整条链，也不构造变更结果。
+     *
+     * <p>仅供工作区拷贝使用。拷贝按源链顺序逐节点追加，因此按链内位置写入的序号与
+     * {@link #resequence} 的结果完全一致；跳过 resequence 可避免逐节点重复遍历整条链
+     * （拷贝数百个节点时是平方级开销，且变更结果在拷贝路径中无人消费）。</p>
+     *
+     * @param node 待追加节点
+     */
+    public void appendSilently(ScheduleTaskNode<T> node) {
+        validateNewNode(node);
+        if (tail == null) {
+            head = node;
+            tail = node;
+        } else {
+            node.linkAfter(tail);
+            tail = node;
+        }
+        node.setOwnerList(this);
+        size++;
+        // 按链内位置写入序号：与 append + resequence 的最终结果保持一致。
+        node.setSequence(size);
+    }
+
     @Override
     public ScheduleChainChangeResult<T> prepend(ScheduleTaskNode<T> node, ScheduleOperationContext context) {
         validateNewNode(node);

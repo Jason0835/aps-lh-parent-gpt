@@ -47,6 +47,54 @@ public class ScheduleProcessTraceBuffer {
     private boolean fallback;
 
     /**
+     * 创建工作区副本，避免试算阶段追加日志污染基础排程的原日志。
+     *
+     * @return 保留既有日志内容与级别的新缓冲器
+     */
+    public ScheduleProcessTraceBuffer copy() {
+        ScheduleProcessTraceBuffer copy = new ScheduleProcessTraceBuffer();
+        copy.entries.addAll(this.entries);
+        this.shiftEntryMap.forEach((shiftOrder, values) ->
+                copy.shiftEntryMap.put(shiftOrder, new ArrayList<>(values)));
+        this.shiftSectionEntryMap.forEach((shiftOrder, sectionMap) -> {
+            Map<ScheduleProcessLogSection, List<Object>> sectionCopy = new LinkedHashMap<>();
+            sectionMap.forEach((section, values) -> sectionCopy.put(section, new ArrayList<>(values)));
+            copy.shiftSectionEntryMap.put(shiftOrder, sectionCopy);
+        });
+        this.deferredShiftEntryMap.forEach((shiftOrder, values) ->
+                copy.deferredShiftEntryMap.put(shiftOrder, new ArrayList<>(values)));
+        this.deferredShiftSectionEntryMap.forEach((shiftOrder, sectionMap) -> {
+            Map<ScheduleProcessLogSection, List<Object>> sectionCopy = new LinkedHashMap<>();
+            sectionMap.forEach((section, values) -> sectionCopy.put(section, new ArrayList<>(values)));
+            copy.deferredShiftSectionEntryMap.put(shiftOrder, sectionCopy);
+        });
+        copy.tailEntries.addAll(this.tailEntries);
+        copy.level = this.level;
+        copy.configuredValue = this.configuredValue;
+        copy.fallback = this.fallback;
+        return copy;
+    }
+
+    /**
+     * 将隔离计算产生的过程事件按原分区追加到当前缓冲区。
+     * @param source 隔离计算的过程事件
+     */
+    public void appendFrom(ScheduleProcessTraceBuffer source) {
+        this.entries.addAll(source.entries);
+        source.shiftEntryMap.forEach((shift, values) -> this.shiftEntryMap
+                .computeIfAbsent(shift, key -> new ArrayList<>()).addAll(values));
+        source.shiftSectionEntryMap.forEach((shift, sections) -> sections.forEach((section, values) ->
+                this.shiftSectionEntryMap.computeIfAbsent(shift, key -> new LinkedHashMap<>())
+                        .computeIfAbsent(section, key -> new ArrayList<>()).addAll(values)));
+        source.deferredShiftEntryMap.forEach((shift, values) -> this.deferredShiftEntryMap
+                .computeIfAbsent(shift, key -> new ArrayList<>()).addAll(values));
+        source.deferredShiftSectionEntryMap.forEach((shift, sections) -> sections.forEach((section, values) ->
+                this.deferredShiftSectionEntryMap.computeIfAbsent(shift, key -> new LinkedHashMap<>())
+                        .computeIfAbsent(section, key -> new ArrayList<>()).addAll(values)));
+        this.tailEntries.addAll(source.tailEntries);
+    }
+
+    /**
      * 配置过程日志级别。
      *
      * @param value 参数配置值
@@ -434,6 +482,19 @@ public class ScheduleProcessTraceBuffer {
                 || this.hasSummarySectionEntries(shiftOrder, this.shiftSectionEntryMap)
                 || this.countSummaryEntries(this.deferredShiftEntryMap.getOrDefault(shiftOrder, new ArrayList<>())) > 0
                 || this.hasSummarySectionEntries(shiftOrder, this.deferredShiftSectionEntryMap);
+    }
+
+    /**
+     * 判断指定班次当前是否已存在任何日志块（摘要或完整事件、普通或延后）。
+     *
+     * <p>供落库终态勾稽类日志判断是否需要为零班次补充确认行：
+     * 班次块不存在且本班终量为 0 时不输出，避免凭空创建只有零值的班次分区。</p>
+     *
+     * @param shiftOrder 班次顺序
+     * @return 已存在日志块返回 true，否则返回 false
+     */
+    public boolean hasShiftEntries(int shiftOrder) {
+        return this.hasSummaryShiftEntries(shiftOrder) || this.hasFullShiftEntries(shiftOrder);
     }
 
     /**

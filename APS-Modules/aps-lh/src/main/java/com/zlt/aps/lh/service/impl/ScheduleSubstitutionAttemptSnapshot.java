@@ -1,5 +1,9 @@
 package com.zlt.aps.lh.service.impl;
 
+import com.zlt.aps.lh.engine.strategy.support.StructureEndingContinuationState;
+import com.zlt.aps.lh.engine.strategy.support.PreviousAlternatePlanReleaseEvent;
+import com.zlt.aps.lh.engine.strategy.support.PreviousAlternateExecutionPlan;
+
 import com.zlt.aps.lh.engine.strategy.support.ContinuationEndingAllocationSnapshot;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationRemainderFinishGroup;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationFinishScheduleResult;
@@ -71,6 +75,26 @@ import java.util.stream.Collectors;
  * @author APS
  */
 final class ScheduleSubstitutionAttemptSnapshot {
+    /**
+     * 专供转产已成功结果随所有后处理尝试一起回滚。
+     */
+    private Set<LhScheduleResult> dedicatedSupplyTransferResults;
+    /**
+     * 结构收尾续作的资格、原机身份及三步进度随候选完整回滚。
+     */
+    private Map<String, StructureEndingContinuationState> structureEndingContinuationStates;
+    /**
+     * 冻结历史机台索引只读复用，失败候选不重新扫描整批计划构建索引。
+     */
+    private Map<String, List<LhMouldChangePlan>> structureEndingHistoricalMachinePlans;
+    /**
+     * 当前专用编排作用域。
+     */
+    private boolean structureEndingContinuationScheduling;
+    /**
+     * 当前唯一组合的生产截止。
+     */
+    private Date activeStructureEndingProductionDeadline;
 
     /** 公共设备计划全部状态，包含0判定缓存、待复评、候选时间计划、安排记录和版本。 */
     private EquipmentPlanRuntimeState equipmentPlanRuntimeState;
@@ -331,6 +355,12 @@ final class ScheduleSubstitutionAttemptSnapshot {
      */
     private Set<LhScheduleResult> continuationFinishAllocatedResults;
 
+    /**
+     * 本次候选前各历史事件的执行决定，使用事件身份恢复，原装事实保持冻结。
+     */
+    private final Map<PreviousAlternatePlanReleaseEvent, PreviousAlternateExecutionPlan> historicalExecutions =
+            new IdentityHashMap<>();
+
     private ScheduleSubstitutionAttemptSnapshot() {
     }
 
@@ -363,6 +393,20 @@ final class ScheduleSubstitutionAttemptSnapshot {
             Collection<SkuScheduleDTO> skuCollection) {
         ScheduleSubstitutionAttemptSnapshot snapshot =
                 new ScheduleSubstitutionAttemptSnapshot();
+        context.getPreviousAlternateReleaseEventMap().values().forEach(event ->
+                snapshot.historicalExecutions.put(event, event.getExecutionPlan()));
+        if (context.getActivePreviousAlternateEvent() != null) {
+            PreviousAlternatePlanReleaseEvent activeEvent = context.getActivePreviousAlternateEvent();
+            snapshot.historicalExecutions.put(activeEvent, activeEvent.getExecutionPlan());
+        }
+        snapshot.dedicatedSupplyTransferResults = copyIdentityResultSet(context.getDedicatedSupplyTransferResults());
+        snapshot.structureEndingContinuationStates = new LinkedHashMap<>();
+        context.getStructureEndingContinuationStates().forEach((key, state) ->
+                snapshot.structureEndingContinuationStates.put(key, state.copy()));
+        snapshot.structureEndingHistoricalMachinePlans = new LinkedHashMap<>(context
+                .getStructureEndingHistoricalMachinePlans());
+        snapshot.structureEndingContinuationScheduling = context.isStructureEndingContinuationScheduling();
+        snapshot.activeStructureEndingProductionDeadline = context.getActiveStructureEndingProductionDeadline();
         snapshot.previousAlternateReleasedMachineTimeMap = new LinkedHashMap<>(context.getPreviousAlternateReleasedMachineTimeMap());
         snapshot.previousAlternateReleasedSkuKeyMap = new LinkedHashMap<>(context.getPreviousAlternateReleasedSkuKeyMap());
         snapshot.previousAlternateCandidateAvailableTimeMap = new IdentityHashMap<>(context.getPreviousAlternateCandidateAvailableTimeMap());
@@ -396,6 +440,9 @@ final class ScheduleSubstitutionAttemptSnapshot {
         }
         // 零量行已移除时，公共快照仍引用原对象；预演修改这些字段也必须恢复。
         context.getContinuationSurplusEndingSnapshotMap().keySet().forEach(result ->
+                snapshot.scheduleResultStateMap.putIfAbsent(result, copyBean(result, LhScheduleResult.class)));
+        context.getStructureEndingContinuationStates().values().stream()
+                .flatMap(state -> state.getOriginalResults().stream()).forEach(result ->
                 snapshot.scheduleResultStateMap.putIfAbsent(result, copyBean(result, LhScheduleResult.class)));
         snapshot.scheduleResultSourceSkuMap =
                 new IdentityHashMap<LhScheduleResult, SkuScheduleDTO>(context.getScheduleResultSourceSkuMap());
@@ -658,6 +705,19 @@ final class ScheduleSubstitutionAttemptSnapshot {
      * @param restoreSourceObjects 是否恢复原结果和SKU对象
      */
     private void restore(LhScheduleContext context, boolean restoreSourceObjects) {
+        if (restoreSourceObjects) {
+            historicalExecutions.forEach(PreviousAlternatePlanReleaseEvent::setExecutionPlan);
+        }
+        context.setDedicatedSupplyTransferResults(restoreSourceObjects
+                ? copyIdentityResultSet(dedicatedSupplyTransferResults)
+                : Collections.newSetFromMap(new IdentityHashMap<>()));
+        Map<String, StructureEndingContinuationState> endingStates = new LinkedHashMap<>();
+        structureEndingContinuationStates.forEach((key, state) -> endingStates.put(key, state.copy()));
+        context.setStructureEndingContinuationStates(endingStates);
+        context.setStructureEndingHistoricalMachinePlans(new LinkedHashMap<>(structureEndingHistoricalMachinePlans));
+        context.setStructureEndingContinuationScheduling(restoreSourceObjects && structureEndingContinuationScheduling);
+        context.setActiveStructureEndingProductionDeadline(restoreSourceObjects
+                ? activeStructureEndingProductionDeadline : null);
         // 班次9使用新实例；原窗口回滚保留外层局部收集域，只恢复可发布关联。
         if (restoreSourceObjects) {
             context.getShiftRemarkRuntime().restore(shiftRemarkRuntime);

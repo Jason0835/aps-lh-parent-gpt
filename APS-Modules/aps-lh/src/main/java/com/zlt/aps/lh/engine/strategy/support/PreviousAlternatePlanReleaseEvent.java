@@ -33,7 +33,7 @@ public class PreviousAlternatePlanReleaseEvent implements Serializable {
          */
         BEFORE_MATERIAL_PRODUCTION,
         /**
-         * MES已显示历史后料，必须先完成历史动作及首检才能生产。
+         * MES已显示历史后料或原模具已全部转移，必须先完成历史动作及首检才能生产。
          */
         AFTER_MATERIAL_PREPARATION,
         /**
@@ -54,9 +54,16 @@ public class PreviousAlternatePlanReleaseEvent implements Serializable {
      * 本次实际动作只读快照，独立于历史计划类型及其排序，候选回滚不改变原装机事实。
      */
     private PreviousAlternateActionPlan actualActionPlan;
+    /**
+     * 本次候选选定的正规替代动作，失败恢复，成功后供后处理和精确重放读取。
+     */
+    private PreviousAlternateExecutionPlan executionPlan;
+
     /** 当前运行态机台编码，左右侧保持独立。 */
     private String machineCode;
-    /** 下机前实际在机物料，不能用历史后料替代。 */
+    /**
+     * 下机前物料；模具全部转移时仅保存历史前料身份，不代表本机仍在生产。
+     */
     private String materialCode;
     /** 下机前实际产品状态。 */
     private String productStatus;
@@ -64,6 +71,10 @@ public class PreviousAlternatePlanReleaseEvent implements Serializable {
      * 本机历史前料最终未排产，默认从T日历史班次尝试，较早早班仅在完整承接成功后生效。
      */
     private boolean beforeMaterialNotScheduled;
+    /**
+     * 本轮已证明原模具全部转移，前料仅用于历史追溯，不表示本机仍有前料或模具占用。
+     */
+    private boolean originalMouldsTransferred;
     /** 历史计划日期及班次解析出的默认下机起点；异料严格收尾可按合法班次内真实释放更新。 */
     private Date plannedShiftStartTime;
     /**
@@ -89,7 +100,7 @@ public class PreviousAlternatePlanReleaseEvent implements Serializable {
 
     /**
      * 余量组在原机分配的窗口上限，非空表示历史交替消费本组提交的真实释放。
-     * 精确异料固定交替仍按原指定起点限制前料，其余历史关系等待原节点分配。
+     * 所有已准入余量组先完成错开和合法对调，历史班次不得截断前料产能。
      */
     private Date remainderFinishWindowEndTime;
 
@@ -176,13 +187,16 @@ public class PreviousAlternatePlanReleaseEvent implements Serializable {
 
     /**
      * 从冻结字段解析动作前身份，避免将MES后料误认作需要先完成的历史前料。
-     * 角色不另存可变标记，关联尝试与时间下机预演恢复原事件后同步恢复身份。
+     * 已转移标记与事件快照共同恢复，不将历史前料重新激活为本机生产段。
      *
      * @return 真实前料、待准备后料、历史同料动作或不匹配身份
      */
     public ProductionRole resolveProductionRole() {
         if (Objects.isNull(plan) || StringUtils.isBlank(materialCode)) {
             return ProductionRole.UNMATCHED;
+        }
+        if (originalMouldsTransferred && beforeMaterialNotScheduled) {
+            return ProductionRole.AFTER_MATERIAL_PREPARATION;
         }
         if (StringUtils.equals(materialCode, plan.getBeforeMaterialCode())) {
             return StringUtils.equals(plan.getBeforeMaterialCode(), plan.getAfterMaterialCode())

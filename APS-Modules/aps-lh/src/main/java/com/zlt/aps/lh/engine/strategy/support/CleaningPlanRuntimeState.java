@@ -37,6 +37,11 @@ public final class CleaningPlanRuntimeState {
      */
     private final Map<String, Date> independentQuotaStartMap = new LinkedHashMap<>();
     /**
+     * 已通过来源校验但因额度不足未安排的干冰候选，保持初始化的计划时间及机台顺序。
+     * 仅在正式续作排量前参与当天补位，不作为机台产能窗口或最终交替计划输出。
+     */
+    private final List<MachineCleaningWindowDTO> pendingDryIceWindows = new ArrayList<>();
+    /**
      * 仅喷砂实际释放机台后的来源事件，保存旧SKU及机台从清洗开始释放、原模具到清洗结束
      * 才可复用以及真实余量回流三项事实；喷砂与其他停机重叠时不登记该专用处置。
      */
@@ -93,6 +98,7 @@ public final class CleaningPlanRuntimeState {
         sourceWindowMap.forEach((machineCode, windows) ->
                 target.sourceWindowMap.put(machineCode, copyWindows(windows)));
         independentQuotaStartMap.forEach((key, time) -> target.independentQuotaStartMap.put(key, copyDate(time)));
+        target.pendingDryIceWindows.addAll(copyWindows(pendingDryIceWindows));
         sandBlastWindowMap.forEach((key, window) -> target.sandBlastWindowMap.put(key,
                 copies.computeIfAbsent(window, CleaningPlanRuntimeState::copyWindow)));
         releaseWindowMap.forEach((key, window) -> target.releaseWindowMap.put(key,

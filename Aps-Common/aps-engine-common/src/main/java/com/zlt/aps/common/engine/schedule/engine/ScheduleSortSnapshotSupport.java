@@ -33,6 +33,11 @@ public final class ScheduleSortSnapshotSupport {
 
     private static final DateTimeFormatter UTC_FORMATTER = DateTimeFormatter.ISO_INSTANT;
 
+    /**
+     * 十六进制字符表，用于把摘要字节快速转换为文本。
+     */
+    private static final char[] HEX_DIGITS = "0123456789abcdef".toCharArray();
+
     private ScheduleSortSnapshotSupport() {
     }
 
@@ -74,6 +79,10 @@ public final class ScheduleSortSnapshotSupport {
                 .map(ScheduleTaskDraftModel::getBusinessKey).collect(Collectors.toList());
         List<String> inputOrder = safeBeforeOrder.stream().filter(Objects::nonNull)
                 .map(ScheduleTaskDraftModel::getBusinessKey).collect(Collectors.toList());
+        // 输入/输出清单只在轮次首个节点写全量：同一轮内每个任务各存一份全量清单会让证据体积随参与任务数平方增长
+        // （实测 1855 个节点重复写入约 140 万个业务键，单条解释落库可达 250KB）。其余节点保留清单哈希与前后位置，
+        // 足以校验顺序，离线重放脚本按轮次取一份清单即可。
+        boolean firstSnapshotNode = true;
         for (T task : safeAfterOrder) {
             if (task == null) {
                 continue;
@@ -92,8 +101,11 @@ public final class ScheduleSortSnapshotSupport {
             evidence.put("participantCount", safeAfterOrder.size());
             evidence.put("inputOrderHash", inputHash);
             evidence.put("outputOrderHash", outputHash);
-            evidence.put("inputOrder", inputOrder);
-            evidence.put("outputOrder", outputOrder);
+            if (firstSnapshotNode) {
+                evidence.put("inputOrder", inputOrder);
+                evidence.put("outputOrder", outputOrder);
+                firstSnapshotNode = false;
+            }
             evidence.put("taskIdentity", buildTaskIdentity(task));
             evidence.put("sourceTaskBusinessKeyList", task.getSourceTaskBusinessKeyList());
             evidence.put("inputPosition", beforeIndexMap.get(task.getBusinessKey()));
@@ -154,12 +166,12 @@ public final class ScheduleSortSnapshotSupport {
                 .map(ScheduleTaskDraftModel::getBusinessKey).collect(Collectors.toList()));
         evidence.put("outputOrder", remainingAfterSelection.stream().filter(Objects::nonNull)
                 .map(ScheduleTaskDraftModel::getBusinessKey).collect(Collectors.toList()));
+        // 剩余任务明细只保留比较所需的业务键与比较键：原实现每项写入 25 个字段（含完整 inputValues），
+        // 参与任务越多证据越大，且离线重放只读取 businessKey 与 comparisonKeys。
         evidence.put("remainingTaskDetails", safeRemaining.stream().filter(Objects::nonNull)
                 .map(task -> {
-                    Map<String, Object> detail = buildTaskIdentity(task);
-                    detail.put("inputValues", buildInputValues(task));
-                    detail.put("latestStartTimeAtSortMillis",
-                            task.getLatestStartTime() == null ? null : task.getLatestStartTime().getTime());
+                    Map<String, Object> detail = new LinkedHashMap<>();
+                    detail.put("businessKey", task.getBusinessKey());
                     detail.put("comparisonKeys", buildAssignmentKeys(task));
                     return detail;
                 }).collect(Collectors.toList()));
@@ -187,11 +199,14 @@ public final class ScheduleSortSnapshotSupport {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] bytes = digest.digest(canonical.getBytes(StandardCharsets.UTF_8));
-            StringBuilder result = new StringBuilder(bytes.length * 2);
-            for (byte value : bytes) {
-                result.append(String.format("%02x", value));
+            // 逐字节手写十六进制：原实现每个字节调用一次 String.format，单次快照就要格式化 64 次，开销远高于直接拼接。
+            char[] hexChars = new char[bytes.length * 2];
+            for (int index = 0; index < bytes.length; index++) {
+                int value = bytes[index] & 0xFF;
+                hexChars[index * 2] = HEX_DIGITS[value >>> 4];
+                hexChars[index * 2 + 1] = HEX_DIGITS[value & 0x0F];
             }
-            return result.toString();
+            return new String(hexChars);
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256不可用", exception);
         }

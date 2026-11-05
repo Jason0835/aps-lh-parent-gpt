@@ -42,6 +42,11 @@ public final class NewSpecMachineAssignmentPlan {
     /** 组合已由调用方明确，仅执行资源分配，不再次进行机台选型。 */
     private boolean fixedMachineExecution;
     /**
+     * 后处理普通组合需要保留跨日绑定，但不授予固定机台准入豁免。
+     */
+    private boolean postProcessing;
+
+    /**
      * 独立结构切换本轮竞争班次；不授予历史指定组合的选型豁免。
      */
     private LhShiftConfigVO structureSwitchShift;
@@ -63,6 +68,16 @@ public final class NewSpecMachineAssignmentPlan {
         this.actualAvailableTimeMode = actualAvailableTimeMode;
         this.assignedMachineCodeMap.put(candidate.getSku(),
                 matchResult.getMachine().getMachineCode());
+    }
+
+    /**
+     * 标记普通后处理组合的跨日绑定需求。
+     *
+     * @return 当前组合
+     */
+    public NewSpecMachineAssignmentPlan forPostProcessing() {
+        this.postProcessing = true;
+        return this;
     }
 
     public DailyNewSpecCandidate getCandidate() {
@@ -132,7 +147,7 @@ public final class NewSpecMachineAssignmentPlan {
      * @return 是否需要登记供后续新增读取的前置在机绑定
      */
     public boolean isPreScheduledExecution() {
-        return fixedMachineExecution || Objects.nonNull(structureSwitchShift);
+        return postProcessing || fixedMachineExecution || Objects.nonNull(structureSwitchShift);
     }
 
     public boolean isAssigned(SkuScheduleDTO sku) {

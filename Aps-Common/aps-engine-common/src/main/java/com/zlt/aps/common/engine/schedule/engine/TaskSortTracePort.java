@@ -1,6 +1,7 @@
 package com.zlt.aps.common.engine.schedule.engine;
 
 import java.util.List;
+import java.util.function.BiConsumer;
 
 /**
  * 自动排程任务排序轨迹端口。
@@ -30,6 +31,21 @@ public interface TaskSortTracePort<C, T extends ScheduleSortableTask> {
      */
     void recordTaskSort(C context, T task, String strategyCode, String sortSource,
                         int sortIndex, boolean startupShift);
+
+    /**
+     * 为本次排序准备任务轨迹记录器，默认保持逐条记录的兼容行为。
+     *
+     * @param context      排程上下文
+     * @param strategyCode 排序策略编码
+     * @param sortSource   排序来源
+     * @param policy       领域排序策略
+     * @return 接收任务和排序序号的记录函数
+     */
+    default BiConsumer<T, Integer> prepareTaskSortRecorder(C context, String strategyCode, String sortSource,
+                                                           TaskSortPolicy<C, T> policy) {
+        return (task, sortIndex) -> this.recordTaskSort(context, task, strategyCode, sortSource,
+                sortIndex, policy.isStartupShift(context, task));
+    }
 
     /**
      * 记录排序汇总日志。

@@ -1,5 +1,7 @@
 package com.zlt.aps.lh.service.impl;
 
+import com.zlt.aps.lh.engine.strategy.support.StructureEndingContinuationPolicy;
+
 import com.zlt.aps.lh.engine.strategy.support.SkuEndingDeferredExpansionPolicy;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
@@ -71,6 +73,12 @@ public class SpecifiedMachineProductionService {
     public NewSpecMachineAssignmentPlan preview(LhScheduleContext context, DayScheduleContext day,
             DailyNewSpecCandidate candidate, MachineScheduleDTO machine, IMachineMatchStrategy machineMatch,
             boolean fixedMachine, Function<MachineSkuMatchResult, NewSpecMachineAvailabilityPlan> resolver) {
+        if (machine == null || !StructureEndingContinuationPolicy.allowsNewMachine(context, candidate
+                .getSku(), machine.getMachineCode())) {
+            candidate.setLastFailure(com.zlt.aps.lh.api.enums.UnscheduledReasonEnum.NO_AVAILABLE_MACHINE
+                    .getDescription());
+            return null;
+        }
         MachineSkuMatchResult match = fixedMachine ? this.declareMachine(context, machine, candidate.getSku())
                 : machineMatch.matchSkuOnMachine(context, machine, candidate.getSku());
         if (!match.isMatched()) {
@@ -247,12 +255,18 @@ public class SpecifiedMachineProductionService {
             }
         };
         int firstRemarkResult = context.getScheduleResultList().size();
-        try (LhShiftRemarkRuntime.Scope remarkScope = context.getShiftRemarkRuntime().openScope(
+        try (StructureEndingContinuationPolicy.DeadlineScope deadlineScope =
+                     StructureEndingContinuationPolicy.openDeadline(context, assignmentPlan.getCandidate().getSku());
+             LhShiftRemarkRuntime.Scope remarkScope = context.getShiftRemarkRuntime().openScope(
                 assignmentPlan.getCandidate().getSku(), assignmentPlan.getMatchResult().getMachine().getMachineCode())) {
             remarkScope.include(assignmentPlan.getAvailabilityPlan().getDelayEvidence());
             NewSpecScheduleCommitResult result = assignmentPlan.isPreScheduledExecution()
                     ? newSpecScheduleCommitService.commitResultOnly(context, activatedAction)
                     : newSpecScheduleCommitService.commit(context, assignmentPlan.getCandidate().getSku(), activatedAction);
+            // 提交快照已恢复后再保存诊断，避免资源恢复清掉原因或沿用更早一次试排失败。
+            if (result.isRolledBack() && StringUtils.isNotEmpty(result.getFailureReason())) {
+                assignmentPlan.getCandidate().setLastFailure(result.getFailureReason());
+            }
             if (!result.isRolledBack() && result.getScheduledCount() > 0) {
                 remarkScope.accept(context, firstRemarkResult);
             } else if (assignmentPlan.isFixedMachineExecution()) {

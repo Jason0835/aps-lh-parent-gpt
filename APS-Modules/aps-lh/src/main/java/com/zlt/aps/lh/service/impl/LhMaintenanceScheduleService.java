@@ -19,6 +19,7 @@ import com.zlt.aps.lh.engine.strategy.support.PreviousAlternatePlanReleaseEvent;
 import com.zlt.aps.lh.engine.strategy.support.EquipmentPlanOverlapResult;
 import com.zlt.aps.lh.engine.strategy.support.FirstInspectionAllocationPlan;
 import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
+import com.zlt.aps.lh.util.LhInventoryPlanMatcher;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.PriorityTraceLogHelper;
@@ -1663,15 +1664,13 @@ public class LhMaintenanceScheduleService {
                 LhScheduleTimeUtil.getCapsulePreheatMinutes(context));
         String physicalMachineCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode);
         if (!CollectionUtils.isEmpty(context.getDevicePlanShutList())) {
-            for (MdmDevicePlanShut planShut : context.getDevicePlanShutList()) {
+            for (MdmDevicePlanShut planShut : LhInventoryPlanMatcher.matchPhysicalStopPlans(
+                    context.getDevicePlanShutList(), physicalMachineCode)) {
                 // 05与精度允许并行，恢复点由公共容量时间轴取最大值；06已在加载时隔离。
-                if (Objects.isNull(planShut)
-                        || StringUtils.equals(MachineStopTypeEnum.PLANNED_REPAIR.getCode(),
+                if (StringUtils.equals(MachineStopTypeEnum.PLANNED_REPAIR.getCode(),
                                 planShut.getMachineStopType())
                         || Objects.isNull(planShut.getBeginDate())
-                        || Objects.isNull(planShut.getEndDate())
-                        || !StringUtils.equals(physicalMachineCode,
-                        LhSingleControlMachineUtil.resolvePhysicalMachineCode(planShut.getMachineCode()))) {
+                        || Objects.isNull(planShut.getEndDate())) {
                     continue;
                 }
                 if (isTimeRangeOverlap(maintenanceStartTime, occupationEndTime,

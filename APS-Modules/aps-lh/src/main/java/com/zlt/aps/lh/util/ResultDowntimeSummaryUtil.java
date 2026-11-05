@@ -26,6 +26,10 @@ public final class ResultDowntimeSummaryUtil {
     private static final String PRECISION_PLAN_ANALYSIS = "精度计划";
     /** 正规换模与精度计划重叠时写入班次分析的组合原因 */
     private static final String MOULD_CHANGE_PRECISION_PLAN_ANALYSIS = "换模+精度计划";
+    /**
+     * 正规换模与精度真实并行时的组合原因。
+     */
+    private static final String PRECISION_MOULD_CHANGE_ANALYSIS = "精度计划+换模";
     /** 喷砂与精度保养重叠时写入班次分析的固定原因 */
     private static final String SAND_BLAST_PRECISION_ANALYSIS = "喷砂清洗+精度";
     /** 喷砂与设备停机计划重叠时写入班次分析的固定原因 */
@@ -178,6 +182,7 @@ public final class ResultDowntimeSummaryUtil {
         for (int shiftIndex = 1; shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
             ShiftFieldUtil.removeShiftAnalysis(result, shiftIndex, PRECISION_PLAN_ANALYSIS);
             ShiftFieldUtil.removeShiftAnalysis(result, shiftIndex, MOULD_CHANGE_PRECISION_PLAN_ANALYSIS);
+            ShiftFieldUtil.removeShiftAnalysis(result, shiftIndex, PRECISION_MOULD_CHANGE_ANALYSIS);
         }
     }
 
@@ -300,15 +305,15 @@ public final class ResultDowntimeSummaryUtil {
      * @param result 最终排程结果
      * @param maintenanceWindowList 精度计划窗口
      * @param mouldChangeHours 现有正规换模时长
-     * @return 固定返回“精度计划”
+     * @return 正规换模真实重叠时返回组合原因，否则返回单独精度原因
      */
     public static String resolveMaintenanceAnalysis(
             LhScheduleResult result,
             List<MachineMaintenanceWindowDTO> maintenanceWindowList,
             int mouldChangeHours) {
-        // 新规则禁止换模、换活字块与精度窗口并行，因此精度所在班次的原因必须保持单一口径。
-        // 即使读取历史脏数据时检测到重叠，也不能继续输出已经废止的“换模+精度计划”语义。
-        return PRECISION_PLAN_ANALYSIS;
+        // 备注消费已提交的时间轴，不因历史计划存在就推断并行，也不修改生产或首检时刻。
+        return isMouldChangeMaintenanceOverlap(result, maintenanceWindowList, mouldChangeHours)
+                ? PRECISION_MOULD_CHANGE_ANALYSIS : PRECISION_PLAN_ANALYSIS;
     }
 
     /**

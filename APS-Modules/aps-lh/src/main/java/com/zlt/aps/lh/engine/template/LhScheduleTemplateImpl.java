@@ -2,7 +2,9 @@ package com.zlt.aps.lh.engine.template;
 
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.handler.ContinuousProductionHandler;
+import com.zlt.aps.lh.handler.DedicatedSupplyTransferHandler;
 import com.zlt.aps.lh.handler.StructureSwitchProductionHandler;
+import com.zlt.aps.lh.handler.StructureEndingContinuationHandler;
 import com.zlt.aps.lh.handler.DataInitHandler;
 import com.zlt.aps.lh.handler.DayPlanAdjustProductionHandler;
 import com.zlt.aps.lh.handler.NewProductionHandler;
@@ -54,10 +56,22 @@ public class LhScheduleTemplateImpl extends AbsLhScheduleTemplate {
     private NewProductionHandler newProductionHandler;
 
     /**
+     * 新增完成后的专供转产处理器。
+     */
+    @Resource
+    private DedicatedSupplyTransferHandler dedicatedSupplyTransferHandler;
+
+    /**
      * 续作和换活字块之后的独立结构切换步骤。
      */
     @Resource
     private StructureSwitchProductionHandler structureSwitchProductionHandler;
+
+    /**
+     * 结构切换完成后执行续作增机和原机回补。
+     */
+    @Resource
+    private StructureEndingContinuationHandler structureEndingContinuationHandler;
 
     @Resource
     private DayPlanAdjustProductionHandler dayPlanAdjustProductionHandler;
@@ -70,6 +84,16 @@ public class LhScheduleTemplateImpl extends AbsLhScheduleTemplate {
 
     @Resource
     private ResultValidationHandler resultValidationHandler;
+
+    /**
+     * 执行专供转产独立步骤。
+     *
+     * @param context 当前排程上下文
+     */
+    @Override
+    protected void doDedicatedSupplyTransfer(LhScheduleContext context) {
+        dedicatedSupplyTransferHandler.handle(context);
+    }
 
     @Override
     protected void doPreValidation(LhScheduleContext context) {
@@ -104,6 +128,16 @@ public class LhScheduleTemplateImpl extends AbsLhScheduleTemplate {
     @Override
     protected void doStructureSwitchProduction(LhScheduleContext context) {
         structureSwitchProductionHandler.handleIfApplicable(context);
+    }
+
+    /**
+     * 在结构切换与普通新增之间执行本轮接管的续作增机回补。
+     *
+     * @param context 实时排程上下文
+     */
+    @Override
+    protected void doStructureEndingContinuation(LhScheduleContext context) {
+        structureEndingContinuationHandler.handleIfApplicable(context);
     }
 
     @Override

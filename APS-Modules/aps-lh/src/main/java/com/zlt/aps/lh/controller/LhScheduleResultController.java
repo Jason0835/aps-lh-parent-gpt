@@ -33,7 +33,6 @@ import com.zlt.aps.lh.api.domain.vo.LhScheduleResultTemplateImportVO;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
 import com.zlt.aps.lh.api.domain.vo.ScheduleSummaryReportVO;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
-import com.zlt.aps.lh.api.enums.ReleaseStatusEnum;
 import com.zlt.aps.lh.component.ScheduleExecutionGuard;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.mapper.MdmMaterialInfoMapper;
@@ -388,6 +387,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
 
         ajaxResult.put(AjaxResult.DATA_TAG, changePlanResult.importErrorLogs);
         ajaxResult.put(AjaxResult.MSG_TAG, changePlanResult.message);
+        ajaxResult.put("mouldImportCode", lhMouldChangePlanAjaxResult.get(AjaxResult.CODE_TAG));
         return ajaxResult;
     }
 
@@ -824,13 +824,16 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     }
 
     /**
-     * 发布选中的排程结果到MES
-     * 发布流程：1.更新发布状态为"待发布" → 2.调用issueToMes下发MES → 3.根据MES反馈更新发布状态
+     * 发布排程结果到MES（全量发布，不区分勾选与发布状态）
+     * 发布流程：1.查询该排程日期+工厂下全部记录 → 2.调用issueToMes下发MES → 3.根据MES反馈更新发布状态
      * 业务规则：
      * 每条硫化排程结果自带8班数据，覆盖排程日期前2天到排程日期当天：
      * - T-2日（窗口首日）：更新夜早中3班
      * - T-1日（窗口次日）：更新夜早中3班
      * - T日（排程日期）：下发早中2班（夜班尚未排产）
+     * 全量发布说明：每次发布都是该排程日期下所有排程数据的完整快照，下发到MES中间表时携带新的
+     * DATA_VERSION版本号，同一业务键的历史版本保留仅供追溯，MES按最新版本号消费；
+     * 因此勾不勾选数据均不影响发布范围，与勾选的数据无关。
      */
     @Log(title = "ui.data.column.lh.scheduleResult.modelName", businessType = BusinessType.PUBLISH)
     @ApiOperation("发布排程")
@@ -840,25 +843,9 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.errorPublish"));
         }
 
-        List<LhScheduleResult> list = lhScheduleResultService.selectByDateAndFactory(
+        // 全量发布：查询该排程日期+工厂下全部排程结果，不区分发布状态（与勾选无关）
+        List<LhScheduleResult> filteredList = lhScheduleResultService.selectByDateAndFactory(
                 dto.getScheduleDate(), dto.getFactoryCode());
-
-        if (StringUtils.isNotEmpty(ids)) {
-            List<Long> idList = Arrays.stream(ids.split(","))
-                    .map(String::trim)
-                    .map(Long::parseLong)
-                    .collect(Collectors.toList());
-            list = list.stream()
-                    .filter(item -> idList.contains(item.getId()))
-                    .collect(Collectors.toList());
-        }
-
-        List<LhScheduleResult> filteredList = list.stream()
-                .filter(item -> ApsConstant.NO_RELEASE.equals(item.getIsRelease())
-                        || ApsConstant.FAILURE_RELEASE.equals(item.getIsRelease())
-                        || ReleaseStatusEnum.TIMEOUT_FAILED.getCode().equals(item.getIsRelease())
-                        || ReleaseStatusEnum.PENDING_RELEASE.getCode().equals(item.getIsRelease()))
-                .collect(Collectors.toList());
 
         if (CollectionUtils.isEmpty(filteredList)) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.errorPublish"));
@@ -896,12 +883,13 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
 
                 try {
                     long startTime = System.currentTimeMillis();
-                    log.info("第{}次尝试下发硫化排程结果到MES, selectedIds={}", retryCount + 1, selectedIds);
+                    log.info("第{}次尝试下发硫化排程结果到MES, 全量记录数={}", retryCount + 1, selectedIds.size());
                     issueResult = doIssueLhScheduleResultToMes(dto.getScheduleDate(), selectedIds);
                     long costTime = System.currentTimeMillis() - startTime;
 
                     if (issueResult != null && Objects.equals(HttpStatus.SUCCESS, issueResult.get(AjaxResult.CODE_TAG))) {
                         log.info("硫化排程发布成功, 耗时={}ms, 记录数={}", costTime, filteredList.size());
+                        // 发布成功：该日期下全部记录置为已发布
                         filteredList.forEach(item -> item.setIsRelease(ApsConstant.IS_RELEASE));
                         lhScheduleResultService.batchUpdateReleaseStatus(filteredList);
                         return AjaxResult.success(I18nUtil.getMessage("ui.data.column.scheduleResult.successPublish"));
@@ -923,8 +911,14 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         }
 
         log.error("硫化排程发布最终失败，已重试{}次", maxRetries);
-        filteredList.forEach(item -> item.setIsRelease(ApsConstant.FAILURE_RELEASE));
-        lhScheduleResultService.batchUpdateReleaseStatus(filteredList);
+        // 发布失败：仅将原本非已发布的记录置为发布失败，已发布记录保持原状态（旧版本数据仍有效）
+        List<LhScheduleResult> failedList = filteredList.stream()
+                .filter(item -> !ApsConstant.IS_RELEASE.equals(item.getIsRelease()))
+                .collect(Collectors.toList());
+        if (!failedList.isEmpty()) {
+            failedList.forEach(item -> item.setIsRelease(ApsConstant.FAILURE_RELEASE));
+            lhScheduleResultService.batchUpdateReleaseStatus(failedList);
+        }
         return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.failedPublish"));
     }
 
@@ -934,11 +928,11 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
      * 背景逻辑（排程日期=T+1日，排程窗口T、T+1、T+2）：
      * 1. 每条硫化排程结果自带8班数据，覆盖排程窗口T、T+1、T+2三天
      * 2. 8班对应关系（使用aps-cx-lh-api实体）：
-     * - 1-2班：T日的早、中班（窗口首日，更新）
-     * - 3-5班：T+1日的夜、早、中班（排程日期当天，更新）
-     * - 6-8班：T+2日的夜、早、中班（窗口第三日，下发）
+     * - 1-2班：T日的早、中班（窗口首日）
+     * - 3-5班：T+1日的夜、早、中班（排程日期当天）
+     * - 6-8班：T+2日的夜、早、中班（窗口第三日）
      * 3. 中间表映射：1班=夜班，2班=早班，3班=中班
-     * 4. T日、T+1日、T+2日数据均为更新（存在则更新，不存在则插入）
+     * 4. 全量下发该排程日期下全部记录（不区分发布状态），携带新DATA_VERSION版本号以版本化追加方式写入中间表
      *
      * @param scheduleDate 排程日期（T+1日）
      * @return 下发结果
@@ -962,13 +956,12 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     }
 
     /**
-     * 执行硫化排程结果下发到MES
-     * 支持两种模式：
-     * 1. 按选中ID下发：selectedIds不为空时，按ID查询选中记录下发
-     * 2. 按排程日期全量下发：selectedIds为空时，查询排程日期下所有未下发记录
+     * 执行硫化排程结果下发到MES（全量下发）
+     * selectedIds为该排程日期+工厂下全部记录的ID列表（全量发布，不区分勾选与发布状态）；
+     * selectedIds为空时（定时/自动触发场景），按排程日期查询该日期下全部记录
      *
      * @param scheduleDate 排程日期
-     * @param selectedIds  选中的记录ID列表，为空时按日期全量查询
+     * @param selectedIds  全量记录ID列表，为空时按日期查询全部记录
      * @return 下发结果
      */
     private AjaxResult doIssueLhScheduleResultToMes(Date scheduleDate, List<Long> selectedIds) {
@@ -985,10 +978,8 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         if (CollectionUtils.isNotEmpty(selectedIds)) {
             scheduleResultList = lhScheduleResultService.getCxLhScheduleResultListByIds(selectedIds);
         } else {
+            // 全量下发：查询排程日期下全部记录，不区分发布状态
             scheduleResultList = lhScheduleResultService.getCxLhScheduleResultList(java.sql.Date.valueOf(scheduleLocalDate));
-            scheduleResultList = scheduleResultList.stream()
-                    .filter(item -> !ApsConstant.IS_RELEASE.equals(item.getIsRelease()))
-                    .collect(Collectors.toList());
         }
 
         if (scheduleResultList.isEmpty()) {

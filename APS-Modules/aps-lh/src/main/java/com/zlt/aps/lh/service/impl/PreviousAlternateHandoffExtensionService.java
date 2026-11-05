@@ -1,5 +1,7 @@
 package com.zlt.aps.lh.service.impl;
 
+import com.zlt.aps.lh.engine.strategy.support.StructureEndingContinuationPolicy;
+
 import cn.hutool.core.bean.BeanUtil;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
@@ -61,7 +63,9 @@ public class PreviousAlternateHandoffExtensionService {
         Map<String, List<LhScheduleResult>> results = context.getScheduleResultList().stream()
                 .collect(Collectors.groupingBy(LhScheduleResult::getLhMachineCode));
         List<PreviousAlternatePlanReleaseEvent> events = context.getPreviousAlternateReleaseEventMap().values()
-                .stream().filter(event -> !Objects.equals(
+                .stream().filter(event -> StructureEndingContinuationPolicy.acceptsHistoricalPlan(context,
+                        event.getPlan()))
+                .filter(event -> !Objects.equals(
                         event.resolveBeforeMaterialCode(), event.getPlan().getAfterMaterialCode())
                         && !submitted.contains(event.getPlan().getId()))
                 .sorted(Comparator.comparing(PreviousAlternatePlanReleaseEvent::getPlannedShiftStartTime))
@@ -80,7 +84,11 @@ public class PreviousAlternateHandoffExtensionService {
             }
             boolean accepted = false;
             if (event.isRemainderFinishDeferred()) {
-                accepted = this.trySlots(context, event, event.getPlannedShiftStartTime(), release, attempt);
+                // 前料数量及释放已由余量错开/对调确定，后料失败只顺延，禁止再次截量或回流前料。
+                if (Objects.nonNull(event.getCompletedStrictEndingReleaseTime())) {
+                    accepted = this.trySlots(context, event, event.getOfflineTime(),
+                            (ignored, time) -> true, attempt);
+                }
             } else if (context.getScheduleWindowShifts().stream().anyMatch(shift ->
                     (shift.isMorningShift() || shift.isAfternoonShift())
                             && shift.getShiftEndDateTime().after(event.getOfflineTime())
@@ -149,6 +157,9 @@ public class PreviousAlternateHandoffExtensionService {
         Map<String, Integer> quantities = new HashMap<>();
         this.indexResults(context, lastByMachine, quantities);
         for (LhMouldChangePlan plan : plans) {
+            if (!StructureEndingContinuationPolicy.acceptsHistoricalPlan(context, plan)) {
+                continue;
+            }
             LhScheduleResult previous = lastByMachine.get(plan.getLhMachineCode());
             if (submitted.contains(plan.getId()) || !this.isCompletedFormalPredecessor(
                     context, plan, previous, quantities)) {

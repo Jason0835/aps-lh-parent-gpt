@@ -3,6 +3,15 @@
  */
 package com.zlt.aps.lh.engine.strategy.impl;
 
+import com.zlt.aps.lh.service.impl.LhInventoryOverlapResolver;
+import com.zlt.aps.lh.engine.strategy.support.StructureEndingContinuationPolicy;
+import com.zlt.aps.lh.engine.strategy.support.HistoricalBeforeRemainderPolicy;
+import com.zlt.aps.lh.engine.strategy.support.OffMachineDecision;
+import com.zlt.aps.lh.engine.strategy.support.ContinuationEndingQuantityReachability;
+import com.zlt.aps.lh.engine.strategy.support.StructureEndingContinuationState;
+import com.zlt.aps.lh.engine.strategy.support.StructureEndingResourceIndex;
+import com.zlt.aps.lh.service.impl.StructureEndingContinuationAdmissionService;
+
 import com.zlt.aps.lh.engine.strategy.support.SkuEndingDeferredExpansionPolicy;
 import com.zlt.aps.lh.engine.strategy.support.EndingDeferredExpansionDecision;
 import com.zlt.aps.lh.service.impl.LhRepairEndingDeferralPolicy;
@@ -216,6 +225,12 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
      */
     @Resource
     private LhRepairPlanScheduleService repairPlanScheduleService;
+
+    /**
+     * 截短原机前共用历史指定的无副作用资格判断。
+     */
+    @Resource
+    private StructureEndingContinuationAdmissionService structureEndingAdmissionService;
 
     private static final String CONTINUOUS_SCHEDULE_TYPE = "01";
     private static final String AUTO_DATA_SOURCE = "0";
@@ -565,8 +580,9 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         } else if (isSingleMachine && sku.isStrictNewSpecShortageOnly()) {
             appliedRule = "窗口无计划仅补本月欠产";
         } else if (isSingleMachine && getTargetScheduleQtyResolver().isFullCapacityMode(context)) {
-            // 单机台目标量与实际消费账本必须原子同步，避免跨月路由清零账本后生成的续作结果被再次裁成0。
-            this.getTargetScheduleQtyResolver().applyProductionTargetState(
+            // 单机窗口产能仅决定本机目标，不能压低同SKU历史承接及其他机台共享的真实余量预算。
+            // 下限入口同时恢复跨月清零账本，严格目标仍沿原控量规则处理。
+            this.getTargetScheduleQtyResolver().applyContinuationTargetFloor(
                     context, sku, windowCapacityQty, "续作单机台满排窗口目标");
             appliedRule = "单机台非收尾满排窗口";
         } else if (!isSingleMachine) {
@@ -978,6 +994,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     public void scheduleReduceMould(LhScheduleContext context) {
         log.info("续作排产 - 前置降模决策");
         context.getContinuationRemainderFinishGroups().clear();
+        context.getContinuationTimedReductionSkus().clear();
         context.getTimedMachineOffRequests().clear();
         context.getTimedMachineOffDecisionMap().clear();
         List<LhShiftConfigVO> shifts = LhScheduleTimeUtil.getScheduleShifts(context, context.getScheduleDate());
@@ -1005,15 +1022,31 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             skuResultMap.get(groupKey).add(result);
         }
 
+        // 必须在任何收尾分组改写目标或原机排量之前，按原需求和原机基线冻结资格。
+        this.freezeStructureEndingContinuations(context, shifts);
+        Set<String> structureEndingGroups = new HashSet<>();
         for (String groupKey : skuOrder) {
             SkuScheduleDTO sourceSku = sourceSkuMap.get(groupKey);
             List<LhScheduleResult> skuResults = skuResultMap.get(groupKey);
+            StructureEndingContinuationState structureEnding = StructureEndingContinuationPolicy
+                    .state(context, sourceSku);
+            if (structureEnding != null) {
+                String key = MonthPlanDateResolver.buildMaterialStatusKey(
+                        sourceSku.getMaterialCode(), sourceSku.getProductStatus());
+                if (structureEndingGroups.add(key)) {
+                    this.prepareStructureEndingContinuationGroup(context, structureEnding);
+                }
+                continue;
+            }
             // 依据冻结身份优先登记胎胚类型，零份额或本窗不足也不回退普通余量及月计划降模。
             if (this.getTargetScheduleQtyResolver().isSharedEmbryoStockEnding(context, sourceSku)) {
                 this.prepareEmbryoFinishGroup(context, sourceSku, skuResults);
                 continue;
             }
-            // 单机也属于新收尾规则；在旧单机缩减及多机分摊之前冻结身份。
+            // 初排整组可清量不代表按逐日机台节奏仍可清量，先冻结受约束的降模选择。
+            Map<LocalDate, ContinuationDayReduction> timedReductionPlan =
+                    this.resolveTimedReductionBeforeEnding(context, sourceSku, skuResults, shifts);
+            // 单机及受约束容量足够的组继续沿用原余量节点，已冻结时间下机的组不得重新进入。
             if (this.isContinuationRemainderFinish(context, sourceSku, skuResults)) {
                 this.prepareRemainderFinishGroup(context, sourceSku, skuResults, shifts);
                 continue;
@@ -1036,7 +1069,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             if (reduceEndingContinuationToSingleMachineWhenCovered(context, sourceSku, skuResults, shifts)) {
                 continue;
             }
-            reduceContinuationMachinesByWorkDate(context, sourceSku, skuResults, shifts);
+            this.reduceContinuationMachinesByWorkDate(context, sourceSku, skuResults, shifts, timedReductionPlan);
             capStrictEndingContinuationGroupToTarget(context, sourceSku, skuResults, shifts);
         }
         // 降模、补满等后置处理可能再次改变中班计划量，最终扣账前统一按续作日标准公式收敛。
@@ -1125,6 +1158,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         cleaningScheduleService.cancelUnreachedReplacements(context);
         retainMultiMachineEmbryoStock(context);
         syncMachineStateAfterContinuousAdjust(context);
+        // 冻结零份额且最终无生产的历史前料，按真实占用确认退出后再统一发布，避免被公共未完成状态锁空。
+        sharedEmbryoEndingScheduleService.confirmZeroQuotaHistoricalReleases(context);
         this.publishSharedEmbryoEndingMachineRelease(context);
         // 零量生产行已清理，但06:00释放事件必须继续交给历史复用。
         this.publishZeroQuantityRemainderReleases(context);
@@ -1168,7 +1203,9 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
      * @return 当前结果仍完整对应原节点方案时返回 true
      */
     private boolean canMatchRemainderFinishHistory(LhScheduleContext context, ContinuationRemainderFinishGroup group) {
-        if (CollectionUtils.isEmpty(group.getMachineProfiles()) || Objects.isNull(group.getOriginalMachineFinishPlan())
+        if (StructureEndingContinuationPolicy.state(context, group.getSourceSku()) != null
+                || CollectionUtils.isEmpty(group.getMachineProfiles()) || Objects.isNull(group
+                        .getOriginalMachineFinishPlan())
                 || group.getOriginalMachineFinishPlan().getRemainingQty() > 0) {
             return false;
         }
@@ -1185,12 +1222,12 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 以原节点方案生成完整匹配，隔离验证指定后料后再提交；资源不足保持原有分配。
+     * 以原节点方案生成完整匹配，隔离复核前料守恒及设备事实后提交；后料按最终释放正式承接。
      *
      * @param context 时间下机已完成的正式上下文
      * @param group 已计算数量及真实容量画像的组
      * @param shifts 真实窗口班次
-     * @param confirmedHistories 本轮已通过的其他组关系，后续候选不得挤掉它们的承接资源
+     * @param confirmedHistories 本轮已通过的其他组关系，仅用于前料匹配诊断
      */
     private void matchRemainderFinishHistoryGroup(LhScheduleContext context,
             ContinuationRemainderFinishGroup group, List<LhShiftConfigVO> shifts,
@@ -2965,7 +3002,9 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 识别单机或多物理机台硫化余量收尾，不扩大到胎胚硬目标、仅补欠产或同物料多状态专用链。
+     * 识别单机或多物理机台硫化余量收尾，优先遵循前置降模冻结身份。
+     * 不扩大到胎胚硬目标、仅补欠产或同物料多状态专用链。
+     *
      * @param context 排程上下文
      * @param sourceSku 来源SKU
      * @param results 同SKU续作结果
@@ -2973,7 +3012,11 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
      */
     private boolean isContinuationRemainderFinish(LhScheduleContext context, SkuScheduleDTO sourceSku,
                                                 List<LhScheduleResult> results) {
-        // 月计划已进入终末需求时，原机容量不足只影响本窗完成量，不能作为整组提前释放依据。
+        // 降模节奏下无法清量的来源身份在前置决策冻结，时间下机补量不得反向取消降模。
+        if (context.getContinuationTimedReductionSkus().contains(sourceSku)) {
+            return false;
+        }
+        // 月计划已进入终末需求时，无降模需求的原机仍保留原终末清量路径。
         boolean terminalDemand = Objects.nonNull(sourceSku) && sourceSku.getOriginalWindowPlanQty() > 0
                 && Objects.nonNull(context.getWindowEndDate())
                 && Objects.isNull(EarlyProductionChecker.resolveFirstFutureOriginalPlanDate(
@@ -2985,6 +3028,664 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 && !this.hasSurplusEndingStatusSwitchDemand(context, sourceSku)
                 && results.stream().noneMatch(result ->
                 this.getTargetScheduleQtyResolver().isEmbryoStockEnding(context, result));
+    }
+
+    /**
+     * 在旧收尾及降模改变数量前，按转产优先及前结构正式窗口证据冻结原机、真实需求和既有增机资格。
+     *
+     * @param context 尚未执行本规则限量的上下文
+     * @param shifts 本轮正式班次
+     */
+    private void freezeStructureEndingContinuations(LhScheduleContext context, List<LhShiftConfigVO> shifts) {
+        Map<String, List<LhScheduleResult>> groups = context.getScheduleResultList().stream()
+                .filter(this::isPureContinuousResult)
+                .filter(result -> !LhSingleControlMachineUtil.isVirtualMachineCode(result.getLhMachineCode()))
+                .collect(Collectors.groupingBy(result -> MonthPlanDateResolver.buildMaterialStatusKey(
+                        result.getMaterialCode(), result.getProductStatus()), LinkedHashMap::new, Collectors.toList()));
+        Map<String, LhShiftConfigVO> endingShifts = new HashMap<>();
+        for (Map.Entry<String, List<LhScheduleResult>> entry : groups.entrySet()) {
+            if (context.getStructureEndingContinuationStates().containsKey(entry.getKey())) {
+                continue;
+            }
+            SkuScheduleDTO source = this.resolveResultSourceSku(context, entry.getValue().get(0));
+            if (source == null || this.hasSurplusEndingStatusSwitchDemand(context, source)) {
+                continue;
+            }
+            Date ending = StructureEndingContinuationPolicy.resolveEndingTime(context, source.getStructureName());
+            if (!endingShifts.containsKey(source.getStructureName())) {
+                endingShifts.put(source.getStructureName(), StructureEndingContinuationPolicy
+                        .resolveEndingShift(context, ending));
+            }
+            LhShiftConfigVO endingShift = endingShifts.get(source.getStructureName());
+            if (endingShift == null || this.getTargetScheduleQtyResolver()
+                    .previewProductionRemainingQty(context, source) <= 0) {
+                continue;
+            }
+            StructureEndingContinuationState state = new StructureEndingContinuationState();
+            state.setSourceSku(source);
+            state.setEndingTime(ending);
+            state.setFirstDeadline(StructureEndingContinuationPolicy.firstDeadline(endingShift));
+            state.setFinalDeadline(LhScheduleTimeUtil.addDays(state.getFirstDeadline(), 1));
+            List<LhScheduleResult> originals = new ArrayList<>(entry.getValue());
+            originals.sort(this.buildContinuationReduceRemoveComparator(context, source));
+            state.setOriginalResults(originals);
+            state.setOriginalRemainderEnding(this.isContinuationRemainderFinish(context, source, originals));
+            state.setOriginalPhysicalMachines(originals.stream().map(result ->
+                    LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode()))
+                    .collect(Collectors.toCollection(LinkedHashSet::new)));
+            state.setOriginalMachineCount(state.getOriginalPhysicalMachines().size());
+            // 普通目标及首次增机日仍读原dayN和原机集合，不用截短之后的释放数量重算资格。
+            LocalDate firstDate = this.resolveContinuationAddMachineProductionDate(context, source);
+            int required = this.resolveContinuationDayMinimumMachineCount(context, source, firstDate, originals);
+            EndingDeferredExpansionDecision deferred = SkuEndingDeferredExpansionPolicy.evaluate(context, source);
+            int originalPlanned = originals.stream().mapToInt(ShiftFieldUtil::resolveScheduledQty).sum();
+            int originalBudget = this.shouldUseActualSurplusForDayNCompensation(source)
+                    ? source.getSurplusQty() : this.getTargetScheduleQtyResolver()
+                            .previewProductionRemainingQty(context, source);
+            if (originalBudget > originalPlanned) {
+                if (deferred.isApplicable()) {
+                    if (deferred.needsExpansion()) {
+                        state.setDeferredExpansion(true);
+                        state.setFirstExpansionDate(this.resolveShiftWorkDate(shifts.get(0)));
+                        state.setOrdinaryAdditionalMachines(1);
+                    }
+                } else if (firstDate != null && required > state.getOriginalMachineCount()) {
+                    state.setFirstExpansionDate(firstDate);
+                    state.setOrdinaryAdditionalMachines(required - state.getOriginalMachineCount());
+                    shifts.stream().map(this::resolveShiftWorkDate).filter(Objects::nonNull).distinct()
+                            .filter(date -> !date.isBefore(firstDate)).forEach(date ->
+                            state.getOrdinaryAdditionalByDate().put(date, Math.max(0,
+                                    this.resolveContinuationDayMinimumMachineCount(context, source, date, originals)
+                                            - state.getOriginalMachineCount())));
+                    state.setOrdinaryAdditionalMachines(Math.max(state.getOrdinaryAdditionalMachines(),
+                            state.getOrdinaryAdditionalByDate().values().stream().mapToInt(Integer::intValue)
+                                    .max().orElse(0)));
+                }
+            }
+            structureEndingAdmissionService.freezeHistoricalEligibility(context, state);
+            if (state.getOrdinaryAdditionalMachines() <= 0 && state.getHistoricalPlanIds().isEmpty()) {
+                continue;
+            }
+            state.setOriginalSeeds(originals.stream().map(result -> BeanUtil.copyProperties(result,
+                    LhScheduleResult.class))
+                    .collect(Collectors.toList()));
+            context.getStructureEndingContinuationStates().put(entry.getKey(), state);
+            String detail = String.format("工厂=%s，日期=%s，批次=%s，物料=%s，状态=%s，结构=%s，前结构=%s，ENDING_TIME=%s，"
+                            + "第一截止=%s，最终截止=%s，原机=%s，原排量=%s，原预算=%s，普通增机数=%s，生效日=%s，历史计划=%s",
+                    context.getFactoryCode(), context.getScheduleDate(), context.getBatchNo(), source.getMaterialCode(),
+                    source.getProductStatus(), source.getStructureName(),
+                    context.getStructureContinuationPreviousStructureMap().get(source.getStructureName()),
+                    ending, state.getFirstDeadline(),
+                    state.getFinalDeadline(), state.getOriginalPhysicalMachines(), originalPlanned, originalBudget,
+                    state.getOrdinaryAdditionalMachines(), state.getFirstExpansionDate(), state.getHistoricalPlanIds());
+            PriorityTraceLogHelper.appendProcessLog(context, "结构收尾续作资格冻结", detail);
+            log.info("结构收尾续作资格冻结, {}", detail);
+        }
+        StructureEndingContinuationPolicy.rebuildHistoricalIndex(context);
+    }
+
+    /**
+     * 登记新规则的原机组，胎胚保留冻结份额，普通增机沿原真实余量口径准备同一账本。
+     *
+     * @param context 原机限量前的正式上下文
+     * @param state 已确认增机资格及原机身份
+     */
+    private void prepareStructureEndingContinuationGroup(LhScheduleContext context,
+            StructureEndingContinuationState state) {
+        SkuScheduleDTO source = state.getSourceSku();
+        if (this.getTargetScheduleQtyResolver().isSharedEmbryoStockEnding(context, source)) {
+            this.prepareEmbryoFinishGroup(context, source, state.getOriginalResults());
+            return;
+        }
+        List<LhShiftConfigVO> shifts = context.getScheduleWindowShifts();
+        if (state.isOriginalRemainderEnding()) {
+            // 保留原余量收尾的合法归整目标与副本身份，只替换之后的错班分量算法。
+            this.prepareRemainderFinishGroup(context, source, state.getOriginalResults(), shifts);
+            return;
+        }
+        if (state.getOriginalResults().size() > 1
+                && !state.isOriginalRemainderEnding()) {
+            // 本规则只替换余量错班，原dayN降模选机和时间下机请求仍在原数量基线下产生。
+            this.applyMultiMachineEndingTargetRule(context, source, state.getOriginalResults());
+            this.raiseMultiMachineContinuationTargetFloor(context, source, state.getOriginalResults(), shifts);
+            if (!this.reduceEndingContinuationToSingleMachineWhenCovered(context, source, state
+                    .getOriginalResults(), shifts)) {
+                this.reduceContinuationMachinesByWorkDate(context, source, state.getOriginalResults(), shifts);
+            }
+            state.getOriginalResults().forEach(result -> {
+                Integer boundary = context.getContinuousReducedMachineReleaseBoundaryShiftIndex(result
+                        .getLhMachineCode());
+                if (boundary != null) {
+                    state.getOriginalReleaseShiftBounds().put(result.getLhMachineCode(), boundary);
+                }
+            });
+        }
+        if (this.shouldUseActualSurplusForDayNCompensation(source)) {
+            this.getTargetScheduleQtyResolver().applyProductionTargetState(
+                    context, source, source.getSurplusQty(), "结构收尾续作沿用既有增机真实需求");
+        }
+        ContinuationRemainderFinishGroup group = new ContinuationRemainderFinishGroup();
+        group.setSourceSku(source);
+        group.setOriginalResults(new ArrayList<>(state.getOriginalResults()));
+        group.setParticipatingResults(new ArrayList<>(state.getOriginalResults()));
+        group.setStopHoldResults(Collections.emptyList());
+        context.getContinuationRemainderFinishGroups().add(group);
+        // 在日标准、均衡及原错班之前建立保护；后续统一计算真实产能并扣账。
+        context.getContinuationSurplusEndingAllocatedResults().addAll(state.getOriginalResults());
+    }
+
+    /**
+     * 由晚下机原机优先承接合法数量，第一步不执行旧余量节点错班。
+     *
+     * @param profiles 按原下机优先级排列且已受硬截止约束的真实容量
+     * @param budget 本SKU合法预算
+     * @param deadline 本阶段生产上限
+     * @return 与原机顺序一致的独立数量和释放事实
+     */
+    private ContinuationFinishScheduleResult allocateStructureEndingOriginals(
+            List<ContinuationEndingMachineProfile> profiles, int budget, Date deadline) {
+        int[] quantities = this.allocateStructureEndingQuantities(profiles, budget);
+        int remaining = budget - java.util.Arrays.stream(quantities).sum();
+        List<ContinuationMachineFinishPlan> plans = new ArrayList<>(profiles.size());
+        for (int position = 0; position < profiles.size(); position++) {
+            ContinuationEndingMachineProfile profile = profiles.get(position);
+            int quantity = quantities[position];
+            ContinuationMachineFinishPlan plan = new ContinuationMachineFinishPlan();
+            plan.setPlanQty(quantity);
+            plan.setFinishShiftIndex(quantity > 0 ? profile.productionEndingShift(quantity) : null);
+            plan.setFinishTime(quantity > 0 ? profile.completionTime(quantity) : null);
+            plan.setOfflineTime(profile.switchReadyTime(quantity));
+            plan.setFinishDeadline(deadline);
+            plan.setFinishRule("结构收尾续作阶段限量");
+            plan.setFinishState(remaining == 0 ? ContinuationMachineFinishPlan.FinishState.SURPLUS_COMPLETED
+                    : ContinuationMachineFinishPlan.FinishState.FORCED_RELEASE);
+            plans.add(plan);
+        }
+        ContinuationFinishScheduleResult result = new ContinuationFinishScheduleResult();
+        result.setMachinePlans(plans);
+        result.setRemainingQty(remaining);
+        result.setDiagnostic("原下机优先级反向承接，真实容量和数量单位约束，不执行旧错班");
+        return result;
+    }
+
+    /**
+     * 复用精确可达性求最大合法总量，优先下机原机取最小可行份额，避免异质模数留下可排尾量。
+     *
+     * @param profiles 按下机优先级从高到低排列的真实时间轴
+     * @param budget 本次未消费预算
+     * @return 与时间轴一致的分量向量
+     * @throws IllegalStateException 原有精确搜索未完成时抛出，不能把未完成伪装成无产能
+     */
+    private int[] allocateStructureEndingQuantities(List<ContinuationEndingMachineProfile> profiles, int budget) {
+        if (profiles.isEmpty()) {
+            return new int[0];
+        }
+        int[][] capacities = profiles.stream().map(ContinuationEndingMachineProfile::getCapacities)
+                .toArray(int[][]::new);
+        int[] multiples = profiles.stream().mapToInt(ContinuationEndingMachineProfile::getMultiple).toArray();
+        int[] maximum = profiles.stream().mapToInt(profile -> profile.floorQuantity(Math.max(0, budget))).toArray();
+        ContinuationEndingQuantityReachability reachability = new
+                ContinuationEndingQuantityReachability(capacities, multiples);
+        int[] allocated = reachability.allocate(Math.max(0, budget), new int[profiles.size()], maximum,
+                new int[profiles.size()]);
+        if (allocated == null) {
+            throw new IllegalStateException("结构收尾续作数量分配未完成：" + reachability.getDiagnostic());
+        }
+        return allocated;
+    }
+
+    /**
+     * 已接管需求仅生成一份共享账本补偿副本，保留冻结增机台数及日期供独立步骤使用。
+     *
+     * @param context 第一步正式扣账后的上下文
+     * @param source 原续作需求
+     */
+    private void appendStructureEndingCompensation(LhScheduleContext context, SkuScheduleDTO source) {
+        StructureEndingContinuationState state = StructureEndingContinuationPolicy.state(context, source);
+        if (this.hasContinuousCompensationSku(context, source)) {
+            return;
+        }
+        int remaining = this.getTargetScheduleQtyResolver().previewProductionRemainingQty(context, source);
+        if (remaining <= 0) {
+            return;
+        }
+        LocalDate firstDate = state.getFirstExpansionDate();
+        SkuScheduleDTO candidate = this.copyContinuousCompensationSku(context, source, remaining,
+                state.getOrdinaryAdditionalMachines(), firstDate, state.getOriginalMachineCount(),
+                state.getOriginalMachineCount() + state.getOrdinaryAdditionalMachines(),
+                state.getOrdinaryAdditionalMachines(),
+                this.resolveContinuationDayPlanQtyByDate(context, source, firstDate), null);
+        if (state.getLegalTargetQty() != null) {
+            candidate.setTargetScheduleQty(state.getLegalTargetQty());
+        }
+        candidate.setEndingDeferredExpansion(state.isDeferredExpansion());
+        context.getNewSpecSkuList().add(candidate);
+    }
+
+    /**
+     * 复核全部冻结原机后统一计算后缀分量，原前缀不参与重排，调用方用完整快照原子提交。
+     *
+     * @param context 全部新增尝试结束后的实时上下文
+     * @param skuKey 冻结物料状态键
+     * @return 实际回补增量；没有合法后缀或提交未通过时为零
+     */
+    public int appendStructureEndingOriginalMachines(LhScheduleContext context, String skuKey) {
+        StructureEndingContinuationState state = context.getStructureEndingContinuationStates().get(skuKey);
+        if (state == null || state.isCompleted()) {
+            return 0;
+        }
+        boolean whole = LhSingleControlMachineUtil.isWholeMachineGranularitySku(context, state.getSourceSku());
+        Map<String, List<LhScheduleResult>> originals = state.getOriginalResults().stream().collect(Collectors
+                .groupingBy(
+                result -> whole ? LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode())
+                        : result.getLhMachineCode(), LinkedHashMap::new, Collectors.toList()));
+        StructureEndingResourceIndex resources = new StructureEndingResourceIndex(context);
+        Map<String, LhScheduleResult> frozenSeeds = state.getOriginalSeeds().stream().collect(Collectors.toMap(
+                LhScheduleResult::getLhMachineCode, seed -> seed, (first, duplicate) -> first, LinkedHashMap::new));
+        List<StructureEndingBackfillUnit> units = new ArrayList<>();
+        for (List<LhScheduleResult> sides : originals.values()) {
+            StructureEndingBackfillUnit unit = this.buildStructureEndingBackfillUnit(context, state, sides,
+                    frozenSeeds, resources);
+            if (unit != null) {
+                units.add(unit);
+            }
+        }
+        // 前两步均已正式扣账，不能再把新增结果当作“未消费固定量”重复扣除胎胚预算。
+        int budget = this.getTargetScheduleQtyResolver().previewEffectiveProductionRemainingQty(context, state
+                .getSourceSku());
+        List<ContinuationEndingMachineProfile> profiles = units.stream().map(unit -> unit.profile)
+                .collect(Collectors.toList());
+        int[] quantities = this.allocateStructureEndingQuantities(profiles, budget);
+        int total = java.util.Arrays.stream(quantities).sum();
+        // 已排前缀是不可改变的常数；后缀按相同下机顺序最小化高优先级原机份额。
+        // 精确可达性同时考虑所有原机模数，避免逐机贪心留下本可由其他原机承接的尾量。
+        for (int position = units.size() - 1; position >= 0; position--) {
+            if (quantities[position] > 0 && !this.commitStructureEndingBackfillUnit(
+                    context, state, units.get(position), quantities[position])) {
+                return 0;
+            }
+        }
+        this.refreshStructureEndingContinuationFacts(context, skuKey);
+        context.rebuildScheduledMachineCountMaps(context.getScheduleWindowShifts());
+        context.setMouldResourceContext(null);
+        PriorityTraceLogHelper.appendProcessLog(context, "结构收尾原机增量回补",
+                String.format("工厂=%s，日期=%s，批次=%s，物料=%s，状态=%s，可回补原机=%s，"
+                                + "追加起点=%s，截止=%s，增量=%s，累计=%s，剩余=%s",
+                        context.getFactoryCode(), context.getScheduleDate(), context.getBatchNo(),
+                        state.getSourceSku().getMaterialCode(), state.getSourceSku().getProductStatus(),
+                        units.stream().map(unit -> this.joinMachineCodes(unit.originals)).collect(Collectors.toList()),
+                        units.stream().map(unit -> unit.start).collect(Collectors.toList()), state.getFinalDeadline(),
+                        java.util.Arrays.toString(quantities), state.getOriginalCommittedQuantities(),
+                        this.getTargetScheduleQtyResolver().previewProductionRemainingQty(context, state
+                                .getSourceSku())));
+        return total;
+    }
+
+    /**
+     * 用冻结模具和节拍构造原机后缀产能，只忽略第一步技术释放投影。
+     *
+     * @param context 当前真实资源和前缀
+     * @param state 原机与截止身份
+     * @param originals 同一单控生产单位的原结果
+     * @param frozenSeeds 按运行机台预建的只读原始产能索引
+     * @param resources 本组统一资源版本索引
+     * @return 合法后缀单元；不能承接时为空
+     */
+    private StructureEndingBackfillUnit buildStructureEndingBackfillUnit(LhScheduleContext context,
+            StructureEndingContinuationState state, List<LhScheduleResult> originals,
+            Map<String, LhScheduleResult> frozenSeeds, StructureEndingResourceIndex resources) {
+        List<LhShiftConfigVO> shifts = context.getScheduleWindowShifts();
+        boolean paired = LhSingleControlMachineUtil.isConfiguredSingleControlMachine(context,
+                originals.get(0).getLhMachineCode())
+                && LhSingleControlMachineUtil.isWholeMachineGranularitySku(context, state.getSourceSku());
+        if ((paired && originals.size() != 2)
+                || originals.stream().map(LhScheduleResult::getLhMachineCode).distinct().count() != originals.size()) {
+            return null;
+        }
+        Map<String, Date> cutoffs = new LinkedHashMap<>();
+        List<LhScheduleResult> seeds = new ArrayList<>(originals.size());
+        Date unitStart = shifts.get(0).getShiftStartDateTime();
+        for (LhScheduleResult original : originals) {
+            LhScheduleResult frozen = frozenSeeds.get(original.getLhMachineCode());
+            if (frozen == null) {
+                return null;
+            }
+            Date start = resources.isLive(original)
+                    ? this.resolveLastPositiveProductionEndTime(original) : null;
+            Date originalStart = capacitySupport.resolveRedistributeStartTime(frozen, shifts);
+            if (start == null || start.before(originalStart)) {
+                start = originalStart;
+            }
+            unitStart = start.after(unitStart) ? start : unitStart;
+            Date cutoff = this.resolveStructureEndingBackfillCutoff(context, state, original, originals, resources);
+            if (cutoff == null) {
+                return null;
+            }
+            cutoffs.put(original.getLhMachineCode(), cutoff);
+            seeds.add(BeanUtil.copyProperties(frozen, LhScheduleResult.class));
+        }
+        final Date start = unitStart;
+        if (!start.before(state.getFinalDeadline()) || cutoffs.values().stream().anyMatch(cutoff -> !start
+                .before(cutoff))) {
+            return null;
+        }
+        List<LhScheduleResult> fullSeeds = seeds.stream()
+                .map(seed -> BeanUtil.copyProperties(seed, LhScheduleResult.class)).collect(Collectors.toList());
+        for (LhScheduleResult seed : seeds) {
+            this.clearShiftPlanQty(seed, shifts);
+            // 产能内核读取首个开始字段作为真实起点；零量种子不进入正式结果或消费账本。
+            ShiftFieldUtil.setShiftPlanQty(seed, shifts.get(0).getShiftIndex(), 0, start, null);
+        }
+        ContinuationEndingMachineProfile profile = capacitySupport.buildMachineProfile(context, seeds, shifts,
+                cutoffs, Collections.emptySet(), true, null, true);
+        ContinuationEndingMachineProfile fullProfile = capacitySupport.buildMachineProfile(context, fullSeeds, shifts,
+                cutoffs, Collections.emptySet(), true, null, true);
+        if (profile == null || fullProfile == null) {
+            return null;
+        }
+        // 后缀不能重新领取一份日标准班产，累计班次量仍以原起点的完整产能为上限。
+        for (int position = 0; position < shifts.size(); position++) {
+            final int shiftIndex = shifts.get(position).getShiftIndex();
+            int prefix = originals.stream().filter(resources::isLive).mapToInt(original -> this
+                    .resolveShiftPlanQty(original, shiftIndex)).sum();
+            int available = Math.max(0, fullProfile.getCapacities()[position] - prefix);
+            profile.getCapacities()[position] = Math.min(profile.getCapacities()[position],
+                    available / profile.getMultiple() * profile.getMultiple());
+        }
+        for (LhScheduleResult original : originals) {
+            Date occupied = this.resolveStructureEndingNextOccupation(context, original, originals, resources);
+            if (occupied != null) {
+                profile.restrictToReleaseDeadline(occupied);
+            }
+        }
+        return new StructureEndingBackfillUnit(originals, seeds, profile, start);
+    }
+
+    /**
+     * 逐侧只消费新增量，并把新增凭证并入原结果；失败由整组快照恢复。
+     *
+     * @param context 原子提交内的上下文
+     * @param state 冻结需求
+     * @param unit 已复核的后缀单元
+     * @param quantity 该物理生产单位的合法新增量
+     * @return 实际消费和计划量严格一致时为真
+     */
+    private boolean commitStructureEndingBackfillUnit(LhScheduleContext context,
+            StructureEndingContinuationState state, StructureEndingBackfillUnit unit, int quantity) {
+        List<LhShiftConfigVO> shifts = context.getScheduleWindowShifts();
+        List<LhScheduleResult> originals = unit.originals;
+        List<LhScheduleResult> seeds = unit.seeds;
+        ContinuationEndingMachineProfile profile = unit.profile;
+        profile.writePlan(seeds, quantity);
+        int sideQuantity = quantity / originals.size();
+        for (int side = 0; side < originals.size(); side++) {
+            LhScheduleResult original = originals.get(side);
+            LhScheduleResult delta = seeds.get(side);
+            SkuScheduleDTO source = this.resolveResultSourceSku(context, original);
+            if (source == null) {
+                source = state.getSourceSku();
+            }
+            ContinuousProductionConsumption.Before before = ContinuousProductionConsumption.captureBefore(source,
+                    this.getTargetScheduleQtyResolver().previewProductionRemainingQty(context, source));
+            context.getContinuationSurplusEndingAllocatedResults().add(delta);
+            context.getScheduleResultSourceSkuMap().put(delta, source);
+            try {
+                this.consumeContinuousBlockToDailyQuota(context, source, delta, shifts);
+            } finally {
+                context.getContinuationSurplusEndingAllocatedResults().remove(delta);
+                context.getScheduleResultSourceSkuMap().remove(delta);
+            }
+            ContinuousProductionConsumption added = before.complete(source,
+                    this.getTargetScheduleQtyResolver().previewProductionRemainingQty(context, source));
+            if (ShiftFieldUtil.resolveScheduledQty(delta) != sideQuantity || added.getProductionQty() != sideQuantity) {
+                return false;
+            }
+            this.mergeStructureEndingDelta(context, state, original, delta, source, added);
+        }
+        return true;
+    }
+
+    /**
+     * 一次原机后缀试算的局部输入，只有整个分量方案验证后才提交。
+     */
+    private static final class StructureEndingBackfillUnit {
+        /**
+         * 不可重排的原结果身份。
+         */
+        private final List<LhScheduleResult> originals;
+        /**
+         * 只写入本次新增量的临时结果。
+         */
+        private final List<LhScheduleResult> seeds;
+        /**
+         * 已核对设备、机台及模具的后缀容量。
+         */
+        private final ContinuationEndingMachineProfile profile;
+        /**
+         * 不早于原已排前缀结束的起点。
+         */
+        private final Date start;
+
+        /**
+         * 保存同一次资源复核的局部计算输入。
+         *
+         * @param originals 原结果
+         * @param seeds 增量副本
+         * @param profile 后缀容量
+         * @param start 后缀起点
+         */
+        private StructureEndingBackfillUnit(List<LhScheduleResult> originals, List<LhScheduleResult> seeds,
+                ContinuationEndingMachineProfile profile, Date start) {
+            this.originals = originals;
+            this.seeds = seeds;
+            this.profile = profile;
+            this.start = start;
+        }
+    }
+
+    /**
+     * 解析原机回补的硬生产截止，零量清理或阶段一释放投影不作为业务退出依据。
+     *
+     * @param context 当前结果、设备及时间下机决定
+     * @param state 原机身份与最终生产上限
+     * @param original 待回补的原侧结果
+     * @param own 当前生产单位的原结果
+     * @param resources 本次资源索引
+     * @return 最早硬截止；资源身份无法证明仍合法时为空
+     */
+    private Date resolveStructureEndingBackfillCutoff(LhScheduleContext context,
+            StructureEndingContinuationState state, LhScheduleResult original, List<LhScheduleResult> own,
+            StructureEndingResourceIndex resources) {
+        String code = original.getLhMachineCode();
+        MachineScheduleDTO machine = context.getMachineScheduleMap().get(code);
+        if (machine == null || context.isContinuousStopHoldMachine(code)) {
+            return null;
+        }
+        Date occupied = this.resolveStructureEndingNextOccupation(context, original, own, resources);
+        if (StringUtils.isNotBlank(machine.getCurrentMaterialCode())
+                && !StringUtils.equals(original.getMaterialCode(), machine.getCurrentMaterialCode()) &&
+                        occupied == null) {
+            return null;
+        }
+        Date cutoff = capacitySupport.earlier(state.getFinalDeadline(), occupied);
+        cutoff = capacitySupport.earlier(cutoff, this.getMaintenanceScheduleService()
+                .resolveForceDownCutoffTime(machine));
+        OffMachineDecision timed = context.getTimedMachineOffDecisionMap().get(original);
+        if (timed != null) {
+            cutoff = capacitySupport.earlier(cutoff, timed.getOccupancyEndTime());
+        } else if (state.getOriginalReleaseShiftBounds().containsKey(code)) {
+            int boundary = state.getOriginalReleaseShiftBounds().get(code);
+            Date release = context.getScheduleWindowShifts().stream()
+                    .filter(shift -> shift.getShiftIndex() == boundary).map(LhShiftConfigVO::getShiftEndDateTime)
+                    .findFirst().orElse(context.getScheduleWindowShifts().get(0).getShiftStartDateTime());
+            cutoff = capacitySupport.earlier(cutoff, release);
+        }
+        MachineCleaningWindowDTO sandBlast = context.getOnlySandBlastContinuationReleaseWindowMap().get(code);
+        if (sandBlast != null) {
+            cutoff = capacitySupport.earlier(cutoff, sandBlast.getCleanStartTime());
+        }
+        ContinuationTemporaryFaultTransferEvent fault = context
+                .getContinuationTemporaryFaultTransferEventMap().get(code);
+        if (fault != null) {
+            cutoff = capacitySupport.earlier(cutoff, fault.getFaultStartTime());
+        }
+        PreviousAlternatePlanReleaseEvent event = context.getPreviousAlternateReleaseEventMap().get(code);
+        if (event != null) {
+            if (event.isFixedHistoricalCutover()) {
+                cutoff = capacitySupport.earlier(cutoff, event.getPlannedShiftStartTime());
+            }
+            cutoff = capacitySupport.earlier(cutoff, event.getForcedHandoffReleaseTime());
+        }
+        return cutoff;
+    }
+
+    /**
+     * 使用本次资源索引查询同机或同模具的最早其他占用，保持原单控粒度。
+     *
+     * @param context 原机SKU的冻结模式
+     * @param original 原结果
+     * @param own 允许追加的原生产单位
+     * @param resources 当前结果及分配的只读索引
+     * @return 最早正式后续占用；没有相关占用时为空
+     */
+    private Date resolveStructureEndingNextOccupation(LhScheduleContext context,
+            LhScheduleResult original, List<LhScheduleResult> own, StructureEndingResourceIndex resources) {
+        StructureEndingContinuationState state = context.getStructureEndingContinuationStates().get(
+                MonthPlanDateResolver.buildMaterialStatusKey(original.getMaterialCode(), original.getProductStatus()));
+        boolean whole = state != null && LhSingleControlMachineUtil.isWholeMachineGranularitySku(context,
+                state.getSourceSku());
+        return resources.nextOccupation(original, own, whole);
+    }
+
+    /**
+     * 合并已经单独扣账的后缀，保留原前缀字段、来源身份及原消费凭证。
+     *
+     * @param context 原子提交中的上下文
+     * @param state 冻结原机状态
+     * @param original 原结果，可能此前因零量清理移出列表
+     * @param delta 本次已扣账后缀
+     * @param source 与原账本绑定的来源
+     * @param consumption 本次实际消费凭证
+     */
+    private void mergeStructureEndingDelta(LhScheduleContext context, StructureEndingContinuationState state,
+            LhScheduleResult original, LhScheduleResult delta, SkuScheduleDTO source,
+            ContinuousProductionConsumption consumption) {
+        for (LhShiftConfigVO shift : context.getScheduleWindowShifts()) {
+            int index = shift.getShiftIndex();
+            Integer increment = ShiftFieldUtil.getShiftPlanQty(delta, index);
+            if (increment == null || increment <= 0) {
+                continue;
+            }
+            Integer previous = ShiftFieldUtil.getShiftPlanQty(original, index);
+            int prefix = previous == null ? 0 : previous;
+            Date start = prefix > 0 ? ShiftFieldUtil.getShiftStartTime(original, index)
+                    : ShiftFieldUtil.getShiftStartTime(delta, index);
+            ShiftFieldUtil.setShiftPlanQty(original, index, Math.addExact(prefix, increment),
+                    start, ShiftFieldUtil.getShiftEndTime(delta, index));
+        }
+        context.getContinuousProductionConsumptionMap().merge(original, consumption,
+                ContinuousProductionConsumption::append);
+        context.getContinuationSurplusEndingAllocatedResults().add(original);
+        context.getScheduleResultSourceSkuMap().put(original, source);
+        if (context.getScheduleResultList().stream().noneMatch(result -> result == original)) {
+            context.getScheduleResultList().add(original);
+        }
+        List<LhScheduleResult> assignments = new ArrayList<>(context.getMachineAssignmentMap()
+                .getOrDefault(original.getLhMachineCode(), Collections.emptyList()));
+        if (assignments.stream().noneMatch(result -> result == original)) {
+            assignments.add(original);
+            context.getMachineAssignmentMap().put(original.getLhMachineCode(), assignments);
+        }
+        this.refreshResultSummary(context, original, context.getScheduleWindowShifts());
+        context.registerContinuousReducedMachineReleaseBoundary(original.getLhMachineCode(),
+                this.resolveLastPlannedShiftIndex(original));
+        state.getOriginalCommittedQuantities().merge(
+                LhSingleControlMachineUtil.resolvePhysicalMachineCode(original.getLhMachineCode()),
+                consumption.getProductionQty(), Integer::sum);
+    }
+
+    /**
+     * 以累计实排量更新原机快照与最终缺口，技术释放不推导SKU已经完成。
+     *
+     * @param context 已提交增机或原机后缀的上下文
+     * @param skuKey 冻结物料状态键
+     */
+    public void refreshStructureEndingContinuationFacts(LhScheduleContext context, String skuKey) {
+        StructureEndingContinuationState state = context.getStructureEndingContinuationStates().get(skuKey);
+        if (state == null) {
+            return;
+        }
+        int remaining = this.getTargetScheduleQtyResolver().previewProductionRemainingQty(context, state
+                .getSourceSku());
+        Map<String, Integer> cumulative = new LinkedHashMap<>();
+        StructureEndingResourceIndex resources = new StructureEndingResourceIndex(context);
+        for (LhScheduleResult original : state.getOriginalResults()) {
+            boolean live = resources.isLive(original);
+            int quantity = live ? ShiftFieldUtil.resolveScheduledQty(original) : 0;
+            cumulative.merge(LhSingleControlMachineUtil.resolvePhysicalMachineCode(original.getLhMachineCode()),
+                    quantity, Integer::sum);
+            ContinuationEndingAllocationSnapshot snapshot = context.getContinuationSurplusEndingSnapshotMap()
+                    .get(original);
+            if (snapshot == null && quantity == 0) {
+                continue;
+            }
+            if (snapshot == null) {
+                snapshot = new ContinuationEndingAllocationSnapshot();
+                snapshot.setGroupKey(this.buildReduceMouldGroupKey(original, state.getSourceSku()));
+            } else {
+                snapshot = BeanUtil.copyProperties(snapshot, ContinuationEndingAllocationSnapshot.class);
+            }
+            snapshot.setShiftQuantities(context.getScheduleWindowShifts().stream()
+                    .mapToInt(shift -> live ? this.resolveShiftPlanQty(original, shift.getShiftIndex()) : 0).toArray());
+            snapshot.setProductionStartTime(quantity > 0 ? this.resolveFirstPlannedShiftStartTime(original) : null);
+            Date end = quantity > 0 ? this.resolveLastPositiveProductionEndTime(original) : null;
+            snapshot.setProductionEndTime(end);
+            snapshot.setFinishDeadline(state.getFinalDeadline());
+            snapshot.setFinishRule("结构收尾续作累计分量");
+            snapshot.setFinishState(remaining == 0 ? ContinuationMachineFinishPlan.FinishState.SURPLUS_COMPLETED
+                    : ContinuationMachineFinishPlan.FinishState.FORCED_RELEASE);
+            if (end != null) {
+                Date ready = ShiftCapacityResolverUtil.resolveCapsuleReplacementReadyTime(context,
+                        original.getLhMachineCode(), end);
+                OffMachineDecision timed = context.getTimedMachineOffDecisionMap().get(original);
+                if (timed != null && timed.getOccupancyEndTime() != null) {
+                    ready = timed.getOccupancyEndTime();
+                }
+                snapshot.setReleaseTime(ready);
+                original.setIsEnd(remaining == 0 ? "1" : "0");
+                original.setSpecEndTime(ready);
+                original.setTdaySpecEndTime(ready);
+                // 后料已正式占用时只更新原结果，不覆盖后料的在机终态或模具释放。
+                MachineScheduleDTO machine = context.getMachineScheduleMap().get(original.getLhMachineCode());
+                if (machine != null && this.resolveStructureEndingNextOccupation(
+                        context, original, state.getOriginalResults(), resources) == null) {
+                    this.applyMachineStateFromResult(context, machine, original, null);
+                    machine.setEstimatedEndTime(ready);
+                    machine.setEnding(remaining == 0);
+                    Date releaseTime = ready;
+                    LhMouldCodeUtil.splitMouldCode(original.getMouldCode()).forEach(mould ->
+                            context.getPreScheduledMouldReleaseTimeMap().put(mould, releaseTime));
+                }
+            }
+            context.getContinuationSurplusEndingSnapshotMap().put(original, snapshot);
+            PreviousAlternatePlanReleaseEvent event = context.getPreviousAlternateReleaseEventMap()
+                    .get(original.getLhMachineCode());
+            if (event != null && event.isRemainderFinishDeferred()
+                    && this.resolveStructureEndingNextOccupation(context, original, state
+                            .getOriginalResults(), resources) == null) {
+                this.syncRemainderFinishPreviousAlternateRelease(context, event);
+            }
+            if (this.getTargetScheduleQtyResolver().isSharedEmbryoStockEnding(context, state.getSourceSku())) {
+                context.getSharedEmbryoStockEndingMachineQuotaMap().put(original, quantity);
+                context.getSharedEmbryoStockEndingMachineReleaseMap().put(original, snapshot.getReleaseTime());
+            }
+        }
+        state.setOriginalCommittedQuantities(cumulative);
+        context.getContinuationRemainderFinishGroups().stream()
+                .filter(group -> StringUtils.equals(skuKey, MonthPlanDateResolver.buildMaterialStatusKey(
+                        group.getSourceSku().getMaterialCode(), group.getSourceSku().getProductStatus())))
+                .filter(group -> group.getOriginalMachineFinishPlan() != null)
+                .forEach(group -> group.getOriginalMachineFinishPlan().setRemainingQty(remaining));
     }
 
     /**
@@ -3146,6 +3847,13 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         int finalTargetQty = embryoEnding ? group.getFinalTargetQty()
                 : Math.min(sourceSku.resolveTargetScheduleQty(),
                         this.getTargetScheduleQtyResolver().previewProductionRemainingQty(context, sourceSku));
+        StructureEndingContinuationState endingState = StructureEndingContinuationPolicy.state(context, sourceSku);
+        if (endingState != null) {
+            if (endingState.getLegalTargetQty() == null) {
+                endingState.setLegalTargetQty(finalTargetQty);
+            }
+            finalTargetQty = endingState.getLegalTargetQty();
+        }
         int targetQty;
         if (embryoEnding) {
             targetQty = this.getTargetScheduleQtyResolver().resolveSharedEmbryoEndingBudget(
@@ -3194,6 +3902,13 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             group.setOriginalMachineFinishPlan(calculated);
             group.setMachineProfiles(profiles);
             group.setNextActions(new HashMap<>(nextActions));
+            // 只发布正式分配前已经证明的08:00维修豁免，失败或异常退出不生成执行事实。
+            repairScope.commitAdmissionProofs();
+            StructureEndingContinuationState structureEnding = StructureEndingContinuationPolicy
+                    .state(context, sourceSku);
+            if (structureEnding != null) {
+                structureEnding.setFirstAllocated(true);
+            }
             if (previousAlternateSegmentFinish) {
                 String capacityDetail = String.format("工厂=%s, 批次=%s, 物料=%s, 状态=%s, 窗口截止=%s, "
                                 + "原机待排目标=%s, 原机已分配=%s, 真实缺口=%s, 原机可完成=%s",
@@ -3205,7 +3920,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             }
             this.recordRemainderFinishSnapshots(context, sourceSku, profiles, shifts, calculated);
             String detail = String.format("类型=%s, 总目标=%s, 物料=%s, 状态=%s, 日期偏移=%s, 预算=%s, 角色机台顺序=%s, 分配=%s, 数量归整单位=%s, 剩余=%s, 诊断=%s, "
-                            + "规则口径=收尾日标准班产且保留此前前缀，精确历史异料指定边界优先",
+                            + "规则口径=收尾日标准班产且保留此前前缀，历史交替不改变初始节点，兼容对调后消费真实释放",
                     group.getEndingType(), finalTargetQty, sourceSku.getMaterialCode(), sourceSku.getProductStatus(), dateOffset, targetQty,
                     profiles.stream().map(profile -> this.joinMachineCodes(profile.getOriginals())).collect(Collectors.toList()),
                     java.util.Arrays.toString(quantities),
@@ -3236,13 +3951,10 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         if (Objects.isNull(cutoffs)) {
             throw new IllegalStateException("续作收尾已有占用缺少真实时间，不能计算可生产窗口");
         }
-        // 精确异料历史指定先封住前料生产边界，其余历史关系仍消费原机真实释放。
+        StructureEndingContinuationState structureEnding = StructureEndingContinuationPolicy.state(context, sourceSku);
         for (LhScheduleResult result : group.getParticipatingResults()) {
-            PreviousAlternatePlanReleaseEvent historicalEvent = context.getPreviousAlternateReleaseEventMap()
-                    .get(result.getLhMachineCode());
-            if (Objects.nonNull(historicalEvent) && historicalEvent.isFixedHistoricalCutover()) {
-                cutoffs.merge(result.getLhMachineCode(), historicalEvent.getPlannedShiftStartTime(),
-                        capacitySupport::earlier);
+            if (structureEnding != null) {
+                cutoffs.merge(result.getLhMachineCode(), structureEnding.getFirstDeadline(), capacitySupport::earlier);
             }
             if (embryoEnding) {
                 Date equipmentCutoff = this.getMaintenanceScheduleService().resolveForceDownCutoffTime(
@@ -3292,6 +4004,11 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             profiles.add(profile);
         }
         int dateOffset = this.resolveRemainderFinishDateOffset(profiles, shifts, targetQty);
+        if (structureEnding != null) {
+            return new RemainderFinishCalculation(profiles,
+                    this.allocateStructureEndingOriginals(profiles, targetQty, structureEnding.getFirstDeadline()),
+                    nextActions, dateOffset);
+        }
         boolean canFinishInWindow = profiles.stream()
                 .mapToLong(profile -> java.util.Arrays.stream(profile.getCapacities()).asLongStream().sum())
                 .sum() >= targetQty;
@@ -3303,8 +4020,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         this.sortRemainderFinishProfiles(context, sourceSku, profiles, shifts, dateOffset, targetQty);
         // 节点计算独立确定数量及时间；历史绑定调整仅在正式时间下机决定完成后隔离复核。
         ContinuationFinishScheduleResult calculated = continuationRemainderFinishScheduleService
-                .calculateWithFixedHistoricalCutovers(context, profiles, shifts,
-                        targetQty, sourceSku.getShiftCapacity(), dateOffset);
+                .calculate(profiles, shifts, targetQty, sourceSku.getShiftCapacity(), dateOffset);
         if (embryoEnding && finalTargetQty == 0) {
             // 零库存份额本身不能证明机台已空闲，保留窗口占用，真实强制退出仍沿原边界。
             calculated.getMachinePlans().stream()
@@ -3727,6 +4443,220 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     }
 
     /**
+     * 在余量收尾准入前按真实逐日降模节奏试算容量，无法清量时冻结普通时间下机身份。
+     * 选机及容量试算不提交生产或资源；分流成立后仅校正来源身份及原余量账本。
+     *
+     * @param context 当前批次上下文
+     * @param sourceSku 原续作来源
+     * @param results 同业务组原机结果
+     * @param shifts 完整窗口班次
+     * @return 需要转入时间下机时的逐日选择；其他场景返回空集合
+     * @throws IllegalStateException 原机容量画像或已提交占用时间不完整时抛出
+     */
+    private Map<LocalDate, ContinuationDayReduction> resolveTimedReductionBeforeEnding(
+            LhScheduleContext context, SkuScheduleDTO sourceSku,
+            List<LhScheduleResult> results, List<LhShiftConfigVO> shifts) {
+        int physicalMachineCount = this.countDistinctPhysicalMachineCount(results);
+        if (physicalMachineCount <= 1 || !this.isContinuationRemainderFinish(context, sourceSku, results)) {
+            return Collections.emptyMap();
+        }
+        Map<LocalDate, List<LhShiftConfigVO>> days = this.groupShiftsByWorkDate(shifts);
+        boolean hasLowerTarget = days.keySet().stream().anyMatch(productionDate ->
+                this.lhDailyMouldCalcService.hasRequiredMachineCount(context,
+                        sourceSku.getMaterialCode(), sourceSku.getProductStatus(), productionDate)
+                        && this.lhDailyMouldCalcService.getRequiredMachineCount(context,
+                        sourceSku.getMaterialCode(), sourceSku.getProductStatus(), productionDate)
+                        < physicalMachineCount);
+        if (!hasLowerTarget) {
+            return Collections.emptyMap();
+        }
+        Map<LocalDate, ContinuationDayReduction> plan = new LinkedHashMap<>(days.size());
+        List<LhScheduleResult> activeResults = new ArrayList<>(results);
+        List<LhScheduleResult> previousProductionResults = new ArrayList<>();
+        List<LhScheduleResult> previousHeldResults = new ArrayList<>();
+        int targetQty = this.resolveRemainderFinishTargetQty(context, sourceSku, results);
+        boolean strictUpperLimit = ProductionQuantityPolicy.from(sourceSku, false).isStrictUpperLimit();
+        Map<String, Date> cutoffs = this.resolveSurplusEndingOccupiedCutoffs(
+                context, results, shifts, new HashMap<>());
+        if (cutoffs == null) {
+            throw new IllegalStateException("降模收尾资格判断缺少已提交占用的真实时间");
+        }
+        Map<String, List<LhScheduleResult>> physicalGroups = results.stream().collect(Collectors.groupingBy(
+                result -> LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode()),
+                LinkedHashMap::new, Collectors.toList()));
+        List<ContinuationEndingMachineProfile> profiles = physicalGroups.values().stream()
+                .map(sides -> this.buildSurplusEndingMachineProfile(
+                        context, sides, shifts, cutoffs, Collections.emptySet(), false))
+                .collect(Collectors.toList());
+        if (profiles.stream().anyMatch(Objects::isNull)) {
+            throw new IllegalStateException("降模收尾资格判断的原机真实产能画像不完整");
+        }
+        int constrainedCapacity = 0;
+        boolean hasRelease = false;
+        LocalDate firstDate = days.keySet().iterator().next();
+        for (Map.Entry<LocalDate, List<LhShiftConfigVO>> entry : days.entrySet()) {
+            LocalDate productionDate = entry.getKey();
+            ContinuationDayReduction selection = this.selectContinuationDayReduction(context, sourceSku,
+                    activeResults, productionDate, Math.max(0, targetQty - constrainedCapacity), strictUpperLimit,
+                    previousProductionResults, previousHeldResults);
+            plan.put(productionDate, selection);
+            List<LhScheduleResult> occupiedResults = this.mergeContinuationOccupiedResults(
+                    activeResults, selection.keptResults, selection.stopHoldResults);
+            hasRelease |= activeResults.stream().anyMatch(result -> !occupiedResults.contains(result));
+            List<LhScheduleResult> positiveResults = new ArrayList<>();
+            for (ContinuationEndingMachineProfile profile : profiles) {
+                List<LhScheduleResult> sides = profile.getOriginals();
+                if (!activeResults.containsAll(sides)) {
+                    continue;
+                }
+                boolean producing = selection.keptResults.containsAll(sides);
+                boolean firstHoldDay = selection.stopHoldResults.containsAll(sides)
+                        && Collections.disjoint(previousHeldResults, sides)
+                        && sides.stream().noneMatch(result -> context.isContinuousStopHoldDate(
+                                result.getLhMachineCode(), productionDate.minusDays(1)));
+                boolean removed = Collections.disjoint(occupiedResults, sides);
+                int dayCapacity = 0;
+                for (LhShiftConfigVO shift : entry.getValue()) {
+                    // 待减机台不再计入整日容量；降模日前已经开始的夜班仍属于合法生产前缀。
+                    boolean retainedNight = shift.isNightShift() && !productionDate.equals(firstDate)
+                            && (firstHoldDay || removed);
+                    if (producing || retainedNight) {
+                        dayCapacity += profile.getCapacities()[shifts.indexOf(shift)];
+                    }
+                }
+                constrainedCapacity += dayCapacity;
+                if (producing && dayCapacity > 0) {
+                    positiveResults.addAll(sides);
+                }
+            }
+            previousProductionResults = positiveResults;
+            previousHeldResults = selection.stopHoldResults;
+            activeResults = occupiedResults;
+        }
+        boolean timedReduction = hasRelease && constrainedCapacity < targetQty;
+        String detail = String.format("工厂=%s, 批次=%s, 物料=%s, 状态=%s, 合法余量=%s, "
+                        + "逐日降模后容量=%s, 存在释放需求=%s, 转按时间下机=%s",
+                context.getFactoryCode(), context.getBatchNo(), sourceSku.getMaterialCode(),
+                sourceSku.getProductStatus(), targetQty, constrainedCapacity, hasRelease, timedReduction);
+        log.info("续作降模后收尾资格, {}", detail);
+        PriorityTraceLogHelper.appendProcessLog(context, "续作降模后收尾资格", detail);
+        if (!timedReduction) {
+            return Collections.emptyMap();
+        }
+        // 同组来源副本共用冻结结论，防止时间下机请求及后处理读取未校正的初排收尾标记。
+        Set<SkuScheduleDTO> aliases = Collections.newSetFromMap(new IdentityHashMap<>());
+        aliases.add(sourceSku);
+        results.stream().map(result -> this.resolveResultSourceSku(context, result)).filter(Objects::nonNull)
+                .forEach(aliases::add);
+        context.getContinuationTimedReductionSkus().addAll(aliases);
+        for (SkuScheduleDTO alias : aliases) {
+            if (alias.isStrictTargetQty() && !ProductionQuantityPolicy.from(alias, false).isStrictUpperLimit()) {
+                // 撤销预计收尾带来的严格目标身份，防止普通满产下限把真实余量账本抬高到整窗产能。
+                alias.setStrictTargetQty(false);
+                this.getTargetScheduleQtyResolver().applyProductionTargetState(
+                        context, alias, alias.getSurplusQty(), "降模后恢复非收尾续作余量");
+            }
+        }
+        results.forEach(result -> result.setIsEnd("0"));
+        return plan;
+    }
+
+    /**
+     * 统一选择一个业务日的生产、停产保机和待减机台，试算与正式降模共用相同排序。
+     *
+     * @param context 排程上下文
+     * @param sourceSku 来源物料及状态
+     * @param activeResults 本日仍有效的原机结果
+     * @param productionDate 本日业务日期
+     * @param remainingTargetQty 剩余目标量
+     * @param strictUpperLimit 是否严格数量限制
+     * @param previousProductionResults 试算前日正量生产集合，正式入口为空
+     * @param previousHeldResults 试算前日保机集合，正式入口为空
+     * @return 本日生产及降模选择
+     */
+    private ContinuationDayReduction selectContinuationDayReduction(LhScheduleContext context,
+            SkuScheduleDTO sourceSku, List<LhScheduleResult> activeResults, LocalDate productionDate,
+            int remainingTargetQty, boolean strictUpperLimit, List<LhScheduleResult> previousProductionResults,
+            List<LhScheduleResult> previousHeldResults) {
+        boolean evaluatingReduction = previousHeldResults != null;
+        List<LhScheduleResult> keptResults = this.resolveStableTargetContinuationResults(context, sourceSku,
+                activeResults, productionDate, strictUpperLimit, evaluatingReduction, previousProductionResults);
+        int requiredMachineCount;
+        if (evaluatingReduction) {
+            int mapCount = this.resolveContinuationDayMinimumMachineCount(context, sourceSku, productionDate, activeResults);
+            requiredMachineCount = this.shouldProtectStrictTargetFromFullRelease(mapCount, remainingTargetQty,
+                    strictUpperLimit, this.countDistinctPhysicalMachineCount(activeResults))
+                    ? 1 : Math.max(mapCount, this.countDistinctPhysicalMachineCount(keptResults));
+        } else {
+            requiredMachineCount = this.resolveContinuousProductionMachineCount(context, sourceSku,
+                    activeResults, productionDate, remainingTargetQty, strictUpperLimit);
+        }
+        List<LhScheduleResult> candidates = new ArrayList<>(activeResults);
+        candidates.removeAll(keptResults);
+        ReductionResult reduction = this.selectContinuationReduction(context, sourceSku, candidates,
+                Math.max(0, requiredMachineCount - this.countDistinctPhysicalMachineCount(keptResults)));
+        keptResults.addAll(this.resolveProductionResultsAfterReduction(context, sourceSku, candidates, reduction));
+        List<LhScheduleResult> stopHoldResults = this.selectContinuousStopHoldCandidates(context, sourceSku,
+                activeResults, keptResults, productionDate, reduction.getResults(),
+                evaluatingReduction ? previousHeldResults : Collections.emptyList());
+        keptResults = this.resolveContinuationProductionResults(context, sourceSku,
+                activeResults, keptResults, stopHoldResults, productionDate);
+        List<LhScheduleResult> exemptedResults = stopHoldResults.stream().filter(keptResults::contains)
+                .collect(Collectors.toList());
+        stopHoldResults.removeAll(keptResults);
+        return new ContinuationDayReduction(requiredMachineCount, reduction,
+                keptResults, stopHoldResults, exemptedResults);
+    }
+
+    /**
+     * 同一次降模选择的日级结果，仅在本次前置分流及紧接的正式降模之间传递。
+     *
+     * @author APS
+     * @date 2026/11/05
+     */
+    private static final class ContinuationDayReduction {
+        /**
+         * 本日应生产的物理机台数。
+         */
+        private final int requiredMachineCount;
+        /**
+         * 既有降模排序选出的候选及决策原因。
+         */
+        private final ReductionResult reduction;
+        /**
+         * 本日生产保留结果。
+         */
+        private final List<LhScheduleResult> keptResults;
+        /**
+         * 本日停产保机结果。
+         */
+        private final List<LhScheduleResult> stopHoldResults;
+        /**
+         * 胎胚时长豁免后恢复正常生产的原保机候选。
+         */
+        private final List<LhScheduleResult> exemptedResults;
+
+        /**
+         * 保存同一轮选机的完整结果，避免分流和正式降模分别选机。
+         *
+         * @param requiredMachineCount 应生产物理台数
+         * @param reduction 原降模选择
+         * @param keptResults 生产保留结果
+         * @param stopHoldResults 停产保机结果
+         * @param exemptedResults 豁免保机结果
+         */
+        private ContinuationDayReduction(int requiredMachineCount, ReductionResult reduction,
+                List<LhScheduleResult> keptResults, List<LhScheduleResult> stopHoldResults,
+                List<LhScheduleResult> exemptedResults) {
+            this.requiredMachineCount = requiredMachineCount;
+            this.reduction = reduction;
+            this.keptResults = keptResults;
+            this.stopHoldResults = stopHoldResults;
+            this.exemptedResults = exemptedResults;
+        }
+    }
+
+    /**
      * 原逐日降模入口：非多机台硫化余量收尾继续按日目标机台与既有额度决策。
      * 胎胚时长豁免候选在当日排量确定后追加班次原因，避免将正常保留机台标为豁免。
      *
@@ -3739,6 +4669,21 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                                                       SkuScheduleDTO sourceSku,
                                                       List<LhScheduleResult> skuResults,
                                                       List<LhShiftConfigVO> shifts) {
+        this.reduceContinuationMachinesByWorkDate(context, sourceSku, skuResults, shifts, Collections.emptyMap());
+    }
+
+    /**
+     * 按逐日选择执行降模；收尾分流已冻结的选择直接复用，不重新更换参与机台。
+     *
+     * @param context 排程上下文
+     * @param sourceSku 来源物料及状态
+     * @param skuResults 原续作结果
+     * @param shifts 完整真实班次
+     * @param frozenPlan 分流时冻结的逐日选择，普通入口为空
+     */
+    private void reduceContinuationMachinesByWorkDate(LhScheduleContext context, SkuScheduleDTO sourceSku,
+            List<LhScheduleResult> skuResults, List<LhShiftConfigVO> shifts,
+            Map<LocalDate, ContinuationDayReduction> frozenPlan) {
         Map<LocalDate, List<LhShiftConfigVO>> shiftMapByDate = groupShiftsByWorkDate(shifts);
         List<LhScheduleResult> activeResults = new ArrayList<LhScheduleResult>(skuResults);
         int remainingTargetQty = Math.max(0, sourceSku.resolveTargetScheduleQty());
@@ -3769,30 +4714,19 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                     calculateMachineDailyCapacityMapByDate(context, sourceSku, activeResults, dayShifts);
             int totalCapacity = capacityMap.values().stream().mapToInt(Integer::intValue).sum();
             int totalPlanQty = sumScheduledQtyByShifts(activeResults, dayShifts);
-            // 相邻日目标持平时，首日保留MES原续作，后续日承接前日仍在生产的有效续作。
-            int requiredMachineCount = resolveContinuousProductionMachineCount(
-                    context, sourceSku, activeResults, productionDate,
-                    remainingTargetQty, policy.isStrictUpperLimit());
+            ContinuationDayReduction selection = frozenPlan.get(productionDate);
+            if (selection == null) {
+                selection = this.selectContinuationDayReduction(context, sourceSku, activeResults,
+                        productionDate, remainingTargetQty, policy.isStrictUpperLimit(), null, null);
+            }
+            int requiredMachineCount = selection.requiredMachineCount;
+            ReductionResult reduction = selection.reduction;
+            List<LhScheduleResult> keptResults = selection.keptResults;
+            List<LhScheduleResult> stopHoldResults = selection.stopHoldResults;
+            List<LhScheduleResult> exemptedStopHoldResults = selection.exemptedResults;
             boolean hasWholeDayUnavailableMachine = capacityMap.values().stream()
                     .anyMatch(capacity -> Objects.isNull(capacity) || capacity <= 0);
-            // 先保留目标持平时应承接的续作机台，再由原排序补足目标，避免受保护机台被挤掉。
-            List<LhScheduleResult> keptResults = this.resolveStableTargetContinuationResults(
-                    context, sourceSku, activeResults, productionDate, policy.isStrictUpperLimit());
-            List<LhScheduleResult> remainingResults = new ArrayList<LhScheduleResult>(activeResults);
-            remainingResults.removeAll(keptResults);
-            ReductionResult reduction = this.selectContinuationReduction(context, sourceSku, remainingResults,
-                    Math.max(0, requiredMachineCount - this.countDistinctPhysicalMachineCount(keptResults)));
-            keptResults.addAll(this.resolveProductionResultsAfterReduction(context, sourceSku, remainingResults, reduction));
             this.logContinuationReduction(context, sourceSku, productionDate, reduction);
-            // 先按原排序识别停产保机候选，再将命中胎胚时长豁免的机台纳入原SKU正常排量。
-            List<LhScheduleResult> stopHoldResults = this.selectContinuousStopHoldCandidates(
-                    context, sourceSku, activeResults, keptResults, productionDate, reduction.getResults());
-            keptResults = this.resolveContinuationProductionResults(
-                    context, sourceSku, activeResults, keptResults, stopHoldResults, productionDate);
-            List<LhScheduleResult> exemptedStopHoldResults = stopHoldResults.stream()
-                    .filter(keptResults::contains)
-                    .collect(Collectors.toList());
-            stopHoldResults.removeAll(keptResults);
             List<LhScheduleResult> occupiedResults = mergeContinuationOccupiedResults(
                     activeResults, keptResults, stopHoldResults);
             if (windowEndingAllocation) {
@@ -3852,6 +4786,26 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                                                                    List<LhScheduleResult> keptResults,
                                                                    LocalDate productionDate,
                                                                    List<LhScheduleResult> reductionResults) {
+        return this.selectContinuousStopHoldCandidates(context, sourceSku, activeResults, keptResults,
+                productionDate, reductionResults, Collections.emptyList());
+    }
+
+    /**
+     * 复用停产保机选择，分流试算通过前日集合延续保机，不写入正式占用状态。
+     *
+     * @param context 排程上下文
+     * @param sourceSku 来源物料及状态
+     * @param activeResults 当前有效结果
+     * @param keptResults 本日生产机台
+     * @param productionDate 本日业务日期
+     * @param reductionResults 原降模排序结果
+     * @param previousHeldResults 试算前日保机结果，正式决策为空
+     * @return 本日停产保机候选
+     */
+    private List<LhScheduleResult> selectContinuousStopHoldCandidates(LhScheduleContext context,
+            SkuScheduleDTO sourceSku, List<LhScheduleResult> activeResults, List<LhScheduleResult> keptResults,
+            LocalDate productionDate, List<LhScheduleResult> reductionResults,
+            List<LhScheduleResult> previousHeldResults) {
         List<LhScheduleResult> stopHoldResults = new ArrayList<LhScheduleResult>(4);
         int activeMachineCount = this.countDistinctPhysicalMachineCount(activeResults);
         int keptMachineCount = this.countDistinctPhysicalMachineCount(keptResults);
@@ -3889,7 +4843,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         // 无新的下降时，只允许昨日已保机的机台延续，不能把其他候选新开为保机段。
         List<LhScheduleResult> removedResults = reductionResults.stream()
                 .filter(result -> !keptResults.contains(result))
-                .filter(result -> newHoldTriggered || context.isContinuousStopHoldDate(
+                .filter(result -> newHoldTriggered || previousHeldResults.contains(result) || context.isContinuousStopHoldDate(
                         result.getLhMachineCode(), productionDate.minusDays(1)))
                 .collect(Collectors.toList());
         if (CollectionUtils.isEmpty(removedResults)) {
@@ -4270,8 +5224,29 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             LhScheduleContext context, SkuScheduleDTO sourceSku,
             List<LhScheduleResult> activeResults, LocalDate productionDate,
             boolean strictUpperLimit) {
+        return this.resolveStableTargetContinuationResults(context, sourceSku, activeResults, productionDate,
+                strictUpperLimit, false, null);
+    }
+
+    /**
+     * 按非收尾逐日节奏试算持平保护，前日生产集合来自同一次试算而非未降模初排。
+     *
+     * @param context 排程上下文
+     * @param sourceSku 来源物料及状态
+     * @param activeResults 当前有效结果
+     * @param productionDate 本日业务日期
+     * @param strictUpperLimit 是否严格数量限制
+     * @param evaluatingReduction 是否忽略尚未校正的初排收尾标记
+     * @param previousProductionResults 试算前日正量生产结果，正式决策为空
+     * @return 本日持平保护结果
+     */
+    private List<LhScheduleResult> resolveStableTargetContinuationResults(LhScheduleContext context,
+            SkuScheduleDTO sourceSku, List<LhScheduleResult> activeResults, LocalDate productionDate,
+            boolean strictUpperLimit, boolean evaluatingReduction,
+            List<LhScheduleResult> previousProductionResults) {
         if (Objects.isNull(context.getScheduleDate()) || strictUpperLimit
-                || CollectionUtils.isEmpty(activeResults) || this.hasEndingResult(activeResults)) {
+                || CollectionUtils.isEmpty(activeResults)
+                || (!evaluatingReduction && this.hasEndingResult(activeResults))) {
             return new ArrayList<LhScheduleResult>(0);
         }
         LocalDate previousDate = productionDate.minusDays(1);
@@ -4287,6 +5262,10 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         LocalDate firstProductionDate = context.getScheduleDate().toInstant()
                 .atZone(ZoneId.systemDefault()).toLocalDate();
         if (productionDate.isAfter(firstProductionDate)) {
+            if (previousProductionResults != null) {
+                return activeResults.stream().filter(previousProductionResults::contains)
+                        .collect(Collectors.toList());
+            }
             // activeResults已排除普通降模退出机台；只承接前日有排量且非停产保机的生产结果。
             List<LhShiftConfigVO> previousShifts = this.groupShiftsByWorkDate(context.getScheduleWindowShifts())
                     .get(previousDate);
@@ -4646,7 +5625,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
      *   <li>硫化余量和胎胚库存均为0，不允许残留dayN把零目标重新放大为满窗口产能；</li>
      *   <li>窗口无计划且无历史欠产，后续虽有月计划但全部超出提前生产范围，不允许提前消费远期计划。</li>
      * </ol>
-     * <p>胎胚库存收尾仍保留既有严格库存目标；窗口及月底均无计划时仍按硫化余量清尾。</p>
+     * <p>胎胚库存收尾保留既有严格库存目标；精确历史前料旧余量不受远期计划释放规则影响，
+     * 与窗口及月底均无计划的续作一起进入严格硫化余量清尾。</p>
      *
      * @param context 排程上下文
      * @param sku 续作SKU
@@ -4671,7 +5651,11 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         if (Math.max(0, sku.getSurplusQty()) <= 0) {
             return true;
         }
-        return isFuturePlanOutsideEarlyProductionRange(context, sku, shortageQuotaPlan);
+        // 精确历史前料的旧余量必须先在原机严格收尾，未来计划只约束新增需求。
+        if (HistoricalBeforeRemainderPolicy.hasOriginalRemainder(context, sku)) {
+            return false;
+        }
+        return this.isFuturePlanOutsideEarlyProductionRange(context, sku, shortageQuotaPlan);
     }
 
     /**
@@ -4690,7 +5674,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 && shortageQuotaPlan.isNoWindowPlan()
                 && Math.max(0, shortageQuotaPlan.getHistoryShortageQty()) <= 0
                 && Math.max(0, sku.getSurplusQty()) > 0
-                && !isFuturePlanOutsideEarlyProductionRange(context, sku, shortageQuotaPlan);
+                && (HistoricalBeforeRemainderPolicy.hasOriginalRemainder(context, sku)
+                || !this.isFuturePlanOutsideEarlyProductionRange(context, sku, shortageQuotaPlan));
     }
 
     /**
@@ -6311,6 +7296,11 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                     context, sides, shifts, cutoffs, Collections.emptySet(), false);
             if (Objects.isNull(profile)) {
                 throw new IllegalStateException("按时间下机真实产能画像不完整");
+            }
+            StructureEndingContinuationState structureEnding = StructureEndingContinuationPolicy
+                    .state(context, sourceSku);
+            if (structureEnding != null) {
+                profile.restrictToReleaseDeadline(structureEnding.getFirstDeadline());
             }
             TimedMachineOffRequest request = new TimedMachineOffRequest();
             request.setSourceSku(sourceSku);
@@ -8209,8 +9199,9 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         if (machine == null || estimatedEndTime == null) {
             return null;
         }
+        Date preparationReady = LhInventoryOverlapResolver.resolveSwitchReadyTime(context, machine, estimatedEndTime);
         Date switchStartTime = resolveAllowedSwitchStartTime(
-                context, machine.getMachineCode(), estimatedEndTime);
+                context, machine.getMachineCode(), preparationReady);
         switchStartTime = getMaintenanceScheduleService().delaySwitchStartByMaintenance(
                 machine, switchStartTime, LhScheduleTimeUtil.getTypeBlockChangeTotalHours(context));
         return switchStartTime;
@@ -8272,7 +9263,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
 
     /**
      * 根据停机窗口顺延换活字块切换起点。
-     * <p>05允许并行并由统一时间轴追加预热；其他停机仍顺延到重叠停机结束时刻。</p>
+     * <p>05允许并行并由统一时间轴追加预热；09盘点允许并行，其他停机仍顺延到重叠停机结束时刻。</p>
      */
     private Date resolveDowntimeAdjustedSwitchStartTime(LhScheduleContext context,
                                                         String machineCode,
@@ -8288,6 +9279,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         if (!CollectionUtils.isEmpty(context.getDevicePlanShutList())) {
             for (MdmDevicePlanShut planShut : context.getDevicePlanShutList()) {
                 if (planShut == null
+                        || LhInventoryOverlapResolver.isInventory(planShut)
                         || !StringUtils.equals(machineCode, planShut.getMachineCode())
                         || StringUtils.equals(MachineStopTypeEnum.PLANNED_REPAIR.getCode(),
                         planShut.getMachineStopType())
@@ -9978,7 +10970,10 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             String groupKey = resolveContinuationGroupKey(context, result);
             int totalPlanQty = groupTotalPlanQtyMap.getOrDefault(groupKey, 0);
             SkuScheduleDTO sourceSku = groupSourceSkuMap.get(groupKey);
-            result.setIsEnd(endingJudgmentStrategy.isRuntimeEnding(context, sourceSku, totalPlanQty) ? "1" : "0");
+            // 已按节奏冻结时间下机的组保持分流身份；最终落库收尾仍由持久化按真实余量判断。
+            boolean runtimeEnding = !context.getContinuationTimedReductionSkus().contains(sourceSku)
+                    && endingJudgmentStrategy.isRuntimeEnding(context, sourceSku, totalPlanQty);
+            result.setIsEnd(runtimeEnding ? "1" : "0");
         }
     }
 
@@ -10090,9 +11085,10 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             int firstOccupiedShiftIndex = resolveFirstOccupiedShiftIndex(result);
             int lastOccupiedShiftIndex = resolveLastOccupiedShiftIndex(result);
             ContinuationEndingAllocationSnapshot finish = context.getContinuationSurplusEndingSnapshotMap().get(result);
-            boolean unfinished = context.getSharedEmbryoStockEndingMachineQuotaMap().containsKey(result)
+            boolean unfinished = (context.getSharedEmbryoStockEndingMachineQuotaMap().containsKey(result)
                     && Objects.nonNull(finish)
-                    && finish.getFinishState() == ContinuationMachineFinishPlan.FinishState.WINDOW_UNFINISHED;
+                    && finish.getFinishState() == ContinuationMachineFinishPlan.FinishState.WINDOW_UNFINISHED)
+                    || ContinuationSurplusCompletionSupport.isUnfinishedContinuation(context, result);
             // 公共未完成事实继续保留物理占用；删除零量生产行不等于发布空闲机台。
             if (!unfinished) {
                 this.completeContinuousMachineOfflineDecision(
@@ -10454,6 +11450,10 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             if (sourceSku == null || !processedSkuSet.add(sourceSku)) {
                 continue;
             }
+            if (StructureEndingContinuationPolicy.state(context, sourceSku) != null) {
+                this.appendStructureEndingCompensation(context, sourceSku);
+                continue;
+            }
             if (context.isOriginalContinuationFinishSatisfied(sourceSku)) {
                 log.info("续作原机已完成合法余量，跳过新增补偿, batchNo: {}, materialCode: {}, productStatus: {}",
                         context.getBatchNo(), sourceSku.getMaterialCode(), sourceSku.getProductStatus());
@@ -10750,6 +11750,12 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 .collect(Collectors.groupingBy(LhScheduleResult::getLhMachineCode));
         Map<String, ContinuationRemainderFinishGroup> finishGroupsByMachine = new HashMap<>();
         context.getContinuationRemainderFinishGroups().stream()
+                .filter(group -> {
+                    StructureEndingContinuationState state = StructureEndingContinuationPolicy.state(context,
+                            group.getSourceSku());
+                    return state == null || state.isOriginalRemainderEnding()
+                            || group.getEndingType() == ContinuationRemainderFinishGroup.EndingType.EMBRYO_STOCK;
+                })
                 .forEach(group -> group.getParticipatingResults().forEach(result ->
                         finishGroupsByMachine.put(result.getLhMachineCode(), group)));
         context.getPreviousAlternateReleaseEventMap().values().forEach(event -> {
@@ -10759,18 +11765,11 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                     && StringUtils.equals(group.getSourceSku().getMaterialCode(), event.getMaterialCode())
                     && StringUtils.equals(this.normalizeProductStatus(group.getSourceSku().getProductStatus()),
                     this.normalizeProductStatus(event.getProductStatus()))) {
-                // 精确异料普通余量优先遵守指定交替；同料、第三种前料和胎胚库存仍沿原收尾口径。
-                event.setFixedHistoricalCutover(
-                        group.getEndingType() == ContinuationRemainderFinishGroup.EndingType.SURPLUS
-                        && Objects.nonNull(event.getPlan()) && Objects.nonNull(event.getPlannedShiftStartTime())
-                        && StringUtils.equals(event.getMaterialCode(), event.getPlan().getBeforeMaterialCode())
-                        && StringUtils.isNotBlank(event.getPlan().getAfterMaterialCode())
-                        && !StringUtils.equals(event.getMaterialCode(), event.getPlan().getAfterMaterialCode())
-                        && !context.isContinuousStopHoldMachine(machineCode));
+                // 历史关系只在错开和合法对调完成后消费真实释放，不再把历史起点作为前料截止。
+                event.setFixedHistoricalCutover(false);
                 event.setRemainderFinishWindowEndTime(shifts.get(shifts.size() - 1).getShiftEndDateTime());
-                this.logPreviousAlternateReleaseDecision(context, event, event.isFixedHistoricalCutover()
-                        ? "历史指定起点封住前料生产，先分配交替前合法前缀，其余原机承接剩余量"
-                        : "等待原续作整组余量分配后的真实释放");
+                this.logPreviousAlternateReleaseDecision(context, event,
+                        "等待余量错开及合法历史对调后的真实释放，后料次数不足在本窗口顺延");
                 return;
             }
             // 未进入余量收尾组的同料换模、前料无需生产及停产保机处置保持原边界。
@@ -11124,7 +12123,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     /**
      * 将已提交余量收尾的物理释放事实同步到后置历史交替事件及模具释放账本。
      * 多机分摊后单台不必覆盖整个SKU余量；仅采用已通过整组校验的逐机快照，不再次选机或扣账。
-     * 整组快照全部确认完成时，同步指定后料连续承接所需的完成事实，零量释放机台同样适用。
+     * 整组快照及最终实排均确认完成时，同步指定后料连续承接所需的完成事实，零量释放机台同样适用。
+     * 最终回裁导致缺口时撤销旧完成资格，后料不得继续使用已失效的自然收尾事实。
      *
      * @param context 排程上下文，包含正式扣账后的收尾快照
      * @param event 待恢复状态的历史交替事件
@@ -11164,14 +12164,12 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         Set<String> groupKeys = machineSnapshots.stream()
                 .map(ContinuationEndingAllocationSnapshot::getGroupKey)
                 .filter(StringUtils::isNotEmpty).collect(Collectors.toSet());
-        boolean groupCompleted = !groupKeys.isEmpty() && context.getContinuationSurplusEndingSnapshotMap()
-                .values().stream().filter(snapshot -> groupKeys.contains(snapshot.getGroupKey()))
-                .allMatch(snapshot -> snapshot.getFinishState()
-                        == ContinuationMachineFinishPlan.FinishState.SURPLUS_COMPLETED);
-        if (groupCompleted) {
-            // 零量机台的释放也是已提交的整组完成事实，不能只在普通严格收口分支登记。
-            event.setCompletedStrictEndingReleaseTime(releaseTime);
-        }
+        boolean groupCompleted = !groupKeys.isEmpty() && context.getContinuationSurplusEndingSnapshotMap().entrySet().stream()
+                .filter(entry -> groupKeys.contains(entry.getValue().getGroupKey()))
+                .allMatch(entry -> entry.getValue().getFinishState() == ContinuationMachineFinishPlan.FinishState.SURPLUS_COMPLETED
+                        && !ContinuationSurplusCompletionSupport.hasIncompleteGroup(context, entry.getKey()));
+        // 回裁后的未完成组必须撤销旧资格；合法零量成员仍可消费整组已经完成的真实释放。
+        event.setCompletedStrictEndingReleaseTime(groupCompleted ? releaseTime : null);
         if (event.isRemainderFinishDeferred()) {
             context.getReleasedContinuousMachineCodeSet().add(event.getMachineCode());
         }
@@ -11264,7 +12262,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     private boolean reconcileSurplusAfterHistoricalHandoff(LhScheduleContext context,
             List<LhScheduleResult> released, List<LhShiftConfigVO> shifts) {
         for (ContinuationRemainderFinishGroup group : context.getContinuationRemainderFinishGroups()) {
-            if (group.getEndingType() != ContinuationRemainderFinishGroup.EndingType.SURPLUS
+            if (StructureEndingContinuationPolicy.state(context, group.getSourceSku()) != null
+                    || group.getEndingType() != ContinuationRemainderFinishGroup.EndingType.SURPLUS
                     || group.getOriginalResults().stream().noneMatch(released::contains)
                     || ContinuationSurplusCompletionSupport.remainingQty(context, group) == 0
                     || CollectionUtils.isEmpty(group.getMachineProfiles())) {

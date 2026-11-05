@@ -3,16 +3,20 @@ package com.zlt.aps.common.engine.schedule.engine;
 import cn.hutool.core.util.StrUtil;
 import com.ruoyi.common.exception.ServiceException;
 import com.zlt.aps.common.engine.schedule.*;
+import com.zlt.aps.common.engine.schedule.constraint.ScheduleTailQuotaLedger;
 import com.zlt.aps.common.engine.schedule.constraint.ScheduleToolLedgerSnapshot;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import org.springframework.beans.BeanUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 /**
  * TM/TC 自动排程公共运行态上下文模型。
@@ -29,6 +33,34 @@ public abstract class ScheduleContextModel<T extends ScheduleTaskDraftModel,
 
     protected String factoryCode;
     protected String batchNo;
+    /**
+     * 内部流水线模式；仅自动排程入口显式启用，人工和滚动默认关闭。
+     */
+    protected boolean twoPhaseEnabled;
+    /**
+     * 基础轮独立供应时长排序模式，不更改全局策略。
+     */
+    protected String twoPhaseBaseSortMode;
+    /**
+     * 当前两阶段执行阶段，用于运行快照与排序作用域。
+     */
+    protected String twoPhasePhase;
+    /**
+     * 活动需求消费快照；不随生产任务前移、删除或复制变化。
+     */
+    protected Map<Integer, Map<String, BigDecimal>> twoPhaseConsumptionMap = new LinkedHashMap<>();
+    /**
+     * 空班也生成的逐班关账证据，最终解释按物料关联查询。
+     */
+    protected List<Map<String, Object>> twoPhaseShiftCloseEvidence = new ArrayList<>();
+    /**
+     * 基础残量与后班原生量的同源吸收账本。
+     */
+    protected ScheduleTwoPhaseCarryLedger<T> twoPhaseCarryLedger = new ScheduleTwoPhaseCarryLedger<>();
+    /**
+     * 按原基础额度保存阶段事件，零生产/后班失败意图也可在最终解释查询。
+     */
+    protected Map<String, List<Map<String, Object>>> twoPhaseTaskEvents = new LinkedHashMap<>();
     protected String traceId;
     /** 参数为空消息工厂，保持领域国际化消息在使用时读取。 */
     @Getter(AccessLevel.NONE)
@@ -67,6 +99,14 @@ public abstract class ScheduleContextModel<T extends ScheduleTaskDraftModel,
     protected String taskId;
     protected Map<String, Object> qualitySummary = new LinkedHashMap<>();
     protected Map<String, F> stockForecastMap = new HashMap<>();
+    /** 加载阶段获取的前日六点净库存。 */
+    protected Map<String, BigDecimal> sixClockStockSnapshot;
+    /** 加载阶段基于施工基础资料计算的首班需求。 */
+    protected Map<String, BigDecimal> firstShiftDemandSnapshot;
+    /**
+     * 本次排程加载的产品卷曲长度快照。
+     */
+    protected Map<String, BigDecimal> curlLengthMap = new HashMap<>();
     /** 用于库存预测和工装占用的产品集合，与可排任务集合严格分离。 */
     protected Set<String> inventoryProductCodeSet = new LinkedHashSet<>();
     protected Map<String, BigDecimal> remainingStockMap = new HashMap<>();
@@ -82,6 +122,16 @@ public abstract class ScheduleContextModel<T extends ScheduleTaskDraftModel,
     protected BigDecimal initialAvailableToolQty;
     protected BigDecimal currentAvailableToolQty;
     protected Map<String, ScheduleToolLedgerSnapshot> toolLedgerSnapshotMap = new LinkedHashMap<>();
+    /**
+     * 当日成型总余量额度台账，按「工厂|排程日期|产品|单位长度」分桶。
+     *
+     * <p>来源未配置成型余量时该映射为空，全链路保持既有行为。</p>
+     */
+    protected Map<String, ScheduleTailQuotaLedger> tailQuotaLedgerMap = new LinkedHashMap<>();
+    /**
+     * 成型总余量台账是否已初始化，避免两阶段工作区重入时重复初始化。
+     */
+    protected boolean tailQuotaPrepared;
     /** 已完成当班成型释放的班次+产品键，避免同一产品重复释放。 */
     protected Set<String> settledToolDemandKeySet = new HashSet<>();
     protected Integer toolLedgerSequence = 0;
@@ -98,6 +148,10 @@ public abstract class ScheduleContextModel<T extends ScheduleTaskDraftModel,
     protected Map<Integer, Map<String, Object>> workCalendarStoppedShiftEvidenceMap = new LinkedHashMap<>();
     protected Map<Integer, Map<String, Object>> currentDayShutdownEvidenceMap = new LinkedHashMap<>();
     protected Map<Integer, ScheduleShiftTimeWindowModel> shiftTimeWindowMap = new HashMap<>();
+    /**
+     * 当前来源日期轴CLASS1至CLASS8的成型日历快照；缺失不视为开放。
+     */
+    protected Map<Integer, Boolean> extraCreateFormingCalendarOpenMap = new LinkedHashMap<>();
     protected String emptyFormingTaskMessage;
     protected List<ScheduleTaskProcessLogEntry> deferredTaskProcessLogList = new ArrayList<>();
     protected Long deferredTaskProcessLogSequence = 0L;
@@ -132,6 +186,184 @@ public abstract class ScheduleContextModel<T extends ScheduleTaskDraftModel,
         this.scheduleDateEmptyMessageSupplier = Objects.requireNonNull(scheduleDateEmptyMessageSupplier,
                 "排程日期为空消息工厂不能为空");
         this.maxShiftOrder = maxShiftOrder;
+    }
+
+    /**
+     * 将本次排程中可变运行态复制到同类型工作区，所有任务链节点和组对象均重连到工作区任务。
+     *
+     * @param target         同模块新建的工作区上下文
+     * @param taskCopier     领域任务复制器
+     * @param machineCopier  领域机台候选复制器
+     * @param snapshotCopier 快照复制器
+     * @param traceCopier    规则轨迹复制器
+     * @param forecastCopier 库存预测复制器
+     * @throws IllegalArgumentException 目标上下文为空时抛出
+     */
+    public void copyWorkspaceStateTo(ScheduleContextModel<T, S, R, F, M> target,
+                                     Function<T, T> taskCopier,
+                                     Function<M, M> machineCopier,
+                                     Function<S, S> snapshotCopier,
+                                     Function<R, R> traceCopier,
+                                     Function<F, F> forecastCopier) {
+        this.copyWorkspaceStateTo(target, taskCopier, machineCopier, snapshotCopier, traceCopier, forecastCopier, true);
+    }
+
+    /**
+     * 将本次排程中可变运行态复制到同类型工作区，可选择是否复制解释证据类集合。
+     *
+     * <p>备库试算的失败副本会被直接丢弃，其规则轨迹和解释快照不会被任何下游读取；
+     * 这类副本可以跳过证据集合的深拷贝，只复制判定所需的运行态，避免每次试算都复制整份解释证据。</p>
+     *
+     * @param target         同模块新建的工作区上下文
+     * @param taskCopier     领域任务复制器
+     * @param machineCopier  领域机台候选复制器
+     * @param snapshotCopier 快照复制器
+     * @param traceCopier    规则轨迹复制器
+     * @param forecastCopier 库存预测复制器
+     * @param copyEvidence   是否深拷贝解释快照与规则轨迹
+     * @throws IllegalArgumentException 目标上下文为空时抛出
+     */
+    public void copyWorkspaceStateTo(ScheduleContextModel<T, S, R, F, M> target,
+                                     Function<T, T> taskCopier,
+                                     Function<M, M> machineCopier,
+                                     Function<S, S> snapshotCopier,
+                                     Function<R, R> traceCopier,
+                                     Function<F, F> forecastCopier,
+                                     boolean copyEvidence) {
+        if (target == null) {
+            throw new IllegalArgumentException("排程工作区上下文不能为空");
+        }
+        IdentityHashMap<T, T> taskCopyMap = new IdentityHashMap<>();
+        Function<T, T> copyTask = task -> task == null ? null
+                : taskCopyMap.computeIfAbsent(task, taskCopier);
+        IdentityHashMap<M, M> machineCopyMap = new IdentityHashMap<>();
+        Function<M, M> copyMachine = machine -> machine == null ? null
+                : machineCopyMap.computeIfAbsent(machine, machineCopier);
+
+        target.setTaskDraftList(ScheduleWorkspaceCopyUtils.copyList(this.taskDraftList, copyTask));
+        target.setSourceTaskDraftList(ScheduleWorkspaceCopyUtils.copyList(this.sourceTaskDraftList, copyTask));
+        target.setPlanTaskGroupMap(this.planTaskGroupMap.entrySet().stream().collect(Collectors.toMap(
+                Map.Entry::getKey, entry -> this.copyPlanTaskGroup(entry.getValue(), copyTask),
+                (left, right) -> right, LinkedHashMap::new)));
+        target.setTaskChainGroup(this.taskChainGroup.copy(copyTask,
+                new ScheduleOperationContext(this.operator, "EXTRA_CREATE_WORKSPACE_COPY", this.traceId)));
+        Map<String, ScheduleTaskNode<T>> copiedNodeIndex = new HashMap<>();
+        target.getTaskChainGroup().values().stream().flatMap(chain -> chain.toList().stream())
+                .filter(Objects::nonNull)
+                .forEach(node -> copiedNodeIndex.put(node.getTaskId(), node));
+        target.setTaskNodeIndex(copiedNodeIndex);
+        // 解释证据（快照、规则轨迹）体积随任务数与规则命中数增长，且试算失败副本不会被下游读取，
+        // 因此试算副本跳过这两项的深拷贝；其余运行态（任务、链、账本、候选、库存预测、参数）仍完整复制。
+        if (copyEvidence) {
+            target.setSnapshotMap(ScheduleWorkspaceCopyUtils.copyMapValues(this.snapshotMap, snapshotCopier));
+            target.setRuleTraceMap(ScheduleWorkspaceCopyUtils.copyMapValues(this.ruleTraceMap, traceCopier));
+        }
+        target.setProcessRuleTraceCursorMap(ScheduleWorkspaceCopyUtils.copyMap(this.processRuleTraceCursorMap));
+        target.setCandidateTraceMap(this.candidateTraceMap.entrySet().stream().collect(Collectors.toMap(
+                Map.Entry::getKey,
+                entry -> ScheduleWorkspaceCopyUtils.copyList(entry.getValue(), copyMachine),
+                (left, right) -> right, HashMap::new)));
+        target.setMachineCandidateList(ScheduleWorkspaceCopyUtils.copyList(this.machineCandidateList, copyMachine));
+        target.setStockForecastMap(ScheduleWorkspaceCopyUtils.copyMapValues(this.stockForecastMap, forecastCopier));
+        target.setSixClockStockSnapshot(ScheduleWorkspaceCopyUtils.copyMap(this.sixClockStockSnapshot));
+        target.setFirstShiftDemandSnapshot(ScheduleWorkspaceCopyUtils.copyMap(this.firstShiftDemandSnapshot));
+        target.setCurlLengthMap(ScheduleWorkspaceCopyUtils.copyMap(this.curlLengthMap));
+        target.setParamMap(ScheduleWorkspaceCopyUtils.copyMapValues(this.paramMap,
+                value -> ScheduleWorkspaceCopyUtils.copyBean(value, ScheduleParamValueModel.class)));
+        target.getParamMap().values().stream().filter(Objects::nonNull)
+                .forEach(value -> value.setConfiguredValues(new ArrayList<>(value.getConfiguredValues() == null
+                        ? Collections.emptyList() : value.getConfiguredValues())));
+        target.setTwoPhaseConsumptionMap(this.twoPhaseConsumptionMap.entrySet().stream().collect(Collectors.toMap(
+                Map.Entry::getKey, entry -> new LinkedHashMap<>(entry.getValue()),
+                (left, right) -> right, LinkedHashMap::new)));
+        target.setTwoPhaseShiftCloseEvidence(this.twoPhaseShiftCloseEvidence.stream()
+                .map(ScheduleWorkspaceCopyUtils::copyEvidenceMap).collect(Collectors.toCollection(ArrayList::new)));
+        target.setTwoPhaseTaskEvents(this.twoPhaseTaskEvents.entrySet().stream().collect(Collectors.toMap(
+                Map.Entry::getKey,
+                entry -> entry.getValue().stream().map(ScheduleWorkspaceCopyUtils::copyEvidenceMap)
+                        .collect(Collectors.toCollection(ArrayList::new)),
+                (left, right) -> right, LinkedHashMap::new)));
+        target.setTwoPhaseCarryLedger(this.twoPhaseCarryLedger.copy(copyTask));
+        target.setQualitySummary(ScheduleWorkspaceCopyUtils.copyEvidenceMap(this.qualitySummary));
+        target.setInventoryProductCodeSet(ScheduleWorkspaceCopyUtils.copySet(this.inventoryProductCodeSet));
+        target.setRemainingStockMap(ScheduleWorkspaceCopyUtils.copyMap(this.remainingStockMap));
+        target.setInitialStockMap(ScheduleWorkspaceCopyUtils.copyMap(this.initialStockMap));
+        target.setProductShiftShortageMap(ScheduleWorkspaceCopyUtils.copyMap(this.productShiftShortageMap));
+        target.setConfiguredMouthPlateCodeSet(ScheduleWorkspaceCopyUtils.copySet(this.configuredMouthPlateCodeSet));
+        target.setConfiguredGlueCodeSet(ScheduleWorkspaceCopyUtils.copySet(this.configuredGlueCodeSet));
+        target.setExperimentSpecInfoMap(ScheduleWorkspaceCopyUtils.copyMapValues(this.experimentSpecInfoMap,
+                value -> ScheduleWorkspaceCopyUtils.copyBean(value, value.getClass())));
+        target.setToolLedgerSnapshotMap(ScheduleWorkspaceCopyUtils.copyMapValues(this.toolLedgerSnapshotMap,
+                value -> ScheduleWorkspaceCopyUtils.copyBean(value, value.getClass())));
+        // 额度台账必须深拷贝值，copyMap 是浅拷贝会让工作区扣减污染主台账；幂等标记同步复制，
+        // 否则两阶段工作区重入会把已扣减的额度冲回总余量。
+        target.setTailQuotaLedgerMap(ScheduleWorkspaceCopyUtils.copyMapValues(this.tailQuotaLedgerMap,
+                ScheduleTailQuotaLedger::copy));
+        target.setTailQuotaPrepared(this.tailQuotaPrepared);
+        target.setSettledToolDemandKeySet(ScheduleWorkspaceCopyUtils.copySet(this.settledToolDemandKeySet));
+        target.setSmallGlueCodeSet(ScheduleWorkspaceCopyUtils.copySet(this.smallGlueCodeSet));
+        target.setSmallGlueMachineMap(ScheduleWorkspaceCopyUtils.copyMap(this.smallGlueMachineMap));
+        target.setGlueCombinedOrderMap(new LinkedHashMap<>(this.glueCombinedOrderMap));
+        target.setShiftHoursMap(ScheduleWorkspaceCopyUtils.copyMap(this.shiftHoursMap));
+        target.setExtraCreateFormingCalendarOpenMap(
+                ScheduleWorkspaceCopyUtils.copyMap(this.extraCreateFormingCalendarOpenMap));
+        target.setCompletedProcessSteps(new ArrayList<>(this.completedProcessSteps));
+        target.setStartupShiftOrderSet(ScheduleWorkspaceCopyUtils.copySet(this.startupShiftOrderSet));
+        target.setWorkCalendarStoppedShiftOrderSet(
+                ScheduleWorkspaceCopyUtils.copySet(this.workCalendarStoppedShiftOrderSet));
+        target.setWorkCalendarStoppedShiftEvidenceMap(this.copyEvidenceMapMap(this.workCalendarStoppedShiftEvidenceMap));
+        target.setCurrentDayShutdownEvidenceMap(this.copyEvidenceMapMap(this.currentDayShutdownEvidenceMap));
+        target.setShiftTimeWindowMap(ScheduleWorkspaceCopyUtils.copyMapValues(this.shiftTimeWindowMap,
+                value -> ScheduleWorkspaceCopyUtils.copyBean(value, ScheduleShiftTimeWindowModel.class)));
+        target.setDeferredTaskProcessLogList(ScheduleWorkspaceCopyUtils.copyList(this.deferredTaskProcessLogList,
+                value -> ScheduleWorkspaceCopyUtils.copyBean(value, ScheduleTaskProcessLogEntry.class)));
+        target.setLossRuleList(ScheduleWorkspaceCopyUtils.copyList(this.lossRuleList,
+                value -> ScheduleWorkspaceCopyUtils.copyBean(value, ScheduleLossRuleModel.class)));
+        target.setIssueCollector(this.issueCollector.copy());
+        target.setMachinePredecessorMap(ScheduleWorkspaceCopyUtils.copyMapValues(this.machinePredecessorMap,
+                value -> ScheduleWorkspaceCopyUtils.copyBean(value, ScheduleTaskPredecessorModel.class)));
+        target.setPreviousDayProductMachineBindingMap(
+                ScheduleWorkspaceCopyUtils.copyMap(this.previousDayProductMachineBindingMap));
+        target.setProductMachineBindingHistoryMap(ScheduleWorkspaceCopyUtils.copyMapValues(
+                this.productMachineBindingHistoryMap, value -> new TreeMap<>(value)));
+        target.setPostTailCloseOutStateMap(ScheduleWorkspaceCopyUtils.copyMapValues(this.postTailCloseOutStateMap,
+                value -> ScheduleWorkspaceCopyUtils.copyBean(value, value.getClass())));
+        target.setProcessTraceBuffer(this.getOrCreateProcessTraceBuffer().copy());
+    }
+
+    /**
+     * 复制汇总组并保持汇总任务、来源任务与工作区任务列表的对象身份一致。
+     *
+     * @param source     原计划汇总组
+     * @param taskCopier 身份一致的任务复制器
+     * @return 工作区汇总组副本
+     */
+    private SchedulePlanTaskGroup<T> copyPlanTaskGroup(SchedulePlanTaskGroup<T> source,
+                                                       Function<T, T> taskCopier) {
+        SchedulePlanTaskGroup<T> copy = new SchedulePlanTaskGroup<>();
+        if (source != null) {
+            BeanUtils.copyProperties(source, copy);
+            copy.setAggregateTask(source.getAggregateTask() == null ? null : taskCopier.apply(source.getAggregateTask()));
+            copy.setSourceTaskList(ScheduleWorkspaceCopyUtils.copyList(source.getSourceTaskList(), taskCopier));
+            copy.setSourceWeightMap(ScheduleWorkspaceCopyUtils.copyMap(source.getSourceWeightMap()));
+        }
+        return copy;
+    }
+
+    /**
+     * 复制班次证据外层映射与内层常见容器。
+     *
+     * @param source 来源证据映射
+     * @return 独立证据映射
+     */
+    private Map<Integer, Map<String, Object>> copyEvidenceMapMap(
+            Map<Integer, Map<String, Object>> source) {
+        Map<Integer, Map<String, Object>> copy = new LinkedHashMap<>();
+        if (source != null) {
+            source.forEach((shiftOrder, evidence) ->
+                    copy.put(shiftOrder, ScheduleWorkspaceCopyUtils.copyEvidenceMap(evidence)));
+        }
+        return copy;
     }
 
     /**
@@ -220,6 +452,12 @@ public abstract class ScheduleContextModel<T extends ScheduleTaskDraftModel,
             return null;
         }
         String normalizedProcessCode = processCode.trim();
+        if (this.twoPhaseEnabled) {
+            NavigableMap<Integer, String> dailyHistory = this.productMachineBindingHistoryMap.get(normalizedProcessCode);
+            if (dailyHistory != null && !dailyHistory.isEmpty()) {
+                return dailyHistory.firstEntry().getValue();
+            }
+        }
         NavigableMap<Integer, String> bindingHistory = this.productMachineBindingHistoryMap
                 .get(normalizedProcessCode);
         if (bindingHistory != null && !bindingHistory.isEmpty()) {
@@ -245,6 +483,13 @@ public abstract class ScheduleContextModel<T extends ScheduleTaskDraftModel,
             return;
         }
         int bindingShiftOrder = shiftOrder == null ? Integer.MAX_VALUE : shiftOrder;
+        if (this.twoPhaseEnabled) {
+            NavigableMap<Integer, String> dailyHistory = this.productMachineBindingHistoryMap.get(processCode.trim());
+            if (dailyHistory != null && dailyHistory.values().stream()
+                    .anyMatch(boundMachine -> !Objects.equals(boundMachine, machineCode.trim()))) {
+                throw new IllegalStateException("Two-phase daily material binding cannot move to another machine");
+            }
+        }
         this.productMachineBindingHistoryMap
                 .computeIfAbsent(processCode.trim(), key -> new TreeMap<>())
                 .put(bindingShiftOrder, machineCode.trim());
@@ -396,6 +641,19 @@ public abstract class ScheduleContextModel<T extends ScheduleTaskDraftModel,
      */
     public ScheduleProcessLogLevel getProcessLogLevel() {
         return this.getOrCreateProcessTraceBuffer().getLevel();
+    }
+
+    /**
+     * 将试算中独立记录的过程事件按原分类追加到本工作区。
+     *
+     * @param source 只承载本次试算输出的上下文
+     */
+    public void appendIsolatedProcessEvents(ScheduleContextModel<T, S, R, F, M> source) {
+        this.getOrCreateProcessTraceBuffer().appendFrom(source.getOrCreateProcessTraceBuffer());
+        source.getDeferredTaskProcessLogList().forEach(entry -> {
+            entry.setOccurrenceOrder(this.nextDeferredTaskProcessLogSequence());
+            this.getOrCreateDeferredTaskProcessLogList().add(entry);
+        });
     }
 
 /**
@@ -796,8 +1054,13 @@ public abstract class ScheduleContextModel<T extends ScheduleTaskDraftModel,
         this.paramMap = paramMap == null ? new HashMap<>() : paramMap;
     }
 
+    /**
+     * 设置本次排程的可修改任务列表，列表元素保持原引用和顺序。
+     *
+     * @param taskDraftList 输入任务列表
+     */
     public void setTaskDraftList(List<T> taskDraftList) {
-        this.taskDraftList = taskDraftList == null ? new ArrayList<>() : taskDraftList;
+        this.taskDraftList = taskDraftList == null ? new ArrayList<>() : new ArrayList<>(taskDraftList);
     }
 
     public void setSourceTaskDraftList(List<T> sourceTaskDraftList) {

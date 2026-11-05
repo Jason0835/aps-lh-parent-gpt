@@ -1,5 +1,8 @@
 package com.zlt.aps.common.engine.schedule;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -19,6 +22,16 @@ public abstract class AbstractMachineCandidateEvaluation<C, T, M, RC>
         extends AbstractMachineCarryoverEvaluator<C, T, M, RC> {
 
     /**
+     * 候选评估性能计时日志，用于定位过滤和评分热点。
+     */
+    private static final Logger PERF_LOG = LoggerFactory.getLogger(AbstractMachineCandidateEvaluation.class);
+
+    /**
+     * 单次候选评估超过该阈值时输出慢评估日志，避免高频明细刷屏。
+     */
+    private static final long SLOW_EVALUATION_LOG_THRESHOLD_MS = 50L;
+
+    /**
      * 执行一次候选机台过滤、评分和排序。
      *
      * @param context 排程上下文
@@ -33,30 +46,78 @@ public abstract class AbstractMachineCandidateEvaluation<C, T, M, RC>
                                                                List<M> sourceCandidates,
                                                                IScheduleRule<M, RC> filterRule,
                                                                IScheduleScoreStrategy<M, RC> scoreStrategy) {
+        return this.evaluate(context, task, sourceCandidates, filterRule, scoreStrategy, null);
+    }
+
+    /**
+     * 使用指定接收器收集机台轨迹；未指定时沿用领域原有记录方式。
+     *
+     * @param context          排程上下文
+     * @param task             待排任务
+     * @param sourceCandidates 原始候选机台
+     * @param filterRule       机台过滤规则
+     * @param scoreStrategy    机台评分策略
+     * @param collector        独立轨迹接收器；为空时使用领域原有记录方式
+     * @return 全部候选和通过过滤候选
+     * @throws IllegalArgumentException 规则或评分策略为空时抛出
+     */
+    public final ScheduleCandidateEvaluationResult<M> evaluate(C context, T task,
+                                                               List<M> sourceCandidates,
+                                                               IScheduleRule<M, RC> filterRule,
+                                                               IScheduleScoreStrategy<M, RC> scoreStrategy,
+                                                               ScheduleCandidateTraceCollector<C, T, M> collector) {
         if (filterRule == null || scoreStrategy == null) {
             throw new IllegalArgumentException("机台过滤规则和评分策略不能为空");
         }
         if (sourceCandidates == null || sourceCandidates.isEmpty()) {
             return new ScheduleCandidateEvaluationResult<>(Collections.emptyList(), Collections.emptyList());
         }
-
+        // 性能计时：候选评估四段(候选复制与运行态补齐/建规则上下文/过滤/评分)与排序轨迹段
+        long evaluateStartMs = System.currentTimeMillis();
         List<M> candidates = this.copyCandidates(sourceCandidates);
         this.prepareCandidatesForTask(task, context, candidates);
+        long prepareMs = System.currentTimeMillis() - evaluateStartMs;
         RC ruleContext = this.buildRuleContext(task, context);
+        long buildRuleContextMs = System.currentTimeMillis() - evaluateStartMs - prepareMs;
+        long filterStartMs = System.currentTimeMillis();
         List<M> passedCandidates = new ArrayList<>();
         for (M candidate : candidates) {
             ScheduleRuleResult ruleResult = filterRule.evaluate(candidate, ruleContext);
-            this.recordFilterResult(context, task, candidate, ruleResult);
+            if (collector == null) {
+                this.recordFilterResult(context, task, candidate, ruleResult);
+            } else {
+                collector.recordFilter(context, task, candidate, ruleResult);
+            }
             if (ruleResult.isPassed()) {
                 passedCandidates.add(candidate);
             }
         }
+        long filterMs = System.currentTimeMillis() - filterStartMs;
+        long scoreStartMs = System.currentTimeMillis();
         for (M candidate : passedCandidates) {
             ScheduleScoreResult scoreResult = scoreStrategy.score(candidate, ruleContext);
-            this.recordScoreResult(context, task, candidate, scoreResult);
+            if (collector == null) {
+                this.recordScoreResult(context, task, candidate, scoreResult);
+            } else {
+                collector.recordScore(context, task, candidate, scoreResult);
+            }
         }
+        long scoreMs = System.currentTimeMillis() - scoreStartMs;
+        long sortTraceStartMs = System.currentTimeMillis();
         List<M> sortedPassedCandidates = this.sortPassedCandidates(task, passedCandidates);
-        this.recordCandidateTrace(context, task, candidates);
+        if (collector == null) {
+            this.recordCandidateTrace(context, task, candidates);
+        } else {
+            collector.recordCandidates(context, task, candidates);
+        }
+        long sortTraceMs = System.currentTimeMillis() - sortTraceStartMs;
+        long totalMs = System.currentTimeMillis() - evaluateStartMs;
+        if (totalMs >= SLOW_EVALUATION_LOG_THRESHOLD_MS) {
+            PERF_LOG.info("[SCHEDULE_PERF] 候选机台评估耗时 candidateCount={}, passedCount={}, prepare={}ms, "
+                            + "buildRuleContext={}ms, filter={}ms, score={}ms, sortTrace={}ms, total={}ms",
+                    candidates.size(), passedCandidates.size(), prepareMs, buildRuleContextMs,
+                    filterMs, scoreMs, sortTraceMs, totalMs);
+        }
         return new ScheduleCandidateEvaluationResult<>(candidates, sortedPassedCandidates);
     }
 

@@ -7,11 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 
 import java.math.BigDecimal;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedHashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * 硫化排程配置快照
@@ -957,6 +953,23 @@ public class LhScheduleConfig {
     }
 
     /**
+     * 获取Sku最大间隔天数
+     * 20261031+ ZLT
+     *
+     * @return
+     */
+    public Integer getSkuMaxDiscontinueDays(){
+        String value = resolvedParamMap.get(LhScheduleParamConstant.SKU_MAX_DISCONTINUE_DAYS);
+        if (StringUtils.isEmpty(value)) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+    /**
      * 解析按日标准量排产结构清单。
      * <p>仅按英文逗号拆分参数值，逐项去除前后空格并过滤空字符串；
      * 使用集合去重后保存为不可变快照，避免续作、换活字块和新增排产重复解析参数。</p>
@@ -993,5 +1006,16 @@ public class LhScheduleConfig {
             return Collections.emptySet();
         }
         return Collections.unmodifiableSet(configValueSet);
+    }
+
+    /**
+     * 获取非等结果结构切换首班上限，直接构造快照时也保证正整数边界。
+     *
+     * @return 首班物理机台数上限，缺省或非法值为2
+     */
+    public int getStructureSwitchNoWaitFirstShiftMachineLimit() {
+        int value = this.getParamIntValue(LhScheduleParamConstant.STRUCTURE_SWITCH_NO_WAIT_FIRST_SHIFT_MACHINE_LIMIT,
+                LhScheduleConstant.STRUCTURE_SWITCH_NO_WAIT_FIRST_SHIFT_MACHINE_LIMIT);
+        return value > 0 ? value : LhScheduleConstant.STRUCTURE_SWITCH_NO_WAIT_FIRST_SHIFT_MACHINE_LIMIT;
     }
 }

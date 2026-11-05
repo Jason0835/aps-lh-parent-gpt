@@ -3,6 +3,7 @@ package com.zlt.aps.common.engine.schedule;
 import com.zlt.aps.common.engine.schedule.engine.SchedulePlanQtyResultModel;
 import com.zlt.aps.common.engine.schedule.engine.SchedulePostTailPlanQtyCalculator;
 import com.zlt.aps.common.engine.schedule.engine.ScheduleTaskDraftModel;
+import com.zlt.aps.common.engine.schedule.engine.TwoPhaseScheduleContext;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -42,20 +43,27 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T extends ScheduleTaskDr
         BigDecimal twoShiftStockGap = twoShiftDemand.subtract(stock);
         this.setTwoShiftDemandQty(task, twoShiftDemand);
         this.setTwoShiftStockGapQty(task, twoShiftStockGap);
-        boolean stockCoverageApplicable = this.isTwoShiftStockCoverageApplicable(task);
+        boolean twoPhase = context instanceof TwoPhaseScheduleContext
+                && ((TwoPhaseScheduleContext) context).isTwoPhaseEnabled();
+        // 两阶段仍按配置窗口判断库存覆盖，基础请求另由两阶段请求计算器按当前班和下一班计算。
+        boolean stockCoverageApplicable = twoPhase || this.isTwoShiftStockCoverageApplicable(task);
         if (stockCoverageApplicable) {
             BigDecimal coverageDemand = task.getStockCoverageDemandQty() == null
                     ? twoShiftDemand : this.nvl(task.getStockCoverageDemandQty());
             task.setStockCoverageDemandQty(coverageDemand);
             BigDecimal coverageStockGap = coverageDemand.subtract(stock);
             task.setStockCoverageStockGapQty(coverageStockGap);
+            this.setTwoShiftStockCovered(task, twoShiftStockGap.compareTo(BigDecimal.ZERO) <= 0);
             if (coverageStockGap.compareTo(BigDecimal.ZERO) <= 0) {
                 task.setStockCoverageCovered(Boolean.TRUE);
-                this.setTwoShiftStockCovered(task, Boolean.TRUE);
-                return this.buildStockCoverageCoveredResult(task, currentDemand, coverageDemand, stock);
+                R coveredResult = this.buildStockCoverageCoveredResult(task, currentDemand, coverageDemand, stock);
+                if (twoPhase) {
+                    this.setResultCalcFormulaDesc(coveredResult,
+                            "配置库存覆盖窗口已覆盖，两阶段基础请求和备库目标分别按各自需求窗口计算");
+                }
+                return coveredResult;
             }
             task.setStockCoverageCovered(Boolean.FALSE);
-            this.setTwoShiftStockCovered(task, Boolean.FALSE);
         } else {
             task.setStockCoverageDemandQty(null);
             task.setStockCoverageCovered(null);
@@ -81,11 +89,30 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T extends ScheduleTaskDr
         if (tailTask) {
             // 收尾规格取需求量和收尾余量对应长度的较小值，不执行最小起排和卷数取整。
             BigDecimal beforeTail = planQty;
-            BigDecimal tailBaseQty = this.nvl(this.getTailBalanceQty(task))
-                    .multiply(this.nvl(this.getProductLength(task)));
-            planQty = planQty.min(tailBaseQty);
-            preLossPlanQty = planQty;
-            this.setResultTailRoundAdjustQty(result, planQty.subtract(beforeTail));
+            // 已下发当日成型总余量额度时以额度为上限；未启用额度必须回退既有口径，
+            // 直接 nvl(tailQuotaAvailableQty) 会让未配置余量的产品收尾上限变成零。
+            // 额度本身已是米数（余量条数×单位长度），不能再乘单位长度；只有回退口径才需要折算。
+            BigDecimal tailBaseQty;
+            if (task.getTailQuotaAvailableQty() != null) {
+                // 整数米取整允许实际产量比额度多不足1米，台账剩余额度可能为负；可执行量必须非负
+                tailBaseQty = task.getTailQuotaAvailableQty().max(BigDecimal.ZERO);
+            } else {
+                tailBaseQty = this.nvl(this.getTailBalanceQty(task))
+                        .multiply(this.nvl(this.getProductLength(task)));
+            }
+            BigDecimal cappedQty = planQty.min(tailBaseQty);
+            preLossPlanQty = cappedQty;
+            this.setResultTailRoundAdjustQty(result, cappedQty.subtract(beforeTail));
+
+            BigDecimal tailMinPlanQty = this.nvl(this.getTailMinPlanQty(task));
+            planQty = cappedQty;
+            BigDecimal minStartAdjust = BigDecimal.ZERO;
+            if (cappedQty.compareTo(BigDecimal.ZERO) > 0 && tailMinPlanQty.compareTo(BigDecimal.ZERO) > 0
+                    && cappedQty.compareTo(tailMinPlanQty) < 0) {
+                planQty = tailMinPlanQty;
+                minStartAdjust = tailMinPlanQty.subtract(cappedQty);
+            }
+            this.setResultMinStartAdjustQty(result, minStartAdjust);
         } else {
             BigDecimal beforeMinStart = planQty;
             planQty = this.applyMinStartQty(task, planQty);
@@ -102,7 +129,9 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T extends ScheduleTaskDr
         this.setResultFinalPlanQty(result, planQty);
         this.setPlanStockQty(task, this.calculateHandoverStock(stock, currentDemand, planQty));
         this.setResultCalcFormulaDesc(result,
-                tailTask ? "收尾余量" : "基础需求->库存抵扣->派机前最小起排与卷数取整估算");
+                task.getDemandOnlyMinimumQty() != null
+                        ? com.ruoyi.common.i18n.utils.I18nUtil.getMessage("ui.schedule.demandOnly.estimateFormula")
+                        : tailTask ? "收尾余量" : "基础需求->库存抵扣->派机前最小起排与卷数取整估算");
         this.setPlanQty(task, planQty);
         return result;
     }
@@ -203,6 +232,16 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T extends ScheduleTaskDr
      * @return 最小起排量
      */
     protected abstract BigDecimal getMinStartQty(T task);
+
+    /**
+     * 获取收尾规格最小计划量。
+     *
+     * @param task 任务
+     * @return 收尾规格最小计划量，默认尝试从公共模型获取，无法取得时返回空值
+     */
+    protected BigDecimal getTailMinPlanQty(T task) {
+        return task != null ? task.getTailMinPlanQty() : null;
+    }
 
     /**
      * 获取任务卷曲长度。
@@ -370,7 +409,19 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T extends ScheduleTaskDr
         BigDecimal stockDeductQty = stock.min(closeOutDemandQty);
         BigDecimal basePlanQty = closeOutDemandQty.subtract(stock).max(BigDecimal.ZERO);
         BigDecimal tailLimitQty = this.nvl(this.getFormingShutdownCloseOutTailLimitQty(task));
-        BigDecimal planQty = basePlanQty.min(tailLimitQty);
+        BigDecimal cappedQty = basePlanQty.min(tailLimitQty);
+        BigDecimal tailRoundAdjust = cappedQty.subtract(basePlanQty);
+
+        BigDecimal preLossPlanQty = cappedQty;
+        BigDecimal planQty = cappedQty;
+        BigDecimal minStartAdjust = BigDecimal.ZERO;
+        BigDecimal tailMinPlanQty = this.nvl(this.getTailMinPlanQty(task));
+        if (cappedQty.compareTo(BigDecimal.ZERO) > 0 && tailMinPlanQty.compareTo(BigDecimal.ZERO) > 0
+                && cappedQty.compareTo(tailMinPlanQty) < 0) {
+            planQty = tailMinPlanQty;
+            minStartAdjust = tailMinPlanQty.subtract(cappedQty);
+        }
+
         this.setTwoShiftDemandQty(task, closeOutDemandQty);
         this.setTwoShiftStockGapQty(task, closeOutDemandQty.subtract(stock));
         this.setTwoShiftStockCovered(task, planQty.compareTo(BigDecimal.ZERO) == 0);
@@ -381,11 +432,14 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T extends ScheduleTaskDr
         R result = this.newResult();
         this.initializeZeroAdjustments(result);
         this.setResultBaseDemandQty(result, basePlanQty);
-        this.setResultTailRoundAdjustQty(result, planQty.subtract(basePlanQty));
-        this.setResultPreLossPlanQty(result, planQty);
+        this.setResultTailRoundAdjustQty(result, tailRoundAdjust);
+        this.setResultMinStartAdjustQty(result, minStartAdjust);
+        this.setResultPreLossPlanQty(result, preLossPlanQty);
         this.setResultPlanQtyBeforeToolLimit(result, planQty);
         this.setResultFinalPlanQty(result, planQty);
-        this.setResultCalcFormulaDesc(result, "成型连续停产收尾需求->库存抵扣->收尾上限");
+        this.setResultCalcFormulaDesc(result, minStartAdjust.signum() > 0
+                ? "成型连续停产收尾需求->库存抵扣->收尾上限->收尾最小计划量补齐"
+                : "成型连续停产收尾需求->库存抵扣->收尾上限");
         return result;
     }
 
@@ -482,7 +536,8 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T extends ScheduleTaskDr
      * @return 调整后的计划量
      */
     private BigDecimal applyMinStartQty(T task, BigDecimal planQty) {
-        BigDecimal minStartQty = this.nvl(this.getMinStartQty(task));
+        BigDecimal minStartQty = task.getDemandOnlyMinimumQty() == null
+                ? this.nvl(this.getMinStartQty(task)) : task.getDemandOnlyMinimumQty();
         if (planQty.compareTo(BigDecimal.ZERO) > 0 && minStartQty.compareTo(BigDecimal.ZERO) > 0
                 && planQty.compareTo(minStartQty) < 0) {
             return minStartQty;
@@ -498,6 +553,9 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T extends ScheduleTaskDr
      * @return 取整后的计划量
      */
     private BigDecimal roundToCurlLength(T task, BigDecimal planQty) {
+        if (task.getDemandOnlyMinimumQty() != null) {
+            return planQty.setScale(0, RoundingMode.CEILING);
+        }
         BigDecimal curlLength = this.resolveCurlLength(task);
         if (planQty.compareTo(BigDecimal.ZERO) <= 0 || curlLength.compareTo(BigDecimal.ZERO) <= 0) {
             return planQty;

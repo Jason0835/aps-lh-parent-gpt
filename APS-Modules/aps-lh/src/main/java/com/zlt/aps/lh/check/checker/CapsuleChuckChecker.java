@@ -10,6 +10,7 @@ import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmCapsuleChuck;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.text.MessageFormat;
@@ -39,6 +40,7 @@ import java.util.Set;
  */
 @Slf4j
 @Component
+@Order(7)
 public class CapsuleChuckChecker implements LhScheduleChecker {
 
     /** 每台机台占用卡盘数 */

@@ -60,12 +60,15 @@ public class LhCleaningOverlapResolver {
             if (window == null) {
                 continue;
             }
-            CleaningPlanResult.Event event = this.resolveEvent(context, machineCode, window);
+            // 无真实切换的续作才把干冰移入维修；切换仍由原三项组合规则投影。
+            MachineCleaningWindowDTO effectiveWindow = switchStart == null
+                    ? LhCleaningRepairOverlapPolicy.projectContinuationWindow(context, window) : window;
+            CleaningPlanResult.Event event = this.resolveEvent(context, machineCode, effectiveWindow);
             if (!offMachine || !Objects.equals(window.getSourcePlanId(), detached.getSourcePlanId())) {
                 events.add(event);
             }
             if (!skipCapacity && event.getStatus() == CleaningPlanStatus.SCHEDULED) {
-                active.add(window);
+                active.add(effectiveWindow);
             }
         }
         if (offMachine) {

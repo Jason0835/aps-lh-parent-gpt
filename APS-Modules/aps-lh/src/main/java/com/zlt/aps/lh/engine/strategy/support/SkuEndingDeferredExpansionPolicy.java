@@ -10,6 +10,8 @@ import com.zlt.aps.lh.util.PriorityTraceLogHelper;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
+import com.zlt.aps.lh.util.MonthPlanDayQtyUtil;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import java.time.LocalDate;
@@ -75,13 +77,15 @@ public final class SkuEndingDeferredExpansionPolicy {
             LocalDate evaluationDate) {
         EndingDeferredExpansionDecision decision = new EndingDeferredExpansionDecision();
         if (context == null || sku == null || context.isTimedMachineOffLoadPreview()
-                || context.isIsolatedNextShiftPlan() || context.isStructureSwitchScheduling()
+                || context.isIsolatedNextShiftPlan() || (context.isStructureSwitchScheduling()
+                && StructureEndingContinuationPolicy.state(context, sku) == null)
                 || context.getEndingDeferredCapacitySnapshot() == null
                 || context.getScheduleDate() == null || context.getWindowEndDate() == null || evaluationDate == null) {
             return decision;
         }
         LocalDate endingDate = context.getStructureMaxEndingDateMap().get(sku.getStructureName());
         if (endingDate == null || endingDate.isAfter(toDate(context.getWindowEndDate()))
+                || isContinuousMonthBoundary(context, sku, endingDate)
                 || !context.getMonthPlanList().stream().filter(Objects::nonNull)
                 .anyMatch(plan -> sameSku(sku, plan.getMaterialCode(), plan.getProductStatus()))
                 || !context.getContinuousSkuList().stream().filter(Objects::nonNull)
@@ -94,13 +98,21 @@ public final class SkuEndingDeferredExpansionPolicy {
         decision.setStructureEndingDate(endingDate);
         int remainingQty = resolveRemainingQty(context, sku);
         Map<String, LhScheduleResult> latestResults = resolveLatestMachineResults(context);
+        StructureEndingContinuationState structureEnding = StructureEndingContinuationPolicy.state(context, sku);
+        if (structureEnding != null && structureEnding.isDeferredExpansion()) {
+            // 冻结原机基线只用于资格复评，C0主动截短不能制造新的延期缺口。
+            structureEnding.getOriginalSeeds().forEach(seed -> latestResults.put(seed.getLhMachineCode(), seed));
+        }
         Set<String> physicalMachines = new LinkedHashSet<String>();
         Map<String, List<Map<Integer, Integer>>> physicalCapacities = new LinkedHashMap<>();
         Set<String> pairedMachines = new LinkedHashSet<>();
         for (LhScheduleResult result : latestResults.values()) {
             MachineScheduleDTO machine = context.getMachineScheduleMap().get(result.getLhMachineCode());
+            boolean frozenOriginal = structureEnding != null && structureEnding.isDeferredExpansion()
+                    && structureEnding.getOriginalSeeds().stream().anyMatch(seed -> seed == result);
             if (!sameSku(sku, result.getMaterialCode(), result.getProductStatus())
-                    || machine == null || !StringUtils.equals(sku.getMaterialCode(), machine.getCurrentMaterialCode())
+                    || machine == null || (!frozenOriginal
+                    && !StringUtils.equals(sku.getMaterialCode(), machine.getCurrentMaterialCode()))
                     || context.resolveForcedReleasedPhysicalMachineCodes(sku).contains(
                     LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode()))) {
                 continue;
@@ -131,6 +143,32 @@ public final class SkuEndingDeferredExpansionPolicy {
         decision.setCommittedMachineCount(physicalMachines.size());
         decision.setShortageQty(Math.max(0, remainingQty - decision.getCommittedCapacityQty()));
         return decision;
+    }
+
+    /**
+     * 排除次月首日仍有同结构生产计划的月末边界，不将月度配置截断视为真实结构收尾。
+     * 非转产且匹配前结构的最晚成型收尾落在正式窗口时，保留原三步收尾规则。
+     *
+     * @param context 本批已加载的有效月份计划及实际成型收尾
+     * @param sku 当前续作需求
+     * @param endingDate 月度结构最大结束日
+     * @return 仅月末边界且次月连续生产时为真
+     */
+    private static boolean isContinuousMonthBoundary(LhScheduleContext context, SkuScheduleDTO sku,
+            LocalDate endingDate) {
+        if (endingDate.getDayOfMonth() != endingDate.lengthOfMonth()
+                || StructureEndingContinuationPolicy.resolveEndingShift(context,
+                StructureEndingContinuationPolicy.resolveEndingTime(context, sku.getStructureName())) != null) {
+            return false;
+        }
+        LocalDate nextDate = endingDate.plusDays(1);
+        List<FactoryMonthPlanProductionFinalResult> plans = context.getLoadedMonthPlanList().isEmpty()
+                ? context.getMonthPlanList() : context.getLoadedMonthPlanList();
+        return plans.stream().filter(Objects::nonNull)
+                .filter(plan -> StringUtils.equals(sku.getStructureName(), plan.getStructureName()))
+                .filter(plan -> Objects.equals(plan.getYear(), nextDate.getYear())
+                        && Objects.equals(plan.getMonth(), nextDate.getMonthValue()))
+                .anyMatch(plan -> MonthPlanDayQtyUtil.resolveDayQty(plan, nextDate.getDayOfMonth()) > 0);
     }
 
     /**
@@ -338,13 +376,34 @@ public final class SkuEndingDeferredExpansionPolicy {
      * @return 不重复扣账的合法剩余量
      */
     private static int resolveRemainingQty(LhScheduleContext context, SkuScheduleDTO sku) {
+        StructureEndingContinuationState structureEnding = StructureEndingContinuationPolicy.state(context, sku);
+        if (structureEnding != null && structureEnding.isDeferredExpansion()) {
+            long originalQty = structureEnding.getOriginalSeeds().stream()
+                    .mapToLong(ShiftFieldUtil::resolveScheduledQty).sum();
+            long additionalQty = context.getScheduleResultList().stream()
+                    .filter(result -> sameSku(sku, result.getMaterialCode(), result.getProductStatus()))
+                    .filter(result -> !structureEnding.getOriginalPhysicalMachines().contains(
+                            LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode())))
+                    .mapToLong(ShiftFieldUtil::resolveScheduledQty).sum();
+            int target = structureEnding.getLegalTargetQty() == null ? sku.resolveTargetScheduleQty()
+                    : structureEnding.getLegalTargetQty();
+            return (int) Math.max(0L, target - originalQty - additionalQty);
+        }
         if (sku.getSurplusQty() > 0 && !ProductionQuantityPolicy.from(sku, sku.isStrictTargetQty()).isStrictUpperLimit()) {
             long scheduledQty = context.getScheduleResultList().stream().filter(Objects::nonNull)
                     .filter(result -> sameSku(sku, result.getMaterialCode(), result.getProductStatus()))
                     .mapToLong(ShiftFieldUtil::resolveScheduledQty).sum();
             return (int) Math.max(0L, sku.getSurplusQty() - scheduledQty);
         }
-        return QUANTITY_READER.previewProductionRemainingQty(context, sku);
+        int remaining = QUANTITY_READER.previewProductionRemainingQty(context, sku);
+        if (!context.isContinuousDailyQuotaSynced()) {
+            long pendingQty = context.getScheduleResultList().stream()
+                    .filter(result -> sameSku(sku, result.getMaterialCode(), result.getProductStatus()))
+                    .filter(result -> !context.getContinuousProductionConsumptionMap().containsKey(result))
+                    .mapToLong(ShiftFieldUtil::resolveScheduledQty).sum();
+            return (int) Math.max(0L, remaining - pendingQty);
+        }
+        return remaining;
     }
 
     /**

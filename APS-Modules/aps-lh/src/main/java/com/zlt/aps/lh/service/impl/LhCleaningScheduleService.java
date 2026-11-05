@@ -91,7 +91,9 @@ public class LhCleaningScheduleService {
         return overlapResolver.appendReplacementCapacityWindow(context, machineCode,
                 replacement == null ? null : replacement.getContinuationMaterialCode(),
                 replacement == null ? null : replacement.getContinuationProductStatus(),
-                this.resolveMachineCleaningWindowList(context, machineCode));
+                this.resolveMachineCleaningWindowList(context, machineCode).stream()
+                        .map(window -> LhCleaningRepairOverlapPolicy.projectContinuationWindow(context, window))
+                        .collect(java.util.stream.Collectors.toList()));
     }
     /**
      * 只读解析结果场景，容量窗口过滤与事件处置独立。
@@ -144,11 +146,12 @@ public class LhCleaningScheduleService {
         return overlapResolver.resolveTypeBlockProductionStartTime(context, machine, switchStart, productionStart);
     }
     /**
-     * 在续作产能计算前落实喷砂资源，按统一精度优先级评估置换及在机维修组合。
+     * 在续作产能计算前复核当天干冰名额，再落实喷砂资源及原精度、维修组合。
      *
      * @param context 当前批次
      */
     public void prepareBeforeContinuous(LhScheduleContext context) {
+        planResolver.reconcileDryIceQuotaBeforeContinuous(context);
         sandBlastDispositionService.prepare(context);
         for (MachineScheduleDTO machine : precisionOverlapPolicy.resolvePriorityMachines(context)) {
             precisionOverlapPolicy.prepareForMachine(context, machine);
@@ -266,7 +269,7 @@ public class LhCleaningScheduleService {
         return finalizer.resolveSandBlastPlanMouldCode(event);
     }
     /**
-     * 对仅喷砂释放原机台的实际交替计划补充备注并清空模具号。
+     * 对仅喷砂实际交替补充备注，接收端保留原模、原机换料端清空离机模具号。
      *
      * @param context 排程上下文
      * @param plan 当前实际交替计划
@@ -274,6 +277,15 @@ public class LhCleaningScheduleService {
     public void applyOnlySandBlastSourcePlanPresentation(
             LhScheduleContext context, LhMouldChangePlan plan) {
         finalizer.applyOnlySandBlastSourcePlanPresentation(context, plan);
+    }
+
+    /**
+     * 最终原因归整后追加离机喷砂实际换料或原模接收的准备班次说明。
+     *
+     * @param context 本轮最终排程上下文
+     */
+    public void appendOnlySandBlastShiftAnalysis(LhScheduleContext context) {
+        finalizer.appendOnlySandBlastShiftAnalysis(context);
     }
     /**
      * 识别仅喷砂释放原机台在触发后的首类实际交替计划。
@@ -336,6 +348,15 @@ public class LhCleaningScheduleService {
             repairPrecisionOverlapPolicy.reconcile(context);
             this.publishCurrentEvents(context);
         }
+    }
+
+    /**
+     * 在最终收尾标记刷新后只校正干冰收尾备注，不重新处理资源、数量、计划或日期回填。
+     *
+     * @param context 已确认最终收尾状态的排程上下文
+     */
+    public void refreshDryIceEndingAnalysis(LhScheduleContext context) {
+        finalizer.refreshDryIceEndingAnalysis(context);
     }
 
     /**

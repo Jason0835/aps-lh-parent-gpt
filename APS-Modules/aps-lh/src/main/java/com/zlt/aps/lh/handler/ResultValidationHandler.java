@@ -1,5 +1,7 @@
 package com.zlt.aps.lh.handler;
 
+import com.zlt.aps.lh.engine.strategy.support.StructureEndingContinuationPolicy;
+
 import com.zlt.aps.lh.service.impl.LhPlannedRepairResolver;
 import com.zlt.aps.lh.service.impl.LhRepairPlanScheduleService;
 import cn.hutool.core.date.DateUtil;
@@ -202,13 +204,18 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
              * 统一刷新同组所有有效结果的isEnd（硫化余量排完 或 胎胚收尾且胎胚库存额度排完），
              * 并执行保存前数量上限强校验。
              */
-            refreshFinalEndingFlagByMaterialStatus(context);
+            this.refreshFinalEndingState(context);
             com.zlt.aps.lh.service.impl.LhRepairEndingDeferralPolicy.appendCommittedAnalysis(context);
 //            validateProductionQuantityPolicy(context);
             // 正式后料、首检及最终裁量均已完成，只读比较续作预测与实际衔接，禁止为维持预测改后料。
             ContinuationEndingHandoffAudit.audit(context);
             // 独立时间下机边界必须经得住所有后置数量归整及后料提交，不能只在S4.4中间态正确。
             this.validateTimedMachineOffBoundaries(context);
+            if (!StructureEndingContinuationPolicy.withinDeadlines(context)) {
+                log.error("结构收尾续作保存前截止校验失败, factoryCode={}, batchNo={}",
+                        context.getFactoryCode(), context.getBatchNo());
+                throw new IllegalStateException(UnscheduledReasonEnum.CAPACITY_INSUFFICIENT.getDescription());
+            }
 
             /*
              * 所有会改变最终结果数量的后置处理已经结束。此处只整理未排诊断投影，
@@ -228,6 +235,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             bindMaintenanceWindowsToFinalResults(context);
             shiftAnalysisRemarkService.appendFinalRemarks(context);
             cleaningScheduleService.appendSandBlastRepairPrecisionAnalysis(context);
+            // 班次原因重建结束后再投影实际换料事实，避免组合备注被摘要覆盖。
+            cleaningScheduleService.appendOnlySandBlastShiftAnalysis(context);
             addSummaryLog(context);
 
             // S4.6.6 保存排程结果到数据库：由持久化服务统一做目标日原子替换。
@@ -1463,7 +1472,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
      */
     private void normalizeMouldMultiplePlanQty(LhScheduleContext context, LhScheduleResult result) {
         // 余量收尾已按整组目标扣账：保存前再次核对逐班模数，禁止通过补量破坏守恒与释放时间。
-        if (Objects.nonNull(context) && context.getContinuationSurplusEndingAllocatedResults().contains(result)) {
+        if (Objects.nonNull(context) && (context.getContinuationSurplusEndingAllocatedResults().contains(result)
+                || StructureEndingContinuationPolicy.ownsResult(context, result))) {
             if (!this.getTargetScheduleQtyResolver().isAllocatedShiftQtyValid(context, result)) {
                 log.warn("续作余量收尾班次数量不符合模数约束, batchNo: {}, materialCode: {}, "
                                 + "productStatus: {}, machineCode: {}, planQty: {}",
@@ -1638,6 +1648,16 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
      */
     private TargetScheduleQtyResolver getTargetScheduleQtyResolver() {
         return Objects.nonNull(targetScheduleQtyResolver) ? targetScheduleQtyResolver : new TargetScheduleQtyResolver();
+    }
+
+    /**
+     * 先确认最终实际收尾状态，再同步只读干冰收尾说明，避免保存预测标记产生的旧备注。
+     *
+     * @param context 已完成全部数量裁量及历史班次保护的排程上下文
+     */
+    private void refreshFinalEndingState(LhScheduleContext context) {
+        this.refreshFinalEndingFlagByMaterialStatus(context);
+        cleaningScheduleService.refreshDryIceEndingAnalysis(context);
     }
 
     /**
@@ -2235,7 +2255,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             String changeMouldType = determineChangeMouldType(result);
             LhMouldChangePlan beforeSource = this.resolveMouldChangeBeforeSource(
                     context, result, observedChangeMachines.add(result.getLhMachineCode()));
-            if (Objects.isNull(beforeSource) && shouldSkipSameMaterialMouldChangePlan(state, result)) {
+            if (Objects.isNull(beforeSource) && shouldSkipSameMaterialMouldChangePlan(state, result)
+                    && !this.isOnlySandBlastReinstallation(context, result)) {
                 log.info("前后物料编码相同，跳过模具交替计划生成, 工厂: {}, 批次: {}, 机台: {}, 前物料: {}, "
                                 + "后物料: {}, 交替类型: {}, 产品状态: {}",
                         context.getFactoryCode(), context.getBatchNo(), result.getLhMachineCode(),
@@ -2910,6 +2931,29 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                 && StringUtils.isNotEmpty(state.getCurrentMaterialCode())
                 && StringUtils.isNotEmpty(result.getMaterialCode())
                 && StringUtils.equals(state.getCurrentMaterialCode(), result.getMaterialCode());
+    }
+
+    /**
+     * 识别清洗后同料原模回装的真实换模，不能按前后物料相同丢弃已提交动作。
+     *
+     * @param context 本批仅喷砂离机事件
+     * @param result 已提交的换模结果
+     * @return 同来源机台、物料状态和整组原模在清洗完成后回装时为真
+     */
+    private boolean isOnlySandBlastReinstallation(LhScheduleContext context, LhScheduleResult result) {
+        MachineCleaningWindowDTO event = context.getOnlySandBlastContinuationReleaseWindowMap()
+                .get(result.getLhMachineCode());
+        Date changeTime = result.getMouldChangeStartTime();
+        return Objects.nonNull(event) && event.isOffMachineCleaning()
+                && StringUtils.isBlank(event.getReplacementMouldCode())
+                && Objects.nonNull(event.getCleanEndTime()) && Objects.nonNull(changeTime)
+                && !changeTime.before(event.getCleanEndTime())
+                && StringUtils.equals(event.getContinuationMaterialCode(), result.getMaterialCode())
+                && StringUtils.equals(StringUtils.defaultIfBlank(event.getContinuationProductStatus(), "S"),
+                        StringUtils.defaultIfBlank(result.getProductStatus(), "S"))
+                && StringUtils.isNotBlank(event.getMouldCode())
+                && LhMouldCodeUtil.splitMouldCode(event.getMouldCode())
+                        .equals(LhMouldCodeUtil.splitMouldCode(result.getMouldCode()));
     }
 
     /**

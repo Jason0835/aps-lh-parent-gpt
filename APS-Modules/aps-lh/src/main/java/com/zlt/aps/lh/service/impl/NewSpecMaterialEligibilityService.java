@@ -9,6 +9,7 @@ import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.api.enums.SkuScheduleSourceTypeEnum;
 import com.zlt.aps.lh.component.EarlyProductionQuantityCalculator;
+import com.zlt.aps.lh.component.EmbryoEndingStockAdmissionPolicy;
 import com.zlt.aps.lh.component.EarlyProductionRuntimePlanService;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.SkuDecrementChecker;
@@ -164,6 +165,25 @@ public class NewSpecMaterialEligibilityService {
     }
 
     /**
+     * 只读预判精确历史组合，不登记试制身份、写过程日志或应用目标量。
+     *
+     * @param context 尚未限量的续作上下文
+     * @param sku 原需求
+     * @param date 预判业务日
+     * @param plan 本批有效历史指令
+     * @param machineCode 指定机台
+     * @return 与正式候选共用业务规则的独立资格对象
+     */
+    public DailyNewSpecCandidate previewPreviousAlternateCandidate(LhScheduleContext context,
+            SkuScheduleDTO sku, LocalDate date, LhMouldChangePlan plan, String machineCode) {
+        if (!context.isEligiblePreviousAlternateCombination(sku, plan, machineCode)) {
+            return new DailyNewSpecCandidate(
+                    MonthPlanDateResolver.buildMaterialStatusKey(sku.getMaterialCode(), sku.getProductStatus()), sku);
+        }
+        return this.resolveCandidate(context, sku, date, PendingSkuUnscheduledRule.isTrialOrMassTrialSku(sku));
+    }
+
+    /**
      * 共用日计划、减量清单、提前生产和真实余量判断，禁止指定关系绕过这些规则。
      * @param context 排程上下文
      * @param sku 当前候选
@@ -211,7 +231,11 @@ public class NewSpecMaterialEligibilityService {
                 && targetScheduleQtyResolver.previewProductionRemainingQty(context, sku) > 0;
         boolean normalDemand = continuation ? continuationDue : originalQty > 0 && (remainingQty > 0
             || switchExpansion);
-        if (!context.isFutureOnlyEarlyProductionCandidate(sku, date) && normalDemand && !continuationEarly) {
+        // 正库存收尾不借用未来计划日期，仍服从续作补机日期与前置独立准入规则。
+        if (EmbryoEndingStockAdmissionPolicy.isEligible(context, sku) && continuationDue) {
+            candidate.addReason(DailyCandidateReason.HISTORY_SHORTAGE_OR_ENDING);
+            candidate.setTargetPlanDate(date);
+        } else if (!context.isFutureOnlyEarlyProductionCandidate(sku, date) && normalDemand && !continuationEarly) {
             candidate.addReason(continuation ? DailyCandidateReason.ADD_MACHINE_REQUIREMENT
                     : DailyCandidateReason.TODAY_PLAN);
             candidate.setTargetPlanDate(date);

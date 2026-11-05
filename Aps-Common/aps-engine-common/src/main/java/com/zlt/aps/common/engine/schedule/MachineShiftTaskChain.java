@@ -1,10 +1,8 @@
 package com.zlt.aps.common.engine.schedule;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.function.Function;
 
 /**
  * 机台班次任务链集合。
@@ -101,6 +99,44 @@ public class MachineShiftTaskChain<T> {
      */
     public void clear() {
         chainMap.clear();
+    }
+
+    /**
+     * 复制链表结构并替换节点任务引用，保留班次、顺序和预计起止时间。
+     *
+     * <p>拷贝按源链顺序逐节点静默追加，不逐节点重排整条链。原实现每次追加都会重新编号整条链，
+     * 拷贝数百个节点时是平方级开销，而变更结果在本方法内无人消费；静默追加按链内位置写入序号，
+     * 与重排后的最终序号完全一致。</p>
+     *
+     * @param taskCopier       节点任务复制器
+     * @param operationContext 保留参数以兼容既有调用方；拷贝路径不再产生变更结果
+     * @param <R>              复制后任务类型
+     * @return 仅引用副本任务的新任务链集合
+     */
+    public <R> MachineShiftTaskChain<R> copy(Function<T, R> taskCopier,
+                                             ScheduleOperationContext operationContext) {
+        MachineShiftTaskChain<R> copiedGroup = new MachineShiftTaskChain<>();
+        for (ScheduleTaskLinkedList<T> sourceChain : this.chainMap.values()) {
+            for (ScheduleTaskNode<T> sourceNode : sourceChain.toList()) {
+                ScheduleTaskNode<R> copiedNode = new ScheduleTaskNode<>(sourceNode.getTaskId(),
+                        sourceNode.getTask() == null ? null : taskCopier.apply(sourceNode.getTask()),
+                        sourceNode.getMachineCode(), sourceNode.getScheduleDate(), sourceNode.getShiftCode(),
+                        sourceNode.getShiftOrder(), sourceNode.getPlanQty());
+                copiedNode.setSequence(sourceNode.getSequence());
+                copiedNode.setStartTime(copyDate(sourceNode.getStartTime()));
+                copiedNode.setEndTime(copyDate(sourceNode.getEndTime()));
+                copiedGroup.getOrCreate(sourceNode.getMachineCode(), sourceNode.getScheduleDate(),
+                        sourceNode.getShiftOrder()).appendSilently(copiedNode);
+            }
+        }
+        return copiedGroup;
+    }
+
+    /**
+     * 复制可变日期，避免工作区重算时间时共享日期实例。
+     */
+    private Date copyDate(Date source) {
+        return source == null ? null : new Date(source.getTime());
     }
 
     /**

@@ -50,6 +50,10 @@ public final class StructureSwitchSelectionTimePolicy {
         if (Objects.isNull(source) || Objects.isNull(availability) || !availability.isAvailable()) {
             return null;
         }
+        if (HistoricalStructureHandoffPolicy.isWaitingExempt(context, sku,
+                availability.getMachine().getMachineCode())) {
+            return null;
+        }
         if (Objects.isNull(availability.getSkuSelectionStartTime())) {
             return I18nUtil.getMessage("ui.lh.structureSwitch.selectionInspectionMissing");
         }
@@ -73,7 +77,7 @@ public final class StructureSwitchSelectionTimePolicy {
     }
 
     /**
-     * 按首个实际切换班次计算候选偏移；首台、历史承接和普通组合执行相同门禁。
+     * 按首个实际切换班次计算候选偏移；精确有效历史组合仅豁免等待差值，其他组合执行原门禁。
      * 已上机连续生产不调用此方法；只记录本窗口历史承接诊断，不登记资源。
      *
      * @param context 本批上下文
@@ -111,6 +115,17 @@ public final class StructureSwitchSelectionTimePolicy {
         if (!StructureSwitchSchedulingPolicy.isEnabled(context) || Objects.isNull(source)
                 || Objects.isNull(source.getEarliestLhTime()) || Objects.isNull(shift)
                 || Objects.isNull(selectionInspectionStartTime)) {
+            return null;
+        }
+        SkuScheduleDTO historicalSku = new SkuScheduleDTO();
+        historicalSku.setMaterialCode(materialCode);
+        historicalSku.setProductStatus(productStatus);
+        if (HistoricalStructureHandoffPolicy.isWaitingExempt(context, historicalSku, machineCode)) {
+            // 历史任务只免等待差值；供胚、完整首检和结构额度仍由实际时间轴校验。
+            HistoricalStructureHandoffPolicy.recordWaitingAdmission(context, source, selectionInspectionStartTime,
+                    materialCode, productStatus, machineCode, false);
+            log.info("历史指定承接豁免供胚等待差值, batchNo={}, sku={}, status={}, machine={}, sourceId={}",
+                    context.getBatchNo(), materialCode, productStatus, machineCode, source.getId());
             return null;
         }
         StructureSwitchRuntimeState state = context.getStructureSwitchRuntimeMap().get(source.getNextStructureName());

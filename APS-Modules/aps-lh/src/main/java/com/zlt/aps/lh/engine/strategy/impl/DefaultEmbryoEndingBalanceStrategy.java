@@ -25,6 +25,7 @@ import com.zlt.aps.lh.engine.strategy.support.ChangeoverFirstShiftQuantityPolicy
 import com.zlt.aps.lh.engine.strategy.IMouldChangeBalanceStrategy;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationEndingAllocationSnapshot;
 import com.zlt.aps.lh.util.CleaningScheduleRuleUtil;
+import com.zlt.aps.lh.util.LhInventoryPlanMatcher;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.MachineCleaningOverlapUtil;
@@ -3349,13 +3350,7 @@ public class DefaultEmbryoEndingBalanceStrategy implements IEmbryoEndingBalanceS
                 || StringUtils.isEmpty(machineCode)) {
             return new ArrayList<MdmDevicePlanShut>(0);
         }
-        List<MdmDevicePlanShut> shutdownWindowList = new ArrayList<MdmDevicePlanShut>(4);
-        for (MdmDevicePlanShut planShut : context.getDevicePlanShutList()) {
-            if (Objects.nonNull(planShut) && StringUtils.equals(machineCode, planShut.getMachineCode())) {
-                shutdownWindowList.add(planShut);
-            }
-        }
-        return shutdownWindowList;
+        return LhInventoryPlanMatcher.matchStopPlans(context.getDevicePlanShutList(), machineCode);
     }
 
     /**

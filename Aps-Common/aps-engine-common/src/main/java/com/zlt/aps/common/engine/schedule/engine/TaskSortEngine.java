@@ -1,8 +1,12 @@
 package com.zlt.aps.common.engine.schedule.engine;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.BiConsumer;
 
 /**
  * 自动排程任务排序公共引擎。
@@ -13,6 +17,8 @@ import java.util.List;
  * @param <T> 排程任务类型
  */
 public final class TaskSortEngine<C, T extends ScheduleSortableTask> {
+
+    private static final Logger LOG = LoggerFactory.getLogger(TaskSortEngine.class);
 
     /**
      * 执行任务排序。
@@ -28,6 +34,8 @@ public final class TaskSortEngine<C, T extends ScheduleSortableTask> {
             return;
         }
 
+        // 分开计量排序、逐任务轨迹和明细日志，避免将日志开销误判为排序算法耗时。
+        long startNanos = System.nanoTime();
         String strategyCode = policy.resolveStrategyCode(context);
         boolean prependSupplyHoursPriority = policy.prependSupplyHoursPriority(context, strategyCode);
         String beforeOrder = tracePort.summarizeTaskOrder(context);
@@ -35,6 +43,7 @@ public final class TaskSortEngine<C, T extends ScheduleSortableTask> {
         boolean planCalcOrderReady = taskList.stream()
                 .allMatch(task -> task != null && task.getPlanCalcOrderIndex() != null);
         String sortSource = planCalcOrderReady ? "PLAN_CALC_ORDER" : "LEGACY_TASK_SORT";
+        long sortStartNanos = System.nanoTime();
         if (planCalcOrderReady) {
             taskList.sort(Comparator
                     .comparing((T task) -> task.getPlanCalcOrderIndex(),
@@ -47,20 +56,35 @@ public final class TaskSortEngine<C, T extends ScheduleSortableTask> {
                     prependSupplyHoursPriority));
         }
 
+        long sortNanos = System.nanoTime() - sortStartNanos;
         String afterOrder = tracePort.summarizeTaskOrder(context);
         tracePort.logTaskSortSummary(context, strategyCode, sortSource, beforeOrder, afterOrder, taskList.size());
+        long traceNanos = 0L;
+        long detailLogNanos = 0L;
+        BiConsumer<T, Integer> taskSortRecorder = tracePort.prepareTaskSortRecorder(context, strategyCode,
+                sortSource, policy);
         for (int index = 0; index < taskList.size(); index++) {
             T task = taskList.get(index);
             int sortIndex = planCalcOrderReady && task.getPlanCalcOrderIndex() != null
                     ? task.getPlanCalcOrderIndex() : index + 1;
             task.setBaseSortIndex(sortIndex);
-            tracePort.recordTaskSort(context, task, strategyCode, sortSource, sortIndex,
-                    policy.isStartupShift(context, task));
+            long itemStartNanos = System.nanoTime();
+            taskSortRecorder.accept(task, sortIndex);
+            traceNanos += System.nanoTime() - itemStartNanos;
+            itemStartNanos = System.nanoTime();
             tracePort.logTaskSortDetail(context, task, strategyCode, sortSource, sortIndex);
+            detailLogNanos += System.nanoTime() - itemStartNanos;
         }
+        long snapshotStartNanos = System.nanoTime();
         tracePort.recordTaskSortSnapshot(context, strategyCode, sortSource,
                 prependSupplyHoursPriority, beforeTaskList,
                 new ArrayList<>(taskList));
+        long snapshotNanos = System.nanoTime() - snapshotStartNanos;
+        String batchNo = context instanceof ScheduleContextModel
+                ? ((ScheduleContextModel<?, ?, ?, ?, ?>) context).getBatchNo() : null;
+        LOG.info("[SCHEDULE_PERF] 任务排序内部耗时 batchNo={}, taskCount={}, sortSource={}, sortMs={}, traceMs={}, detailLogMs={}, snapshotMs={}, totalMs={}",
+                batchNo, taskList.size(), sortSource, sortNanos / 1000000, traceNanos / 1000000,
+                detailLogNanos / 1000000, snapshotNanos / 1000000, (System.nanoTime() - startNanos) / 1000000);
     }
 
     /**

@@ -53,6 +53,10 @@ public final class ShiftProductionControlUtil {
         if (Objects.nonNull(requestedStartTime) && requestedStartTime.after(control.getEffectiveStartTime())) {
             control.setEffectiveStartTime(requestedStartTime);
         }
+        Date productionDeadline = context == null ? null : context.getActiveStructureEndingProductionDeadline();
+        if (productionDeadline != null && productionDeadline.before(control.getEffectiveEndTime())) {
+            control.setEffectiveEndTime(productionDeadline);
+        }
         if (!control.getEffectiveStartTime().before(control.getEffectiveEndTime())) {
             control.setCanSchedule(false);
             control.setUnavailableReason(REASON_REQUEST_TIME_NOT_AVAILABLE);

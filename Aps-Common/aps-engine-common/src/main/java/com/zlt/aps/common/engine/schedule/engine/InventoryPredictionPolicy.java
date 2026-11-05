@@ -53,6 +53,21 @@ public interface InventoryPredictionPolicy<C, F extends ScheduleInventoryForecas
     Map<String, BigDecimal> queryFirstShiftDemand(String factoryCode, LocalDate scheduleDate,
                                                    List<String> productCodes, boolean useRecipe);
 
+    /**
+     * 查询早班需求量，并允许领域策略读取当前排程上下文中的来源参数。
+     *
+     * @param context      当前排程上下文
+     * @param factoryCode  工厂编号
+     * @param scheduleDate 排程日期
+     * @param productCodes 产品编码
+     * @param useRecipe    是否使用示方书匹配
+     * @return 产品编码到早班需求量的映射
+     */
+    default Map<String, BigDecimal> queryFirstShiftDemand(C context, String factoryCode, LocalDate scheduleDate,
+                                                          List<String> productCodes, boolean useRecipe) {
+        return this.queryFirstShiftDemand(factoryCode, scheduleDate, productCodes, useRecipe);
+    }
+
     /** @return 早班计划量 */
     Map<String, BigDecimal> queryFirstShiftPlan(String factoryCode, LocalDate scheduleDate,
                                                  List<String> productCodes);

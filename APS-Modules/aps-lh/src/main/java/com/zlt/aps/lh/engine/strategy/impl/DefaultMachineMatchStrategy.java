@@ -3,6 +3,8 @@
  */
 package com.zlt.aps.lh.engine.strategy.impl;
 
+import com.zlt.aps.lh.engine.strategy.support.StructureEndingContinuationPolicy;
+
 import com.ruoyi.common.i18n.utils.I18nUtil;
 
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
@@ -34,6 +36,7 @@ import com.zlt.aps.lh.engine.strategy.support.MouldResourceContext;
 import com.zlt.aps.lh.engine.strategy.support.NewSpecEmbryoAvailableTimeResolver;
 import com.zlt.aps.lh.engine.strategy.support.SpecifiedMachineMatchResult;
 import com.zlt.aps.lh.service.impl.LhMaintenanceScheduleService;
+import com.zlt.aps.lh.util.LhInventoryPlanMatcher;
 import com.zlt.aps.lh.util.LhMachineHardMatchUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
@@ -232,6 +235,12 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         MachineFilterTrace trace = new MachineFilterTrace(context.getMachineScheduleMap().size());
 
         for (MachineScheduleDTO machine : context.getMachineScheduleMap().values()) {
+            if (machine != null && !StructureEndingContinuationPolicy.allowsNewMachine(context, sku, machine
+                    .getMachineCode())) {
+                trace.recordFilteredMachine(machine, com.zlt.aps.lh.api.enums.UnscheduledReasonEnum
+                        .NO_AVAILABLE_MACHINE.getDescription());
+                continue;
+            }
             if (Objects.nonNull(machine) && StructureSwitchCandidateScope.isHistoricalMachineReservedForOtherSku(
                     context, sku, machine.getMachineCode())) {
                 trace.recordFilteredMachine(machine, I18nUtil.getMessage(
@@ -249,11 +258,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                 trace.recordFilteredMachine(machine, "临时故障SKU禁止选回原机台");
                 continue;
             }
-            if (Objects.nonNull(machine)
-                    && context.isOnlySandBlastOriginalMachine(sku, machine.getMachineCode())) {
-                trace.recordFilteredMachine(machine, "仅喷砂释放SKU禁止选回原机台");
-                continue;
-            }
+            // 仅喷砂原机也参与竞争；来源原模可用时刻由完整时间轴和精确模具分配共同校验。
             MachineAvailabilityReason availabilityReason = resolveMachineAvailabilityReason(
                     context, sku, mouldResourceContext, skuInch,
                     specialMaterialMatchResult, machine);
@@ -331,6 +336,10 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         if (Objects.isNull(context) || Objects.isNull(machine) || Objects.isNull(sku)
                 || StringUtils.isEmpty(machine.getMachineCode())) {
             return MachineSkuMatchResult.failed(machine, sku, "排程上下文、机台或SKU为空");
+        }
+        if (!StructureEndingContinuationPolicy.allowsNewMachine(context, sku, machine.getMachineCode())) {
+            return MachineSkuMatchResult.failed(machine, sku, com.zlt.aps.lh.api.enums.UnscheduledReasonEnum
+                    .NO_AVAILABLE_MACHINE.getDescription());
         }
         // 指定后料尚未承接时保护其原机台，其他 SKU 不能借普通竞争覆盖该关系。
         if (StructureSwitchCandidateScope.isHistoricalMachineReservedForOtherSku(
@@ -471,9 +480,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         if (context.isTemporaryFaultOriginalMachine(sku, machine.getMachineCode())) {
             return MachineSkuMatchResult.failed(machine, sku, "临时故障SKU禁止选回原故障机台");
         }
-        if (context.isOnlySandBlastOriginalMachine(sku, machine.getMachineCode())) {
-            return MachineSkuMatchResult.failed(machine, sku, "仅喷砂释放SKU禁止选回原机台");
-        }
+        // 同料喷砂回装不再按原机身份拒绝，仍须等待来源原模清洗完成并通过全部资源约束。
         MouldResourceContext mouldResourceContext = resolveMouldResourceContext(context);
         BigDecimal skuInch = parseInch(sku.getProSize());
         SpecialMaterialMatchResult specialMaterialMatchResult =
@@ -3162,6 +3169,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
      * 判断机台计划停机是否超过自动换机阈值。
      *
      * @param context 排程上下文
+     * @param sku 当前候选物料，用于解析对齐后的候选时间窗
      * @param machine 候选机台
      * @return true-超过阈值，false-未超过阈值
      */
@@ -3173,11 +3181,8 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         Date candidateReferenceTime =
                 resolveAlignedCandidateReferenceTime(context, sku, machine);
         Date candidateWindowEndTime = resolveCandidateWindowEndTime(context, candidateReferenceTime);
-        for (MdmDevicePlanShut planShut : context.getDevicePlanShutList()) {
-            if (planShut == null || StringUtils.isEmpty(planShut.getMachineCode())
-                    || !StringUtils.equals(machine.getMachineCode(), planShut.getMachineCode())) {
-                continue;
-            }
+        for (MdmDevicePlanShut planShut : LhInventoryPlanMatcher.matchStopPlans(
+                context.getDevicePlanShutList(), machine.getMachineCode())) {
             if (planShut.getBeginDate() == null || planShut.getEndDate() == null
                     || !planShut.getEndDate().after(planShut.getBeginDate())) {
                 continue;
@@ -3291,7 +3296,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
      * @param context 排程上下文
      * @param sku 待排SKU
      * @param machine 候选机台
-     * @return 与排程窗口首班对齐后的参考时间
+     * @return 与排程窗口及来源原模清洗完成时刻对齐后的参考时间
      */
     private Date resolveAlignedCandidateReferenceTime(LhScheduleContext context,
                                                       SkuScheduleDTO sku,
@@ -3306,9 +3311,11 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
             Date pairSideReferenceTime = resolveAlignedCandidateReferenceTime(
                     context, pairMachine);
             // 正规SKU按整机占用单控机台，最早换模起点必须等L/R两边都释放。
-            return resolveLaterTime(currentSideReferenceTime, pairSideReferenceTime);
+            return this.resolveLaterTime(this.resolveLaterTime(currentSideReferenceTime, pairSideReferenceTime),
+                    context.resolveOnlySandBlastRequeueNotBeforeTime(sku));
         }
-        return resolveAlignedCandidateReferenceTime(context, machine);
+        return this.resolveLaterTime(this.resolveAlignedCandidateReferenceTime(context, machine),
+                context.resolveOnlySandBlastRequeueNotBeforeTime(sku));
     }
 
     /**
@@ -3371,17 +3378,22 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
 
     /**
      * 选择调用方当前所处的查询范围：日循环外排序是窗口预检，日循环内使用实际业务日。
-     * <p>不回写currentScheduleDate；模具资源层收到的始终是已经解析的非空时刻。</p>
+     * <p>仅喷砂来源及需要清洗原模的普通候选等待模具可用节点，避免日首预检永久排除合法接收。
+     * 不回写currentScheduleDate或机台释放时间；正式准备仍须执行完整时间轴校验。</p>
+     *
      * @param context 排程上下文
+     * @param sku 当前待排SKU，按来源事件确定原模清洗下限
      * @param machine 当前候选机台
-     * @return 明确的模具预检时刻
+     * @return 当前模具可用或原模喷砂完成后的明确预检时刻，不预留接收机台
      */
-    private Date resolveMouldReferenceTime(LhScheduleContext context, MachineScheduleDTO machine) {
+    private Date resolveMouldReferenceTime(LhScheduleContext context, SkuScheduleDTO sku, MachineScheduleDTO machine) {
         Date businessDate = context.getCurrentScheduleDate();
-        if (Objects.isNull(businessDate)) {
-            return LhScheduleTimeUtil.resolveWindowResourceReferenceTime(context, machine);
-        }
-        return LhScheduleTimeUtil.resolveDayResourceReferenceTime(context, businessDate, machine);
+        Date resourceTime = Objects.isNull(businessDate)
+                ? LhScheduleTimeUtil.resolveWindowResourceReferenceTime(context, machine)
+                : LhScheduleTimeUtil.resolveDayResourceReferenceTime(context, businessDate, machine);
+        Date referenceTime = this.resolveLaterTime(resourceTime, context.resolveOnlySandBlastRequeueNotBeforeTime(sku));
+        return this.resolveMouldResourceContext(context).resolveSandBlastAvailableTime(
+                sku.getMaterialCode(), machine.getMachineCode(), referenceTime);
     }
 
     /**
@@ -3404,7 +3416,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
             return true;
         }
         MouldResourceAllocationResult previewResult = mouldResourceContext.previewAllocate(
-                sku.getMaterialCode(), machine.getMachineCode(), this.resolveMouldReferenceTime(context, machine));
+                sku.getMaterialCode(), machine.getMachineCode(), this.resolveMouldReferenceTime(context, sku, machine));
         context.getShiftRemarkRuntime().recordMould(context, sku, previewResult, "MACHINE_MATCH_MOULD_PRECHECK");
         return previewResult.isAllowed();
     }
@@ -3803,7 +3815,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
             return targetMouldCodeSet;
         }
         MouldResourceAllocationResult previewResult = mouldResourceContext.previewAllocate(
-                sku.getMaterialCode(), machine.getMachineCode(), this.resolveMouldReferenceTime(context, machine));
+                sku.getMaterialCode(), machine.getMachineCode(), this.resolveMouldReferenceTime(context, sku, machine));
         if (previewResult.isAllowed()
                 && !CollectionUtils.isEmpty(previewResult.getAllocatedMouldCodeList())) {
             targetMouldCodeSet.addAll(previewResult.getAllocatedMouldCodeList());

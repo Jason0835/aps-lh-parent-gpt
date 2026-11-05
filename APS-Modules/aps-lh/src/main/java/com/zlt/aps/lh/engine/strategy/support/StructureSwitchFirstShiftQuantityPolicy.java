@@ -47,7 +47,9 @@ public final class StructureSwitchFirstShiftQuantityPolicy {
     private static Integer resolveLimit(LhScheduleContext context, CxEmbryoLhTime source,
             String embryoCode, LhShiftConfigVO shift) {
         if (!StructureSwitchSchedulingPolicy.isEnabled(context)
-                || Objects.isNull(source) || Objects.isNull(source.getEarliestLhTime())
+                || Objects.isNull(source)
+                || StructureTransferExemptionPolicy.isTransferStructure(context, source.getNextStructureName())
+                || Objects.isNull(source.getEarliestLhTime())
                 || Objects.isNull(shift) || StringUtils.isEmpty(embryoCode)
                 || source.getEarliestLhTime().before(shift.getShiftStartDateTime())
                 || !source.getEarliestLhTime().before(shift.getShiftEndDateTime())) {
@@ -68,6 +70,7 @@ public final class StructureSwitchFirstShiftQuantityPolicy {
     public static boolean isSupplyFirstShift(LhScheduleContext context, CxEmbryoLhTime source,
             LhShiftConfigVO shift) {
         return StructureSwitchSchedulingPolicy.isEnabled(context) && Objects.nonNull(source)
+                && !StructureTransferExemptionPolicy.isTransferStructure(context, source.getNextStructureName())
                 && Objects.nonNull(source.getEarliestLhTime()) && Objects.nonNull(shift)
                 && !source.getEarliestLhTime().before(shift.getShiftStartDateTime())
                 && source.getEarliestLhTime().before(shift.getShiftEndDateTime());
@@ -382,8 +385,12 @@ public final class StructureSwitchFirstShiftQuantityPolicy {
                 if (!isSupplyFirstShift(context, source, shift)) {
                     continue;
                 }
-                long total = usedQuantity(context, result.getStructureName(), result.getEmbryoCode(), shift, null);
                 int plannedQty = StructureSwitchSchedulingPolicy.quantity(result, shift.getShiftIndex());
+                // 后续班次承接不消费供胚首班额度，不能用该班原续作超限撤销合法后续生产。
+                if (plannedQty <= 0) {
+                    continue;
+                }
+                long total = usedQuantity(context, result.getStructureName(), result.getEmbryoCode(), shift, null);
                 if ((Objects.nonNull(limit) && total > limit)
                         || capRetainedTotal(context, result, shift, plannedQty) != plannedQty) {
                     return MessageFormat.format("结构{0}胎胚{1}班次{2}的含首检数量不合法，上限{3}，累计{4}",

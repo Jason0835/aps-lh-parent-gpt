@@ -7,6 +7,7 @@ import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.PreviousAlternatePlanReleaseEvent;
+import com.zlt.aps.lh.engine.strategy.support.HistoricalBeforeRemainderPolicy;
 import com.zlt.aps.lh.engine.strategy.support.PreviousAlternateMachineOrder;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationEndingReleaseOrderAllocator;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
@@ -227,7 +228,7 @@ public class ContinuationRemainderFinishScheduleService {
 
     /**
      * 先为精确历史指定机台保留交替前的合法生产前缀，再由其余原机按既有节点规则消化余量。
-     * 固定机台不参与收尾角色交换，总预算不足时只生产真实余量，设备及单控物理边界仍优先。
+     * 单台普通原机可在历史班内完整收尾；其余固定机台不参与角色交换，设备及单控边界仍优先。
      *
      * @param context 已冻结历史释放身份的上下文
      * @param machines 与结果顺序一致的真实物理机台画像
@@ -244,6 +245,11 @@ public class ContinuationRemainderFinishScheduleService {
         if (CollectionUtils.isEmpty(machines) || CollectionUtils.isEmpty(shifts)
                 || remainQty < 0 || shiftQty <= 0 || dateOffset < 0) {
             throw new IllegalArgumentException("历史指定余量收尾计算输入不完整");
+        }
+        ContinuationFinishScheduleResult completed = this.tryCompleteSingleHistoricalRemainder(
+                context, machines, shifts, remainQty, shiftQty, dateOffset);
+        if (Objects.nonNull(completed)) {
+            return completed;
         }
         List<ContinuationEndingMachineProfile> fixed = machines.stream()
                 .filter(profile -> Objects.nonNull(this.resolveFixedHistoricalCutover(context, profile)))
@@ -308,6 +314,63 @@ public class ContinuationRemainderFinishScheduleService {
         PriorityTraceLogHelper.appendProcessLog(context, "历史指定交替前缀分配", detail);
         log.info("历史指定交替前缀分配, {}", detail);
         return merged;
+    }
+
+    /**
+     * 用真实容量证明单台历史前料可全部排完，禁止只延长部分尾量或越过设备硬截止。
+     * 试算只读原画像，失败仍进入原固定前缀分配，正式结果与账本由调用方一次提交。
+     *
+     * @param context 冻结历史身份和设备约束
+     * @param machines 整组原机画像
+     * @param shifts 完整班次窗口
+     * @param remainQty 当前严格余量预算
+     * @param shiftQty 标准班产
+     * @param dateOffset 原容量确定的收尾日
+     * @return 完整收尾方案，不满足班内完整释放时为空
+     */
+    private ContinuationFinishScheduleResult tryCompleteSingleHistoricalRemainder(LhScheduleContext context,
+            List<ContinuationEndingMachineProfile> machines, List<LhShiftConfigVO> shifts,
+            int remainQty, int shiftQty, int dateOffset) {
+        if (machines.size() != 1 || remainQty <= 0
+                || !HistoricalBeforeRemainderPolicy.isSingleOriginalMachine(context, machines.get(0).getOriginals())) {
+            return null;
+        }
+        ContinuationEndingMachineProfile profile = machines.get(0);
+        LhScheduleResult original = profile.getOriginals().get(0);
+        PreviousAlternatePlanReleaseEvent event = context.getPreviousAlternateReleaseEventMap()
+                .get(original.getLhMachineCode());
+        if (!event.isFixedHistoricalCutover() || !profile.isLegalQuantity(remainQty)
+                || profile.quantityUntil(event.getPlannedShiftEndTime()) < remainQty) {
+            return null;
+        }
+        Date releaseTime = profile.switchReadyTime(remainQty);
+        if (Objects.isNull(releaseTime) || !releaseTime.before(event.getPlannedShiftEndTime())
+                || LhScheduleTimeUtil.isNoMouldChangeTime(context, releaseTime)
+                || (Objects.nonNull(profile.getReleaseDeadline()) && releaseTime.after(profile.getReleaseDeadline()))) {
+            return null;
+        }
+        ContinuationFinishScheduleResult completed = this.calculate(
+                machines, shifts, remainQty, shiftQty, dateOffset);
+        if (completed.getRemainingQty() != 0) {
+            return null;
+        }
+        ContinuationMachineFinishPlan plan = completed.getMachinePlans().get(0);
+        // 硬截止恰好容纳完整预算仍是收尾完成，不能保留公共分配器的强制释放身份。
+        plan.setFinishState(ContinuationMachineFinishPlan.FinishState.SURPLUS_COMPLETED);
+        plan.setFinishRule(ContinuationMachineFinishPlan.HISTORICAL_COMPLETE_REMAINDER_RULE);
+        plan.setHistoricalFinishPlanId(event.getPlan().getId());
+        plan.setFinishRoleMachineCode(original.getLhMachineCode());
+        plan.setFinishDeadline(event.getPlannedShiftEndTime());
+        String detail = String.format("工厂=%s, 批次=%s, 计划ID=%s, 机台=%s, 前料=%s, 状态=%s, "
+                        + "完整余量=%s, 历史起点=%s, 生产完成=%s, 物理释放=%s, 历史班末=%s",
+                context.getFactoryCode(), context.getBatchNo(), event.getPlan().getId(), original.getLhMachineCode(),
+                original.getMaterialCode(), original.getProductStatus(), remainQty,
+                LhScheduleTimeUtil.formatDateTime(event.getPlannedShiftStartTime()),
+                LhScheduleTimeUtil.formatDateTime(plan.getFinishTime()), LhScheduleTimeUtil.formatDateTime(releaseTime),
+                LhScheduleTimeUtil.formatDateTime(event.getPlannedShiftEndTime()));
+        PriorityTraceLogHelper.appendProcessLog(context, "历史原机班内完整收尾", detail);
+        log.info("历史原机班内完整收尾, {}", detail);
+        return completed;
     }
 
     /**

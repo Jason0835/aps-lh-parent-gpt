@@ -65,7 +65,8 @@ public final class StructureInternalEarlyExpansionPlanner {
                         sku -> sku, (firstSku, duplicateSku) -> firstSku, LinkedHashMap::new));
         for (SkuScheduleDTO sourceSku : sourceMap.values()) {
             if (context.getStructurePlanMachineCount(businessDate, sourceSku.getStructureName()) <= 0
-                    || context.getStructureSwitchSourceMap().containsKey(sourceSku.getStructureName())) {
+                    || (context.getStructureSwitchSourceMap().containsKey(sourceSku.getStructureName())
+                    && !StructureTransferExemptionPolicy.shouldBypassStructureSwitch(context, sourceSku))) {
                 continue;
             }
             int committedCount = DailyMachineExpansionPlanner.countCommittedMachineDemand(

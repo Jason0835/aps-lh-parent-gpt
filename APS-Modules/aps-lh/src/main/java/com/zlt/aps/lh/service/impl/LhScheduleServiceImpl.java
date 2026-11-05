@@ -1578,7 +1578,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         if (Objects.isNull(result) || StringUtils.isBlank(result.getFactoryCode()) || Objects.isNull(result.getScheduleDate())) {
             return AjaxResult.error("导入条件中的工厂和排程日期不能为空");
         }
-        if (Objects.isNull(list) || list.isEmpty()) {
+        if (Objects.isNull(list)) {
             return AjaxResult.error("导入文件未读取到有效明细行");
         }
 
@@ -1590,15 +1590,20 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
         list.stream()
                 .filter(Objects::nonNull)
+                .filter(this::hasImportPlanValue)
                 .forEach(this::fillImportChangedTrialStatus);
         // 先按模板中的物料描述和胎胚描述反显编码，再执行编码及描述必填校验。
         AppUtils.formatData(list.stream()
                 .filter(Objects::nonNull)
+                .filter(this::hasImportPlanValue)
                 .collect(Collectors.toList()), getQueryFormulasByDesc());
         // 第一轮：注解必填和Excel内重复校验（模板数据从第6行开始）
         for (int i = 0; i < list.size(); i++) {
             int rowNum = i + LH_SCHEDULE_IMPORT_DATA_START_ROW;
             LhScheduleResultTemplateImportVO row = list.get(i);
+            if (row != null && !this.hasImportPlanValue(row)) {
+                continue;
+            }
             if (Objects.isNull(row)) {
                 failureNum++;
                 ImportExcelValidatedUtils.addImportErrorLog(id, rowNum,
@@ -1607,8 +1612,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             }
             row.setFactoryCode(factoryCode);
             row.setScheduleDate(scheduleDate);
+            row.setLeftRightMould(this.resolveImportLeftRightMould(row));
             List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(id, rowNum, row);
-            ImportExcelValidatedUtils.validatedRepeat(list, row, i, LH_SCHEDULE_IMPORT_DATA_START_ROW, id, validated, "lhMachineCode", "materialCode", "changedTrialStatus");
             if (PubUtil.isNotEmpty(validated)) {
                 failureNum++;
                 row.setId(-999L);
@@ -1620,6 +1625,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
         boolean hasValidBaseRow = list.stream()
                 .filter(Objects::nonNull)
+                .filter(this::hasImportPlanValue)
                 .anyMatch(item -> !Objects.equals(item.getId(), -999L));
         ImportScheduleValidationContext validationContext = new ImportScheduleValidationContext();
         if (hasValidBaseRow) {
@@ -1632,6 +1638,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             if (CollUtil.isNotEmpty(validationContext.globalErrors)) {
                 failureNum += (int) list.stream()
                         .filter(Objects::nonNull)
+                        .filter(this::hasImportPlanValue)
                         .filter(item -> !Objects.equals(item.getId(), -999L))
                         .count();
                 ImportExcelValidatedUtils.addImportErrorLog(id, 0,
@@ -1639,11 +1646,13 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
             }
         }
-        String batchNo = lhScheduleResultService.generateNextBatchNo(scheduleDate, factoryCode);
         List<LhScheduleResult> insertList = new ArrayList<>();
         for (int i = 0; i < list.size(); i++) {
             LhScheduleResultTemplateImportVO row = list.get(i);
             int rowNum = i + LH_SCHEDULE_IMPORT_DATA_START_ROW;
+            if (row != null && !this.hasImportPlanValue(row)) {
+                continue;
+            }
             if (Objects.isNull(row) || Objects.equals(row.getId(), -999L)) {
                 continue;
             }
@@ -1671,43 +1680,131 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             copyImportRowToEntity(row, target);
             fillShiftTimes(target, shiftTimeMap);
 
-            String orderNo = lhScheduleResultService.generateInsertOrderNo(scheduleDate);
-            target.setBatchNo(batchNo);
-            target.setOrderNo(orderNo);
-
-//            scheduleResultMapper.insert(target);
             insertList.add(target);
             successNum++;
         }
 
-        if (CollUtil.isEmpty(insertList)) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
-        }
-
-        // 模板导入以指定排程日期为整体覆盖范围；存在可导入记录时，再逻辑删除旧排程并写入本次有效数据。
-        // 这样可以满足“只导入存在硫化示方号/班产的 SKU”的要求：失败 SKU 写入错误日志，
-        // 成功 SKU 进入 insertList，并作为本次日期的新排程结果。
-        scheduleResultMapper.update(null, new LambdaUpdateWrapper<LhScheduleResult>()
-                .eq(LhScheduleResult::getFactoryCode, factoryCode)
-                .eq(LhScheduleResult::getScheduleDate, scheduleDate)
-                .eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
-                .set(LhScheduleResult::getIsDelete, DeleteFlagEnum.DELETED.getCode()));
-
-        // 复用排程结果服务中的字段补全逻辑，统一填充月计划版本、生产版本、规格、
-        // 硫化时间、日计划量、硫化余量、示方号等导入模板没有直接提供的字段。
-        lhScheduleResultService.fillScheduleResultFields(insertList, scheduleDate);
-
-        // 从物料表反显胎胚代码和产品结构
-        AppUtils.formatData(insertList, getQueryFormulas());
-
-        // Excel 排程日期为 T+1；未维护胎胚库存时，按排程日期前一天回填 T 日库存。
-        this.fillMissingImportEmbryoStock(insertList, factoryCode, scheduleDate);
-
-        this.baseDao.insertBatch(insertList);
+        // 校验失败的行不能被当作 Excel 删除行，否则会误清空数据库中的计划量。
         if (failureNum > 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
+            return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + ",0," + failureNum, importErrorLogs);
         }
+
+        if (CollUtil.isNotEmpty(insertList)) {
+            // 补齐月计划、班次及主数据字段后再匹配，确保描述字段与数据库使用同一口径。
+            lhScheduleResultService.fillScheduleResultFields(insertList, scheduleDate);
+            AppUtils.formatData(insertList, getQueryFormulas());
+            this.fillMissingImportEmbryoStock(insertList, factoryCode, scheduleDate);
+        }
+
+        List<LhScheduleResult> existingList = scheduleResultMapper.selectList(new LambdaQueryWrapper<LhScheduleResult>()
+                .eq(LhScheduleResult::getFactoryCode, factoryCode)
+                .eq(LhScheduleResult::getScheduleDate, scheduleDate));
+        Map<String, List<LhScheduleResult>> existingByKey = existingList.stream()
+                .collect(Collectors.groupingBy(this::buildImportUniqueKey));
+        Set<String> importedKeys = new HashSet<>();
+        List<LhScheduleResult> newList = new ArrayList<>();
+        List<LhScheduleResult> updateList = new ArrayList<>();
+        Set<Long> matchedIds = new HashSet<>();
+        for (LhScheduleResult candidate : insertList) {
+            String key = this.buildImportUniqueKey(candidate);
+            if (!importedKeys.add(key)) {
+                importErrorLogs.add(new ImportErrorLog(id, 0,
+                        I18nUtil.getMessage("ui.data.message.lhScheduleResult.import.excel.repeat.key")));
+                failureNum++;
+                continue;
+            }
+            List<LhScheduleResult> matches = existingByKey.getOrDefault(key, Collections.emptyList());
+            if (matches.size() > 1) {
+                importErrorLogs.add(new ImportErrorLog(id, 0,
+                        I18nUtil.getMessage("ui.data.message.lhScheduleResult.import.database.duplicateKey")));
+                failureNum++;
+                continue;
+            }
+            if (matches.isEmpty()) {
+                newList.add(candidate);
+            } else {
+                LhScheduleResult existing = matches.get(0);
+                candidate.setId(existing.getId());
+                candidate.setBatchNo(existing.getBatchNo());
+                candidate.setOrderNo(existing.getOrderNo());
+                candidate.setIsRelease(this.hasChangedLhPlan(candidate, existing)
+                        ? ReleaseStatusEnum.NOT_RELEASED.getCode() : existing.getIsRelease());
+                candidate.setDataSource(existing.getDataSource());
+                updateList.add(candidate);
+                matchedIds.add(existing.getId());
+            }
+        }
+
+        if (failureNum > 0) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + ",0," + failureNum, importErrorLogs);
+        }
+
+        if (CollUtil.isNotEmpty(newList)) {
+            List<String> batchNos = existingList.stream()
+                    .map(LhScheduleResult::getBatchNo)
+                    .filter(StringUtils::isNotBlank)
+                    .distinct()
+                    .collect(Collectors.toList());
+            if (batchNos.size() > 1) {
+                importErrorLogs.add(new ImportErrorLog(id, 0,
+                        I18nUtil.getMessage("ui.data.message.lhScheduleResult.import.database.multipleBatches")));
+                return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + ",0,1", importErrorLogs);
+            }
+            String batchNo = batchNos.isEmpty()
+                    ? lhScheduleResultService.generateNextBatchNo(scheduleDate, factoryCode) : batchNos.get(0);
+            newList.forEach(item -> {
+                item.setBatchNo(batchNo);
+                item.setOrderNo(lhScheduleResultService.generateInsertOrderNo(scheduleDate));
+            });
+        }
+
+        updateList.forEach(scheduleResultMapper::updateById);
+        if (CollUtil.isNotEmpty(newList)) {
+            this.baseDao.saveBatch(newList);
+        }
+        existingList.stream()
+                .filter(item -> !matchedIds.contains(item.getId()))
+                .filter(this::hasPositiveStoredLhPlan)
+                .forEach(item -> {
+                    LhScheduleResult zeroPlan = new LhScheduleResult();
+                    zeroPlan.setId(item.getId());
+                    zeroPlan.setDailyPlanQty(0);
+                    zeroPlan.setIsRelease(ReleaseStatusEnum.NOT_RELEASED.getCode());
+                    IntStream.rangeClosed(1, LhScheduleConstant.MAX_SHIFT_SLOT_COUNT)
+                            .forEach(index -> zeroPlan.setFieldValueByFieldName(
+                                    String.format("class%dPlanQty", index), 0));
+                    scheduleResultMapper.updateById(zeroPlan);
+                });
         return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
+    }
+
+    private boolean hasImportPlanValue(LhScheduleResultTemplateImportVO row) {
+        return IntStream.rangeClosed(1, LhScheduleConstant.MAX_SHIFT_SLOT_COUNT)
+                .mapToObj(index -> (Integer) row.getFieldValueByFieldName(String.format("class%dPlanQty", index)))
+                .anyMatch(Objects::nonNull);
+    }
+
+    private boolean hasChangedLhPlan(LhScheduleResult candidate, LhScheduleResult existing) {
+        int incomingDaily = candidate.getDailyPlanQty() == null ? 0 : candidate.getDailyPlanQty();
+        int storedDaily = existing.getDailyPlanQty() == null ? 0 : existing.getDailyPlanQty();
+        if (incomingDaily != storedDaily) {
+            return true;
+        }
+        return IntStream.rangeClosed(1, LhScheduleConstant.MAX_SHIFT_SLOT_COUNT).anyMatch(index -> {
+            String field = String.format("class%dPlanQty", index);
+            Integer incoming = (Integer) candidate.getFieldValueByFieldName(field);
+            Integer stored = (Integer) existing.getFieldValueByFieldName(field);
+            return !Objects.equals(incoming == null ? 0 : incoming, stored == null ? 0 : stored);
+        });
+    }
+
+    private boolean hasPositiveStoredLhPlan(LhScheduleResult row) {
+        if (row.getDailyPlanQty() != null && row.getDailyPlanQty() > 0) {
+            return true;
+        }
+        return IntStream.rangeClosed(1, LhScheduleConstant.MAX_SHIFT_SLOT_COUNT)
+                .mapToObj(index -> (Integer) row.getFieldValueByFieldName(String.format("class%dPlanQty", index)))
+                .anyMatch(qty -> qty != null && qty > 0);
     }
 
     /**
@@ -1804,6 +1901,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         // 必填缺失、Excel 内重复等基础错误行已经标记为 -999，不参与业务主数据校验。
         List<LhScheduleResultTemplateImportVO> validRows = list.stream()
                 .filter(Objects::nonNull)
+                .filter(this::hasImportPlanValue)
                 .filter(row -> !Objects.equals(row.getId(), -999L))
                 .collect(Collectors.toList());
         Set<String> materialCodes = validRows.stream()
@@ -1934,21 +2032,47 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             errors.add(String.format("机台%s状态不可用", machineCode));
         }
 
+        for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
+            Integer planQty = (Integer) row.getFieldValueByFieldName(String.format("class%dPlanQty", shift));
+            if (planQty == null || planQty <= 0) {
+                continue;
+            }
+            String side = StringUtils.trimToEmpty((String) row.getFieldValueByFieldName(
+                    String.format("class%dLeftRightMould", shift)));
+            String recipeType = (String) row.getFieldValueByFieldName(String.format("class%dLhType", shift));
+            if (StringUtils.isBlank(recipeType)) {
+                errors.add(MessageFormat.format(I18nUtil.getMessage("ui.lh.import.shift.recipeRequired"), shift));
+            }
+            if (machineInfo == null) {
+                continue;
+            }
+            Integer mouldCount = machineInfo.getMaxMoldNum();
+            boolean validSide = Integer.valueOf(2).equals(mouldCount) && "LR".equals(side)
+                    || Integer.valueOf(1).equals(mouldCount) && ("L".equals(side) || "R".equals(side));
+            if (!validSide) {
+                errors.add(MessageFormat.format(I18nUtil.getMessage("ui.lh.import.shift.mouldSideInvalid"), shift));
+            } else if (Integer.valueOf(1).equals(mouldCount)
+                    && (machineCode.endsWith("L") && !"L".equals(side)
+                    || machineCode.endsWith("R") && !"R".equals(side))) {
+                errors.add(MessageFormat.format(I18nUtil.getMessage("ui.lh.import.shift.machineSideMismatch"), shift));
+            }
+        }
+
         // 校验模具号是否可用：
         // 先通过 SKU-模具关系表按 factoryCode + materialCode 找到所有模具号，
         // 再到模具台账可用集合中确认这些模具号是否存在且 mouldStatus=1。
-        List<String> mouldCodes = context.materialMouldRelMap.getOrDefault(materialKey, Collections.emptyList());
-        if (CollUtil.isEmpty(mouldCodes)) {
-            errors.add(String.format("SKU%s未维护模具关系", materialCode));
-        } else {
-            List<String> unavailableMouldCodes = mouldCodes.stream()
-                    .filter(mouldCode -> !context.availableMouldCodeSet.contains(buildMouldFactoryKey(factoryCode, mouldCode)))
-                    .distinct()
-                    .collect(Collectors.toList());
-            if (CollUtil.isNotEmpty(unavailableMouldCodes)) {
-                errors.add(String.format("SKU%s模具号不可用：%s", materialCode, String.join(",", unavailableMouldCodes)));
-            }
-        }
+//        List<String> mouldCodes = context.materialMouldRelMap.getOrDefault(materialKey, Collections.emptyList());
+//        if (CollUtil.isEmpty(mouldCodes)) {
+//            errors.add(String.format("SKU%s未维护模具关系", materialCode));
+//        } else {
+//            List<String> unavailableMouldCodes = mouldCodes.stream()
+//                    .filter(mouldCode -> !context.availableMouldCodeSet.contains(buildMouldFactoryKey(factoryCode, mouldCode)))
+//                    .distinct()
+//                    .collect(Collectors.toList());
+//            if (CollUtil.isNotEmpty(unavailableMouldCodes)) {
+//                errors.add(String.format("SKU%s模具号不可用：%s", materialCode, String.join(",", unavailableMouldCodes)));
+//            }
+//        }
 
         // 校验硫化示方号是否存在：
         // 需求要求“通过月计划中物料编码+产品状态到 SKU 与示方关系校验硫化示方号”。
@@ -2347,9 +2471,11 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             errors.add(buildRequiredMessage(rowNum, "ui.data.column.lhScheduleResult.materialCode", "materialCode"));
         }
         if (errors.isEmpty()) {
-            String uniqueKey = buildImportUniqueKey(factoryCode, scheduleDate, row.getLhMachineCode(), row.getMaterialCode(), row.getChangedTrialStatus());
+            String uniqueKey = this.buildImportUniqueKey(factoryCode, scheduleDate, row.getLhMachineCode(),
+                    row.getMaterialCode(), row.getLeftRightMould(), row.getMaterialDesc(),
+                    row.getMainMaterialDesc(), row.getChangedTrialStatus());
             if (!importUniqueKeys.add(uniqueKey)) {
-                errors.add(I18nUtil.getMessage("ui.data.message.lhScheduleResult.import.excel.repeat.machineMaterial"));
+                errors.add(I18nUtil.getMessage("ui.data.message.lhScheduleResult.import.excel.repeat.key"));
             }
         }
         return errors;
@@ -2365,12 +2491,31 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
 
-    private String buildImportUniqueKey(String factoryCode, Date scheduleDate, String lhMachineCode, String materialCode, String changedTrialStatus) {
+    private String buildImportUniqueKey(LhScheduleResult result) {
+        return this.buildImportUniqueKey(result.getFactoryCode(), result.getScheduleDate(),
+                result.getLhMachineCode(), result.getMaterialCode(), result.getLeftRightMould(),
+                result.getMaterialDesc(), result.getMainMaterialDesc(), result.getChangedTrialStatus());
+    }
+
+    private String buildImportUniqueKey(String factoryCode, Date scheduleDate, String lhMachineCode,
+                                        String materialCode, String leftRightMould, String materialDesc,
+                                        String mainMaterialDesc, String changedTrialStatus) {
         return StringUtils.defaultString(factoryCode).trim() + "|"
                 + DateUtil.format(DateUtil.beginOfDay(scheduleDate), "yyyy-MM-dd") + "|"
                 + StringUtils.defaultString(lhMachineCode).trim() + "|"
                 + StringUtils.defaultString(materialCode).trim() + "|"
+                + StringUtils.defaultString(leftRightMould).trim() + "|"
+                + StringUtils.defaultString(materialDesc).trim() + "|"
+                + StringUtils.defaultString(mainMaterialDesc).trim() + "|"
                 + StringUtils.defaultString(changedTrialStatus).trim();
+    }
+
+    private String resolveImportLeftRightMould(LhScheduleResultTemplateImportVO row) {
+        return Stream.of(row.getLeftRightMould(), row.getClass1LeftRightMould(), row.getClass2LeftRightMould(),
+                row.getClass3LeftRightMould(), row.getClass4LeftRightMould(),
+                row.getClass5LeftRightMould(), row.getClass6LeftRightMould(),
+                row.getClass7LeftRightMould(), row.getClass8LeftRightMould())
+                .filter(StringUtils::isNotBlank).findFirst().orElse(null);
     }
 
     private void fillImportChangedTrialStatus(LhScheduleResultTemplateImportVO row) {
@@ -2431,18 +2576,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         ).filter(StringUtils::isNotBlank).findFirst().orElse(null);
         target.setProductStatus(scheduleType);
 
-        // 遍历class1LeftRightMould到class8LeftRightMould，取第一个非空值
-        String leftRightMould = Stream.of(
-                source.getClass1LeftRightMould(),
-                source.getClass2LeftRightMould(),
-                source.getClass3LeftRightMould(),
-                source.getClass4LeftRightMould(),
-                source.getClass5LeftRightMould(),
-                source.getClass6LeftRightMould(),
-                source.getClass7LeftRightMould(),
-                source.getClass8LeftRightMould()
-        ).filter(StringUtils::isNotBlank).findFirst().orElse(null);
-        target.setLeftRightMould(leftRightMould);
+        target.setLeftRightMould(this.resolveImportLeftRightMould(source));
 
         target.setSpecCode(source.getSpecCode());
         target.setEmbryoCode(source.getEmbryoCode());
@@ -2688,7 +2822,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         tableMap.putAll(buildMouldChangeCountTableMap(list, exportScheduleDate, shiftDateList));
 
         // 固定表头字段沿用模板占位符，避免再通过 loadExportI18nTableName 动态改列名。
-        tableMap.put("yearmonthday", DateUtil.format(exportScheduleDate, "yyyy年MM月dd日"));
+        // 表头日期按导出排程日期顺延 1 天展示。
+        tableMap.put("yearmonthday", Objects.isNull(exportScheduleDate)
+                ? "" : DateUtil.format(DateUtil.offsetDay(exportScheduleDate, 1), "yyyy年MM月dd日"));
         tableMap.put("productionVersion", PubUtil.isNotEmpty(list) ? list.get(0).getProductionVersion() : "");
         tableMap.put("batchNo", PubUtil.isNotEmpty(list) ? list.get(0).getBatchNo() : "");
         return tableMap;

@@ -27,6 +27,11 @@ public enum UnscheduledReasonEnum {
     NO_AVAILABLE_MACHINE("03", "S4.5", "无可用机台", 130, false),
     CAPACITY_INSUFFICIENT("04", "S4.4/S4.5", "无有效产能", 155, false),
     EMBRYO_STOCK_INSUFFICIENT("05", "S4.3/S4.4/S4.5", "胎胚库存不足", 150, false),
+    /**
+     * 交班已停产且无可用胎胚，零合法生产目标仍保留禁排说明。
+     */
+    HANDOVER_STOPPED_NO_EMBRYO_STOCK("HANDOVER_STOPPED_NO_EMBRYO_STOCK", "S4.3/S4.4/S4.5",
+            "交班已停产收尾且无可用胎胚库存，不参与排产", 195, true),
     CONSTRUCTION_NOT_READY("06", "S4.3", "施工信息未就绪", 125, false),
     NO_ORIGINAL_TARGET("NO_ORIGINAL_TARGET", "S4.3", "无排产目标量", 100, true),
     NO_DAILY_PLAN_IN_WINDOW("NO_DAILY_PLAN_IN_WINDOW", "S4.3", "排产窗口内无日计划", 110, true),

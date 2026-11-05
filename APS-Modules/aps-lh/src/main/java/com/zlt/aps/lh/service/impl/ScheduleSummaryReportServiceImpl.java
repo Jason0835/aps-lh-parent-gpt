@@ -651,7 +651,8 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         //   ② IS_DELETE = 0：同一排程日重跑会生成多个批次（如 LHPC20260902001/002 被003取代后已置为
         //      逻辑删除）；项目未配置 MyBatis-Plus 全局逻辑删除，selectList 不会自动过滤 is_delete，
         //      必须显式加该条件，否则已删除批次的机台也会混入；
-        // changeMouldType 不在 SQL 层过滤，改为在内存中按 01/02→交替、03/04→清洗 分组，避免漏掉脏数据。
+        // 分组不在 SQL 层过滤，改为在内存中处理：交替取 CHANGE_MOULD_TYPE 的 01/02，清洗取 CLEAN_TYPE 的 03/04
+        // （03/04 在保存前已从 CHANGE_MOULD_TYPE 拆到 CLEAN_TYPE，见 LhCleaningPlanFinalizer#splitMouldChangePlanCleaningTypes）。
         Date t1Start = LhScheduleTimeUtil.clearTime(scheduleDateT1);
         Date t1End = LhScheduleTimeUtil.getEndTime(scheduleDateT1);
         Date t2Start = LhScheduleTimeUtil.clearTime(scheduleDateT2);
@@ -691,20 +692,23 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 .limit(15)
                 .collect(Collectors.joining(";"));
 
-        // T+1 模具清洗机台（planDate 仅取 T+1 当天，更换类型 03/04；业务确认清洗不并入T日前一日的准备数据）
+        // T+1 模具清洗机台（planDate 仅取 T+1 当天，清洗类型 03/04；业务确认清洗不并入T日前一日的准备数据）
+        // 注意：清洗类型在保存前已由 splitMouldChangePlanCleaningTypes 从 CHANGE_MOULD_TYPE 拆到 CLEAN_TYPE，
+        // 因此这里必须按 CLEAN_TYPE 过滤，与"首检及模具交替清洗小结"的喷砂/干冰统计口径保持一致；
+        // 若误用 CHANGE_MOULD_TYPE，纯清洗计划的该字段为空、栏位会恒为空。
         String mouldCleanInfoT1 = allPlans.stream()
                 .filter(p -> this.isPlanDateInRange(p, t1Start, t1End))
-                .filter(p -> MouldChangeTypeEnum.containsAnyCode(p.getChangeMouldType(),
+                .filter(p -> MouldChangeTypeEnum.containsAnyCode(p.getCleanType(),
                         MouldChangeTypeEnum.SAND_BLAST.getCode(), MouldChangeTypeEnum.DRY_ICE.getCode()))
                 .map(LhMouldChangePlan::getLhMachineCode)
                 .filter(StringUtils::isNotBlank)
                 .distinct()
                 .collect(Collectors.joining(";"));
 
-        // T+2 模具清洗机台（planDate 在 T+2 当天，更换类型 03/04）
+        // T+2 模具清洗机台（planDate 在 T+2 当天，清洗类型 03/04，同一律按 CLEAN_TYPE 过滤）
         String mouldCleanInfoT2 = allPlans.stream()
                 .filter(p -> this.isPlanDateInRange(p, t2Start, t2End))
-                .filter(p -> MouldChangeTypeEnum.containsAnyCode(p.getChangeMouldType(),
+                .filter(p -> MouldChangeTypeEnum.containsAnyCode(p.getCleanType(),
                         MouldChangeTypeEnum.SAND_BLAST.getCode(), MouldChangeTypeEnum.DRY_ICE.getCode()))
                 .map(LhMouldChangePlan::getLhMachineCode)
                 .filter(StringUtils::isNotBlank)

@@ -55,7 +55,9 @@ public final class EmbryoSupplyNewMachineLimitPolicy {
      * @return 普通入口有效来源；既有切换策略接管或供胚班不在判定窗口时为空
      */
     public static CxEmbryoLhTime resolveSource(LhScheduleContext context, SkuScheduleDTO sku) {
-        if (!StructureSwitchSchedulingPolicy.isEnabled(context) || context.isStructureSwitchSelectionProbe()
+        if (!StructureSwitchSchedulingPolicy.isEnabled(context)
+                || StructureTransferExemptionPolicy.shouldBypassStructureSwitch(context, sku)
+                || context.isStructureSwitchSelectionProbe()
                 || Objects.isNull(sku) || StringUtils.isEmpty(sku.getStructureName())
                 || Objects.nonNull(StructureSwitchSchedulingPolicy.resolveSource(context, sku))) {
             return null;
@@ -142,7 +144,7 @@ public final class EmbryoSupplyNewMachineLimitPolicy {
                     && Objects.equals(second.getShiftStartDateTime(), shift.getShiftStartDateTime())) {
                 offset = 1;
             }
-            shiftLimit = StructureSwitchSchedulingPolicy.shiftLimit(source.getIsWaitNotify(), offset);
+            shiftLimit = StructureSwitchSchedulingPolicy.shiftLimit(context, source.getIsWaitNotify(), offset);
         }
         if (shiftLimit == Integer.MAX_VALUE) {
             return evidence;

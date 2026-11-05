@@ -16,11 +16,18 @@ public class ScheduleResultConservationResult {
     /** 未排任务计划量。 */
     private final BigDecimal unplannedQty;
 
-    /** 来源量减已排量和未排量后的差额。 */
+    /**
+     * 成型总余量额度封顶扣减量。
+     */
+    private final BigDecimal quotaCappedQty;
+
+    /**
+     * 来源量减已排量、未排量和额度封顶扣减量后的差额。
+     */
     private final BigDecimal difference;
 
     /**
-     * 创建数量守恒结果。
+     * 创建数量守恒结果，不含额度封顶扣减量。
      *
      * @param sourceFinalPlanQty 来源任务最终计划量
      * @param assignedQty 已排任务计划量
@@ -28,10 +35,28 @@ public class ScheduleResultConservationResult {
      */
     public ScheduleResultConservationResult(BigDecimal sourceFinalPlanQty, BigDecimal assignedQty,
                                             BigDecimal unplannedQty) {
+        this(sourceFinalPlanQty, assignedQty, unplannedQty, BigDecimal.ZERO);
+    }
+
+    /**
+     * 创建数量守恒结果。
+     *
+     * <p>守恒式扩展为四项：来源最终计划量 = 已排量 + 未排量 + 额度封顶扣减量。
+     * 额度封顶扣减量是成型总余量封顶造成的独立去向，既不进已排也不进未排。</p>
+     *
+     * @param sourceFinalPlanQty 来源任务最终计划量
+     * @param assignedQty        已排任务计划量
+     * @param unplannedQty       未排任务计划量
+     * @param quotaCappedQty     成型总余量额度封顶扣减量
+     */
+    public ScheduleResultConservationResult(BigDecimal sourceFinalPlanQty, BigDecimal assignedQty,
+                                            BigDecimal unplannedQty, BigDecimal quotaCappedQty) {
         this.sourceFinalPlanQty = sourceFinalPlanQty;
         this.assignedQty = assignedQty;
         this.unplannedQty = unplannedQty;
-        this.difference = sourceFinalPlanQty.subtract(assignedQty.add(unplannedQty));
+        this.quotaCappedQty = quotaCappedQty;
+        this.difference = sourceFinalPlanQty
+                .subtract(assignedQty.add(unplannedQty).add(quotaCappedQty));
     }
 
     /**
@@ -62,6 +87,15 @@ public class ScheduleResultConservationResult {
     }
 
     /**
+     * 获取成型总余量额度封顶扣减量。
+     *
+     * @return 额度封顶扣减量
+     */
+    public BigDecimal getQuotaCappedQty() {
+        return this.quotaCappedQty;
+    }
+
+    /**
      * 获取守恒差额。
      *
      * @return 守恒差额
@@ -71,7 +105,7 @@ public class ScheduleResultConservationResult {
     }
 
     /**
-     * 判断来源量是否等于已排量与未排量之和。
+     * 判断来源量是否等于已排量、未排量与额度封顶扣减量之和。
      *
      * @return 差额为零时返回 true
      */

@@ -15,6 +15,20 @@ public interface MachineAssignmentPolicy<C, T extends ScheduleTaskDraftModel, P>
 
     void validateContext(C context);
 
+    /**
+     * 上报逐班机台分配的整体进度。
+     *
+     * <p>机台分配在胎面排程中占绝大部分耗时，而进度条此前只在步骤结束时刷新一次，
+     * 因此需要在分配过程中按已完成班次/任务推进进度，避免长时间停留在同一个百分比。</p>
+     *
+     * @param context 排程上下文
+     * @param done    已完成的任务数（跨班累计）
+     * @param total   本次需要分配的任务总数
+     */
+    default void reportAssignProgress(C context, int done, int total) {
+        // 默认不上报进度，未接入进度能力的领域保持原行为。
+    }
+
     boolean isInventoryClosedLoopEnabled(C context);
 
     void recalculateShiftPlans(C context, List<T> shiftTaskList, Map<String, BigDecimal> runtimeStockMap);
@@ -83,9 +97,50 @@ public interface MachineAssignmentPolicy<C, T extends ScheduleTaskDraftModel, P>
 
     T selectNextTask(List<T> remainingTaskList, C context, int assignmentSequence);
 
+    /**
+     * 每次基础派机尝试后补齐未排请求证据；兼容路径默认无动作。
+     *
+     * @param context 本次上下文
+     * @param task    已尝试的任务
+     */
+    default void afterBaseAssignmentAttempt(C context, T task) {
+        // 两阶段领域服务负责登记未选机意图，不影响旧流水线。
+    }
+
     void assignSingleTask(T task, C context);
 
     void fillCurrentShiftIdleCapacity(Integer shiftOrder, Map<Integer, List<T>> shiftTaskMap, C context);
+
+    /**
+     * 基础轮屏障后只扩增本班已有合法任务；默认实现保留旧入口兼容性。
+     *
+     * @param shiftOrder    当前班次
+     * @param shiftTaskList 本班完整任务，包含无实际行的诊断任务
+     * @param context       内部排程上下文
+     */
+    default void expandExtraInPlace(Integer shiftOrder, List<T> shiftTaskList, C context) {
+        // 非两阶段领域默认不扩增。
+    }
+
+    /**
+     * 提供具有完整领域证明与隔离工作区的新行端口；未接入默认禁用。
+     *
+     * @return 新行端口，null时保持现有行为，不影响已有行扩增
+     */
+    default ScheduleExtraCreatePolicy<C, T> extraCreatePolicy() {
+        return null;
+    }
+
+    /**
+     * 本班原生请求重算后补充已结算基础残量意图，不提前扣资源。
+     *
+     * @param shiftOrder 当前实际生产班
+     * @param tasks      当前班可变任务集合
+     * @param context    排程上下文
+     */
+    default void prepareBaseCarryTasks(Integer shiftOrder, List<T> tasks, C context) {
+        // 兼容入口不增加基础carry。
+    }
 
     void closeShiftInventory(C context, Integer shiftOrder, List<T> shiftTaskList,
                              Map<String, BigDecimal> runtimeStockMap);

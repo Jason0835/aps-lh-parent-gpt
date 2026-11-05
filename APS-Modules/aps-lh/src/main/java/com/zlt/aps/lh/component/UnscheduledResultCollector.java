@@ -9,6 +9,7 @@ import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationRemainderFinishGroup;
 import com.zlt.aps.lh.engine.strategy.support.EndingDiscardCandidate;
 import com.zlt.aps.lh.engine.strategy.support.SmallEndingSurplusSkipRule;
+import com.zlt.aps.lh.engine.strategy.support.PendingSkuUnscheduledRule;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.engine.strategy.support.UnscheduledDemandSnapshot;
 import com.zlt.aps.lh.engine.strategy.support.UnscheduledReasonEvent;
@@ -407,7 +408,8 @@ public class UnscheduledResultCollector {
     }
 
     /**
-     * 在S4.6全部数量调整结束后核对最终余量并归并未排，其他阶段不得调用。
+     * 在S4.6全部数量调整结束后核对最终余量并归并未排，保留交班停产无库存的禁排说明。
+     * 其他阶段不得调用。
      *
      * @param context 即将持久化的最终八班上下文
      */
@@ -418,9 +420,31 @@ public class UnscheduledResultCollector {
         }
         // 指定试制量试完成实机和虚拟补量后，按最终全部产量补齐未排。
         this.reconcilePreviousAlternateTrials(context);
+        this.reconcileHandoverStoppedWithoutStock(context);
         this.finalizeResults(context, true);
         // 先归并已有原因，再按最终八班结果补齐或清除本批余量收尾需求的真实缺口。
         this.reconcileRemainderFinishGroups(context);
+    }
+
+    /**
+     * 按原始需求补齐交班停产无库存的未排说明，避免零硬目标被当作排完而删除。
+     * 同源多机副本只保留一条，独立日调整需求仍各自登记，不修改任何生产或资源账本。
+     *
+     * @param context 全部后置处理完成的排程上下文
+     */
+    private void reconcileHandoverStoppedWithoutStock(LhScheduleContext context) {
+        if (Objects.isNull(context)) {
+            return;
+        }
+        Set<String> processedDemands = new LinkedHashSet<>();
+        context.getUnscheduledResultRuntime().getDemandKeyBySku().forEach((sku, demandKey) -> {
+            if (PendingSkuUnscheduledRule.isHandoverStoppedWithoutStock(context, sku)
+                    && processedDemands.add(demandKey)) {
+                LhUnscheduledResult result =
+                        PendingSkuUnscheduledRule.evaluateHandoverStoppedWithoutStock(context, sku);
+                this.addOrReplace(context, sku, result);
+            }
+        });
     }
 
     /**
@@ -491,6 +515,10 @@ public class UnscheduledResultCollector {
                 continue;
             }
             SkuScheduleDTO sku = group.getSourceSku();
+            // 零库存禁排不等于原需求已完成，不能按零合法目标删除其未排说明。
+            if (PendingSkuUnscheduledRule.isHandoverStoppedWithoutStock(context, sku)) {
+                continue;
+            }
             int scheduledQty = context.getScheduleResultList().stream()
                     .filter(result -> group.getEndingType() != ContinuationRemainderFinishGroup.EndingType.EMBRYO_STOCK
                             || !LhSingleControlMachineUtil.isVirtualMachineCode(result.getLhMachineCode()))
@@ -613,6 +641,10 @@ public class UnscheduledResultCollector {
      * @return 已无剩余需求、应移除此记录时返回true
      */
     private boolean reconcileContinuationZeroPlan(LhScheduleContext context, LhUnscheduledResult result) {
+        if (StringUtils.equals(UnscheduledReasonEnum.HANDOVER_STOPPED_NO_EMBRYO_STOCK.getCode(),
+                result.getUnscheduledReasonCode())) {
+            return false;
+        }
         UnscheduledDemandSnapshot snapshot = this.findSnapshot(context, result);
         if (Objects.isNull(snapshot)) {
             return false;

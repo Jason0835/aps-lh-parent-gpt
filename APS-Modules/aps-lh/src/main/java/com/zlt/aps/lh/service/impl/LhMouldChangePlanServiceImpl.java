@@ -917,6 +917,8 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
 
         List<LhMouldChangePlan> mouldResolutionPlanList = planList.stream()
                 .filter(Objects::nonNull)
+                // 离机喷砂原机已换料，刷新不得补回离机模具或覆盖组合备注。
+                .filter(plan -> !LhCleaningPlanFinalizer.isOnlySandBlastSourcePresentation(plan))
                 .filter(plan -> !this.isPureCleaningPlan(plan))
                 .collect(Collectors.toList());
         planList.stream()
@@ -1033,6 +1035,7 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
 
     /**
      * 根据类型、下机方式、模具号和前日计划差异重建备注。
+     * 组合计划同时读取独立清洗字段和旧交替类型中的清洗码，保证保存前后刷新文案一致。
      * 交替类型为空且清洗类型为03/04时，仅返回对应清洗文案，不判断下机方式或前日计划变化。
      * 按余量收尾文案仅在 END_TYPE=0 且 CHANGE_MOULD_TYPE 包含 01（正规换模）时生成；
      * 按时间下机文案仅在 CHANGE_MOULD_TYPE 非空、END_TYPE=1 且其包含01（正规换模）时生成。
@@ -1069,11 +1072,14 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
                 remarkParts.add(I18nUtil.getMessage(REMARK_BY_TIME_KEY));
             }
         }
-        if (MouldChangeTypeEnum.containsCode(plan.getChangeMouldType(),
+        // 组合记录保存后已拆分清洗字段，刷新备注仍须保留干冰或喷砂事实。
+        String cleaningTypes = StringUtils.defaultString(plan.getCleanType()) + ","
+                + StringUtils.defaultString(plan.getChangeMouldType());
+        if (MouldChangeTypeEnum.containsCode(cleaningTypes,
                 MouldChangeTypeEnum.DRY_ICE.getCode())) {
             remarkParts.add(I18nUtil.getMessage(REMARK_DRY_ICE_KEY));
         }
-        if (MouldChangeTypeEnum.containsCode(plan.getChangeMouldType(),
+        if (MouldChangeTypeEnum.containsCode(cleaningTypes,
                 MouldChangeTypeEnum.SAND_BLAST.getCode())) {
             remarkParts.add(I18nUtil.getMessage(REMARK_SAND_BLAST_KEY));
         }
@@ -2223,13 +2229,9 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
                 return AjaxResult.error(msg);
             }
 
-            // 校验是否存在已发布的数据
-            List<LhMouldChangePlan> releasedList = planList.stream()
-                    .filter(item -> ApsConstant.IS_RELEASE.equals(item.getIsRelease()))
-                    .collect(Collectors.toList());
-            if (CollectionUtils.isNotEmpty(releasedList)) {
-                return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.hasReleasedData"));
-            }
+            // 全量发布说明：发布范围为该排程日期+工厂下全部记录（不区分发布状态），
+            // 每次发布都是一个完整快照，下发到MES中间表时携带新的DATA_VERSION版本号，
+            // 历史版本保留仅供追溯，MES按最新版本号消费，因此已发布记录允许随全量数据一起重复下发
 
             // 校验班次是否为空，班次为空不允许发布
             List<LhMouldChangePlan> noClassIndexList = planList.stream()

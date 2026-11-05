@@ -1,5 +1,7 @@
 package com.zlt.aps.lh.service.impl;
 
+import com.zlt.aps.lh.engine.strategy.support.StructureEndingContinuationPolicy;
+
 import com.zlt.aps.cx.entity.config.CxEmbryoLhTime;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
@@ -126,6 +128,7 @@ public class StructureSwitchSchedulingService {
      */
     public boolean hasRemainingCandidates(LhScheduleContext context) {
         return context.getStructureSwitchCandidateSkuMap().values().stream()
+                .filter(sku -> !StructureEndingContinuationPolicy.shouldDefer(context, sku))
                 .anyMatch(sku -> targetScheduleQtyResolver.previewUnfulfilledProductionRemainingQty(context, sku) > 0);
     }
 
@@ -178,10 +181,12 @@ public class StructureSwitchSchedulingService {
                 if (Objects.nonNull(context.getMouldResourceContext())) {
                     context.getMouldResourceContext().refreshAvailability(context);
                 }
-                List<SkuScheduleDTO> candidates = new ArrayList<>(context.getStructureSwitchCandidateSkuMap().values());
+                List<SkuScheduleDTO> candidates = context.getStructureSwitchCandidateSkuMap().values().stream()
+                        .filter(sku -> !StructureEndingContinuationPolicy.shouldDefer(context, sku))
+                        .collect(Collectors.toList());
                 candidates.forEach(sku -> materialEligibilityService.prepareNormalPlanOnDueDate(context, sku, entry
                     .getKey()));
-                // 业务排序一天一次；首班和第二班均在组合等级内沿用，不再按同胎胚覆盖。
+                // 业务排序一天一次；非等结果首班的同胎胚偏好仅在每轮同等级竞争内生效。
                 strategyFactory.getSkuPriorityStrategy().sortNewSpecPoolByPriority(context, candidates);
                 Map<String, List<SkuScheduleDTO>> groups = this.groupBySupplyTime(context, candidates);
                 for (LhShiftConfigVO shift : entry.getValue()) {
@@ -321,11 +326,13 @@ public class StructureSwitchSchedulingService {
                 continue;
             }
             // 先完成同结构全部SKU的高等级组合，再进入低等级，避免前序普通SKU先占名额。
-            // S1与首班共用本顺序；同胎胚关系不得越过历史指定、活字块或原SKU延期排序。
+            // 同胎胚偏好只作用于非等结果首班，不越过历史指定、活字块或专供组合等级。
+            List<SkuScheduleDTO> ordered = StructureSwitchSchedulingPolicy.prioritizeNoWaitFirstShift(
+                    context, source, shift, original);
             Map<String, DailyNewSpecCandidate> candidates = new LinkedHashMap<>();
             for (int combinationRank = StructureSwitchPriorityPolicy.HISTORICAL;
                     combinationRank <= StructureSwitchPriorityPolicy.ORDINARY; combinationRank++) {
-                for (SkuScheduleDTO sku : original) {
+                for (SkuScheduleDTO sku : ordered) {
                     if (targetScheduleQtyResolver.previewUnfulfilledProductionRemainingQty(context, sku) <= 0) {
                         continue;
                     }

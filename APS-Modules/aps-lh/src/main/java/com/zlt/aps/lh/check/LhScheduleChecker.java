@@ -16,7 +16,8 @@ import java.util.List;
  * {@code LhScheduleCheckServiceImpl} 统一收集执行；单个检查项内部异常
  * 由执行方捕获降级，不阻断其他检查项。</p>
  *
- * <p>编号沿用需求评审时的检查项编号（1/4/5/6/7）。</p>
+ * <p>编号沿用需求评审时的检查项编号（1 空班 / 2 机台全空 / 3 模壳周转 / 4 收尾班差 / 5 收尾库存 /
+ * 6 模壳数量 / 7 卡盘 / 8 成型未排产）；实现类通过 {@code @Order} 固定报告分组顺序。</p>
  *
  * @author APS
  * @date 2026/10/27
@@ -25,6 +26,12 @@ public interface LhScheduleChecker {
 
     /** 检查项编码：空班 */
     String CODE_IDLE_SHIFT = "IDLE_SHIFT";
+
+    /** 检查项编码：机台全空（配置机台在整个排程窗口内没有任何排产计划） */
+    String CODE_EMPTY_MACHINE = "EMPTY_MACHINE";
+
+    /** 检查项编码：模壳周转（模壳数量 − 在机数量小于周转数量） */
+    String CODE_MOULD_SHELL_TURNOVER = "MOULD_SHELL_TURNOVER";
 
     /** 检查项编码：收尾班差 */
     String CODE_ENDING_SHIFT_GAP = "ENDING_SHIFT_GAP";
@@ -37,6 +44,9 @@ public interface LhScheduleChecker {
 
     /** 检查项编码：卡盘 */
     String CODE_CAPSULE_CHUCK = "CAPSULE_CHUCK";
+
+    /** 检查项编码：成型未排产（硫化已排产的胎胚在成型排程结果中查不到排产计划） */
+    String CODE_CX_NO_SCHEDULE = "CX_NO_SCHEDULE";
 
     /** 每日物理班数量上限（class1~class8，班次9的独立计划不纳入校验） */
     int SHIFT_SLOT_COUNT = 8;

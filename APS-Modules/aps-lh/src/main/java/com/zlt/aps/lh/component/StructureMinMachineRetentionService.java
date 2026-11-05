@@ -124,6 +124,32 @@ public class StructureMinMachineRetentionService {
     }
 
     /**
+     * 将准入收口后恢复的库存续作纳入原结构快照，仅刷新该结构的最低机台配置。
+     * <p>保留其他已出队SKU的原快照及其他结构配置，不重新初始化全部结构。</p>
+     *
+     * @param context 已完成结构初始化的排程上下文
+     * @param sku 恢复唯一库存承接身份的续作来源
+     */
+    public void includeRestoredContinuation(LhScheduleContext context, SkuScheduleDTO sku) {
+        String structureName = sku.getStructureName();
+        List<SkuScheduleDTO> snapshot = context.getStructureSkuSnapshotMap()
+                .computeIfAbsent(structureName, structure -> new ArrayList<>());
+        boolean alreadyIncluded = snapshot.stream().filter(Objects::nonNull)
+                .anyMatch(existing -> StringUtils.equals(existing.getMaterialCode(), sku.getMaterialCode())
+                        && StringUtils.equals(existing.getProductStatus(), sku.getProductStatus()));
+        if (alreadyIncluded) {
+            return;
+        }
+        snapshot.add(sku);
+        int minimumMachineCount = this.resolveMinimumMachineCount(context, structureName, snapshot);
+        if (minimumMachineCount < 0) {
+            context.getStructureMinVulcanizingMachineMap().remove(structureName);
+        } else {
+            context.getStructureMinVulcanizingMachineMap().put(structureName, minimumMachineCount);
+        }
+    }
+
+    /**
      * 收集通用在机索引需要覆盖的结构，统一用于全量构建和单机刷新。
      * 已提交结果和MES在机结构也必须纳入，避免待排SKU出队或无月计划前料造成漏计。
      * @param context 本次排程上下文

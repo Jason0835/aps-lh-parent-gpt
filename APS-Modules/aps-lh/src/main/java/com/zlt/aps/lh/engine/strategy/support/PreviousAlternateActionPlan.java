@@ -86,6 +86,9 @@ public final class PreviousAlternateActionPlan implements Serializable {
      */
     public static PreviousAlternateActionPlan resolve(LhScheduleContext context,
             PreviousAlternatePlanReleaseEvent event) {
+        if (event.getExecutionPlan() != null) {
+            return event.getExecutionPlan().getAction();
+        }
         if (Objects.nonNull(event.getActualActionPlan())) {
             return event.getActualActionPlan();
         }
@@ -130,6 +133,17 @@ public final class PreviousAlternateActionPlan implements Serializable {
         // 仅缓存固定输入事实；候选选定模具与资源仍由既有预演快照和重放机制维护。
         event.setActualActionPlan(action);
         return action;
+    }
+
+    /**
+     * 从固定的原装事实构造正规替代动作，不修改历史计划或原动作快照。
+     *
+     * @param reason 原组不可用及替代处理的业务原因
+     * @return 保留原前料身份的正规换模动作
+     */
+    public PreviousAlternateActionPlan withRegularReplacement(String reason) {
+        return new PreviousAlternateActionPlan(MouldChangeTypeEnum.REGULAR.getCode(),
+                originalMouldCodes, reason, beforeMaterialCode, beforeProductStatus);
     }
 
     /**

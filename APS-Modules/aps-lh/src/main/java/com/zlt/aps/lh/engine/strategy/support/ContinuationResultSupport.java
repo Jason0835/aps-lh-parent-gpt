@@ -8,6 +8,7 @@ import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.util.LhInventoryPlanMatcher;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.PriorityTraceLogHelper;
@@ -538,13 +539,7 @@ public class ContinuationResultSupport {
                 || StringUtils.isEmpty(machineCode)) {
             return new ArrayList<>();
         }
-        List<MdmDevicePlanShut> shutdownWindowList = new ArrayList<>(4);
-        for (MdmDevicePlanShut planShut : context.getDevicePlanShutList()) {
-            if (planShut != null && StringUtils.equals(machineCode, planShut.getMachineCode())) {
-                shutdownWindowList.add(planShut);
-            }
-        }
-        return shutdownWindowList;
+        return LhInventoryPlanMatcher.matchStopPlans(context.getDevicePlanShutList(), machineCode);
     }
 
     /**

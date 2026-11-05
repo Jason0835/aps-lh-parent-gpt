@@ -7,6 +7,7 @@ import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
+import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.PriorityTraceLogHelper;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -15,14 +16,15 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /**
- * 在均有可靠历史关系的机台之间匹配既定收尾方案，使交接时间贴近历史班次。
- * 无历史机台及固定角色保持原方案；只调整计算计划，实际后料资源由正式承接链隔离复核。
+ * 在可靠历史机台之间匹配完整错开方案，使历史优先机台优先物理释放。
+ * 无历史机台及设备固定角色保留原方案；节点角色随方案转移，后料由正式承接链排量及顺延。
  *
  * @author Codex
  * @date 2026/10/13
@@ -30,7 +32,7 @@ import java.util.stream.IntStream;
 @Slf4j
 public final class ContinuationFinishPlanMatcher {
     /**
-     * 在历史机台内部按命中班次、距离、等待及对调数量择优，一次更新完整映射。
+     * 按历史日期班次顺序绑定较早释放方案，数量和逐班合计保持守恒。
      *
      * @param context 已冻结历史资格与物理资源的上下文
      * @param sku 当前前物料及产品状态
@@ -59,13 +61,25 @@ public final class ContinuationFinishPlanMatcher {
                     || this.isFixed(context, profiles.get(position), baseline.get(position),
                             stopHoldResults, shifts.get(shifts.size() - 1).getShiftEndDateTime());
         }
+        List<Integer> orderedMachines = IntStream.range(0, count).boxed()
+                .filter(position -> !fixed[position])
+                .sorted(Comparator.comparingInt(position -> context.getPreviousAlternateMachineOrder()
+                        .rank(profiles.get(position).getOriginals().get(0).getLhMachineCode())))
+                .collect(Collectors.toList());
+        List<Integer> orderedSlots = orderedMachines.stream()
+                .sorted(Comparator.comparing(position -> baseline.get(position).getOfflineTime(),
+                        Comparator.nullsLast(Date::compareTo))).collect(Collectors.toList());
+        Date[] preferredReleases = new Date[count];
+        for (int position = 0; position < orderedMachines.size(); position++) {
+            preferredReleases[orderedMachines.get(position)] = baseline.get(orderedSlots.get(position)).getOfflineTime();
+        }
         ContinuationMachineFinishPlan[][] candidates = new ContinuationMachineFinishPlan[count][count];
         long[][][] scores = new long[count][count][];
         List<String> rejected = new ArrayList<>();
         for (int machine = 0; machine < count; machine++) {
             for (int slot = 0; slot < count; slot++) {
                 String rejection = machine == slot ? null : this.rejectCandidate(profiles.get(machine),
-                        profiles.get(slot), baseline.get(machine), baseline.get(slot), fixed[machine] || fixed[slot]);
+                        profiles.get(slot), baseline.get(slot), fixed[machine] || fixed[slot]);
                 if (Objects.nonNull(rejection)) {
                     if (Objects.nonNull(targets.get(machine))) {
                         rejected.add(this.code(profiles.get(machine)) + "<-" + this.code(profiles.get(slot))
@@ -82,8 +96,7 @@ public final class ContinuationFinishPlanMatcher {
                     continue;
                 }
                 candidates[machine][slot] = candidate;
-                scores[machine][slot] = this.score(targets.get(machine), changeover, candidate.getOfflineTime(),
-                        machine == slot);
+                scores[machine][slot] = this.score(preferredReleases[machine], candidate.getOfflineTime(), machine == slot);
             }
         }
         int[] assignment = this.minimumAssignment(this.encodeCosts(scores));
@@ -103,7 +116,7 @@ public final class ContinuationFinishPlanMatcher {
                     + "~" + this.time(target.getShiftEndDateTime()))
                     + ",原/新数量=" + baseline.get(machine).getPlanQty() + "/" + selected.get(machine).getPlanQty()
                     + ",原/新可交替=" + this.time(previous) + "/" + this.time(current)
-                    + ",距离毫秒=" + scores[machine][assignment[machine]][1];
+                    + ",历史顺序距离毫秒=" + scores[machine][assignment[machine]][0];
         }).collect(Collectors.joining(";"));
         // 原对象、来源SKU、模具及各类机台索引保持不变，统一提交入口按目标机台时间轴写回。
         calculated.setMachinePlans(selected);
@@ -148,7 +161,7 @@ public final class ContinuationFinishPlanMatcher {
     }
 
     /**
-     * 保留已确认的物理硬截止及指定释放角色，不将未完成占用或保机计划作为可交换槽位。
+     * 保留设备硬截止和未完成/保机身份；纯错开节点角色允许随完整方案转移。
      *
      * @param context 当前上下文
      * @param profile 真实机台画像
@@ -160,9 +173,9 @@ public final class ContinuationFinishPlanMatcher {
     private boolean isFixed(LhScheduleContext context, ContinuationEndingMachineProfile profile,
             ContinuationMachineFinishPlan plan, List<LhScheduleResult> held, Date windowEnd) {
         return plan.getFinishState() != ContinuationMachineFinishPlan.FinishState.SURPLUS_COMPLETED
-                || Objects.nonNull(plan.getHistoricalFinishPlanId()) || Objects.nonNull(plan.getTDayFinishConstraint())
-                || Objects.nonNull(plan.getNightFinishConstraint())
-                || StringUtils.isNotEmpty(plan.getFinishRoleMachineCode())
+                || Objects.nonNull(plan.getHistoricalFinishPlanId())
+                || (StringUtils.isNotEmpty(plan.getFinishRoleMachineCode())
+                && Objects.isNull(plan.getTDayFinishConstraint()) && Objects.isNull(plan.getNightFinishConstraint()))
                 || (Objects.nonNull(profile.getReleaseDeadline()) && profile.getReleaseDeadline().before(windowEnd))
                 || profile.getOriginals().stream().anyMatch(result -> held.contains(result)
                 || context.isContinuousStopHoldMachine(result.getLhMachineCode())
@@ -177,13 +190,12 @@ public final class ContinuationFinishPlanMatcher {
      *
      * @param target 目标机台
      * @param source 槽位原机台
-     * @param original 目标机台原节点
      * @param slot 待承接计划
      * @param fixed 是否涉及固定角色
      * @return 不可承接原因；合法时为空
      */
     private String rejectCandidate(ContinuationEndingMachineProfile target, ContinuationEndingMachineProfile source,
-            ContinuationMachineFinishPlan original, ContinuationMachineFinishPlan slot, boolean fixed) {
+            ContinuationMachineFinishPlan slot, boolean fixed) {
         if (fixed) {
             return "固定释放或保机角色";
         }
@@ -200,9 +212,23 @@ public final class ContinuationFinishPlanMatcher {
         if (Objects.isNull(release) || (quantity > 0 && Objects.isNull(finish))) {
             return "目标机真实时间不完整";
         }
-        if ((Objects.nonNull(original.getFinishDeadline()) && release.after(original.getFinishDeadline()))
-                || (Objects.nonNull(slot.getFinishDeadline()) && release.after(slot.getFinishDeadline()))) {
+        if (Objects.nonNull(slot.getFinishDeadline()) && release.after(slot.getFinishDeadline())) {
             return "越过既定收尾节点";
+        }
+        if (Objects.nonNull(slot.getTDayFinishConstraint())) {
+            ContinuationTDayFinishConstraint constraint = slot.getTDayFinishConstraint();
+            Date node = ContinuationTDayFinishConstraint.resolveNode(constraint.getWorkDate(),
+                    constraint.getTargetQty(), constraint.getShiftQty());
+            if (target.quantityUntil(node) != constraint.getNodeCapacityQty()) {
+                return "目标机节点容量不能保持原错开角色";
+            }
+        }
+        if (Objects.nonNull(slot.getNightFinishConstraint())) {
+            ContinuationNightFinishConstraint constraint = slot.getNightFinishConstraint();
+            Date node = LhScheduleTimeUtil.buildTime(LhScheduleTimeUtil.clearTime(constraint.getWorkDate()), 19, 0, 0);
+            if (target.quantityUntil(node) != constraint.getNodeCapacityQty()) {
+                return "目标机跨日节点容量不能保持原公式";
+            }
         }
         return null;
     }
@@ -220,7 +246,7 @@ public final class ContinuationFinishPlanMatcher {
     }
 
     /**
-     * 保留槽位数量及约束，并以目标机真实节拍重算完成、释放和收尾班次。
+     * 保留槽位数量及约束，将节点角色重绑定到目标机并按真实节拍重算时间。
      *
      * @param target 目标机台
      * @param slot 原槽位计划
@@ -229,6 +255,17 @@ public final class ContinuationFinishPlanMatcher {
     private ContinuationMachineFinishPlan transferPlan(ContinuationEndingMachineProfile target,
             ContinuationMachineFinishPlan slot) {
         ContinuationMachineFinishPlan transferred = BeanUtil.copyProperties(slot, ContinuationMachineFinishPlan.class);
+        if (StringUtils.isNotEmpty(slot.getFinishRoleMachineCode())) {
+            transferred.setFinishRoleMachineCode(LhSingleControlMachineUtil.resolvePhysicalMachineCode(this.code(target)));
+        }
+        ContinuationNightFinishConstraint night = slot.getNightFinishConstraint();
+        if (Objects.nonNull(night)) {
+            transferred.setNightFinishConstraint(new ContinuationNightFinishConstraint(night.getTargetQty(),
+                    night.getDayRemainingQty(), night.getShiftQty(), night.getWorkDate(),
+                    LhSingleControlMachineUtil.resolvePhysicalMachineCode(this.code(target)), night.isFormulaRole(),
+                    night.getPrefixQty(), night.getNodeCapacityQty(), night.getRequiredQty(),
+                    night.getNightShiftIndex(), night.getRequiredNightQty()));
+        }
         transferred.setFinishTime(target.completionTime(slot.getPlanQty()));
         transferred.setOfflineTime(target.switchReadyTime(slot.getPlanQty()));
         transferred.setFinishShiftIndex(slot.getPlanQty() > 0 ? target.productionEndingShift(slot.getPlanQty()) : null);
@@ -236,27 +273,17 @@ public final class ContinuationFinishPlanMatcher {
     }
 
     /**
-     * 计算字典序代价，不通过人为等待制造班次命中；班末是下一班的起点。
+     * 按历史优先级分配较早释放方案；相同释放时刻优先保留原绑定。
      *
-     * @param target 历史交替目标班次
-     * @param changeover 最早物理可交替时间
-     * @param release 真实释放时间
-     * @param unchanged 是否保持原绑定
-     * @return 未命中数、区间距离、交接等待毫秒及对调数
+     * @param preferredRelease 历史顺序应承接的释放节点，固定机台为空
+     * @param release 候选真实物理释放时刻
+     * @param unchanged 是否保持原方案
+     * @return 历史释放顺序距离及对调数量的字典序代价
      */
-    private long[] score(LhShiftConfigVO target, Date changeover, Date release, boolean unchanged) {
-        long distance = 0;
-        long missed = 0;
-        long wait = 0;
-        if (Objects.nonNull(target)) {
-            long start = target.getShiftStartDateTime().getTime();
-            long end = target.getShiftEndDateTime().getTime();
-            long actual = changeover.getTime();
-            missed = actual >= start && actual < end ? 0 : 1;
-            distance = actual < start ? start - actual : Math.max(0, actual - end);
-            wait = Math.max(0, Math.max(start, actual) - release.getTime());
-        }
-        return new long[]{missed, distance, wait, unchanged ? 0 : 1};
+    private long[] score(Date preferredRelease, Date release, boolean unchanged) {
+        long distance = Objects.isNull(preferredRelease) ? 0
+                : Math.abs(preferredRelease.getTime() - release.getTime());
+        return new long[]{distance, 0, 0, unchanged ? 0 : 1};
     }
 
     /**

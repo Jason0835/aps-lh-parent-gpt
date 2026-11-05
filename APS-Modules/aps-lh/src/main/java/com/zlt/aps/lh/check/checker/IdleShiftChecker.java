@@ -8,6 +8,7 @@ import com.zlt.aps.lh.check.LhScheduleCheckContext;
 import com.zlt.aps.lh.check.LhScheduleChecker;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.text.MessageFormat;
@@ -33,6 +34,7 @@ import java.util.Map;
  */
 @Slf4j
 @Component
+@Order(1)
 public class IdleShiftChecker implements LhScheduleChecker {
 
     /** 连续空班阈值：超过该值才记异常（1 表示连续 2 班及以上空班才报） */

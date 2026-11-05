@@ -19,21 +19,32 @@ public class LhMonthStartDayResult implements Serializable {
 
     private Date planStartDate;
 
+    private Date nextMonthDate;
+
     private boolean addLastMonthOverdueQty;
     /**
      * 空起始日
      */
-    public static final LhMonthStartDayResult EMPTY = new LhMonthStartDayResult(null, false);
+    public static final LhMonthStartDayResult EMPTY = new LhMonthStartDayResult(null, null, false);
 
     /**
      * 构造函数
      *
      * @param planStartDate          计划起始日
+     * @param nextMonthDate          下个月定稿的库存抓取日
      * @param addLastMonthOverdueQty 是否包含上个月超欠产
      */
-    public LhMonthStartDayResult(Date planStartDate, boolean addLastMonthOverdueQty) {
+    public LhMonthStartDayResult(Date planStartDate, Date nextMonthDate, boolean addLastMonthOverdueQty) {
         this.planStartDate = planStartDate;
+        this.nextMonthDate = nextMonthDate;
         this.addLastMonthOverdueQty = addLastMonthOverdueQty;
+    }
+
+    /**
+     * 重新置空起始日
+     */
+    public void resetEmptyPlanStartDate() {
+        this.planStartDate = null;
     }
 
     /**

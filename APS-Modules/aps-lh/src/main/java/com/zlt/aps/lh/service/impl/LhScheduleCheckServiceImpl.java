@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cx.entity.schedule.CxEmbryoEndingShift;
+import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.util.LhVirtualMachineUtil;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleCheckResult;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
@@ -16,6 +17,8 @@ import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.lh.check.LhScheduleCheckContext;
 import com.zlt.aps.lh.check.LhScheduleChecker;
 import com.zlt.aps.lh.mapper.CxEmbryoEndingShiftMapper;
+import com.zlt.aps.lh.mapper.CxScheduleResultMapper;
+import com.zlt.aps.lh.mapper.LhMachineInfoMapper;
 import com.zlt.aps.lh.mapper.LhScheduleCheckResultMapper;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.mapper.MdmCapsuleChuckMapper;
@@ -24,7 +27,9 @@ import com.zlt.aps.lh.mapper.MdmModelInfoMapper;
 import com.zlt.aps.lh.mapper.MdmMouldShellInfoMapper;
 import com.zlt.aps.lh.mapper.MdmSkuMouldRelMapper;
 import com.zlt.aps.lh.service.ILhScheduleCheckService;
+import com.zlt.aps.lh.util.MachineStatusUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
+import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmModelInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMouldShellInfo;
@@ -78,7 +83,8 @@ public class LhScheduleCheckServiceImpl
     private static final String ROW_KEY_SEPARATOR = "|";
 
     /**
-     * 校验器集合（按 Spring 注册顺序执行，报告分组也按此顺序）
+     * 校验器集合（按 @Order 排序执行：1 空班 / 2 机台全空 / 3 模壳周转 / 4 收尾班差 /
+     * 5 收尾库存 / 6 模壳数量 / 7 卡盘），报告分组也按此顺序
      */
     @Autowired
     private List<LhScheduleChecker> checkers;
@@ -110,6 +116,14 @@ public class LhScheduleCheckServiceImpl
     /** 成型收尾记录 Mapper */
     @Resource
     private CxEmbryoEndingShiftMapper cxEmbryoEndingShiftMapper;
+
+    /** 硫化机台配置 Mapper */
+    @Resource
+    private LhMachineInfoMapper lhMachineInfoMapper;
+
+    /** 成型排程结果 Mapper */
+    @Resource
+    private CxScheduleResultMapper cxScheduleResultMapper;
 
     /**
      * 执行校验并落库（幂等替换），返回最新报告。
@@ -309,7 +323,70 @@ public class LhScheduleCheckServiceImpl
         context.setMaterialInfoList(this.loadMaterialInfoList(factoryCode, materialCodes));
         context.setSkuMouldRelList(this.loadSkuMouldRelList(factoryCode, materialCodes));
         context.setCxEndingShiftList(this.loadCxEndingShiftList(factoryCode, scheduleDate));
+        // 5. 硫化机台配置：机台全空检查需要按配置表遍历启用机台
+        context.setMachineInfoList(this.loadMachineInfoList(factoryCode));
+        // 6. 成型排程结果：成型未排产检查需要与硫化侧按「胎胚描述 + 产品状态」比对
+        context.setCxScheduleResultList(this.loadCxScheduleResultList(factoryCode, scheduleDate));
         return context;
+    }
+
+    /**
+     * 加载成型排程结果（工厂 + 排程日维度，供成型未排产检查使用）。
+     *
+     * <p>只取判定所需列：胎胚描述、产品状态与 class1~class8 计划量，避免整行宽表拉取。</p>
+     *
+     * <p>逻辑删除在此显式过滤：{@code BaseEntity.isDelete} 没有 {@code @TableLogic}，
+     * 项目也未配置 MyBatis-Plus 全局逻辑删除，selectList 不会自动过滤，
+     * 与本类其它 load 方法保持一致。</p>
+     *
+     * @param factoryCode 工厂编号
+     * @param scheduleDate 排程日期（与硫化同一 SCHEDULE_DATE）
+     * @return 成型排程结果
+     */
+    private List<CxScheduleResult> loadCxScheduleResultList(String factoryCode, Date scheduleDate) {
+        List<CxScheduleResult> cxScheduleResultList = cxScheduleResultMapper.selectList(
+                new LambdaQueryWrapper<CxScheduleResult>()
+                        .select(CxScheduleResult::getFactoryCode,
+                                CxScheduleResult::getScheduleDate,
+                                CxScheduleResult::getMainMaterialDesc,
+                                CxScheduleResult::getProductStatus,
+                                CxScheduleResult::getClass1PlanQty,
+                                CxScheduleResult::getClass2PlanQty,
+                                CxScheduleResult::getClass3PlanQty,
+                                CxScheduleResult::getClass4PlanQty,
+                                CxScheduleResult::getClass5PlanQty,
+                                CxScheduleResult::getClass6PlanQty,
+                                CxScheduleResult::getClass7PlanQty,
+                                CxScheduleResult::getClass8PlanQty)
+                        .eq(CxScheduleResult::getFactoryCode, factoryCode)
+                        .eq(CxScheduleResult::getScheduleDate, scheduleDate)
+                        .eq(CxScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
+        if (cxScheduleResultList == null || cxScheduleResultList.isEmpty()) {
+            log.warn("硫化排程校验：未查询到成型排程结果, factoryCode={}, scheduleDate={}",
+                    factoryCode, DateUtil.formatDate(scheduleDate));
+            return new ArrayList<>();
+        }
+        return cxScheduleResultList;
+    }
+
+    /**
+     * 加载硫化机台配置（仅启用机台，按机台顺序）。
+     *
+     * @param factoryCode 工厂编号
+     * @return 机台配置
+     */
+    private List<LhMachineInfo> loadMachineInfoList(String factoryCode) {
+        List<LhMachineInfo> machineInfoList = lhMachineInfoMapper.selectList(
+                new LambdaQueryWrapper<LhMachineInfo>()
+                        .eq(LhMachineInfo::getFactoryCode, factoryCode)
+                        .eq(LhMachineInfo::getStatus, MachineStatusUtil.STATUS_ENABLED)
+                        .eq(LhMachineInfo::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
+                        .orderByAsc(LhMachineInfo::getMachineOrder));
+        if (machineInfoList == null || machineInfoList.isEmpty()) {
+            log.warn("硫化排程校验：未查询到启用的硫化机台配置, factoryCode={}", factoryCode);
+            return new ArrayList<>();
+        }
+        return machineInfoList;
     }
 
     /**

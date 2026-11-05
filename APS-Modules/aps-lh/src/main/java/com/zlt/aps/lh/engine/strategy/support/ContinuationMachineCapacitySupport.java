@@ -140,6 +140,27 @@ public class ContinuationMachineCapacitySupport {
             LhScheduleContext context, List<LhScheduleResult> sides, List<LhShiftConfigVO> shifts,
             Map<String, Date> cutoffs, Set<LhScheduleResult> pendingStopHoldResults,
             boolean remainderFinish, Integer finishDateOffset) {
+        return this.buildMachineProfile(context, sides, shifts, cutoffs, pendingStopHoldResults,
+                remainderFinish, finishDateOffset, false);
+    }
+
+    /**
+     * 为结构收尾回补计算后缀产能，仅忽略第一步技术释放投影，真实硬截止由调用方明确传入。
+     *
+     * @param context 当前实时资源及管控
+     * @param sides 保留原模具和节拍的后缀种子
+     * @param shifts 正式窗口班次
+     * @param cutoffs 已复核的维护、时间下机、后料及生产截止
+     * @param pendingStopHoldResults 停产保机原结果
+     * @param remainderFinish 是否按原数量单位向下归整
+     * @param finishDateOffset 收尾日班产口径
+     * @param ignoreReductionBoundary 是否忽略第一步技术释放的班次投影
+     * @return 不改变正式结果和资源的产能画像
+     */
+    public ContinuationEndingMachineProfile buildMachineProfile(
+            LhScheduleContext context, List<LhScheduleResult> sides, List<LhShiftConfigVO> shifts,
+            Map<String, Date> cutoffs, Set<LhScheduleResult> pendingStopHoldResults,
+            boolean remainderFinish, Integer finishDateOffset, boolean ignoreReductionBoundary) {
         List<LhScheduleResult> rawProfiles = new ArrayList<>(sides.size());
         List<List<MachineCleaningWindowDTO>> cleaningWindows = new ArrayList<>(sides.size());
         List<List<MachineMaintenanceWindowDTO>> maintenanceWindows = new ArrayList<>(sides.size());
@@ -185,7 +206,7 @@ public class ContinuationMachineCapacitySupport {
                         control.getEffectiveStartTime(), control.getEffectiveEndTime());
                 int allowed = this.limitSurplusEndingCapacity(context, result, shift, control, capacity,
                         cutoff, cleaning, maintenance, quantityMultiple,
-                        pendingStopHoldResults.contains(result), shifts);
+                        pendingStopHoldResults.contains(result), shifts, ignoreReductionBoundary);
                 // 时间内核保留原始班产比例；可分配容量按整模向下截取，尾量由组内其他机台承接。
                 if (remainderFinish) {
                     allowed = allowed / quantityMultiple * quantityMultiple;
@@ -228,11 +249,37 @@ public class ContinuationMachineCapacitySupport {
             Date cutoff, List<MachineCleaningWindowDTO> cleaning,
             List<MachineMaintenanceWindowDTO> maintenance, int multiple,
             boolean pendingStopHold, List<LhShiftConfigVO> shifts) {
+        return this.limitSurplusEndingCapacity(context, result, shift, control, capacity, cutoff,
+                cleaning, maintenance, multiple, pendingStopHold, shifts, false);
+    }
+
+    /**
+     * 反算真实时间边界前可排量，回补仅忽略阶段一技术释放，不豁免停产保机。
+     *
+     * @param context 实时资源上下文
+     * @param result 结果或后缀种子
+     * @param shift 当前班次
+     * @param control 已裁定的生产窗口
+     * @param capacity 原始有效产能
+     * @param cutoff 已提交资源与生产截止
+     * @param cleaning 清洗窗口
+     * @param maintenance 维护窗口
+     * @param multiple 数量单位
+     * @param pendingStopHold 是否待保机
+     * @param shifts 正式班次
+     * @param ignoreReductionBoundary 是否忽略技术释放投影
+     * @return 不晚于硬边界的真实可排量
+     */
+    private int limitSurplusEndingCapacity(LhScheduleContext context, LhScheduleResult result,
+            LhShiftConfigVO shift, ShiftProductionControlDTO control, int capacity,
+            Date cutoff, List<MachineCleaningWindowDTO> cleaning,
+            List<MachineMaintenanceWindowDTO> maintenance, int multiple,
+            boolean pendingStopHold, List<LhShiftConfigVO> shifts, boolean ignoreReductionBoundary) {
         Integer release = context.getContinuousReducedMachineReleaseBoundaryShiftIndex(result.getLhMachineCode());
         if (context.isContinuousStopHoldShift(result.getLhMachineCode(), this.resolveShiftWorkDate(shift),
                 shift.getShiftIndex())
                 || (pendingStopHold && this.isPendingContinuousStopHoldShift(context, result, shift, shifts))
-                || (Objects.nonNull(release) && shift.getShiftIndex() > release)) {
+                || (!ignoreReductionBoundary && Objects.nonNull(release) && shift.getShiftIndex() > release)) {
             return 0;
         }
         if (Objects.isNull(cutoff) || !cutoff.before(control.getEffectiveEndTime())) {

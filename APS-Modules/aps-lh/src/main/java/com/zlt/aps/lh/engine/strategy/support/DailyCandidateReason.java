@@ -16,7 +16,9 @@ public enum DailyCandidateReason {
     TODAY_PLAN,
     /** 续作补偿或 dayN 节奏判断要求从当前业务日起增加机台 */
     ADD_MACHINE_REQUIREMENT,
-    /** 当前日和提前生产阈值内均无计划，但仍有历史欠产或既有收尾目标需要按原新增链处理 */
+    /**
+     * 当前无原始日计划但存在获准库存收尾需求；兼容既有历史欠产或收尾来源标识。
+     */
     HISTORY_SHORTAGE_OR_ENDING,
     /** 当前业务日满足现有提前生产准入规则 */
     EARLY_PRODUCTION,

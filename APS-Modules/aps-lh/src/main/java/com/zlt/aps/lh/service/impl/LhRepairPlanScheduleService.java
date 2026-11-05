@@ -306,12 +306,9 @@ public class LhRepairPlanScheduleService {
                     MachineStopTypeEnum.PLANNED_REPAIR.getCode(), source.getMachineStopType());
             MdmDevicePlanShut actual = repair ? LhPlannedRepairResolver.buildActualRepairPlan(context, source) : source;
             if (repair && actual != null) {
-                // 被完整收尾排除的05不执行；来源旧安排日期也必须随本轮替换清理。
+                // 未执行05不产生回填项，原空值和历史日期均保持，不能以null更新代替不更新。
                 actual = context.getDevicePlanShutList().stream()
                         .filter(plan -> Objects.equals(source.getId(), plan.getId())).findFirst().orElse(null);
-                if (actual == null) {
-                    dates.put(source.getId(), null);
-                }
             }
             if (Objects.isNull(actual)) {
                 continue;

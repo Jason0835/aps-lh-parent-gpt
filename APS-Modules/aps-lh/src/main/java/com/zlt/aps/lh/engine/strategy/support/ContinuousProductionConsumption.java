@@ -38,6 +38,25 @@ public final class ContinuousProductionConsumption {
     }
 
     /**
+     * 合并同一结果前缀与追加后缀的消费凭证，不重新扣减已经提交的数量。
+     *
+     * @param additional 本次增量消费
+     * @return 同一结果可完整恢复的累计凭证
+     */
+    public ContinuousProductionConsumption append(ContinuousProductionConsumption additional) {
+        Map<LocalDate, int[]> combined = new LinkedHashMap<>();
+        quotaDeltas.forEach((date, delta) -> combined.put(date, delta.clone()));
+        additional.quotaDeltas.forEach((date, delta) -> {
+            int[] total = combined.computeIfAbsent(date, ignored -> new int[delta.length]);
+            for (int index = 0; index < delta.length; index++) {
+                total[index] = Math.addExact(total[index], delta[index]);
+            }
+        });
+        return new ContinuousProductionConsumption(Math.addExact(productionQty, additional.productionQty),
+                Math.addExact(shiftFillOverQty, additional.shiftFillOverQty), combined);
+    }
+
+    /**
      * 在公共扣账入口调用前保存本条可能修改的账本字段。
      * @param sku 当前来源SKU
      * @param productionRemainingQty 扣账前生产余量

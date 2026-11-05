@@ -368,14 +368,12 @@ public final class MachineCleaningOverlapUtil {
         if (CollectionUtils.isEmpty(context.getDevicePlanShutList())) {
             return false;
         }
-        return context.getDevicePlanShutList().stream()
-                .filter(Objects::nonNull)
+        return LhInventoryPlanMatcher.matchPhysicalStopPlans(
+                context.getDevicePlanShutList(), physicalMachineCode).stream()
                 .filter(plan -> !StringUtils.equals(
                         MachineStopTypeEnum.DRY_ICE_CLEANING.getCode(), plan.getMachineStopType()))
                 .filter(plan -> !StringUtils.equals(
                         MachineStopTypeEnum.SANDBLASTING_CLEANING.getCode(), plan.getMachineStopType()))
-                .filter(plan -> StringUtils.equals(physicalMachineCode,
-                        LhSingleControlMachineUtil.resolvePhysicalMachineCode(plan.getMachineCode())))
                 .anyMatch(plan -> isWindowOverlap(
                         plan.getBeginDate(), plan.getEndDate(), startTime, endTime));
     }

@@ -190,7 +190,8 @@ public final class EarlyProductionChecker {
              * 提前生产中心按“业务日最后一个班次”生成当天唯一资格。资格通过后，当天其他班次
              * 不再根据候选实际开产班次重复校验结构机台数。
              */
-            boolean normalStructureEarlyProduction = currentPlanMachineCount > 0;
+            boolean normalStructureEarlyProduction = currentPlanMachineCount > 0
+                    || StructureTransferExemptionPolicy.shouldBypassStructureSwitch(context, sku);
             logEarlyProductionDecision(context, sku, currentDate, firstFuturePlanDate, planMachineCount,
                     scheduledStructureCount, scheduledSkuCount, threshold,
                     earlyProductionDaysThreshold, earlyDays, futurePlanQty, true,
@@ -199,7 +200,7 @@ public final class EarlyProductionChecker {
                     ? EarlyProductionDecision.SCENE_CONTINUATION_ADD_MACHINE
                     : normalStructureEarlyProduction
                     ? EarlyProductionDecision.SCENE_NORMAL : EarlyProductionDecision.SCENE_STRUCTURE_SWITCH;
-            if (currentPlanMachineCount == 0) {
+            if (structureSwitchEarlyProduction) {
                 log.info("提前生产结构切换准入, currentDate: {}, futurePlanDate: {}, structureName: {}, "
                                 + "currentPlanMachineCount: {}, futurePlanMachineCount: {}, "
                                 + "scheduledStructureCount: {}, result: {}",
@@ -247,7 +248,8 @@ public final class EarlyProductionChecker {
             LocalDate firstFuturePlanDate) {
         if (Objects.isNull(context) || Objects.isNull(sku)
                 || Objects.isNull(currentDate) || Objects.isNull(firstFuturePlanDate)
-                || StringUtils.isEmpty(sku.getStructureName())) {
+                || StringUtils.isEmpty(sku.getStructureName())
+                || StructureTransferExemptionPolicy.shouldBypassStructureSwitch(context, sku)) {
             return false;
         }
         int currentPlanMachineCount = context.getStructurePlanMachineCount(
@@ -796,8 +798,8 @@ public final class EarlyProductionChecker {
                 NewSpecEmbryoAvailableTimeResolver.resolveEarliestAvailableTime(context, sku);
         boolean structureScheduledInContinuation =
                 NewSpecEmbryoAvailableTimeResolver.isStructureScheduledInCurrentContinuation(context, sku);
-        Date effectiveEarliestEmbryoAvailableTime = structureScheduledInContinuation
-                ? null : configuredEarliestEmbryoAvailableTime;
+        Date effectiveEarliestEmbryoAvailableTime =
+                NewSpecEmbryoAvailableTimeResolver.resolveEffectiveEarliestAvailableTime(context, sku);
         LocalDate earlyProductionMaxDate = resolveEarlyProductionMaxDate(context, null);
         log.info("提前生产准入判断, factoryCode: {}, batchNo: {}, currentDate: {}, futurePlanDate: {}, "
                         + "earlyProductionMaxDate: {}, "

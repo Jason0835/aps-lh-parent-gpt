@@ -28,6 +28,10 @@ public class LhDayPlanAdjustRequireSummaryVo implements Serializable {
     @ApiModelProperty("调整3合计")
     private BigDecimal adjustQty3 = BigDecimal.ZERO;
 
+    /** 调整4合计 */
+    @ApiModelProperty("调整4合计")
+    private BigDecimal adjustQty4 = BigDecimal.ZERO;
+
     /** 调整后总合计 */
     @ApiModelProperty("调整后总合计")
     private BigDecimal adjustedTotalQty = BigDecimal.ZERO;

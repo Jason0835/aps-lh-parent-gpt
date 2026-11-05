@@ -14,6 +14,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
+import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -34,6 +35,18 @@ public class MouldRelationValidator implements IDataValidator {
     private static final String MOULD_CODE_DELIMITER = "\u3001";
     private static final int SUMMARY_DISPLAY_LIMIT = 3;
 
+    /**
+     * 本轮需求资格的只读解析入口，仅用于收窄模具禁用校验。
+     */
+    @Resource
+    private MouldValidationScopeResolver mouldValidationScopeResolver;
+
+    /**
+     * 校验模具关系完整性，仅在同一可排物料的全部关联模具均禁用时报告禁用错误。
+     *
+     * @param context 当前工厂、窗口及基础数据
+     * @return 关系完整且不存在全部关联模具均禁用的可排物料时返回 true
+     */
     @Override
     public boolean validate(LhScheduleContext context) {
         if (CollectionUtils.isEmpty(context.getSkuMouldRelMap())) {
@@ -52,36 +65,11 @@ public class MouldRelationValidator implements IDataValidator {
                     + String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.monthPlanMouldRelMissing"), context.getFactoryDisplayName()));
             return false;
         }
-        Set<String> monthPlanSkuSet = context.getMonthPlanList().stream()
-                .map(p -> p.getMaterialCode())
-                .filter(StringUtils::isNotEmpty)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
+        Set<String> eligibleMaterialCodes = mouldValidationScopeResolver.resolveMaterialCodes(context);
         Set<String> missingModelInfoMouldCodeSet = new LinkedHashSet<>();
-        Set<String> disabledMouldCodeSet = new LinkedHashSet<>();
+        Set<String> disabledMouldCodeSet = this.collectAllDisabledMouldCodes(
+                context, eligibleMaterialCodes, missingModelInfoMouldCodeSet);
         Map<String, MdmModelInfo> modelInfoMap = context.getModelInfoMap();
-        for (String materialCode : monthPlanSkuSet) {
-            List<MdmSkuMouldRel> mouldRelList = context.getSkuMouldRelMap().get(materialCode);
-            if (CollectionUtils.isEmpty(mouldRelList)) {
-                continue;
-            }
-            for (MdmSkuMouldRel mouldRel : mouldRelList) {
-                String mouldCode = StringUtils.trim(mouldRel.getMouldCode());
-                if (StringUtils.isEmpty(mouldCode)) {
-                    continue;
-                }
-                if (Objects.nonNull(mouldRel.getBoardingDate())) {
-                    continue;
-                }
-                MdmModelInfo modelInfo = modelInfoMap.get(mouldCode);
-                if (Objects.isNull(modelInfo)) {
-                    missingModelInfoMouldCodeSet.add(mouldCode);
-                    continue;
-                }
-                if (!MouldStatusUtil.isEnabled(modelInfo.getMouldStatus())) {
-                    disabledMouldCodeSet.add(mouldCode);
-                }
-            }
-        }
 //        if (!missingModelInfoMouldCodeSet.isEmpty()) {
 //            String summaryMsg = buildSummaryMessage(
 //                    I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.mouldMissingSimple"),
@@ -94,21 +82,68 @@ public class MouldRelationValidator implements IDataValidator {
 //            context.addValidationErrorDetails(details);
 //        }
         if (!disabledMouldCodeSet.isEmpty()) {
-            String summaryMsg = buildSummaryMessage(
+            String summaryMsg = this.buildSummaryMessage(
                     I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.mouldDisabledSimple"),
                     I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.mouldDisabledMany"),
                     getValidatorName(), disabledMouldCodeSet);
-            log.warn("检测到禁用模具, 工厂: {}, 模具号: {}", context.getFactoryCode(),
+            log.warn("检测到全部关联模具禁用的可排物料, 工厂: {}, 模具号: {}", context.getFactoryCode(),
                     String.join(MOULD_CODE_DELIMITER, disabledMouldCodeSet));
             context.addValidationError(summaryMsg);
-            List<MouldValidationErrorDetail> details = buildDisabledDetails(disabledMouldCodeSet, modelInfoMap);
+            List<MouldValidationErrorDetail> details = this.buildDisabledDetails(disabledMouldCodeSet, modelInfoMap);
             context.addValidationErrorDetails(details);
-        }
-        if (!disabledMouldCodeSet.isEmpty()) {
             return false;
         }
         log.info("模具关系校验通过, SKU模具关系数: {}", context.getSkuMouldRelMap().size());
         return true;
+    }
+
+    /**
+     * 按可排物料分别判断全部禁用，只汇总命中物料的模具号。
+     * <p>到货来源和台账缺失不能证明禁用；保留它们在关联集合中，避免仅凭部分已知模具误判全部禁用。</p>
+     *
+     * @param context 当前批次的模具关系与台账
+     * @param eligibleMaterialCodes 已通过本轮需求范围判断的物料
+     * @param missingModelInfoMouldCodeSet 沿用既有台账缺失收集集合
+     * @return 全部关联模具禁用物料对应的去重模具号
+     */
+    private Set<String> collectAllDisabledMouldCodes(LhScheduleContext context, Set<String> eligibleMaterialCodes,
+                                                     Set<String> missingModelInfoMouldCodeSet) {
+        Set<String> allDisabledMouldCodes = new LinkedHashSet<>();
+        Map<String, MdmModelInfo> modelInfoMap = context.getModelInfoMap();
+        for (String materialCode : eligibleMaterialCodes) {
+            List<MdmSkuMouldRel> mouldRelList = context.getSkuMouldRelMap().get(materialCode);
+            if (CollectionUtils.isEmpty(mouldRelList)) {
+                continue;
+            }
+            Set<String> materialMouldCodes = new LinkedHashSet<>();
+            Set<String> materialDisabledMouldCodes = new LinkedHashSet<>();
+            for (MdmSkuMouldRel mouldRel : mouldRelList) {
+                String mouldCode = StringUtils.trim(mouldRel.getMouldCode());
+                if (StringUtils.isEmpty(mouldCode)) {
+                    continue;
+                }
+                materialMouldCodes.add(mouldCode);
+                if (Objects.nonNull(mouldRel.getBoardingDate())) {
+                    continue;
+                }
+                MdmModelInfo modelInfo = modelInfoMap.get(mouldCode);
+                if (Objects.isNull(modelInfo)) {
+                    missingModelInfoMouldCodeSet.add(mouldCode);
+                    continue;
+                }
+                if (!MouldStatusUtil.isEnabled(modelInfo.getMouldStatus())) {
+                    materialDisabledMouldCodes.add(mouldCode);
+                }
+            }
+            // 每个物料独立比较，其他物料的启用模具不能抵消当前物料的全部禁用。
+            if (!materialMouldCodes.isEmpty() && materialMouldCodes.equals(materialDisabledMouldCodes)) {
+                allDisabledMouldCodes.addAll(materialDisabledMouldCodes);
+                log.warn("可排物料全部关联模具禁用, 工厂: {}, 批次: {}, 物料: {}, 模具号: {}",
+                        context.getFactoryCode(), context.getBatchNo(), materialCode,
+                        String.join(MOULD_CODE_DELIMITER, materialDisabledMouldCodes));
+            }
+        }
+        return allDisabledMouldCodes;
     }
 
     /**

@@ -3,6 +3,11 @@ package com.zlt.aps.common.engine.schedule.engine;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.engine.quantity.PlanQuantityAllocationItem;
 import com.zlt.aps.common.engine.quantity.PlanQuantityAllocationUtils;
+import com.zlt.aps.common.engine.schedule.constraint.ScheduleTailQuotaCollectResult;
+import com.zlt.aps.common.engine.schedule.constraint.ScheduleTailQuotaLedger;
+import com.zlt.aps.common.engine.schedule.constraint.ScheduleTailQuotaSourceCollector;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.util.*;
@@ -21,6 +26,8 @@ import java.util.stream.Collectors;
 public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, G>,
         T extends ScheduleTaskDraftModel, F extends ScheduleInventoryForecast,
         G extends SchedulePlanTaskGroup<T>, P, D> {
+
+    private static final Logger LOG = LoggerFactory.getLogger(PlanCalculationEngine.class);
 
     /**
      * 执行计划量计算主流程。
@@ -80,6 +87,7 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
             return;
         }
         this.aggregateTaskDrafts(context, policy);
+        this.prepareTailQuota(context, policy);
         Map<String, F> stockForecastMap = context.getStockForecastMap();
 
         Map<String, BigDecimal> remainingStockMap = new HashMap<>();
@@ -125,24 +133,42 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
         Map<String, BigDecimal> planningStockMap = new HashMap<>(runtimeStockMap);
         Set<String> recalculatedProductCodeSet = new HashSet<>();
         context.setRemainingStockMap(planningStockMap);
+        this.applyTailQuotaAvailableQty(context, shiftTaskList, policy);
         try {
+            // 拆分逐班重算，区分需求准备、排序及每条任务计划计算的累计开销。
+            long phaseStartNanos = System.nanoTime();
             policy.prepareShiftDemandAndSupply(context, shiftTaskList, stockForecastMap, planningStockMap,
                     demandStrategy, demandAlgorithmCode);
+            long demandNanos = System.nanoTime() - phaseStartNanos;
+            phaseStartNanos = System.nanoTime();
             policy.beforeCalculatePlanQty(context, shiftTaskList);
+            long beforeNanos = System.nanoTime() - phaseStartNanos;
             List<T> beforeSortTaskList = new ArrayList<>(shiftTaskList);
+            phaseStartNanos = System.nanoTime();
             policy.sortPlanCalcShiftTasks(context, shiftTaskList);
+            long sortNanos = System.nanoTime() - phaseStartNanos;
             int orderIndex = this.resolveNextPlanCalcOrderIndex(context);
             int sortStartIndex = orderIndex + 1;
             BigDecimal remainingToolQty = context.getCurrentAvailableToolQty();
             for (T task : shiftTaskList) {
                 task.setPlanCalcOrderIndex(++orderIndex);
                 task.setBaseSortIndex(orderIndex);
+                if (context.isTwoPhaseEnabled()) {
+                    task.setTwoPhaseDuplicateTask(false);
+                }
                 if (!this.isPresetPlanTask(task)) {
                     task.setPlanQty(null);
                 }
             }
+            phaseStartNanos = System.nanoTime();
             policy.recordPlanCalcSortSnapshot(context, beforeSortTaskList, new ArrayList<>(shiftTaskList),
                     sortStartIndex, orderIndex);
+            long snapshotNanos = System.nanoTime() - phaseStartNanos;
+            long calculationNanos = 0L;
+            long maxTaskNanos = 0L;
+            String slowestBusinessKey = null;
+            int calculatedCount = 0;
+            phaseStartNanos = System.nanoTime();
             for (T task : shiftTaskList) {
                 String productCode = task.getProcessCode();
                 if (productCode == null || productCode.trim().isEmpty()) {
@@ -150,6 +176,9 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
                 }
                 // 同一产品同班只计算首个非预置任务，保留原有计划组去重语义，避免局部库存被重复扣减。
                 if (!this.isPresetPlanTask(task) && !recalculatedProductCodeSet.add(productCode)) {
+                    if (context.isTwoPhaseEnabled()) {
+                        task.setTwoPhaseDuplicateTask(true);
+                    }
                     task.setStockCoverageStockGapQty(null);
                     task.setStockCoverageCovered(null);
                     // 同班重复任务不参与二次库存判断，清除历史兼容标记避免日志误判为覆盖。
@@ -162,13 +191,29 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
                             this.nvl(task.getRollingStockQty())));
                     continue;
                 }
+                long taskStartNanos = System.nanoTime();
                 remainingToolQty = policy.calculatePlanQtyForTask(context, task, stockForecastMap,
                         planningStockMap, remainingToolQty, planStrategy, planStrategyCode, demandAlgorithmCode);
+                long taskNanos = System.nanoTime() - taskStartNanos;
+                calculationNanos += taskNanos;
+                calculatedCount++;
+                if (taskNanos > maxTaskNanos) {
+                    maxTaskNanos = taskNanos;
+                    slowestBusinessKey = task.getBusinessKey();
+                }
                 if (productCode != null && !productCode.trim().isEmpty()) {
                     planningStockMap.put(productCode, this.nvl(task.getPlanStockQty()));
                 }
             }
+            long loopNanos = System.nanoTime() - phaseStartNanos;
             context.setCurrentAvailableToolQty(remainingToolQty);
+            String batchNo = context instanceof ScheduleContextModel
+                    ? ((ScheduleContextModel<?, ?, ?, ?, ?>) context).getBatchNo() : null;
+            LOG.info("[SCHEDULE_PERF] 逐班计划重算内部耗时 batchNo={}, factoryCode={}, scheduleDate={}, shiftOrder={}, taskCount={}, calculatedCount={}, demandMs={}, beforeMs={}, sortAndLogMs={}, snapshotMs={}, taskLoopMs={}, calculateMs={}, slowestTask={}, slowestMs={}",
+                    batchNo, context.getFactoryCode(), context.getScheduleDate(), shiftTaskList.get(0).getShiftOrder(),
+                    shiftTaskList.size(), calculatedCount, demandNanos / 1000000, beforeNanos / 1000000,
+                    sortNanos / 1000000, snapshotNanos / 1000000, loopNanos / 1000000,
+                    calculationNanos / 1000000, slowestBusinessKey, maxTaskNanos / 1000000);
         } finally {
             context.setRemainingStockMap(new HashMap<>(runtimeStockMap));
         }
@@ -200,6 +245,64 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
     }
 
     /**
+     * 初始化当日成型总余量额度台账。
+     *
+     * <p>必须在汇总任务之后执行：{@link #aggregateTaskDrafts} 在已有汇总组时会提前返回，
+     * 把初始化放进去会被跳过。幂等标记独立保存，并在工作区复制时同步，
+     * 避免两阶段重入把已扣减的额度冲回总余量。</p>
+     *
+     * @param context 排程上下文
+     * @param policy  领域差异策略
+     */
+    private void prepareTailQuota(C context, PlanCalculationPolicy<C, T, F, G, P, D> policy) {
+        if (context.isTailQuotaPrepared()) {
+            return;
+        }
+        context.setTailQuotaPrepared(true);
+        List<T> sourceTaskList = context.getSourceTaskDraftList();
+        if (sourceTaskList == null || sourceTaskList.isEmpty()) {
+            return;
+        }
+        ScheduleTailQuotaCollectResult collectResult = new ScheduleTailQuotaSourceCollector()
+                .collect(context.getFactoryCode(), context.getScheduleDate(), sourceTaskList,
+                        policy::resolveTailQuotaRemainQty, policy::resolveTailQuotaUnitLength);
+        context.setTailQuotaLedgerMap(new LinkedHashMap<>(collectResult.getLedgerMap()));
+        if (!collectResult.getWarningList().isEmpty()) {
+            LOG.warn("成型总余量额度采集告警 batchNo={}, warnings={}",
+                    context.getFactoryCode(), collectResult.getWarningList());
+        }
+    }
+
+    /**
+     * 把本班任务可用的成型总余量额度下发到任务运行态。
+     *
+     * <p>额度为空表示该产品未启用额度，下游按未启用处理，不做任何封顶。</p>
+     *
+     * @param context       排程上下文
+     * @param shiftTaskList 当前班次任务
+     * @param policy        领域差异策略
+     */
+    private void applyTailQuotaAvailableQty(C context, List<T> shiftTaskList,
+                                            PlanCalculationPolicy<C, T, F, G, P, D> policy) {
+        Map<String, ScheduleTailQuotaLedger> ledgerMap = context.getTailQuotaLedgerMap();
+        for (T task : shiftTaskList) {
+            if (task == null) {
+                continue;
+            }
+            if (ledgerMap == null || ledgerMap.isEmpty()) {
+                task.setTailQuotaAvailableQty(null);
+                continue;
+            }
+            BigDecimal unitLength = policy.resolveTailQuotaUnitLength(task);
+            String bucketKey = ScheduleTailQuotaSourceCollector.resolveBucketKey(context.getFactoryCode(),
+                    context.getScheduleDate(), ScheduleTailQuotaSourceCollector.resolveProductCode(task),
+                    unitLength);
+            ScheduleTailQuotaLedger ledger = ledgerMap.get(bucketKey);
+            task.setTailQuotaAvailableQty(ledger == null ? null : ledger.availableFor(task.getBusinessKey()));
+        }
+    }
+
+    /**
      * 按产品编码和班次汇总原始成型来源任务。
      *
      * @param context 排程上下文
@@ -212,6 +315,10 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
             return;
         }
         List<T> originalTaskList = new ArrayList<>(context.getTaskDraftList());
+        if (context.isTwoPhaseEnabled()) {
+            originalTaskList.stream().filter(Objects::nonNull)
+                    .forEach(task -> this.freezeTwoPhaseInput(context, task));
+        }
         SchedulePlanTailCalculator.prepareTailMetadata(originalTaskList);
         Map<String, List<T>> groupedTaskMap = originalTaskList.stream()
                 .filter(Objects::nonNull)
@@ -259,11 +366,32 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
                     .allMatch(sourceTask -> sourceTask.getStockCoverageDemandQty() != null);
             BigDecimal stockCoverageDemandQty = coverageWindowAvailable
                     ? this.sum(groupSourceList, ScheduleTaskDraftModel::getStockCoverageDemandQty) : null;
-            ScheduleStockCoverageWindowModel stockCoverageWindow = this.mergeStockCoverageWindow(groupSourceList);
+            ScheduleStockCoverageWindowModel stockCoverageWindow = this.mergeStockCoverageWindow(groupSourceList,
+                    context.isTwoPhaseEnabled());
             BigDecimal guardDemandQty = this.resolveGroupGuardDemandQty(groupSourceList,
                     rawCurrentShiftDemandQty, guardWindowQtyMap);
             Integer formingLogicalShiftOrder = this.resolveGroupCurrentLogicalShiftOrder(groupSourceList,
                     guardWindowQtyMap);
+
+            if (context.isTwoPhaseEnabled() && !formingShutdownCloseOut
+                    && groupSourceList.stream().allMatch(source -> source.getFormingLogicalShiftOrder() != null)) {
+                // 前移后同班的多个派生草稿按原消费事件合并，保留窗口并集而非仅保留一个锚点。
+                ScheduleTwoPhaseSourceWindows windows = new ScheduleTwoPhaseSourceWindows();
+                guardWindowQtyMap = windows.fullWindow(groupSourceList);
+                currentShiftDemandQty = windows.baseDemand(groupSourceList, false);
+                nextShiftDemandQty = windows.baseDemand(groupSourceList, true)
+                        .subtract(currentShiftDemandQty).max(BigDecimal.ZERO);
+                guardDemandQty = guardWindowQtyMap.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add)
+                        .subtract(currentShiftDemandQty).max(BigDecimal.ZERO);
+                formingLogicalShiftOrder = groupSourceList.stream()
+                        .map(ScheduleTaskDraftModel::getFormingLogicalShiftOrder).min(Integer::compareTo).orElse(null);
+            }
+            if (context.isTwoPhaseEnabled() && !formingShutdownCloseOut) {
+                // 覆盖使用来源配置窗口；来源窗口缺失时明确回退两班，确保数值与窗口标签一致。
+                stockCoverageDemandQty = stockCoverageWindow == null
+                        ? currentShiftDemandQty.add(nextShiftDemandQty)
+                        : this.sumStockCoverageWindow(stockCoverageWindow);
+            }
 
             aggregateTask.setPlanGroupKey(planGroupKey);
             aggregateTask.setSourceTaskBusinessKeyList(sourceSnapshotList.stream()
@@ -301,6 +429,10 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
             }
 
             G taskGroup = policy.createPlanTaskGroup();
+            if (context.isTwoPhaseEnabled() && groupSourceList.size() > 1) {
+                aggregateTask.setInputSnapshotKey(null);
+                this.freezeTwoPhaseInput(context, aggregateTask);
+            }
             taskGroup.setPlanGroupKey(planGroupKey);
             taskGroup.setAggregateTask(aggregateTask);
             taskGroup.setSourceTaskList(sourceSnapshotList);
@@ -363,11 +495,11 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
                 || taskGroup.getSourceTaskList().isEmpty()) {
             return;
         }
-        boolean twoShiftStockCovered = aggregateTask.getStockCoverageCovered() == null
+        boolean stockCoverageCovered = aggregateTask.getStockCoverageCovered() == null
                 ? Boolean.TRUE.equals(aggregateTask.getTwoShiftStockCovered())
                 : Boolean.TRUE.equals(aggregateTask.getStockCoverageCovered());
         Map<String, BigDecimal> sourceWeightMap = this.resolveSourceWeightMap(taskGroup.getSourceTaskList(),
-                aggregateTask, twoShiftStockCovered);
+                aggregateTask, stockCoverageCovered);
         taskGroup.setSourceWeightMap(sourceWeightMap);
         taskGroup.setGroupBaseDemandQty(aggregateTask.getBaseDemandQty());
         taskGroup.setGroupMinStartAdjustQty(aggregateTask.getMinStartAdjustQty());
@@ -417,14 +549,13 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
                 sourceTask.setUnplannedReasonCode(aggregateTask.getUnplannedReasonCode());
                 sourceTask.setUnplannedReasonDesc(aggregateTask.getUnplannedReasonDesc());
             } else if (sourceHasPostTailBlockedReason
-                    && (twoShiftStockCovered || this.nvl(aggregateTask.getPostTailBlockedQty())
-                    .compareTo(BigDecimal.ZERO) <= 0)) {
-                // 聚合任务因库存覆盖或零缺口清除了禁排原因时，同步清除来源任务的旧禁排标记。
+                    && this.nvl(aggregateTask.getPostTailBlockedQty()).compareTo(BigDecimal.ZERO) <= 0) {
+                // 仅在没有禁排缺口时清除来源任务的旧未排原因。
                 sourceTask.setMachineCode(null);
                 sourceTask.setUnplannedReasonCode(null);
                 sourceTask.setUnplannedReasonDesc(null);
             }
-            if (twoShiftStockCovered) {
+            if (stockCoverageCovered) {
                 sourceTask.setLossAddQty(BigDecimal.ZERO);
                 sourceTask.setToolLimitAdjustQty(BigDecimal.ZERO);
                 sourceTask.setToolOverflowQty(BigDecimal.ZERO);
@@ -497,6 +628,34 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
 
     private String defaultString(String value) {
         return value == null ? "" : value;
+    }
+
+    /**
+     * 冻结两阶段来源；缺失元数据时保留完整任务证据并重抛原异常。
+     *
+     * @param context 排程上下文
+     * @param task    待冻结的来源或汇总任务
+     * @throws RuntimeException 来源或消费归属不合法时原样抛出
+     */
+    private void freezeTwoPhaseInput(C context, T task) {
+        try {
+            new ScheduleTwoPhaseRequestPreparer().freezeInput(task, context.getBatchNo(),
+                    context.getFactoryCode(), context.getScheduleDate());
+        } catch (RuntimeException exception) {
+            String traceId = context instanceof TaskChainContextAccess
+                    ? ((TaskChainContextAccess<?>) context).getTraceId() : org.slf4j.MDC.get("traceId");
+            LOG.error("[TWO_PHASE_INPUT_INVALID] batchNo={}, traceId={}, businessKey={}, processCode={}, "
+                            + "formingSourceKey={}, sourceShift={}, targetShift={}, newSpec={}, experiment={}, "
+                            + "normalTargetShift={}", context.getBatchNo(), traceId, task.getBusinessKey(),
+                    task.getProcessCode(), task.getFormingSourceKey(), task.getSourceShiftOrder(), task.getShiftOrder(),
+                    task.getCommonNewSpecInfo() != null && task.getCommonNewSpecInfo().isNewSpecHit(),
+                    task.getCommonExperimentSpecInfo() != null && task.getCommonExperimentSpecInfo().isExperimentSpecHit(),
+                    task.getCommonExperimentSpecInfo() != null && task.getCommonExperimentSpecInfo().isExperimentSpecHit()
+                            ? task.getCommonExperimentSpecInfo().getNormalTargetShift()
+                            : task.getCommonNewSpecInfo() == null ? null
+                            : task.getCommonNewSpecInfo().getNormalTargetShift(), exception);
+            throw exception;
+        }
     }
 
     public BigDecimal resolveGroupGuardDemandQty(List<T> sourceTaskList, BigDecimal currentShiftDemandQty) {
@@ -667,19 +826,24 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
      *
      * @param sourceTaskList 来源任务
      * @param aggregateTask 汇总任务
-     * @param twoShiftStockCovered 是否命中库存覆盖；变量名保留历史兼容语义
+     * @param stockCoverageCovered 是否命中当前适用的库存覆盖窗口
      * @return 来源业务键到需求权重的映射
      */
     private Map<String, BigDecimal> resolveSourceWeightMap(List<T> sourceTaskList, T aggregateTask,
-                                                            boolean twoShiftStockCovered) {
+                                                           boolean stockCoverageCovered) {
+        if (aggregateTask.getInputSnapshotKey() != null && sourceTaskList.stream().allMatch(source ->
+                source.getFormingLogicalShiftOrder() != null && source.getFormingGuardWindowQtyMap() != null
+                        && !source.getFormingGuardWindowQtyMap().isEmpty())) {
+            return new ScheduleTwoPhaseSourceWindows().sourceWeights(sourceTaskList);
+        }
         if (!this.isAllNewSpecGroup(sourceTaskList)
                 || aggregateTask.getFormingGuardWindowQtyMap() == null
                 || aggregateTask.getFormingGuardWindowQtyMap().isEmpty()
-                || twoShiftStockCovered) {
+                || stockCoverageCovered) {
             return sourceTaskList.stream().collect(Collectors.toMap(ScheduleTaskDraftModel::getBusinessKey,
                     sourceTask -> Boolean.TRUE.equals(aggregateTask.getFormingShutdownCloseOutFlag())
                             ? this.nvl(sourceTask.getFormingShutdownCloseOutDemandQty())
-                            : twoShiftStockCovered
+                            : stockCoverageCovered
                             ? this.nvl(sourceTask.getStockCoverageDemandQty() == null
                             ? this.nvl(sourceTask.getCurrentShiftDemandQty()).add(
                             this.nvl(sourceTask.getNextShiftDemandQty()))
@@ -714,13 +878,28 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
      * 合并计划组来源任务的库存覆盖窗口。
      *
      * @param sourceTaskList 来源任务快照
+     * @param deduplicateSourceWindows 是否按来源和原消费班合并两阶段窗口
      * @return 合并后的库存覆盖窗口；来源缺少窗口时返回 null
      */
-    private ScheduleStockCoverageWindowModel mergeStockCoverageWindow(List<T> sourceTaskList) {
+    private ScheduleStockCoverageWindowModel mergeStockCoverageWindow(List<T> sourceTaskList,
+                                                                      boolean deduplicateSourceWindows) {
         if (sourceTaskList == null || sourceTaskList.isEmpty()
                 || sourceTaskList.stream().anyMatch(task -> task.getStockCoverageWindow() == null)) {
             return null;
         }
+        if (!deduplicateSourceWindows) {
+            return this.mergeLegacyStockCoverageWindow(sourceTaskList);
+        }
+        return this.mergeTwoPhaseStockCoverageWindows(sourceTaskList);
+    }
+
+    /**
+     * 保留非两阶段入口既有的库存覆盖窗口聚合口径。
+     *
+     * @param sourceTaskList 来源任务
+     * @return 按旧兼容规则合并的窗口
+     */
+    private ScheduleStockCoverageWindowModel mergeLegacyStockCoverageWindow(List<T> sourceTaskList) {
         ScheduleStockCoverageWindowModel first = sourceTaskList.get(0).getStockCoverageWindow();
         ScheduleStockCoverageWindowModel target = first.copy();
         Map<Integer, BigDecimal> demandMap = new LinkedHashMap<>();
@@ -742,6 +921,166 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
         }
         target.setTotalDemandQty(totalDemandQty);
         return target;
+    }
+
+    /**
+     * 将来源窗口按原消费班对齐，同一来源同一消费班只保留一次。
+     *
+     * @param sourceTaskList 同一生产计划组的来源任务
+     * @return 合并后的完整窗口；班数不一致时返回空值
+     */
+    private ScheduleStockCoverageWindowModel mergeTwoPhaseStockCoverageWindows(List<T> sourceTaskList) {
+        ScheduleStockCoverageWindowModel first = sourceTaskList.get(0).getStockCoverageWindow();
+        Integer shiftCount = first.getShiftCount();
+        if (shiftCount == null || shiftCount < 1 || sourceTaskList.stream()
+                .anyMatch(task -> !Objects.equals(shiftCount, task.getStockCoverageWindow().getShiftCount()))) {
+            return null;
+        }
+        if (sourceTaskList.size() == 1) {
+            return first.copy();
+        }
+        int firstShift = sourceTaskList.stream().map(this::resolveStockCoverageWindowStartShift)
+                .min(Integer::compareTo).orElse(0);
+        ScheduleStockCoverageWindowModel target = first.copy();
+        Map<Integer, BigDecimal> demandMap = new LinkedHashMap<>();
+        int finiteLength = this.resolveStockCoverageFinitePrefixLength(sourceTaskList, firstShift, shiftCount);
+        for (int offset = 0; offset < finiteLength; offset++) {
+            demandMap.put(offset, this.mergeStockCoverageDemandAtOffset(sourceTaskList, firstShift, offset));
+        }
+        target.setDemandQtyByOffset(demandMap);
+        int extrapolatedCount = shiftCount - finiteLength;
+        BigDecimal extrapolatedDemand = extrapolatedCount == 0 ? BigDecimal.ZERO
+                : this.mergeStockCoverageDemandAtOffset(sourceTaskList, firstShift, finiteLength);
+        // 连续外推段保持紧凑表示，避免配置班数较大时逐班创建大量对象。
+        target.setExtrapolatedStartOffset(extrapolatedCount == 0 ? null : finiteLength);
+        target.setExtrapolatedShiftCount(extrapolatedCount == 0 ? null : extrapolatedCount);
+        target.setExtrapolatedDemandQtyPerShift(extrapolatedCount == 0 ? null : extrapolatedDemand);
+        BigDecimal total = demandMap.values().stream().map(this::nvl).reduce(BigDecimal.ZERO, BigDecimal::add);
+        target.setTotalDemandQty(total.add(extrapolatedDemand.multiply(BigDecimalUtils.valueOf(extrapolatedCount))));
+        return target;
+    }
+
+    /**
+     * 确定合并窗口中需逐班表示的前缀，后续需求为稳定外推值。
+     *
+     * @param tasks      来源任务
+     * @param firstShift 组内最早来源班次
+     * @param shiftCount 配置覆盖班数
+     * @return 逐班明细长度
+     */
+    private int resolveStockCoverageFinitePrefixLength(List<T> tasks, int firstShift, int shiftCount) {
+        long finiteLength = 0;
+        for (T task : tasks) {
+            long startOffset = (long) this.resolveStockCoverageWindowStartShift(task) - firstShift;
+            ScheduleStockCoverageWindowModel window = task.getStockCoverageWindow();
+            if (window.getDemandQtyByOffset() != null) {
+                for (Integer offset : window.getDemandQtyByOffset().keySet()) {
+                    if (offset != null && offset >= 0 && offset < shiftCount) {
+                        finiteLength = Math.max(finiteLength, startOffset + offset + 1);
+                    }
+                }
+            }
+            Integer extrapolatedStart = window.getExtrapolatedStartOffset();
+            Integer extrapolatedCount = window.getExtrapolatedShiftCount();
+            if (extrapolatedStart != null && extrapolatedCount != null && extrapolatedCount > 0) {
+                long start = startOffset + extrapolatedStart;
+                long end = start + extrapolatedCount;
+                finiteLength = Math.max(finiteLength, start);
+                if (end < shiftCount) {
+                    finiteLength = Math.max(finiteLength, end);
+                }
+            }
+        }
+        return (int) Math.min(shiftCount, Math.max(0, finiteLength));
+    }
+
+    /**
+     * 对齐指定班次并合并需求，同来源取最大值，不同来源相加。
+     *
+     * @param tasks       来源任务
+     * @param firstShift  组内最早来源班次
+     * @param groupOffset 组窗口内的班次偏移
+     * @return 该班次的去重需求
+     */
+    private BigDecimal mergeStockCoverageDemandAtOffset(List<T> tasks, int firstShift, int groupOffset) {
+        Map<String, BigDecimal> demandBySource = new LinkedHashMap<>();
+        tasks.forEach(task -> {
+            int sourceOffset = groupOffset - (this.resolveStockCoverageWindowStartShift(task) - firstShift);
+            if (sourceOffset >= 0 && sourceOffset < task.getStockCoverageWindow().getShiftCount()) {
+                demandBySource.merge(this.resolveStockCoverageSourceWindowKey(task),
+                        this.resolveStockCoverageDemandAtOffset(task.getStockCoverageWindow(), sourceOffset),
+                        BigDecimal::max);
+            }
+        });
+        return demandBySource.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    /**
+     * 解析一个覆盖窗口在指定偏移班的需求量。
+     *
+     * @param window 库存覆盖窗口
+     * @param offset 从当前班开始的偏移量
+     * @return 指定班需求量；窗口未记录该班时返回零
+     */
+    private BigDecimal resolveStockCoverageDemandAtOffset(ScheduleStockCoverageWindowModel window, int offset) {
+        Map<Integer, BigDecimal> demandMap = window.getDemandQtyByOffset();
+        if (demandMap != null && demandMap.containsKey(offset)) {
+            return this.nvl(demandMap.get(offset));
+        }
+        Integer extrapolatedStartOffset = window.getExtrapolatedStartOffset();
+        Integer extrapolatedShiftCount = window.getExtrapolatedShiftCount();
+        if (extrapolatedStartOffset != null && extrapolatedShiftCount != null
+                && offset >= extrapolatedStartOffset && offset < extrapolatedStartOffset + extrapolatedShiftCount) {
+            return this.nvl(window.getExtrapolatedDemandQtyPerShift());
+        }
+        return BigDecimal.ZERO;
+    }
+
+    /**
+     * 解析来源窗口去重键，沿用来源日期、来源键及工序口径。
+     *
+     * @param task 来源任务
+     * @return 用于区分不同来源的稳定键
+     */
+    private String resolveStockCoverageSourceWindowKey(T task) {
+        String sourceKey = task.getFormingSourceKey();
+        if (sourceKey == null || sourceKey.trim().isEmpty()) {
+            sourceKey = task.getBusinessKey();
+        }
+        return Objects.toString(task.getFormingSourceScheduleDate(), "") + "|" + sourceKey + "|"
+                + Objects.toString(task.getProcessCode(), "");
+    }
+
+    /**
+     * 获取来源覆盖窗口的起始消费班，与两阶段来源窗口的原消费班口径一致。
+     *
+     * @param task 来源任务
+     * @return 原成型逻辑班；缺失时依次回退来源排程班、生产班和零
+     */
+    private int resolveStockCoverageWindowStartShift(T task) {
+        Integer shift = task.getFormingLogicalShiftOrder() == null
+                ? task.getSourceShiftOrder() : task.getFormingLogicalShiftOrder();
+        return shift == null ? (task.getShiftOrder() == null ? 0 : task.getShiftOrder()) : shift;
+    }
+
+    /**
+     * 读取合并窗口累计需求；窗口模型缺少总量时按逐班明细重新累计。
+     *
+     * @param window 合并后的库存覆盖窗口
+     * @return 配置窗口累计需求
+     */
+    private BigDecimal sumStockCoverageWindow(ScheduleStockCoverageWindowModel window) {
+        if (window.getTotalDemandQty() != null) {
+            return window.getTotalDemandQty();
+        }
+        BigDecimal totalDemandQty = window.getDemandQtyByOffset().values().stream().map(this::nvl)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        Integer extrapolatedShiftCount = window.getExtrapolatedShiftCount();
+        if (extrapolatedShiftCount != null && extrapolatedShiftCount > 0) {
+            totalDemandQty = totalDemandQty.add(this.nvl(window.getExtrapolatedDemandQtyPerShift())
+                    .multiply(BigDecimalUtils.valueOf(extrapolatedShiftCount)));
+        }
+        return totalDemandQty;
     }
 
     public Map<Integer, BigDecimal> resolveGroupGuardWindowHoursMap(
@@ -809,8 +1148,10 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
 
     public Map<String, Object> buildTwoShiftCoverageEvidence(T task) {
         Map<String, Object> evidence = new LinkedHashMap<>();
-        boolean newSpecBypass = task.getCommonNewSpecInfo() != null && task.getCommonNewSpecInfo().isNewSpecHit();
-        boolean experimentBypass = task.getCommonExperimentSpecInfo() != null
+        boolean newSpecBypass = task.getInputSnapshotKey() == null
+                && task.getCommonNewSpecInfo() != null && task.getCommonNewSpecInfo().isNewSpecHit();
+        boolean experimentBypass = task.getInputSnapshotKey() == null
+                && task.getCommonExperimentSpecInfo() != null
                 && task.getCommonExperimentSpecInfo().isExperimentSpecHit();
         boolean formingShutdownCloseOut = Boolean.TRUE.equals(task.getFormingShutdownCloseOutFlag());
         evidence.put("applicable", !newSpecBypass && !experimentBypass && !formingShutdownCloseOut

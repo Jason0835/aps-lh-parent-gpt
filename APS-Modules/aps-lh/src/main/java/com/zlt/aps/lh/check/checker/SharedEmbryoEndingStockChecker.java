@@ -8,6 +8,7 @@ import com.zlt.aps.lh.check.LhScheduleCheckContext;
 import com.zlt.aps.lh.check.LhScheduleChecker;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.text.MessageFormat;
@@ -29,6 +30,7 @@ import java.util.Map;
  */
 @Slf4j
 @Component
+@Order(5)
 public class SharedEmbryoEndingStockChecker implements LhScheduleChecker {
 
     /** 检查项名称多语言 key */

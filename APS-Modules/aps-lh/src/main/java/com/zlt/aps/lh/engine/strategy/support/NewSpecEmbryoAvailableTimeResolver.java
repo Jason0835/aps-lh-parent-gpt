@@ -20,6 +20,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Date;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
@@ -83,6 +84,31 @@ public final class NewSpecEmbryoAvailableTimeResolver {
     }
 
     /**
+     * 读取适用于排程约束的配置时间，转产结构只保留原始配置供展示。
+     *
+     * @param context 当前批次上下文
+     * @param sku 当前候选
+     * @return 非转产的原始配置时间，转产或无配置时为空
+     */
+    public static Date resolveApplicableEarliestAvailableTime(LhScheduleContext context, SkuScheduleDTO sku) {
+        return StructureTransferExemptionPolicy.shouldBypassStructureSwitch(context, sku)
+                ? null : resolveEarliestAvailableTime(context, sku);
+    }
+
+    /**
+     * 为原排序提供排除转产结构的时间视图，原始时间快照保持可供持久化及日志读取。
+     *
+     * @param context 当前批次上下文
+     * @return 不参与转产时间排序的独立映射
+     */
+    public static Map<String, Date> resolveApplicableTimeMap(LhScheduleContext context) {
+        Map<String, Date> applicable = new LinkedHashMap<>(context.getStructureEarliestLhTimeMap());
+        applicable.keySet().removeIf(
+                structure -> StructureTransferExemptionPolicy.isTransferStructure(context, structure));
+        return applicable;
+    }
+
+    /**
      * 从无胎胚等待的预演计划读取首检起点；计时首检也必须使用开始时间。
      *
      * @param selectionPlan 未叠加胎胚等待的只读计划
@@ -113,7 +139,7 @@ public final class NewSpecEmbryoAvailableTimeResolver {
      */
     public static String resolveMachineSelectionTimeFailure(
             LhScheduleContext context, SkuScheduleDTO sku, Date selectionStartTime) {
-        Date earliestTime = resolveEarliestAvailableTime(context, sku);
+        Date earliestTime = resolveApplicableEarliestAvailableTime(context, sku);
         if (Objects.isNull(earliestTime) || Objects.isNull(selectionStartTime)) {
             return null;
         }
@@ -130,17 +156,32 @@ public final class NewSpecEmbryoAvailableTimeResolver {
     }
 
     /**
-     * 判断当前 SKU 是否命中原始胎胚时间配置。
+     * 对携带真实机台身份的选料入口应用精确历史等待豁免。
      *
-     * <p>该方法只判断配置是否存在，不考虑本批次同结构续作排产对配置的抑制；需要判断
+     * @param context 当前历史执行作用域
+     * @param sku 当前后物料
+     * @param selectionStartTime 原选料比较时间
+     * @param machineCode 当前运行机台
+     * @return 拒绝原因，通过时为空
+     */
+    public static String resolveMachineSelectionTimeFailure(LhScheduleContext context, SkuScheduleDTO sku,
+            Date selectionStartTime, String machineCode) {
+        return HistoricalStructureHandoffPolicy.isWaitingExempt(context, sku, machineCode)
+                ? null : resolveMachineSelectionTimeFailure(context, sku, selectionStartTime);
+    }
+
+    /**
+     * 判断当前 SKU 是否命中适用的胎胚时间配置，转产结构不受约束。
+     *
+     * <p>该方法排除转产后只判断配置是否存在，不考虑本批次同结构续作排产对配置的抑制；需要判断
      * 当前是否真正生效时，调用 {@link #isEffectiveConstrained(LhScheduleContext, SkuScheduleDTO)}。</p>
      *
      * @param context 排程上下文
      * @param sku 待排 SKU
-     * @return true-命中原始时间配置；false-未命中原始时间配置
+     * @return 命中非转产适用配置时返回 true
      */
     public static boolean isConstrained(LhScheduleContext context, SkuScheduleDTO sku) {
-        return Objects.nonNull(resolveEarliestAvailableTime(context, sku));
+        return Objects.nonNull(resolveApplicableEarliestAvailableTime(context, sku));
     }
 
     /**
@@ -175,19 +216,19 @@ public final class NewSpecEmbryoAvailableTimeResolver {
     /**
      * 获取当前批次实际生效的胎胚最早可供硫化时间。
      *
-     * <p>同结构已经在本次续作中形成有效排产时，说明该结构已经完成续作衔接，后续 SKU
+     * <p>转产结构或同结构已经在本次续作中形成有效排产时，后续 SKU
      * 不再受配置的最早胎胚时间限制；其余场景继续返回原始结构配置时间。</p>
      *
      * @param context 排程上下文
      * @param sku 待排 SKU
-     * @return 当前实际生效的胎胚可供时间；被续作结构规则抑制或未配置时返回 null
+     * @return 当前实际生效的胎胚可供时间；转产、被续作结构规则抑制或未配置时返回 null
      */
     public static Date resolveEffectiveEarliestAvailableTime(
             LhScheduleContext context, SkuScheduleDTO sku) {
         if (isStructureScheduledInCurrentContinuation(context, sku)) {
             return null;
         }
-        return resolveEarliestAvailableTime(context, sku);
+        return resolveApplicableEarliestAvailableTime(context, sku);
     }
 
     /**

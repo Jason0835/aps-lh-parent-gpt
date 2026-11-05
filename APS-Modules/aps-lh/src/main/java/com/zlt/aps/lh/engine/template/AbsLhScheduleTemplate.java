@@ -94,11 +94,21 @@ public abstract class AbsLhScheduleTemplate {
                 return buildInterruptResponse(context);
             }
 
+            doStructureEndingContinuation(context);
+            if (context.isInterrupted()) {
+                return buildInterruptResponse(context);
+            }
+
             // S4.5 新增规格排产：只处理仍在新增待排列表中的 SKU，执行选机、换模、首检和班次分配。
             context.setCurrentStep(ScheduleStepEnum.S4_5_NEW_PRODUCTION.getCode());
             log.info(">>> 步骤 S4.5: {}", ScheduleStepEnum.S4_5_NEW_PRODUCTION.getDescription());
             doNewSpecProduction(context);
             logStepSnapshot(context, ScheduleStepEnum.S4_5_NEW_PRODUCTION);
+            if (context.isInterrupted()) {
+                return buildInterruptResponse(context);
+            }
+
+            doDedicatedSupplyTransfer(context);
             if (context.isInterrupted()) {
                 return buildInterruptResponse(context);
             }
@@ -201,8 +211,26 @@ public abstract class AbsLhScheduleTemplate {
         // 默认空实现兼容只覆盖原模板步骤的测试替身，正式模板绑定独立Handler。
     }
 
+    /**
+     * 提供结构切换后的续作增机回补入口，由正式模板绑定独立处理器。
+     *
+     * @param context 结构切换完成后的实时上下文
+     */
+    protected void doStructureEndingContinuation(LhScheduleContext context) {
+        // 原模板测试替身保持兼容，正式模板明确绑定独立步骤。
+    }
+
     /** S4.5 新增规格排产 */
     protected abstract void doNewSpecProduction(LhScheduleContext context);
+
+    /**
+     * 新增完成后处理专供机台转产，默认空实现兼容原模板替身。
+     *
+     * @param context 新增完成的共享上下文
+     */
+    protected void doDedicatedSupplyTransfer(LhScheduleContext context) {
+        // 正式模板绑定独立处理器。
+    }
 
     /** S4.5.2 硫化日计划调整排产 */
     protected abstract void doDayPlanAdjustProduction(LhScheduleContext context);

@@ -4,14 +4,17 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.zlt.aps.cx.entity.config.CxLhMachineSupplyConfig;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
+import com.zlt.aps.lh.api.domain.entity.CxMachineOnlineInfo;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.context.StructureDedicatedMachineContext;
 import com.zlt.aps.lh.engine.strategy.support.PreviousAlternatePlanReleaseEvent;
 import com.zlt.aps.lh.mapper.CxLhMachineSupplyConfigMapper;
+import com.zlt.aps.lh.mapper.CxMachineOnlineInfoMapper;
 import com.zlt.aps.lh.mapper.LhMpStructureAllocationMapper;
 import com.zlt.aps.lh.mapper.LhMachineInfoMapper;
 import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
+import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +24,7 @@ import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
 import java.util.Collections;
+import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -51,6 +55,11 @@ public class LhMachineSupplyStructureRule {
     private LhMpStructureAllocationMapper structureAllocationMapper;
     @Resource
     private LhMachineInfoMapper machineInfoMapper;
+    /**
+     * 当前工厂成型在机来源，仅在初始化阶段查询。
+     */
+    @Resource
+    private CxMachineOnlineInfoMapper cxMachineOnlineInfoMapper;
 
     /**
      * 初始化本工厂、本批月计划范围内的专供快照。
@@ -73,8 +82,70 @@ public class LhMachineSupplyStructureRule {
         planGroups.forEach((planKey, plans) -> snapshots.put(planKey,
                 this.loadStructureSnapshots(context, factoryCode, plans)));
         context.setStructureDedicatedMachineContextMap(snapshots);
+        this.loadEmbryoFormingMachines(context, factoryCode);
         log.info("[专供结构约束] 初始化完成, factoryCode: {}, batchNo: {}, 月计划范围数: {}, 专供物理机数: {}",
                 factoryCode, context.getBatchNo(), snapshots.size(), context.getSupplyFormingMachinesByLhMachineMap().size());
+    }
+
+    /**
+     * 冻结T/T-1范围内每种胎胚最近有效日期的全部成型来源，避免结构级弱专供放行独占胎胚。
+     * 同日期多机来源取并集，旧日期不覆盖新来源；缺证据时不虚构新的供机限制。
+     *
+     * @param context 当前排程日期及只读输入
+     * @param factoryCode 本次工厂
+     */
+    private void loadEmbryoFormingMachines(LhScheduleContext context, String factoryCode) {
+        if (Objects.isNull(context.getScheduleDate())) {
+            return;
+        }
+        Date currentDate = LhScheduleTimeUtil.clearTime(context.getScheduleDate());
+        List<CxMachineOnlineInfo> rows = cxMachineOnlineInfoMapper.selectList(
+                new LambdaQueryWrapper<CxMachineOnlineInfo>()
+                        .eq(CxMachineOnlineInfo::getFactoryCode, factoryCode)
+                        .ge(CxMachineOnlineInfo::getOnlineDate, LhScheduleTimeUtil.addDays(currentDate, -1))
+                        .lt(CxMachineOnlineInfo::getOnlineDate, LhScheduleTimeUtil.addDays(currentDate, 1)));
+        Map<String, List<CxMachineOnlineInfo>> byEmbryo = rows.stream()
+                .filter(Objects::nonNull)
+                .filter(row -> StringUtils.isNotBlank(row.getMaterialCode())
+                        && StringUtils.isNotBlank(row.getCxCode()) && Objects.nonNull(row.getOnlineDate()))
+                .collect(Collectors.groupingBy(row -> row.getMaterialCode().trim()));
+        Map<String, Set<String>> sources = new LinkedHashMap<>();
+        byEmbryo.forEach((embryoCode, embryoRows) -> {
+            Date latestDate = embryoRows.stream().map(CxMachineOnlineInfo::getOnlineDate)
+                    .max(Date::compareTo).get();
+            Set<String> machines = embryoRows.stream()
+                    .filter(row -> LhScheduleTimeUtil.isSameDay(latestDate, row.getOnlineDate()))
+                    .map(row -> row.getCxCode().trim().toUpperCase(Locale.ROOT))
+                    .collect(Collectors.toCollection(LinkedHashSet::new));
+            sources.put(embryoCode, Collections.unmodifiableSet(machines));
+        });
+        context.setEmbryoFormingMachineMap(Collections.unmodifiableMap(sources));
+        log.info("胎胚实际成型来源冻结, factoryCode: {}, batchNo: {}, scheduleDate: {}, sources: {}",
+                factoryCode, context.getBatchNo(), LhScheduleTimeUtil.formatDate(currentDate), sources);
+    }
+
+    /**
+     * 全部实际来源均配置专供时，将胎胚限制在这些来源对应的物理硫化机范围内。
+     * 混合普通来源仍沿原结构级规则，既有结构限制和临时资源可用性不参与来源推断。
+     *
+     * @param context 冻结成型来源与专供配置
+     * @param machineCode 候选硫化机台或单控侧
+     * @param sku 本次待排物料
+     * @return 胎胚来源未形成硬专供或候选位于硬专供范围时为真
+     */
+    public boolean canMachineReceiveEmbryo(LhScheduleContext context, String machineCode, SkuScheduleDTO sku) {
+        if (Objects.isNull(sku) || StringUtils.isBlank(sku.getEmbryoCode())) {
+            return true;
+        }
+        Set<String> sources = context.getEmbryoFormingMachineMap()
+                .getOrDefault(sku.getEmbryoCode().trim(), Collections.emptySet());
+        if (sources.isEmpty() || sources.stream().anyMatch(source -> CollectionUtils.isEmpty(
+                context.getFormingMachineSupplyLhMachineMap().get(source)))) {
+            return true;
+        }
+        String physicalMachine = LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode);
+        return sources.stream().anyMatch(source -> context.getFormingMachineSupplyLhMachineMap()
+                .get(source).contains(physicalMachine));
     }
 
     /**
@@ -227,6 +298,10 @@ public class LhMachineSupplyStructureRule {
      * @return 是否通过专供准入，仍须执行其它硬约束
      */
     public boolean canMachineSelectStructure(LhScheduleContext context, String machineCode, SkuScheduleDTO sku) {
+        // 胎胚物理去向先于历史指令豁免判断，不能把独占供胚放宽成结构级优先关系。
+        if (!this.canMachineReceiveEmbryo(context, machineCode, sku)) {
+            return false;
+        }
         if (this.getDedicatedType(context, sku) == DedicatedType.EXCLUSIVE
                 && !this.isPreferredMachine(context, machineCode, sku)) {
             return false;

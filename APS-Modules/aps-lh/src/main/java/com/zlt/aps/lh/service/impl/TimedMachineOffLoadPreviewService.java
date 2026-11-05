@@ -189,7 +189,7 @@ public class TimedMachineOffLoadPreviewService {
     }
 
     /**
-     * 收集正量结果中的唯一动作，全部本轮新增成功组合均须保留同源输入及提交顺序。
+     * 收集正量结果中的唯一动作；新增动作缺少同源输入时仅告警并固定在原模拟位置。
      *
      * @param context 模拟结果及本轮输入捕获器
      * @param requestedMachines 可调整物理机台
@@ -216,15 +216,29 @@ public class TimedMachineOffLoadPreviewService {
             }
             LocalDate date = changeTime.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
             boolean baseline = baselineResults.contains(result);
-            boolean movable = !baseline && requestedMachines.contains(physical) && firstHandoffMachines.add(physical);
-            TimedMachineOffLoadPreview.ChangeoverEvent event = new TimedMachineOffLoadPreview.ChangeoverEvent(
-                    physical, result.getMaterialCode(), result.getProductStatus(), changeTime, date, slot, movable);
+            TimedMachineOffActionPreviewCapture.PreparedAction prepared = null;
             if (!baseline) {
-                // 只有显式记录的正式基线允许缺少本轮捕获；新增竞争动作同样必须能按固定组合重放。
+                // 只有显式记录的正式基线允许缺少本轮捕获；新增竞争动作优先按固定组合重放。
                 TimedMachineOffActionPreviewCapture capture = Objects.requireNonNull(
                         context.getTimedMachineOffActionPreviewCapture(), "时间下机事件收集缺少同源输入捕获器");
-                event.withPreparedAction(capture.require(context.getScheduleResultSourceSkuMap().get(result),
-                        result.getLhMachineCode(), changeTime));
+                prepared = capture.find(context.getScheduleResultSourceSkuMap().get(result),
+                        result.getLhMachineCode(), changeTime);
+                if (prepared == null) {
+                    // 缺少同源未消费输入时不再中断预演，只告警并把事件固定在原模拟位置；
+                    // 首次交接无法重放时同机后续动作也不能前移，避免跳过未重放动作重建错误时间轴。
+                    log.warn("时间下机成功交接缺少同源未消费输入, batchNo: {}, materialCode: {}, productStatus: {}, "
+                                    + "machineCode: {}, changeTime: {}",
+                            context.getBatchNo(), result.getMaterialCode(), result.getProductStatus(),
+                            result.getLhMachineCode(), LhScheduleTimeUtil.formatDateTime(changeTime));
+                }
+            }
+            // 首次交接资格照常消费：同机首个动作不可重放时，后续动作不得顶替成为可移动交接。
+            boolean movable = !baseline && requestedMachines.contains(physical)
+                    && firstHandoffMachines.add(physical) && prepared != null;
+            TimedMachineOffLoadPreview.ChangeoverEvent event = new TimedMachineOffLoadPreview.ChangeoverEvent(
+                    physical, result.getMaterialCode(), result.getProductStatus(), changeTime, date, slot, movable);
+            if (prepared != null) {
+                event.withPreparedAction(prepared);
             }
             events.add(event);
         }

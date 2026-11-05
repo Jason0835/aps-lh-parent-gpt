@@ -11,6 +11,7 @@ import com.zlt.aps.mdm.api.domain.entity.MdmMouldShellInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.text.MessageFormat;
@@ -43,6 +44,7 @@ import java.util.Set;
  */
 @Slf4j
 @Component
+@Order(6)
 public class MouldShellCheckChecker implements LhScheduleChecker {
 
     /** 检查项名称多语言 key */

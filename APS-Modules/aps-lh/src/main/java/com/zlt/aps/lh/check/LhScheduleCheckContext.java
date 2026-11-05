@@ -1,9 +1,11 @@
 package com.zlt.aps.lh.check;
 
 import com.zlt.aps.cx.entity.schedule.CxEmbryoEndingShift;
+import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
+import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmModelInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMouldShellInfo;
@@ -64,6 +66,16 @@ public class LhScheduleCheckContext {
 
     /** 成型收尾记录（T_CX_EMBRYO_ENDING_SHIFT，按排程日窗口加载） */
     private List<CxEmbryoEndingShift> cxEndingShiftList = Collections.emptyList();
+
+    /** 硫化机台配置（T_LH_MACHINE_INFO，工厂维度启用机台，按机台顺序） */
+    private List<LhMachineInfo> machineInfoList = Collections.emptyList();
+
+    /**
+     * 成型排程结果（T_CX_SCHEDULE_RESULT，工厂 + 排程日维度）
+     *
+     * <p>供「成型未排产」检查使用：只加载判定所需列，逻辑删除在加载时已过滤。</p>
+     */
+    private List<CxScheduleResult> cxScheduleResultList = Collections.emptyList();
 
     /**
      * 判断结果集是否为空。

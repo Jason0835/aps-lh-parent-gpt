@@ -488,8 +488,16 @@ public final class ContinuationEndingHandoffAudit {
         PreviousAlternatePlanReleaseEvent historicalEvent = context.getPreviousAlternateReleaseEventMap()
                 .get(result.getLhMachineCode());
         boolean fixedCutover = Objects.nonNull(historicalEvent) && historicalEvent.isFixedHistoricalCutover();
+        boolean completeHistoricalRemainder = fixedCutover
+                && StringUtils.equals(ContinuationMachineFinishPlan.HISTORICAL_COMPLETE_REMAINDER_RULE,
+                        snapshot.getFinishRule())
+                && snapshot.getFinishState() == ContinuationMachineFinishPlan.FinishState.SURPLUS_COMPLETED
+                && Objects.equals(snapshot.getHistoricalFinishPlanId(), historicalEvent.getPlan().getId())
+                && Objects.nonNull(snapshot.getReleaseTime())
+                && snapshot.getReleaseTime().before(historicalEvent.getPlannedShiftEndTime())
+                && !LhScheduleTimeUtil.isNoMouldChangeTime(context, snapshot.getReleaseTime());
         if (fixedCutover && Objects.nonNull(finalEnd)
-                && finalEnd.after(historicalEvent.getPlannedShiftStartTime())) {
+                && finalEnd.after(historicalEvent.getPlannedShiftStartTime()) && !completeHistoricalRemainder) {
             reasons.add("前料实际生产越过历史指定交替起点");
         }
         if (!Objects.equals(snapshot.getProductionEndTime(), finalEnd)) {

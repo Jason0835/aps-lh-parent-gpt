@@ -75,28 +75,23 @@ public class LhDeviceStopPlanScheduleService {
     }
 
     /**
-     * 回填实际执行日期，或清除因完整收尾取消维修的旧安排日期；班次9沿用同一事务入口。
+     * 只回填实际执行的非空日期，未执行维修不更新旧值；班次9沿用同一事务入口。
      *
-     * @param scheduleDates 来源计划主键到实际执行日期，空值表示本轮取消后的旧日期清理
+     * @param scheduleDates 来源计划主键到实际执行日期，空值不产生更新
      * @return 实际更新条数
      */
     public int batchFillStopScheduleDates(Map<Long, Date> scheduleDates) {
         int updatedCount = 0;
         for (Map.Entry<Long, Date> entry : scheduleDates.entrySet()) {
+            if (entry.getValue() == null) {
+                // 未执行维修不得清空旧日期，兼容调用方的空日期也不触发数据库更新。
+                continue;
+            }
             MdmDevicePlanShut update = new MdmDevicePlanShut();
             update.setId(entry.getKey());
             update.setScheduleDate(entry.getValue());
             // 仅更新来源日期，更新条数异常只记录应用日志，不把校验升级为排程中断。
-            int affectedRows;
-            if (entry.getValue() == null) {
-                // updateById会忽略空字段，取消本轮维修须显式清除旧执行日期。
-                affectedRows = mdmDevicePlanShutMapper.update(null,
-                        new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<MdmDevicePlanShut>()
-                                .eq(MdmDevicePlanShut::getId, entry.getKey())
-                                .set(MdmDevicePlanShut::getScheduleDate, null));
-            } else {
-                affectedRows = mdmDevicePlanShutMapper.updateById(update);
-            }
+            int affectedRows = mdmDevicePlanShutMapper.updateById(update);
             if (affectedRows != 1) {
                 log.warn("设备停机排程日期回填条数异常，不阻断排程, 计划ID: {}, 排程日期: {}, 更新条数: {}",
                         entry.getKey(), entry.getValue(), affectedRows);

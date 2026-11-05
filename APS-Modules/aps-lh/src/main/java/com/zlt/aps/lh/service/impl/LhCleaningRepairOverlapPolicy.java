@@ -38,6 +38,42 @@ public final class LhCleaningRepairOverlapPolicy {
     }
 
     /**
+     * 将续作早班干冰移入同班实际执行的计划性维修，保留维修前固定量的生产时间。
+     * 只返回独立投影，不改写清洗来源或名额；维修被收尾规则跳过后自动沿用原窗口。
+     *
+     * @param context 当前批次有效维修及班次
+     * @param source 已取得独立清洗名额的原窗口
+     * @return 同班维修本体严格相交时返回完整时长投影，否则返回原窗口
+     */
+    public static MachineCleaningWindowDTO projectContinuationWindow(LhScheduleContext context,
+            MachineCleaningWindowDTO source) {
+        if (!MachineCleaningOverlapUtil.isDryIceCleaning(source) || source.isOffMachineCleaning()
+                || source.getCleanStartTime() == null || source.getCleanEndTime() == null
+                || !source.getCleanStartTime().before(source.getCleanEndTime())
+                || !LhScheduleTimeUtil.isMorningShift(context, source.getCleanStartTime())) {
+            return source;
+        }
+        Date morningEnd = LhScheduleTimeUtil.getAfternoonShiftStart(context, source.getCleanStartTime());
+        Date repairStart = LhPlannedRepairResolver.resolveCapacityWindows(
+                context, context.getDevicePlanShutList(), source.getLhCode()).stream()
+                .filter(repair -> source.getCleanStartTime().before(repair.getMaintenanceStartTime())
+                        && repair.getMaintenanceStartTime().before(morningEnd)
+                        && MachineCleaningOverlapUtil.isOverlap(source,
+                        repair.getMaintenanceStartTime(), repair.getMaintenanceEndTime()))
+                .map(MachineMaintenanceWindowDTO::getMaintenanceStartTime)
+                .min(Date::compareTo).orElse(null);
+        if (repairStart == null) {
+            return source;
+        }
+        MachineCleaningWindowDTO projected = CleaningPlanRuntimeState.copyWindow(source);
+        long durationMillis = source.getCleanEndTime().getTime() - source.getCleanStartTime().getTime();
+        projected.setCleanStartTime(new Date(repairStart.getTime()));
+        projected.setCleanEndTime(new Date(repairStart.getTime() + durationMillis));
+        projected.setReadyTime(new Date(projected.getCleanEndTime().getTime()));
+        return projected;
+    }
+
+    /**
      * 判断清洗来源是否与计划性维修本体相交，故障、预热和端点相接均不取得组合资格。
      *
      * @param context 当前批次固定维修来源

@@ -7,6 +7,7 @@ import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleProcessLog;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
+import com.zlt.aps.lh.engine.strategy.support.OffMachineDecision;
 import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
@@ -214,6 +215,7 @@ public class SchedulePersistenceService {
             fillShortageQty(context, context.getScheduleResultList());
             // 回填 SKU 排序名次/描述（来源 sortByPriority 回写到 sourceSku）
             fillSkuSortInfo(context, context.getScheduleResultList());
+            this.fillTimedOffMouldChangeCount(context, context.getScheduleResultList());
             // 通用字段直接复用结构维度已加载的最早胎胚可供硫化时间，不在保存阶段重复计算。
             fillEarliestEmbryoAvailableTime(context, context.getScheduleResultList());
             // 回填 T/T+1/T+2 三天的结构计划机台数、已排机台数及物料每日目标机台数
@@ -310,6 +312,21 @@ public class SchedulePersistenceService {
                 factoryCode, oldBatchNos, arrangementLogs.size(), clearableDates.size(),
                 (System.nanoTime() - startedNanos) / 1000000L);
         return clearableDates;
+    }
+
+    /**
+     * 按原结果身份回填已冻结的时间下机次数，未命中时清除历史或后料复制携带的旧值。
+     *
+     * @param context 保存最终采用决策的批次上下文
+     * @param scheduleResults 当前实际保存的结果列表
+     */
+    private void fillTimedOffMouldChangeCount(LhScheduleContext context, List<LhScheduleResult> scheduleResults) {
+        Map<LhScheduleResult, OffMachineDecision> decisions = context.getTimedMachineOffDecisionMap();
+        scheduleResults.forEach(result -> {
+            OffMachineDecision decision = decisions.get(result);
+            result.setTimedOffMouldChangeCount(Objects.nonNull(decision)
+                    ? decision.getTimedOffMouldChangeCount() : null);
+        });
     }
 
     /**

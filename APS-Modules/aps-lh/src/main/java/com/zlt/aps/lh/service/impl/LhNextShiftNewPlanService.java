@@ -9,6 +9,7 @@ import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
+import com.zlt.aps.lh.api.enums.MachineStopTypeEnum;
 import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuDailyPlanQuotaDTO;
@@ -363,6 +364,7 @@ public class LhNextShiftNewPlanService {
         isolatedContext.setSkuProductionTargetQtyMap(
                 this.buildRemainingQtyMap(remainingSkuList));
         // 班次9开产下限由独立类型门禁控制，不能伪造胎胚可供时间参与T+4提前准入。
+        isolatedContext.setStructureTransferMap(sourceContext.getStructureTransferMap());
         isolatedContext.setStructureEarliestLhTimeMap(
                 new LinkedHashMap<>(sourceContext.getStructureEarliestLhTimeMap()));
         this.extendDevicePlanWindow(isolatedContext, preparationSlot, targetSlot);
@@ -714,7 +716,13 @@ public class LhNextShiftNewPlanService {
         return remainingQtyMap;
     }
 
-    /** 扩展设备计划仍复用05/06的统一分流。 */
+    /**
+     * 扩展班次9设备计划，补齐跨准备班起点的盘点，并复用05/06统一分流。
+     *
+     * @param context 班次9独立上下文
+     * @param preparationShift 准备班次，提供扩展窗口起点
+     * @param targetShift 生产班次，提供扩展窗口终点
+     */
     private void extendDevicePlanWindow(
             LhScheduleContext context,
             LhShiftConfigVO preparationShift,
@@ -722,7 +730,14 @@ public class LhNextShiftNewPlanService {
         List<MdmDevicePlanShut> additionalPlanList = devicePlanShutMapper.selectList(
                 new LambdaQueryWrapper<MdmDevicePlanShut>()
                         .eq(MdmDevicePlanShut::getFactoryCode, context.getFactoryCode())
-                        .ge(MdmDevicePlanShut::getBeginDate, preparationShift.getShiftStartDateTime())
+                        .and(stopWrapper -> stopWrapper
+                                .ge(MdmDevicePlanShut::getBeginDate, preparationShift.getShiftStartDateTime())
+                                // 原查询保留；额外加载准备班前已开始、准备班内尚未结束的盘点。
+                                .or(inventoryWrapper -> inventoryWrapper
+                                        .eq(MdmDevicePlanShut::getMachineStopType,
+                                                MachineStopTypeEnum.TAKE_STOCK.getCode())
+                                        .lt(MdmDevicePlanShut::getBeginDate, preparationShift.getShiftStartDateTime())
+                                        .gt(MdmDevicePlanShut::getEndDate, preparationShift.getShiftStartDateTime())))
                         .le(MdmDevicePlanShut::getBeginDate, targetShift.getShiftEndDateTime()));
         Map<String, MdmDevicePlanShut> planMap = new LinkedHashMap<String, MdmDevicePlanShut>();
         List<MdmDevicePlanShut> sourcePlanList = CollectionUtils.isEmpty(context.getDevicePlanShutList())

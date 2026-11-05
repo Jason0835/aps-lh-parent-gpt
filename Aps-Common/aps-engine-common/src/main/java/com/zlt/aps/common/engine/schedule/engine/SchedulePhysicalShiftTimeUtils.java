@@ -1,8 +1,11 @@
 package com.zlt.aps.common.engine.schedule.engine;
 
 import cn.hutool.core.util.StrUtil;
+import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 
 import java.math.BigDecimal;
+import java.text.MessageFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -228,7 +231,9 @@ public final class SchedulePhysicalShiftTimeUtils {
             return new Date[]{Date.from(start.atZone(effectiveZoneId).toInstant()),
                     Date.from(end.atZone(effectiveZoneId).toInstant())};
         } catch (RuntimeException exception) {
-            return null;
+            // 班次时间配置非法时按详设口径终止并提示班次，不向调用方返回部分结果。
+            throw new ServiceException(MessageFormat.format(
+                    I18nUtil.getMessage("ui.data.alert.schedule.taskShiftWindowInvalid"), shiftOrder));
         }
     }
 

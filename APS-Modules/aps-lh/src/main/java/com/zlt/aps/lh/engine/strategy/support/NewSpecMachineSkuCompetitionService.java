@@ -1239,7 +1239,8 @@ public class NewSpecMachineSkuCompetitionService {
             return true;
         }
         String failureReason = NewSpecEmbryoAvailableTimeResolver.resolveMachineSelectionTimeFailure(
-                context, candidate.getSku(), availabilityPlan.getSkuSelectionStartTime());
+                context, candidate.getSku(), availabilityPlan.getSkuSelectionStartTime(),
+                availabilityPlan.getMachine().getMachineCode());
         if (StringUtils.isEmpty(failureReason)) {
             return true;
         }

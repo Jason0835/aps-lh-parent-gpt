@@ -54,7 +54,7 @@ public class LhDayPlanAdjustVo implements Serializable {
     private String mesMaterialCode;
 
     /**
-     * 调整序号，仅允许1、2、3
+     * 调整序号，仅允许1、2、3、4
      */
     private Integer adjustCount;
 

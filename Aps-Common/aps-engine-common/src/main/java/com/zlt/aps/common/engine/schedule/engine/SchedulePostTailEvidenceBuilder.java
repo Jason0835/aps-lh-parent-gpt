@@ -61,6 +61,7 @@ public final class SchedulePostTailEvidenceBuilder {
         evidence.put("stockCoverageApplicable", task.getStockCoverageWindow() != null);
         evidence.put("stockCoverageCovered", task.getStockCoverageCovered());
         evidence.put("currentShiftDemandQty", task.getCurrentShiftDemandQty());
+        evidence.put("nextShiftDemandQty", task.getNextShiftDemandQty());
         evidence.put("guardDemandQty", task.getGuardDemandQty());
         evidence.put("openingStockQty", task.getRollingStockQty());
         evidence.put("blockedQty", task.getPostTailBlockedQty());

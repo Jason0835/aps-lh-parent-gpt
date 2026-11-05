@@ -313,7 +313,8 @@ public final class CleaningDispositionResolver {
     }
 
     /**
-     * 用来源在机SKU的最后一段结果核对收尾，清洗前已经结束的结果也必须参加判断。
+     * 核对来源SKU的最终收尾，干冰同时识别清洗时刻使用原完整模具组的实际承接物料。
+     * 干冰前一自然日已结束的前料不能提前取消次日清洗；当天收尾和喷砂沿用原规则。
      *
      * @param context 已提交结果及初始在机快照
      * @param machineCode 清洗运行侧
@@ -367,6 +368,17 @@ public final class CleaningDispositionResolver {
         if (Objects.isNull(latest)) {
             return null;
         }
+        if (!window.isOffMachineCleaning() && MachineCleaningOverlapUtil.isDryIceCleaning(window)
+                && Objects.nonNull(window.getCleanStartTime())) {
+            LhScheduleResult occupying = resolveDryIceOccupyingResult(context, machineCode, window, latest);
+            if (Objects.nonNull(occupying)) {
+                return CleaningScheduleRuleUtil.shouldSkipCleaningByResultEnding(occupying) ? occupying : null;
+            }
+            // 尚无已提交后料时保留次日窗口，供候选容量计算继续扣除，不能先按前日收尾撤销。
+            if (latest.getSpecEndTime().before(LhScheduleTimeUtil.clearTime(window.getCleanStartTime()))) {
+                return null;
+            }
+        }
         if (!window.isOffMachineCleaning()) {
             return CleaningScheduleRuleUtil.shouldSkipCleaningByResultEnding(latest) ? latest : null;
         }
@@ -377,6 +389,49 @@ public final class CleaningDispositionResolver {
         return originalSurplus > 0 && scheduledQty >= originalSurplus
                 && Objects.nonNull(window.getCleanStartTime())
                 && !latest.getSpecEndTime().after(window.getCleanStartTime()) ? latest : null;
+    }
+
+    /**
+     * 查找干冰开始时实际占用原完整模具组的已提交正量结果。
+     * 换活字块保持原模具，从真实准备起点即占用该组模具，不依赖扣除清洗后的首个生产起点。
+     *
+     * @param context 当前批次的已提交结果
+     * @param machineCode 清洗运行侧
+     * @param window 实际干冰窗口
+     * @param sourceResult 来源物料最终结果及原完整模具组
+     * @return 清洗时刻占用原模具的结果；无可靠承接证据时为空
+     */
+    private static LhScheduleResult resolveDryIceOccupyingResult(LhScheduleContext context, String machineCode,
+            MachineCleaningWindowDTO window, LhScheduleResult sourceResult) {
+        Date cleanStartTime = window.getCleanStartTime();
+        return context.getScheduleResultList().stream().filter(Objects::nonNull)
+                .filter(result -> coversMachineSide(result.getLhMachineCode(), machineCode))
+                .filter(result -> Objects.nonNull(result.getDailyPlanQty()) && result.getDailyPlanQty() > 0)
+                .filter(result -> Objects.nonNull(result.getSpecEndTime())
+                        && result.getSpecEndTime().after(cleanStartTime))
+                .filter(result -> result == sourceResult
+                        || (StringUtils.isNotBlank(sourceResult.getMouldCode())
+                        && LhMouldCodeUtil.isSameMouldCodeSet(sourceResult.getMouldCode(), result.getMouldCode())))
+                .filter(result -> {
+                    Date occupationStart = resolveDryIceOccupationStart(result);
+                    return Objects.nonNull(occupationStart) && !occupationStart.after(cleanStartTime);
+                })
+                .max(Comparator.comparing(CleaningDispositionResolver::resolveDryIceOccupationStart))
+                .orElse(null);
+    }
+
+    /**
+     * 取得干冰所属模具的实际占用起点，普通续作仍使用首个正量班次起点。
+     *
+     * @param result 已提交正量结果
+     * @return 实际占用起点；缺少时间证据时为空
+     */
+    private static Date resolveDryIceOccupationStart(LhScheduleResult result) {
+        if ("1".equals(result.getIsTypeBlock()) && Objects.nonNull(result.getMouldChangeStartTime())) {
+            return result.getMouldChangeStartTime();
+        }
+        int firstShiftIndex = ShiftFieldUtil.resolveFirstPlannedShiftIndex(result);
+        return firstShiftIndex > 0 ? ShiftFieldUtil.getShiftStartTime(result, firstShiftIndex) : null;
     }
 
     /**

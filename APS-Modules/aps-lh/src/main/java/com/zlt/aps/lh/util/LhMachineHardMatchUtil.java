@@ -57,11 +57,7 @@ public final class LhMachineHardMatchUtil {
             // 达到两班阈值的故障SKU必须迁移到其他物理机台，禁止本轮重新选回故障原机。
             return false;
         }
-        if (Objects.nonNull(context)
-                && context.isOnlySandBlastOriginalMachine(sku, machine.getMachineCode())) {
-            // 仅喷砂释放后原机台重新选料，原 SKU 携带清洗模具转到其他物理机台继续排产。
-            return false;
-        }
+        // 喷砂原机不属于永久禁用资源，原模清洗结束与换模时间仍由排产链路判断。
         BigDecimal skuInch = parseInch(Objects.isNull(sku) ? null : sku.getProSize());
         if (!isInchInRange(skuInch, machine.getDimensionMinimum(), machine.getDimensionMaximum())) {
             return false;

@@ -3,6 +3,8 @@ import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.dto.CleaningScheduleDateFillItem;
 import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
+import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
+import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.CleaningTypeEnum;
@@ -11,6 +13,7 @@ import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.context.LhScheduleConfig;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.util.LeftRightMouldUtil;
+import com.zlt.aps.lh.util.CleaningScheduleRuleUtil;
 import com.zlt.aps.lh.util.LhMouldCodeUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
@@ -28,11 +31,15 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import com.zlt.aps.lh.engine.strategy.support.CleaningPlanResult;
 import com.zlt.aps.lh.engine.strategy.support.CleaningPlanRuntimeState;
@@ -129,6 +136,168 @@ public class LhCleaningPlanResolver {
                 .filterNonCleaningStopPlans(context.getDevicePlanShutList()));
         return cleaningWindowMap;
     }
+
+    /**
+     * 在续作排量前按已建立的硫化余量及日标准产能复核当天普通干冰，并补入原额度候选。
+     * 保留其他已安排班次；喷砂、未来占用未定及维修组合不参与本次名额释放。
+     *
+     * @param context 已完成需求归集但尚未生成生产结果的排程上下文
+     */
+    public void reconcileDryIceQuotaBeforeContinuous(LhScheduleContext context) {
+        if (context == null || context.getScheduleDate() == null
+                || !context.getScheduleResultList().isEmpty() || context.isContinuousDailyQuotaSynced()) {
+            return;
+        }
+        CleaningPlanRuntimeState runtime = context.getCleaningPlanRuntimeState();
+        Map<Long, List<MachineCleaningWindowDTO>> allocated = context.getMachineScheduleMap().values().stream()
+                .flatMap(machine -> machine.getCleaningWindowList().stream())
+                .filter(MachineCleaningOverlapUtil::isDryIceCleaning)
+                .collect(Collectors.groupingBy(MachineCleaningWindowDTO::getSourcePlanId,
+                        LinkedHashMap::new, Collectors.toList()));
+        Set<Long> releasedIds = new HashSet<>();
+        for (Map.Entry<Long, List<MachineCleaningWindowDTO>> entry : allocated.entrySet()) {
+            List<MachineCleaningWindowDTO> sides = entry.getValue();
+            // L/R属于一个物理事件，必须两侧均有同身份的收尾依据才能共同释放一次名额。
+            boolean ending = sides.stream().allMatch(window -> {
+                SkuScheduleDTO sku = this.resolveOrdinaryDryIceSku(context, window);
+                return sku != null && CleaningScheduleRuleUtil.shouldSkipCleaningBySkuEnding(context, sku);
+            });
+            if (!ending) {
+                continue;
+            }
+            for (MachineCleaningWindowDTO window : sides) {
+                runtime.getIndependentQuotaStartMap().remove(LhCleaningRepairOverlapPolicy.sourceKey(window));
+                this.updateDryIceMachineWindow(context, window, false);
+                this.recordInitialization(context, window, CleaningPlanStatus.SKIPPED, "正式余量三天内收尾，释放干冰名额");
+            }
+            releasedIds.add(entry.getKey());
+            log.info("干冰收尾名额释放, 工厂: {}, 批次: {}, 来源计划ID: {}, 机台: {}, 原清洗时间: {}",
+                    context.getFactoryCode(), context.getBatchNo(), entry.getKey(), sides.get(0).getLhCode(),
+                    LhScheduleTimeUtil.formatDateTime(sides.get(0).getCleanStartTime()));
+        }
+        if (releasedIds.isEmpty()) {
+            return;
+        }
+
+        // 从保留的实际预约班次重建计数，不能按归一来源时间把已排中班挪回早班。
+        Map<String, Integer> dailyCounts = new HashMap<>();
+        Map<String, Integer> morningCounts = new HashMap<>();
+        Map<String, Integer> afternoonCounts = new HashMap<>();
+        Set<Long> countedIds = new HashSet<>();
+        runtime.getSourceWindowMap().values().stream().flatMap(List::stream)
+                .filter(MachineCleaningOverlapUtil::isDryIceCleaning)
+                .forEach(source -> {
+                    Date reservedStart = runtime.getIndependentQuotaStartMap()
+                            .get(LhCleaningRepairOverlapPolicy.sourceKey(source));
+                    if (reservedStart != null && countedIds.add(source.getSourcePlanId())) {
+                        this.increaseDeviceStopCleaningUsage(context, dailyCounts, morningCounts, afternoonCounts,
+                                Collections.emptyMap(), source.getCleanType(), reservedStart);
+                    }
+                });
+        List<MachineCleaningWindowDTO> pending = new ArrayList<>(runtime.getPendingDryIceWindows());
+        pending.sort(Comparator.comparing(MachineCleaningWindowDTO::getSourcePlanStartTime)
+                .thenComparing(MachineCleaningWindowDTO::getLhCode));
+        for (MachineCleaningWindowDTO source : pending) {
+            if (countedIds.contains(source.getSourcePlanId()) || releasedIds.contains(source.getSourcePlanId())) {
+                continue;
+            }
+            Date start = this.resolveDryIcePlan(context, source.getSourcePlanStartTime(),
+                    dailyCounts, morningCounts, afternoonCounts);
+            if (start == null) {
+                continue;
+            }
+            MachineCleaningWindowDTO window = CleaningPlanRuntimeState.copyWindow(source);
+            long offsetMillis = start.getTime() - window.getCleanStartTime().getTime();
+            window.setCleanStartTime(start);
+            window.setCleanEndTime(new Date(window.getCleanEndTime().getTime() + offsetMillis));
+            window.setReadyTime(new Date(window.getReadyTime().getTime() + offsetMillis));
+            List<MachineCleaningWindowDTO> sides = new ArrayList<>();
+            sides.add(window);
+            MachineCleaningWindowDTO paired = this.createPairedSingleControlCleaningWindow(context, window);
+            if (paired != null) {
+                sides.add(paired);
+            }
+            // 额度候补同样复核当前SKU；未知占用及维修组合不能借补位绕开原准入。
+            boolean eligible = sides.stream().allMatch(side -> {
+                SkuScheduleDTO sku = this.resolveOrdinaryDryIceSku(context, side);
+                return sku != null && !CleaningScheduleRuleUtil.shouldSkipCleaningBySkuEnding(context, sku);
+            });
+            if (!eligible) {
+                continue;
+            }
+            this.increaseDeviceStopCleaningUsage(context, dailyCounts, morningCounts, afternoonCounts,
+                    Collections.emptyMap(), window.getCleanType(), start);
+            this.rememberIndependentQuota(context, window);
+            for (MachineCleaningWindowDTO side : sides) {
+                this.updateDryIceMachineWindow(context, side, true);
+                this.recordInitialization(context, side, CleaningPlanStatus.SCHEDULED, "收尾释放名额后干冰补位");
+            }
+            CleaningScheduleDateFillItem fill = new CleaningScheduleDateFillItem();
+            fill.setPlanId(window.getSourcePlanId());
+            fill.setMachineCode(window.getLhCode());
+            fill.setCleanType(window.getCleanType());
+            fill.setScheduleDate(LhScheduleTimeUtil.clearTime(start));
+            fill.setFillReason("收尾释放名额后干冰补位");
+            runtime.getScheduleDateFillList().add(fill);
+            runtime.getPendingDryIceWindows().removeIf(candidate ->
+                    Objects.equals(candidate.getSourcePlanId(), window.getSourcePlanId()));
+            countedIds.add(window.getSourcePlanId());
+            log.info("干冰清洗名额补位, 工厂: {}, 批次: {}, 来源计划ID: {}, 机台: {}, 开始: {}, 结束: {}",
+                    context.getFactoryCode(), context.getBatchNo(), window.getSourcePlanId(), window.getLhCode(),
+                    LhScheduleTimeUtil.formatDateTime(start), LhScheduleTimeUtil.formatDateTime(window.getCleanEndTime()));
+        }
+    }
+
+    /**
+     * 查找当天普通干冰在机来源的精确续作身份，复用正式SKU的余量及日标准产能。
+     *
+     * @param context 已完成需求归集的上下文
+     * @param window 当前运行侧的实际清洗窗口
+     * @return 身份明确的续作SKU；未来来源、维修组合或占用未确定时返回空
+     */
+    private SkuScheduleDTO resolveOrdinaryDryIceSku(LhScheduleContext context, MachineCleaningWindowDTO window) {
+        if (!LhScheduleTimeUtil.clearTime(context.getScheduleDate()).equals(
+                LhScheduleTimeUtil.clearTime(window.getCleanStartTime()))
+                || window.isSourceFollowsMachineOccupation()
+                || LhCleaningRepairOverlapPolicy.hasRepairOverlap(context, window)
+                || !context.getMachineScheduleMap().containsKey(window.getLhCode())) {
+            return null;
+        }
+        return context.getContinuousSkuList().stream()
+                .filter(sku -> StringUtils.equals(sku.getContinuousMachineCode(), window.getLhCode())
+                        && StringUtils.equals(sku.getMaterialCode(), window.getSourceMaterialCode())
+                        && StringUtils.equals(this.normalizeProductStatus(sku.getProductStatus()),
+                        this.normalizeProductStatus(window.getSourceProductStatus())))
+                .findFirst().orElse(null);
+    }
+
+    /**
+     * 同步运行机台及初始机台快照的清洗窗口和摘要，使后续容量及恢复路径读取同一约束。
+     *
+     * @param context 尚未分配产量的上下文
+     * @param window 本次取消或补位的运行侧清洗窗口
+     * @param scheduled 是否安排本窗口；否则移除该来源窗口
+     */
+    private void updateDryIceMachineWindow(LhScheduleContext context, MachineCleaningWindowDTO window,
+                                           boolean scheduled) {
+        List<MachineScheduleDTO> machines = new ArrayList<>();
+        machines.add(context.getMachineScheduleMap().get(window.getLhCode()));
+        MachineScheduleDTO initial = context.getInitialMachineScheduleMap().get(window.getLhCode());
+        if (initial != null && initial != machines.get(0)) {
+            machines.add(initial);
+        }
+        for (MachineScheduleDTO machine : machines) {
+            List<MachineCleaningWindowDTO> windows = new ArrayList<>(machine.getCleaningWindowList());
+            windows.removeIf(existing -> Objects.equals(existing.getSourcePlanId(), window.getSourcePlanId()));
+            if (scheduled) {
+                windows.add(CleaningPlanRuntimeState.copyWindow(window));
+            }
+            windows.sort(Comparator.comparing(MachineCleaningWindowDTO::getCleanStartTime));
+            machine.setCleaningWindowList(windows);
+            machine.setHasDryIceCleaning(windows.stream().anyMatch(MachineCleaningOverlapUtil::isDryIceCleaning));
+            machine.setCleaningPlanTime(windows.isEmpty() ? null : windows.get(0).getCleanStartTime());
+        }
+    }
     /**
      * 为单控机台配对侧创建清洗窗口。
      * <p>单控机台（如 K1501L/K1501R）左右模需一起清洗，当一侧机台生成了清洗窗口时，
@@ -178,7 +347,8 @@ public class LhCleaningPlanResolver {
         pairedWindow.setLhCode(pairMachineCode);
         pairedWindow.setCleanType(cleaningWindow.getCleanType());
         pairedWindow.setLeftRightMould(LeftRightMouldUtil.resolveCleaningLeftRightMould(pairMachineCode));
-        pairedWindow.setMouldCode(this.resolveCleaningMouldCode(context, pairMachineCode));
+        pairedWindow.setMouldCode(this.resolveCleaningMouldCode(
+                context, pairMachineCode, cleaningWindow.getCleanType()));
         pairedWindow.setCleanStartTime(cleaningWindow.getCleanStartTime());
         pairedWindow.setCleanEndTime(cleaningWindow.getCleanEndTime());
         pairedWindow.setReadyTime(cleaningWindow.getReadyTime());
@@ -241,6 +411,7 @@ public class LhCleaningPlanResolver {
         LhMachineOnlineInfo machineOnlineInfo = this.resolveMachineOnlineInfo(context, cleaningPlan.getMachineCode());
         String machineMaterial = Objects.isNull(machineOnlineInfo) ? null : machineOnlineInfo.getMaterialCode();
         String productStatus = Objects.isNull(machineOnlineInfo) ? null : machineOnlineInfo.getProductStatus();
+        MachineCleaningWindowDTO dryIceSource = null;
         if (CleaningTypeEnum.DRY_ICE.getCode().equals(cleanType) && cleaningPlan.getBeginDate() != null) {
             // 正规换模覆盖来源时不执行独立清洗，不能用额度顺延后的备用时间否定原计划组合。
             Date normalizedStart = this.resolveDryIceShiftStartTime(context, cleaningPlan.getBeginDate());
@@ -251,6 +422,7 @@ public class LhCleaningPlanResolver {
                 source.setSourceProductStatus(this.normalizeProductStatus(productStatus));
                 source.setSourceFollowsMachineOccupation(followsOccupation);
                 this.rememberSourceWindow(context, source);
+                dryIceSource = source;
             }
         }
         // 按计划日期（beginDate）定位实际清洗班次，不再从排程窗口 T 日提前寻找空档
@@ -258,6 +430,10 @@ public class LhCleaningPlanResolver {
                 cleaningPlan.getBeginDate(),
                 dryIceDailyCountMap, dryIceMorningCountMap, dryIceAfternoonCountMap, sandBlastDailyCountMap);
         if (Objects.isNull(cleanStartTime)) {
+            if (dryIceSource != null) {
+                context.getCleaningPlanRuntimeState().getPendingDryIceWindows()
+                        .add(CleaningPlanRuntimeState.copyWindow(dryIceSource));
+            }
             this.recordSkip(context, cleaningPlan, cleanType, "额度或日期条件不满足");
             log.info("清洗计划超过可安排上限，本次不纳入, 机台: {}, 类型: {}, 计划开始: {}",
                     cleaningPlan.getMachineCode(), cleanType,
@@ -281,9 +457,14 @@ public class LhCleaningPlanResolver {
             }
             this.rememberSourceWindow(context, cleaningWindow);
         }
-        // 普通收尾预判不占清洗名额；干冰与05重叠时保留名额供后续真实组合兑现。
+        // 未来干冰须等对应日期的实际物料确定后再判断收尾，不能让当前前料提前取消次日事件。
+        boolean futureDryIce = CleaningTypeEnum.DRY_ICE.getCode().equals(cleanType)
+                && Objects.nonNull(context.getScheduleDate())
+                && LhScheduleTimeUtil.clearTime(cleanStartTime).after(
+                        LhScheduleTimeUtil.clearTime(context.getScheduleDate()));
+        // 当天普通收尾预判不占清洗名额；干冰与05重叠时保留名额供后续真实组合兑现。
         boolean sandBlastHandoff = LhCleaningRepairOverlapPolicy.hasPlannedSandBlastHandoff(context, cleaningWindow);
-        if (!followsOccupation && !sandBlastHandoff
+        if (!futureDryIce && !followsOccupation && !sandBlastHandoff
                 && this.isMachineEndingWithinThreeDays(context, cleaningPlan.getMachineCode(), cleanStartTime,
                 machineMaterial, productStatus)) {
             log.info("机台当前物料3天内可收尾，跳过清洗, 机台: {}, 物料: {}, 清洗类型: {}, 清洗时间: {}",
@@ -619,7 +800,7 @@ public class LhCleaningPlanResolver {
         // 单控机台按机台编码后缀确定左/右模，双模机台统一 LR
         cleaningWindow.setLeftRightMould(
                 LeftRightMouldUtil.resolveCleaningLeftRightMould(cleaningPlan.getMachineCode()));
-        cleaningWindow.setMouldCode(this.resolveCleaningMouldCode(context, cleaningPlan.getMachineCode()));
+        cleaningWindow.setMouldCode(this.resolveCleaningMouldCode(context, cleaningPlan.getMachineCode(), cleanType));
         cleaningWindow.setCleanStartTime(cleanStartTime);
         // 喷砂清洗结束与首检结束分开记录，后续机台可用时间统一取 readyTime。
         int readyDurationHours = this.resolveReadyDurationHours(context, cleanType, cleanDurationHours);
@@ -846,15 +1027,20 @@ public class LhCleaningPlanResolver {
                 LhScheduleConstant.SAND_BLAST_SKIP_HOLIDAY_ENABLED) == ENABLED;
     }
     /**
-     * 解析机台当前在机模具号。
+     * 解析清洗模具号，干冰仅使用本运行侧的实际完整装机组。
      *
      * @param context 排程上下文
      * @param machineCode 机台编号
-     * @return 模具号
+     * @param cleanType 清洗类型
+     * @return 清洗模具号；干冰缺少实际装机证据时不补造关联模具
      */
-    private String resolveCleaningMouldCode(LhScheduleContext context, String machineCode) {
+    private String resolveCleaningMouldCode(LhScheduleContext context, String machineCode, String cleanType) {
         if (Objects.isNull(context) || StringUtils.isEmpty(machineCode)) {
             return null;
+        }
+        if (CleaningTypeEnum.DRY_ICE.getCode().equals(cleanType)) {
+            // 关联模具可能包含多套备模，干冰只能输出实际装机组，配对侧同样独立解析。
+            return LhMouldCodeUtil.resolveInMachineMouldCode(context, machineCode);
         }
         LhMachineOnlineInfo onlineInfo = context.getMachineOnlineInfoMap().get(machineCode);
         if (Objects.isNull(onlineInfo) || StringUtils.isEmpty(onlineInfo.getMaterialCode())) {

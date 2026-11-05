@@ -27,6 +27,11 @@ public final class RepairPlanRuntimeState {
      */
     private final Map<Long, MdmDevicePlanShut> sourcePlanMap = new LinkedHashMap<>();
     /**
+     * 正式扣账前已经通过08:00判断的来源证明，只保存不可变身份及毫秒值。
+     * 结果变化后必须重新核验，不能在维修影响排量后临时推导新的取消决定。
+     */
+    private final Map<Long, List<Object>> admissionProofMap = new LinkedHashMap<>();
+    /**
      * 原始故障禁产窗口。
      */
     private final Map<Long, MachineFaultWindowDTO> faultWindowMap = new LinkedHashMap<>();
@@ -130,6 +135,9 @@ public final class RepairPlanRuntimeState {
         sourcePlanMap.forEach((planId, source) -> target.sourcePlanMap.put(planId, copySource(source)));
         faultWindowMap.forEach((planId, fault) -> target.faultWindowMap.put(planId, copyFault(fault)));
         transferEventMap.forEach((machineCode, event) -> target.transferEventMap.put(machineCode, copyEvent(event)));
+        // 证明元素仅含不可变值，复制列表容器避免隔离上下文共享集合。
+        admissionProofMap.forEach((planId, proof) -> target.admissionProofMap.put(planId,
+                java.util.Collections.unmodifiableList(new ArrayList<>(proof))));
         target.constraintVersion = constraintVersion;
         target.scopedStopPlans = scopedStopPlans == null ? null : scopedStopPlans.stream()
                 .map(RepairPlanRuntimeState::copySource).collect(java.util.stream.Collectors.toList());

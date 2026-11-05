@@ -14,7 +14,6 @@ import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.dto.LhEmbryoMachineMappingQueryDTO;
 import com.zlt.aps.lh.api.domain.dto.LhInsertOrderValidateResultDTO;
-import com.zlt.aps.lh.api.domain.dto.LhEmbryoMachineMappingQueryDTO;
 import com.zlt.aps.lh.api.domain.dto.LhOrderInsertDTO;
 import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.lh.api.domain.vo.LhEmbryoMachineMappingVO;
@@ -128,33 +127,20 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
      */
     @Override
     public List<LhEmbryoMachineMappingVO> queryEmbryoMachineMappings(LhEmbryoMachineMappingQueryDTO query) {
-        if (query == null || query.getScheduleDate() == null || StringUtils.isBlank(query.getFactoryCode())
-                || CollectionUtils.isEmpty(query.getEmbryoCodes())) {
+        if (query == null || query.getScheduleDate() == null || StringUtils.isBlank(query.getFactoryCode()) || CollectionUtils.isEmpty(query.getEmbryoCodes())) {
             return Collections.emptyList();
         }
-        Set<String> embryoCodeSet = query.getEmbryoCodes().stream()
-                .filter(StringUtils::isNotBlank)
-                .map(String::trim)
-                .collect(Collectors.toSet());
+        Set<String> embryoCodeSet = query.getEmbryoCodes().stream().filter(StringUtils::isNotBlank).map(String::trim).collect(Collectors.toSet());
         if (embryoCodeSet.isEmpty()) {
             return Collections.emptyList();
         }
         Date scheduleDate = Date.from(query.getScheduleDate().atStartOfDay(ZoneId.systemDefault()).toInstant());
-        return this.selectByDateAndFactory(scheduleDate, query.getFactoryCode()).stream()
-                .filter(Objects::nonNull)
-                .filter(result -> StringUtils.isNotBlank(result.getEmbryoCode()))
-                .filter(result -> embryoCodeSet.contains(result.getEmbryoCode().trim()))
-                .filter(result -> StringUtils.isNotBlank(result.getLhMachineCode()))
-                .map(result -> {
-                    LhEmbryoMachineMappingVO mapping = new LhEmbryoMachineMappingVO();
-                    mapping.setEmbryoCode(result.getEmbryoCode().trim());
-                    mapping.setLhMachineCode(result.getLhMachineCode().trim());
-                    return mapping;
-                })
-                .distinct()
-                .sorted(Comparator.comparing(LhEmbryoMachineMappingVO::getEmbryoCode)
-                        .thenComparing(LhEmbryoMachineMappingVO::getLhMachineCode))
-                .collect(Collectors.toList());
+        return this.selectByDateAndFactory(scheduleDate, query.getFactoryCode()).stream().filter(Objects::nonNull).filter(result -> StringUtils.isNotBlank(result.getEmbryoCode())).filter(result -> embryoCodeSet.contains(result.getEmbryoCode().trim())).filter(result -> StringUtils.isNotBlank(result.getLhMachineCode())).map(result -> {
+            LhEmbryoMachineMappingVO mapping = new LhEmbryoMachineMappingVO();
+            mapping.setEmbryoCode(result.getEmbryoCode().trim());
+            mapping.setLhMachineCode(result.getLhMachineCode().trim());
+            return mapping;
+        }).distinct().sorted(Comparator.comparing(LhEmbryoMachineMappingVO::getEmbryoCode).thenComparing(LhEmbryoMachineMappingVO::getLhMachineCode)).collect(Collectors.toList());
     }
 
     @Override
@@ -682,7 +668,8 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         int year = DateUtil.year(dateTime);
         int month = DateUtil.month(dateTime) + 1;
         YearMonth productionYearMonth = YearMonth.of(year, month);
-        Integer maxDiscontinueDays = getDiscontinueDays(factoryCode);
+        Integer extendDays = getExtendDays(factoryCode);
+        Integer skuMaxDiscontinueDays = getSkuMaxDiscontinueDays(factoryCode);
         log.info("fillScheduleResultFields: 开始填充排程结果字段, 排程日期={}, 结果数量={}, year={}, month={}", DateUtil.formatDate(scheduleDate), lhScheduleResultList.size(), year, month);
 
         // scheduleDate 业务上为 T+1，计算 T 日用于完成量相关查询
@@ -732,7 +719,6 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             monthPlanMap = allMonthPlanList.stream().collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getFactoryMaterialStatusKey));
         }
         log.info("fillScheduleResultFields: 月计划定稿加载完成, 月计划匹配数={}", monthPlanMap.size());
-        List<LhDayPlanAdjustVo> allLhDayAdjustList = getLhDayPlanAdjustList(allProductionDate, factoryCodeList, materialCodeList);
         // ======== 3. 加载机台信息（使用模数） ========
         // key: machineCode, value: LhMachineInfo
         Map<String, LhMachineInfo> machineInfoMap = new HashMap<>(machineCodes.size());
@@ -798,6 +784,8 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         //20260831+ 获取起始天，需要考虑调整后库存抓取日
         YearMonth yearMonthKey = SkuMonthPlanCalculator.getFirstYearMonth(allProductionDate);
         LhMonthStartDayResult monthStartResult = lhMonthStartService.getMonthPlanStartDate(factoryCode, yearMonthKey);
+        //20261102+ ZLT 日硫化调整计划获取调整：下个月是否定稿有关
+        List<LhDayPlanAdjustVo> allLhDayAdjustList = getLhDayPlanAdjustList(allProductionDate, monthStartResult.getNextMonthDate(), factoryCodeList, materialCodeList);
         boolean addLastMonthOverdueQty = false;
         Date startDate = null;
         if (null != monthStartResult) {
@@ -868,7 +856,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             finishedQty = Math.max(finishedQty, 0);
             result.setTotalFinishQty(finishedQty);
             //20260830+ 余量计算
-            LhSurplusProductionDayInfo productionDayInfo = new LhSurplusProductionDayInfo(productionYearMonth, startDay, addLastMonthOverdueQty, realProductionDateList, maxDiscontinueDays);
+            LhSurplusProductionDayInfo productionDayInfo = new LhSurplusProductionDayInfo(productionYearMonth, startDay, addLastMonthOverdueQty, realProductionDateList, extendDays, skuMaxDiscontinueDays);
             LhSurplusSkuInfo lhSurplusSkuInfo = new LhSurplusSkuInfo(skuInfo, allMonthPlanList, monthOverdueQtyMap, finishedQty, allLhDayAdjustList);
             LhSurplusResultVo lhSurplusResult = MonthPlanSurplusCalculator.getSurplusInfo(productionDayInfo, lhSurplusSkuInfo);
 
@@ -1191,12 +1179,12 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
     }
 
     /**
-     * 获取连续生产间隔天数约束
+     * 获取提前生产延长天数
      *
      * @param factoryCode
      * @return
      */
-    private Integer getDiscontinueDays(String factoryCode) {
+    private Integer getExtendDays(String factoryCode) {
         if (StringUtils.isBlank(factoryCode)) {
             return null;
         }
@@ -1213,6 +1201,33 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             return Integer.parseInt(configurationValue.trim());
         } catch (NumberFormatException e) {
             log.warn("硫化参数解析失败, paramCode={}, value={}, 使用默认值: {}", LhScheduleParamConstant.EARLY_PRODUCTION_DAYS_THRESHOLD, configurationValue, null);
+            return null;
+        }
+    }
+
+    /**
+     * 获取连续生产间隔天数约束
+     *
+     * @param factoryCode
+     * @return
+     */
+    private Integer getSkuMaxDiscontinueDays(String factoryCode) {
+        if (StringUtils.isBlank(factoryCode)) {
+            return null;
+        }
+        Wrapper<LhParams> paramsQuery = new LambdaQueryWrapper<LhParams>().eq(LhParams::getFactoryCode, factoryCode).eq(LhParams::getParamCode, LhScheduleParamConstant.SKU_MAX_DISCONTINUE_DAYS).eq(LhParams::getIsDelete, DeleteFlagEnum.NORMAL.getCode());
+        LhParams param = lhParamsMapper.selectOne(paramsQuery);
+        if (null == param) {
+            return null;
+        }
+        String configurationValue = param.getParamValue();
+        if (StringUtils.isBlank(configurationValue)) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(configurationValue.trim());
+        } catch (NumberFormatException e) {
+            log.warn("硫化参数解析失败, paramCode={}, value={}, 使用默认值: {}", LhScheduleParamConstant.SKU_MAX_DISCONTINUE_DAYS, configurationValue, null);
             return null;
         }
     }
@@ -1295,24 +1310,39 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
      * 获取对应月计划排产数据
      *
      * @param allProductionDate 日排产周期
+     * @param nextMonthDate     下个月定稿的库存抓取日
      * @param factoryList       工厂
      * @param materialCodeList  物料信息
      * @return
      */
-    private List<LhDayPlanAdjustVo> getLhDayPlanAdjustList(List<Date> allProductionDate, List<String> factoryList, List<String> materialCodeList) {
+    private List<LhDayPlanAdjustVo> getLhDayPlanAdjustList(List<Date> allProductionDate, Date nextMonthDate, List<String> factoryList, List<String> materialCodeList) {
         if (CollectionUtils.isEmpty(allProductionDate)) {
             return Collections.emptyList();
         }
-        YearMonth first = SkuMonthPlanCalculator.getFirstYearMonth(allProductionDate);
-        YearMonth last = SkuMonthPlanCalculator.getLastYearMonth(allProductionDate);
-        //同年月
-        if (first.equals(last)) {
-            return lhDayPlanAdjustRequireService.getMonthPlanLhDayAdjustList(first, factoryList, materialCodeList);
-        }
-        //跨月
         List<LhDayPlanAdjustVo> lhDayPlanAdjustList = Lists.newArrayList();
-        lhDayPlanAdjustList.addAll(lhDayPlanAdjustRequireService.getMonthPlanLhDayAdjustList(first, factoryList, materialCodeList));
-        lhDayPlanAdjustList.addAll(lhDayPlanAdjustRequireService.getMonthPlanLhDayAdjustList(last, factoryList, materialCodeList));
+        Date scheduleDate = allProductionDate.get(BigDecimal.ZERO.intValue());
+        boolean isAddPreviousMonth = null == nextMonthDate ? true : scheduleDate.before(nextMonthDate);
+        YearMonth first = SkuMonthPlanCalculator.getFirstYearMonth(allProductionDate);
+        //20261102+ 硫化日调整量取值变化 ：首个排产日与下个月定稿的抓取日，在之前则上月调整4+本月所有调整，否则 本月调整4 + 下个月所有调整
+        if (isAddPreviousMonth) {
+            //获取前一个月的硫化日调整4
+            YearMonth previousMonth = first.minusMonths(BigDecimal.ONE.intValue());
+            List<LhDayPlanAdjustVo> adjust4List = getYearMonthLhDayPlanAdjust4(previousMonth, factoryList, materialCodeList);
+            if (!org.springframework.util.CollectionUtils.isEmpty(adjust4List)) {
+                lhDayPlanAdjustList.addAll(adjust4List);
+            }
+            //获取当前月的硫化日调整
+            lhDayPlanAdjustList.addAll(lhDayPlanAdjustRequireService.getMonthPlanLhDayAdjustList(first, factoryList, materialCodeList));
+        } else {
+            //当前月的硫化日调整4
+            List<LhDayPlanAdjustVo> adjust4List = getYearMonthLhDayPlanAdjust4(first, factoryList, materialCodeList);
+            if (!org.springframework.util.CollectionUtils.isEmpty(adjust4List)) {
+                lhDayPlanAdjustList.addAll(adjust4List);
+            }
+            //下个月的硫化日调整
+            YearMonth nextMonth = first.plusMonths(BigDecimal.ONE.intValue());
+            lhDayPlanAdjustList.addAll(lhDayPlanAdjustRequireService.getMonthPlanLhDayAdjustList(nextMonth, factoryList, materialCodeList));
+        }
         return lhDayPlanAdjustList;
     }
 
@@ -1344,5 +1374,29 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             }
         }
         return monthPlanList;
+    }
+
+    /**
+     * 单独获取日硫化调整计划的调整4
+     *
+     * @param yearMonth        年月
+     * @param factoryCodeList  工厂
+     * @param materialCodeList 物料
+     * @return
+     */
+    private List<LhDayPlanAdjustVo> getYearMonthLhDayPlanAdjust4(YearMonth yearMonth, List<String> factoryCodeList, List<String> materialCodeList) {
+        if (null == yearMonth || org.springframework.util.CollectionUtils.isEmpty(factoryCodeList)) {
+            return Collections.emptyList();
+        }
+        //获取年月的硫化日调整量
+        List<LhDayPlanAdjustVo> yearMonthResult = lhDayPlanAdjustRequireService.getMonthPlanLhDayAdjustList(yearMonth, factoryCodeList, materialCodeList);
+        if (org.springframework.util.CollectionUtils.isEmpty(yearMonthResult)) {
+            return Collections.emptyList();
+        }
+        List<LhDayPlanAdjustVo> findAdjust4List = yearMonthResult.stream().filter(singleAdjust -> LhScheduleConstant.ADJUST_4.equals(singleAdjust.getAdjustCount())).collect(Collectors.toList());
+        if (org.springframework.util.CollectionUtils.isEmpty(findAdjust4List)) {
+            return Collections.emptyList();
+        }
+        return findAdjust4List;
     }
 }

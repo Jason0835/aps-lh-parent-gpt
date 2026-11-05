@@ -3,6 +3,7 @@
  */
 package com.zlt.aps.lh.engine.strategy.impl;
 
+import com.zlt.aps.lh.engine.strategy.support.NewSpecEmbryoAvailableTimeResolver;
 import com.zlt.aps.cx.entity.config.CxEmbryoLhTime;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
@@ -62,6 +63,11 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
     @Resource
     private StructureEndingPrioritySnapshotResolver structureEndingPrioritySnapshotResolver;
 
+    /**
+     * 按原业务优先级排序，并仅对非转产结构应用配置供胚时间排序。
+     *
+     * @param context 当前批次的候选、结构及转产快照
+     */
     @Override
     public void sortByPriority(LhScheduleContext context) {
         log.info("执行SKU优先级排序, 续作SKU数: {}, 新增SKU数: {}",
@@ -83,19 +89,20 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
         // 新增规格按试制、量试、正规组分层；小批量作为正规组 SKU 继续走通用排序。
         Comparator<SkuScheduleDTO> newSpecComparator = buildNewSpecComparator(
                 context, structurePriorityMap, structureEndingDaysMap, tailComparator);
-        sortSkuList(context.getContinuousSkuList(), context.getStructureEarliestLhTimeMap(),comparator);
-        sortSkuList(context.getNewSpecSkuList(), context.getStructureEarliestLhTimeMap(),newSpecComparator);
+        Map<String, Date> applicableTimeMap = NewSpecEmbryoAvailableTimeResolver.resolveApplicableTimeMap(context);
+        this.sortSkuList(context.getContinuousSkuList(), applicableTimeMap, comparator);
+        this.sortSkuList(context.getNewSpecSkuList(), applicableTimeMap, newSpecComparator);
 
         // 同时对每个结构下的SKU列表排序，保证结构内顺序与主排序一致。
         for (Map.Entry<String, List<SkuScheduleDTO>> entry : context.getStructureSkuMap().entrySet()) {
             entry.getValue().sort(comparator);
             //根据胎胚最早可供硫化时间重新排序 sandy+ 2026.7.7
-            reorderByEarliestLhTime(entry.getValue(),context.getStructureEarliestLhTimeMap());
+            this.reorderByEarliestLhTime(entry.getValue(), applicableTimeMap);
         }
 
         // 按统一优先级回写顺序号，供后续结果对象复用。
         List<SkuScheduleDTO> orderedSkuList = buildOrderedSkuList(context, newSpecComparator);
-        reorderByEarliestLhTime(orderedSkuList,context.getStructureEarliestLhTimeMap());
+        this.reorderByEarliestLhTime(orderedSkuList, applicableTimeMap);
         int order = 1;
         for (SkuScheduleDTO sku : orderedSkuList) {
             sku.setScheduleOrder(order++);
@@ -161,7 +168,7 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
         Comparator<SkuScheduleDTO> comparator = this.buildNewSpecComparator(
                 context, structurePriorityMap, structureEndingDaysMap, tailComparator);
         this.sortSkuList(
-                pendingNewSpecSkuList, context.getStructureEarliestLhTimeMap(), comparator);
+                pendingNewSpecSkuList, NewSpecEmbryoAvailableTimeResolver.resolveApplicableTimeMap(context), comparator);
         for (int index = 0; index < pendingNewSpecSkuList.size(); index++) {
             SkuScheduleDTO sku = pendingNewSpecSkuList.get(index);
             if (Objects.isNull(sku)) {
@@ -213,7 +220,7 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
         Comparator<SkuScheduleDTO> comparator = this.buildNewSpecComparator(
                 context, structurePriorityMap, structureEndingDaysMap,
                 this.buildTailComparator(context));
-        this.sortSkuList(poolSkuList, context.getStructureEarliestLhTimeMap(), comparator);
+        this.sortSkuList(poolSkuList, NewSpecEmbryoAvailableTimeResolver.resolveApplicableTimeMap(context), comparator);
     }
 
     /**

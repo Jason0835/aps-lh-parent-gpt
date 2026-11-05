@@ -4,6 +4,7 @@ import com.zlt.aps.lh.api.domain.dto.MachineMaintenanceWindowDTO;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.RepairPlanResult;
 import com.zlt.aps.lh.engine.strategy.support.RepairPlanRuntimeState;
+import com.zlt.aps.lh.util.LhInventoryPlanMatcher;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
 import org.apache.commons.lang3.StringUtils;
@@ -139,10 +140,8 @@ public final class LhRepairOverlapResolver {
             Date start, Date end, String reasonPrefix) {
         RepairPlanResult result = new RepairPlanResult();
         result.setPhysicalMachineCode(physicalMachineCode);
-        for (MdmDevicePlanShut stop : plans) {
-            if (stop != null && StringUtils.equals(physicalMachineCode,
-                    LhSingleControlMachineUtil.resolvePhysicalMachineCode(stop.getMachineCode()))
-                    && overlaps(start, end, stop.getBeginDate(), stop.getEndDate())) {
+        for (MdmDevicePlanShut stop : LhInventoryPlanMatcher.matchPhysicalStopPlans(plans, physicalMachineCode)) {
+            if (overlaps(start, end, stop.getBeginDate(), stop.getEndDate())) {
                 result.setOverlapStatus(RepairPlanResult.OverlapStatus.UNSUPPORTED);
                 result.setReason(reasonPrefix + stop.getMachineStopType());
                 return result;

@@ -44,6 +44,8 @@ public final class ContinuationMachineReducer {
 
     /**
      * 在既定减少台数内先选历史交替命中机台，再按原正常规则补足。
+     * 整机共用性只汇总本轮候选运行侧的实际模具，避免单控代表侧少计另一侧。
+     *
      * @param context 已初始化的排程上下文
      * @param sourceSku 当前续作SKU
      * @param candidates 已完成业务准入和保护过滤的候选，不跨SKU扩展候选
@@ -69,9 +71,19 @@ public final class ContinuationMachineReducer {
         Comparator<LhScheduleResult> sideOrder = this.buildRemoveComparator(context, sourceSku);
         groups.values().forEach(sides -> sides.sort(sideOrder));
         Map<String, Integer> sharedCounts = this.buildFuturePlanMouldSharedSkuCountMap(context, sourceSku);
+        // 同一物理机台的模具去重后逐副计分；不能从全局机台表补入未参与本轮的另一SKU侧。
+        Map<String, Integer> physicalSharedCounts = new LinkedHashMap<>(groups.size());
+        groups.forEach((machineCode, sides) -> physicalSharedCounts.put(machineCode, sides.stream()
+                .flatMap(result -> LhMouldCodeUtil.resolveInMachineMouldCodeSet(
+                        context, result.getLhMachineCode()).stream())
+                .distinct()
+                .mapToInt(mouldCode -> Math.max(0, sharedCounts.getOrDefault(mouldCode, 0)))
+                .sum()));
+        ToIntFunction<LhScheduleResult> mouldCommonality = result -> physicalSharedCounts.get(
+                LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode()));
         boolean dimensionEnabled = this.shouldEnableContinuationReduceDimensionPriority(context, sourceSku);
         Comparator<LhScheduleResult> keepOrder = this.buildKeepComparator(
-                context, sourceSku, result -> this.resolveCapsuleUsageCount(context, result));
+                context, sourceSku, result -> this.resolveCapsuleUsageCount(context, result), mouldCommonality);
         // 原主流程先选保留再取差集；反向使用同一保留序，连尺寸缺失时的选择行为也保持一致。
         List<LhScheduleResult> representatives = groups.values().stream()
                 .map(sides -> sides.stream().min(keepOrder).get()).collect(Collectors.toList());
@@ -101,11 +113,13 @@ public final class ContinuationMachineReducer {
             LhScheduleResult candidate = remaining.get(index);
             LhScheduleResult next = index + 1 < remaining.size() ? remaining.get(index + 1) : null;
             String machineCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(candidate.getLhMachineCode());
-            ReductionReason reason = this.resolveReason(context, candidate, next, sharedCounts, dimensionEnabled);
-            String detail = String.format("正常下机排序, 前缀保护=%s, 模具共用数=%s, 尺寸优先启用=%s, "
+            ReductionReason reason = this.resolveReason(context, candidate, next, mouldCommonality, dimensionEnabled);
+            String detail = String.format("正常下机排序, 统计运行侧=%s, 前缀保护=%s, 模具共用数=%s, 尺寸优先启用=%s, "
                             + "尺寸=%s, 有效清洗=%s, 胶囊最大次数=%s, 对比下序机台=%s",
+                    groups.get(machineCode).stream().map(LhScheduleResult::getLhMachineCode)
+                            .distinct().collect(Collectors.joining(",")),
                     this.isPriorityContinuationMachine(context, candidate),
-                    this.resolveMachineMouldSharedSkuCount(context, candidate, sharedCounts), dimensionEnabled,
+                    mouldCommonality.applyAsInt(candidate), dimensionEnabled,
                     this.resolveMachineDimensionSize(context, candidate), this.hasValidCleaningPlanForMachine(context, candidate),
                     this.resolveCapsuleUsageCount(context, candidate), Objects.nonNull(next) ? next.getLhMachineCode() : "无剩余候选");
             decisions.add(new MachineReductionDecision(machineCode, reason, detail,
@@ -153,27 +167,34 @@ public final class ContinuationMachineReducer {
 
     /**
      * 构建不含历史交替偏好的正常保留排序，供选机和既有排量顺序共同使用。
+     * 侧别排量及专用载体沿用单条结果的共用性口径，不套用整机选机指标。
+     *
      * @param context 排程上下文
      * @param sourceSku 当前SKU
      * @return 正常保留比较器
      */
     public Comparator<LhScheduleResult> buildKeepComparator(LhScheduleContext context, SkuScheduleDTO sourceSku) {
-        return this.buildKeepComparator(context, sourceSku, result -> this.resolveCapsuleRecordUsageCount(context, result));
+        Map<String, Integer> sharedCounts = this.buildFuturePlanMouldSharedSkuCountMap(context, sourceSku);
+        return this.buildKeepComparator(context, sourceSku,
+                result -> this.resolveCapsuleRecordUsageCount(context, result),
+                result -> this.resolveMachineMouldSharedSkuCount(context, result, sharedCounts));
     }
 
     /**
-     * 复用正常排序键；仅具体整机选择使用物理机台胶囊最大值，既有排量顺序保持原记录口径。
+     * 复用正常排序键，由调用方明确整机选择或侧别排量的共用性、胶囊统计口径。
+     *
      * @param context 排程上下文
      * @param sourceSku 当前SKU
      * @param capsuleUsage 胶囊次数只读取值方法
+     * @param mouldCommonality 模具共用性只读取值方法，排序与原因说明使用同一口径
      * @return 正常保留顺序
      */
     private Comparator<LhScheduleResult> buildKeepComparator(LhScheduleContext context, SkuScheduleDTO sourceSku,
-                                                             ToIntFunction<LhScheduleResult> capsuleUsage) {
-        Map<String, Integer> sharedCounts = this.buildFuturePlanMouldSharedSkuCountMap(context, sourceSku);
+                                                             ToIntFunction<LhScheduleResult> capsuleUsage,
+                                                             ToIntFunction<LhScheduleResult> mouldCommonality) {
         boolean dimensionEnabled = this.shouldEnableContinuationReduceDimensionPriority(context, sourceSku);
         return Comparator.comparingInt((LhScheduleResult result) -> this.isPriorityContinuationMachine(context, result) ? 0 : 1)
-                .thenComparingInt(result -> this.resolveMachineMouldSharedSkuCount(context, result, sharedCounts))
+                .thenComparingInt(mouldCommonality)
                 .thenComparing(result -> dimensionEnabled ? this.resolveMachineDimensionSize(context, result) : BigDecimal.ZERO,
                         Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparingInt(result -> this.hasValidCleaningPlanForMachine(context, result) ? 1 : 0)
@@ -202,15 +223,16 @@ public final class ContinuationMachineReducer {
 
     /**
      * 解释与下序候选相比第一个不同的排序因素；最后一台记录为确定性编码收口。
+     *
      * @param context 排程上下文
      * @param candidate 当前选择
      * @param next 下序候选
-     * @param sharedCounts 模具共用性
+     * @param mouldCommonality 本轮整机排序使用的模具共用性取值方法
      * @param dimensionEnabled 是否启用尺寸优先
      * @return 排序原因
      */
     private ReductionReason resolveReason(LhScheduleContext context, LhScheduleResult candidate,
-                                           LhScheduleResult next, Map<String, Integer> sharedCounts,
+                                           LhScheduleResult next, ToIntFunction<LhScheduleResult> mouldCommonality,
                                            boolean dimensionEnabled) {
         if (Objects.isNull(next)) {
             return ReductionReason.MACHINE_CODE_FALLBACK;
@@ -218,8 +240,7 @@ public final class ContinuationMachineReducer {
         if (this.isPriorityContinuationMachine(context, candidate) != this.isPriorityContinuationMachine(context, next)) {
             return ReductionReason.CONTINUATION_PREFIX;
         }
-        if (this.resolveMachineMouldSharedSkuCount(context, candidate, sharedCounts)
-                != this.resolveMachineMouldSharedSkuCount(context, next, sharedCounts)) {
+        if (mouldCommonality.applyAsInt(candidate) != mouldCommonality.applyAsInt(next)) {
             return ReductionReason.MOULD_COMMONALITY;
         }
         if (dimensionEnabled && Comparator.<BigDecimal>nullsLast(BigDecimal::compareTo).compare(

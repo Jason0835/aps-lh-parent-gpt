@@ -14,6 +14,271 @@ import java.util.*;
 @Data
 public class ScheduleTaskDraftModel implements ScheduleSortableTask, ScheduleQualityTask {
 
+    /**
+     * 来源全部满足领域规则时启用的免整卷最低量；null表示沿用原数量规则。
+     */
+    protected BigDecimal demandOnlyMinimumQty;
+
+    /**
+     * 同物料同生产班次实际供料来源的判定证据，仅写解释JSON。
+     */
+    protected Map<String, Object> demandOnlyEvidence = new LinkedHashMap<>();
+
+    /**
+     * 收尾含损耗计划候选，两侧统一保留证明。
+     */
+    protected BigDecimal tailPlanCandidateQty;
+    /**
+     * 收尾计划候选的损耗补量。
+     */
+    protected BigDecimal tailPlanLossAddQty;
+    /**
+     * 收尾损耗前上限，不替代活动消费。
+     */
+    protected BigDecimal tailLimitQty;
+    /**
+     * 收尾含损耗上限候选，两侧统一保留证明。
+     */
+    protected BigDecimal tailLimitCandidateQty;
+    /**
+     * 收尾上限候选的损耗补量。
+     */
+    protected BigDecimal tailLimitLossAddQty;
+    /**
+     * 收尾选中候选的损耗前输入。
+     */
+    protected BigDecimal tailSelectedPreLossPlanQty;
+    /**
+     * 收尾上限来源证据。
+     */
+    protected String tailLimitSource;
+
+    /**
+     * 两阶段输入来源，与损耗结算模式正交。
+     */
+    protected ScheduleRequestSourceMode requestSourceMode;
+    /**
+     * 两阶段数量结算模式，不由当前数量是否为空推断。
+     */
+    protected ScheduleSettlementMode settlementMode;
+    /**
+     * 扩增结构准入主因，资源试算不回改此值。
+     */
+    protected ScheduleExtraPolicy extraPolicy;
+    /**
+     * 独立备库新行用途；不能将无节点任务伪装成已有行扩增。
+     */
+    protected Boolean extraCreateTask;
+    /**
+     * 新行已验证窗口证据，仅运行态及解释JSON，不新增结果表列。
+     */
+    protected ScheduleExtraCreateWindowProof extraCreateWindowProof;
+    /**
+     * 实际选中速度的资料原值，单位见machineSpeedRawUnit。
+     */
+    protected BigDecimal machineSpeedRawValue;
+    /**
+     * 原速度单位M_PER_MINUTE或M_PER_HOUR，不根据数值大小猜测。
+     */
+    protected String machineSpeedRawUnit;
+    /**
+     * 速度来源PROCESS、MACHINE或CAPACITY_SHIFT_HOURS。
+     */
+    protected String machineSpeedSource;
+    /**
+     * 当前数量生命周期；禁排任务为null。
+     */
+    protected ScheduleQuantityStage quantityStage;
+    /**
+     * 首次冻结的输入阶段；候选结算和实际分配不得覆盖此来源证明。
+     */
+    protected ScheduleQuantityStage inputQuantityStage;
+    /**
+     * 复制用途，试算与未排副本不提交生产。
+     */
+    protected ScheduleCopyPurpose copyPurpose;
+    /**
+     * 原规则形成的备库优先级快照，基础紧迫度排序不能覆盖。
+     */
+    protected Integer extraPrioritySnapshot;
+    /**
+     * 显式派机阻断；诊断缺口不作为实际生产量。
+     */
+    protected Boolean dispatchBlocked;
+    /**
+     * 同物料同班重复组沿用原去重结果，分解不得重新生成基础请求。
+     */
+    protected Boolean twoPhaseDuplicateTask;
+    /**
+     * 来源分摊视图引用的物理行总量，避免将归属份额误读为再次生产。
+     */
+    protected BigDecimal physicalPlanQty;
+    /**
+     * 来源分摊视图引用的物理行基础总量。
+     */
+    protected BigDecimal physicalBaseAssignQty;
+    /**
+     * 来源分摊视图引用的物理行备库总量。
+     */
+    protected BigDecimal physicalExtraAssignQty;
+    /**
+     * 数量候选结算采用的机台证明，不等于已成功生产的当日绑定。
+     */
+    protected String settlementMachineCode;
+    /**
+     * 尚待资源承接的已结算基础carry请求，与实际片段数量分开。
+     */
+    protected BigDecimal carryRequestQty;
+    /**
+     * 普通基础候选补整卷后或收尾结算后的整数归一前数量；追加不改写基础候选证据。
+     */
+    protected BigDecimal integerRoundingBeforeQty;
+    /**
+     * 最终向上取整新增量，需在产能/工装承接前计入。
+     */
+    protected BigDecimal integerRoundingAddedQty;
+    /**
+     * 本班损耗前基础请求，不能用于直接扣减产能。
+     */
+    protected BigDecimal baseRequestQty;
+    /**
+     * 本班损耗前全量请求，包含当前班需求。
+     */
+    protected BigDecimal targetRequestQty;
+    /**
+     * 选中机台后、资源承接前的合法基础候选。
+     */
+    protected BigDecimal baseCommittedQty;
+    /**
+     * 同一机台规则形成的合法全量候选。
+     */
+    protected BigDecimal targetCommittedQty;
+    /**
+     * 经过合法目标封顶的本班基础额度。
+     */
+    protected BigDecimal baseRequired;
+    /**
+     * 已承接基础量；仅实际行与extra之和等于planQty。
+     */
+    protected BigDecimal baseAssignQty;
+    /**
+     * 已原地承接的累计备库量。
+     */
+    protected BigDecimal extraAssignQty;
+    /**
+     * 基础候选未承接余额，不能作为备库追加。
+     */
+    protected BigDecimal baseRemaining;
+    /**
+     * 合法目标与基础额度的潜在差额。
+     */
+    protected BigDecimal extraPotentialQty;
+    /**
+     * 结构准入后的备库目标，不因资源不足清零。
+     */
+    protected BigDecimal extraTargetQty;
+    /**
+     * 本次资源和时间试算允许追加量。
+     */
+    protected BigDecimal extraAllowedQty;
+    /**
+     * 本次成功原子提交的追加量。
+     */
+    protected BigDecimal extraActualQty;
+    /**
+     * 未承接备库量，班末削减，不生成顺延。
+     */
+    protected BigDecimal extraRemaining;
+    /**
+     * 是否具备扩增结构资格。
+     */
+    protected Boolean extraEligibleTask;
+    /**
+     * 收尾专用计划候选原始输入。
+     */
+    protected BigDecimal tailPlanBaseRequestQty;
+    /**
+     * 收尾专用上限原始输入，与通用全量目标不同。
+     */
+    protected BigDecimal tailLimitRequestQty;
+    /**
+     * 原始预置输入，不允许由finalize回写量重新生成。
+     */
+    protected BigDecimal presetInputPlanQty;
+    /**
+     * 不可变来源输入快照键，非预置量段采用NULL。
+     */
+    protected String inputSnapshotKey;
+    /**
+     * 显式新建请求时引用的上游输入快照。
+     */
+    protected String parentInputSnapshotKey;
+    /**
+     * preLoss值证明阶段；严格替换门禁仅限PRESET。
+     */
+    protected String preLossValueStage;
+    /**
+     * preLoss值对应的输入快照键。
+     */
+    protected String preLossValueSnapshotKey;
+    /**
+     * 前移或派生前冻结的原始业务键。
+     */
+    protected String sourceBusinessKey;
+    /**
+     * 稳定来源身份，聚合来源必须包含完整成员。
+     */
+    protected String sourceIdentity;
+    /**
+     * 活动需求事件身份，与实际生产班分离。
+     */
+    protected String demandEventKey;
+    /**
+     * 活动需求班键，包含业务日期。
+     */
+    protected String demandShiftKey;
+    /**
+     * 原基础额度所属活动需求班。
+     */
+    protected String originDemandShiftKey;
+    /**
+     * 未来重分配前来源班，仅作审计。
+     */
+    protected String originalSourceShiftKey;
+    /**
+     * 当前实际生产分配键，跨班必须生成新键。
+     */
+    protected String productionAllocKey;
+    /**
+     * 来源生产分配引用，不冒充当前键。
+     */
+    protected String originProductionAllocKey;
+    /**
+     * 初次计划生产班，不随carry变化。
+     */
+    protected String baseProductionShiftKey;
+    /**
+     * 实际生产班。
+     */
+    protected String actualProductionShiftKey;
+    /**
+     * 原基础额度键，不能只用planGroupKey。
+     */
+    protected String originBaseQuotaKey;
+    /**
+     * 原基础额度与实际生产班组成的阶段余额键。
+     */
+    protected String phaseBalanceKey;
+    /**
+     * 全部准入和资源原因，主因由统一rank解析。
+     */
+    protected Set<String> twoPhaseReasonCodes;
+
+    /**
+     * 收尾规格最小计划量，单位米
+     */
+    protected BigDecimal tailMinPlanQty;
+
     /** 产品工序编码；TM/TC 在运行态统一使用该字段，边界模型负责映射到产品专属字段。 */
     protected String processCode;
     /** 工单号 */
@@ -98,6 +363,10 @@ public class ScheduleTaskDraftModel implements ScheduleSortableTask, ScheduleQua
     protected Map<Integer, BigDecimal> formingClassQtyMap = new LinkedHashMap<>();
     /** 来源成型行 CLASS1~CLASS8 对应的产品换算长度，单位米，仅用于重建保证窗口。 */
     protected Map<Integer, BigDecimal> formingClassLengthMap = new LinkedHashMap<>();
+    /**
+     * 保证范围逐班成型余量封顶过程快照，仅用于计划量过程日志。
+     */
+    protected ScheduleGuardDemandCapLogSnapshot guardDemandCapLogSnapshot;
 
     /**
      * 设置库存覆盖窗口并复制对象，避免派生任务与来源任务共享可变窗口。
@@ -107,7 +376,10 @@ public class ScheduleTaskDraftModel implements ScheduleSortableTask, ScheduleQua
     public void setStockCoverageWindow(ScheduleStockCoverageWindowModel stockCoverageWindow) {
         this.stockCoverageWindow = stockCoverageWindow == null ? null : stockCoverageWindow.copy();
     }
-    /** 来源行硫化余量封顶条数，空值表示不封顶。 */
+
+    /**
+     * 来源行成型余量封顶条数，空值表示不封顶。
+     */
     protected BigDecimal formingGuardFormingQtyLimit;
     /** 当前班开始滚动库存，单位米 */
     protected BigDecimal rollingStockQty;
@@ -225,6 +497,30 @@ public class ScheduleTaskDraftModel implements ScheduleSortableTask, ScheduleQua
     protected BigDecimal preLossPlanQty;
     /** 工装限制前计划量，单位米 */
     protected BigDecimal planQtyBeforeToolLimit;
+    /**
+     * 成型总余量封顶前计划量，单位米；封顶差额计算与证据展示使用
+     */
+    protected BigDecimal planQtyBeforeQuotaCap;
+    /**
+     * 本次定稿是否被成型总余量额度封顶
+     */
+    protected Boolean tailQuotaCappedFlag;
+    /**
+     * 成型总余量封顶扣减量，单位米；等于封顶前计划量减封顶后立即值
+     */
+    protected BigDecimal tailQuotaCappedDiffQty;
+    /**
+     * 下发到本任务的成型总余量可用额度，单位米；为空表示未启用额度
+     */
+    protected BigDecimal tailQuotaAvailableQty;
+    /**
+     * 未登记成型总余量台账的原因编码，仅写解释证据
+     */
+    protected String tailQuotaSkippedReason;
+    /**
+     * 成型总余量封顶允许超出工装上限的量，单位米，仅写解释证据
+     */
+    protected BigDecimal tailQuotaToolOverdrawnQty;
     /** 基础应排需求量，单位米 */
     protected BigDecimal baseDemandQty;
     /** 损耗补偿量，单位米 */
@@ -257,6 +553,87 @@ public class ScheduleTaskDraftModel implements ScheduleSortableTask, ScheduleQua
     protected BigDecimal defaultCurlRollLength;
     /** 最小起排量 */
     protected BigDecimal minStartQty;
+    /**
+     * 开产阈值调整量，单位米
+     */
+    protected BigDecimal startupThresholdAdjustQty;
+
+    /**
+     * 复制两阶段状态与不可变来源引用。用途、生产班及执行余额仍由派生调用者显式重置。
+     * 集合创建独立副本，避免试算/未排诊断污染实际来源任务。
+     *
+     * @param target 派生草稿
+     */
+    public void copyTwoPhaseStateTo(ScheduleTaskDraftModel target) {
+        target.setDemandOnlyMinimumQty(this.demandOnlyMinimumQty);
+        target.setDemandOnlyEvidence(ScheduleWorkspaceCopyUtils.copyMap(this.demandOnlyEvidence));
+        target.setTailPlanCandidateQty(this.tailPlanCandidateQty);
+        target.setTailPlanLossAddQty(this.tailPlanLossAddQty);
+        target.setTailLimitQty(this.tailLimitQty);
+        target.setTailLimitCandidateQty(this.tailLimitCandidateQty);
+        target.setTailLimitLossAddQty(this.tailLimitLossAddQty);
+        target.setTailSelectedPreLossPlanQty(this.tailSelectedPreLossPlanQty);
+        target.setTailLimitSource(this.tailLimitSource);
+        target.setRequestSourceMode(this.requestSourceMode);
+        target.setSettlementMode(this.settlementMode);
+        target.setExtraPolicy(this.extraPolicy);
+        target.setExtraCreateTask(this.extraCreateTask);
+        target.setExtraCreateWindowProof(this.extraCreateWindowProof == null
+                ? null : this.extraCreateWindowProof.copy());
+        target.setMachineSpeedRawValue(this.machineSpeedRawValue);
+        target.setMachineSpeedRawUnit(this.machineSpeedRawUnit);
+        target.setMachineSpeedSource(this.machineSpeedSource);
+        target.setQuantityStage(this.quantityStage);
+        target.setInputQuantityStage(this.inputQuantityStage);
+        target.setCopyPurpose(this.copyPurpose);
+        target.setExtraPrioritySnapshot(this.extraPrioritySnapshot);
+        target.setDispatchBlocked(this.dispatchBlocked);
+        target.setTwoPhaseDuplicateTask(this.twoPhaseDuplicateTask);
+        target.setPhysicalPlanQty(this.physicalPlanQty);
+        target.setPhysicalBaseAssignQty(this.physicalBaseAssignQty);
+        target.setPhysicalExtraAssignQty(this.physicalExtraAssignQty);
+        target.setSettlementMachineCode(this.settlementMachineCode);
+        target.setCarryRequestQty(this.carryRequestQty);
+        target.setIntegerRoundingBeforeQty(this.integerRoundingBeforeQty);
+        target.setIntegerRoundingAddedQty(this.integerRoundingAddedQty);
+        target.setStartupThresholdAdjustQty(this.startupThresholdAdjustQty);
+        target.setBaseRequestQty(this.baseRequestQty);
+        target.setTargetRequestQty(this.targetRequestQty);
+        target.setBaseCommittedQty(this.baseCommittedQty);
+        target.setTargetCommittedQty(this.targetCommittedQty);
+        target.setBaseRequired(this.baseRequired);
+        target.setBaseAssignQty(this.baseAssignQty);
+        target.setExtraAssignQty(this.extraAssignQty);
+        target.setBaseRemaining(this.baseRemaining);
+        target.setExtraPotentialQty(this.extraPotentialQty);
+        target.setExtraTargetQty(this.extraTargetQty);
+        target.setExtraAllowedQty(this.extraAllowedQty);
+        target.setExtraActualQty(this.extraActualQty);
+        target.setExtraRemaining(this.extraRemaining);
+        target.setExtraEligibleTask(this.extraEligibleTask);
+        target.setTailPlanBaseRequestQty(this.tailPlanBaseRequestQty);
+        target.setTailLimitRequestQty(this.tailLimitRequestQty);
+        target.setTailMinPlanQty(this.tailMinPlanQty);
+        target.setPresetInputPlanQty(this.presetInputPlanQty);
+        target.setInputSnapshotKey(this.inputSnapshotKey);
+        target.setParentInputSnapshotKey(this.parentInputSnapshotKey);
+        target.setPreLossValueStage(this.preLossValueStage);
+        target.setPreLossValueSnapshotKey(this.preLossValueSnapshotKey);
+        target.setSourceBusinessKey(this.sourceBusinessKey);
+        target.setSourceIdentity(this.sourceIdentity);
+        target.setDemandEventKey(this.demandEventKey);
+        target.setDemandShiftKey(this.demandShiftKey);
+        target.setOriginDemandShiftKey(this.originDemandShiftKey);
+        target.setOriginalSourceShiftKey(this.originalSourceShiftKey);
+        target.setProductionAllocKey(this.productionAllocKey);
+        target.setOriginProductionAllocKey(this.originProductionAllocKey);
+        target.setBaseProductionShiftKey(this.baseProductionShiftKey);
+        target.setActualProductionShiftKey(this.actualProductionShiftKey);
+        target.setOriginBaseQuotaKey(this.originBaseQuotaKey);
+        target.setPhaseBalanceKey(this.phaseBalanceKey);
+        target.setTwoPhaseReasonCodes(this.twoPhaseReasonCodes == null
+                ? null : new LinkedHashSet<>(this.twoPhaseReasonCodes));
+    }
     /** 机台剩余产能，单位米 */
     protected BigDecimal machineRemainCapacity;
     /** 机台生产速度，单位米/小时 */
@@ -353,6 +730,16 @@ public class ScheduleTaskDraftModel implements ScheduleSortableTask, ScheduleQua
     public void setFormingClassLengthMap(Map<Integer, BigDecimal> formingClassLengthMap) {
         this.formingClassLengthMap = formingClassLengthMap == null
                 ? new LinkedHashMap<>() : new LinkedHashMap<>(formingClassLengthMap);
+    }
+
+    /**
+     * 设置保证范围逐班封顶日志快照并复制快照及其班次映射。
+     *
+     * @param guardDemandCapLogSnapshot 保证范围封顶日志快照
+     */
+    public void setGuardDemandCapLogSnapshot(ScheduleGuardDemandCapLogSnapshot guardDemandCapLogSnapshot) {
+        this.guardDemandCapLogSnapshot = guardDemandCapLogSnapshot == null
+                ? null : guardDemandCapLogSnapshot.copy();
     }
 
     /**

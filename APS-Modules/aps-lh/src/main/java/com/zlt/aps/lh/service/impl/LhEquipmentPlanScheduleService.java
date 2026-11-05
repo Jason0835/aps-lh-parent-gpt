@@ -21,6 +21,7 @@ import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.engine.strategy.impl.ContinuousProductionStrategy;
+import com.zlt.aps.lh.util.LhInventoryPlanMatcher;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.PriorityTraceLogHelper;
@@ -922,8 +923,7 @@ public class LhEquipmentPlanScheduleService {
                     occupations.add("维护:" + window.getPrecisionPlanId() + ":" + window.getMaintenanceStartTime()
                             + ":" + window.getProductionResumeTime()));
         }
-        context.getDevicePlanShutList().stream().filter(Objects::nonNull)
-                .filter(stop -> StringUtils.equals(physical, LhSingleControlMachineUtil.resolvePhysicalMachineCode(stop.getMachineCode())))
+        LhInventoryPlanMatcher.matchPhysicalStopPlans(context.getDevicePlanShutList(), physical).stream()
                 .forEach(stop -> occupations.add("停机:" + stop.getMachineStopType() + ":" + stop.getBeginDate() + ":" + stop.getEndDate()));
         return occupations.stream().sorted().collect(Collectors.joining(";"));
     }

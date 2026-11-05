@@ -3,6 +3,7 @@
  */
 package com.zlt.aps.lh.engine.strategy.impl;
 
+import com.zlt.aps.lh.service.impl.LhInventoryOverlapResolver;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.enums.MachineStopTypeEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
@@ -941,7 +942,7 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
      * 解析扣除设备停机后的最早换模开始时间。
      * <p>05-计划性维修属于下机维修，换模或换活字块允许在维修窗口内并行完成，因此不再把
      * 切换开始时间顺延到 05 结束；后续由统一维修时间轴执行 max(维修结束, 切换结束)+预热。
-     * 00～04、06、09 等其他停机仍保持原顺延语义，不扩大本次规则影响范围。</p>
+     * 09盘点允许切换并行，00～04、06等其他停机仍保持原顺延语义，不扩大本次规则影响范围。</p>
      */
     private Date resolveDowntimeAdjustedStartTime(LhScheduleContext context,
                                                   String machineCode,
@@ -958,6 +959,7 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
         Date latestOverlapEndTime = null;
         for (MdmDevicePlanShut planShut : context.getDevicePlanShutList()) {
             if (planShut == null
+                    || LhInventoryOverlapResolver.isInventory(planShut)
                     || !StringUtils.equals(machineCode, planShut.getMachineCode())
                     || StringUtils.equals(MachineStopTypeEnum.PLANNED_REPAIR.getCode(),
                     planShut.getMachineStopType())

@@ -5,6 +5,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
+import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
@@ -27,6 +28,7 @@ import org.springframework.util.CollectionUtils;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Collections;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -58,13 +60,13 @@ public class ContinuationSandBlastDispositionService {
             new DefaultMouldChangeBalanceStrategy();
 
     /**
-     * 续作计算产能前优先落实可用模具，防止置换后仍扣减原模具的清洗停机产能。
+     * 续作计算产能前登记旧装机喷砂事实并优先落实续作可用模具。
      * 单控同源事件先整体检查足量模具及一次物理换模额度，再按运行侧精确绑定。
      *
      * @param context 排程上下文
      */
     public void prepare(LhScheduleContext context) {
-        if (Objects.isNull(context) || CollectionUtils.isEmpty(context.getContinuousSkuList())
+        if (Objects.isNull(context)
                 || CollectionUtils.isEmpty(context.getScheduleWindowShifts())
                 || !CollectionUtils.isEmpty(context.getContinuationSandBlastWindowMap())) {
             return;
@@ -74,6 +76,7 @@ public class ContinuationSandBlastDispositionService {
                 .filter(sku -> StringUtils.isNotEmpty(sku.getContinuousMachineCode()))
                 .collect(Collectors.toMap(SkuScheduleDTO::getContinuousMachineCode,
                         sku -> sku, (first, second) -> first, LinkedHashMap::new));
+        this.prepareIdleMachineSandBlast(context, sources.keySet());
         Map<String, MachineCleaningWindowDTO> candidates = new LinkedHashMap<>(sources.size());
         for (String machineCode : sources.keySet()) {
             MachineScheduleDTO machine = context.getMachineScheduleMap().get(machineCode);
@@ -84,6 +87,7 @@ public class ContinuationSandBlastDispositionService {
             }
         }
         if (CollectionUtils.isEmpty(candidates)) {
+            context.setMouldResourceContext(MouldResourceContext.from(context));
             return;
         }
         List<String> orderedMachines = new ArrayList<>(candidates.keySet());
@@ -109,6 +113,78 @@ public class ContinuationSandBlastDispositionService {
         }
         // 后续阶段从已登记交接事实重建资源，不保留预计算日期的可用性视图。
         context.setMouldResourceContext(MouldResourceContext.from(context));
+    }
+
+    /**
+     * 登记未取得续作资格的旧装机原模喷砂事实，机台与原模分别释放。
+     * 不恢复旧MES续作身份、不生成候选需求，后续选机仍由现有竞争流程决定。
+     *
+     * @param context 当前批次与有效清洗窗口
+     * @param continuousMachines 已取得续作资格的运行侧机台
+     */
+    private void prepareIdleMachineSandBlast(LhScheduleContext context, Set<String> continuousMachines) {
+        Date windowDate = LhScheduleTimeUtil.clearTime(
+                context.getScheduleWindowShifts().get(0).getShiftStartDateTime());
+        for (MachineScheduleDTO machine : context.getMachineScheduleMap().values()) {
+            if (Objects.isNull(machine) || continuousMachines.contains(machine.getMachineCode())
+                    || context.getOnlySandBlastContinuationReleaseWindowMap().containsKey(machine.getMachineCode())) {
+                continue;
+            }
+            LhMachineOnlineInfo online = context.getMachineOnlineInfoMap().get(machine.getMachineCode());
+            if (Objects.isNull(online) || Objects.isNull(online.getOnlineDate())
+                    || !online.getOnlineDate().before(windowDate)) {
+                continue;
+            }
+            MachineCleaningWindowDTO source = this.resolveWindow(context, machine);
+            Set<String> originalMoulds = LhMouldCodeUtil.resolveInMachineMouldCodeSet(
+                    context, machine.getMachineCode());
+            if (Objects.isNull(source) || source.isSourceFollowsMachineOccupation()
+                    || LhCleaningRepairOverlapPolicy.hasPlannedSandBlastHandoff(context, source)
+                    || CollectionUtils.isEmpty(originalMoulds)
+                    || !originalMoulds.equals(this.resolveSourcePlanMoulds(context, source))
+                    || !StringUtils.equals(online.getMaterialCode(), source.getSourceMaterialCode())
+                    || !StringUtils.equals(StringUtils.defaultIfBlank(online.getProductStatus(), "S"),
+                    StringUtils.defaultIfBlank(source.getSourceProductStatus(), "S"))) {
+                continue;
+            }
+            MachineCleaningWindowDTO event = BeanUtil.copyProperties(source, MachineCleaningWindowDTO.class);
+            event.setContinuationMaterialCode(online.getMaterialCode());
+            event.setContinuationProductStatus(StringUtils.defaultIfBlank(online.getProductStatus(), "S"));
+            event.setContinuationMaterialDesc(machine.getCurrentMaterialDesc());
+            event.setMouldCode(LhMouldCodeUtil.joinMouldCode(originalMoulds));
+            this.detach(context, machine, source, event);
+            context.getContinuationSandBlastWindowMap().put(machine.getMachineCode(), event);
+            context.getOnlySandBlastContinuationReleaseWindowMap().put(machine.getMachineCode(), event);
+            // 只释放机台供普通竞争；原模清洗结束前仍受共享资源账本约束。
+            machine.setPreviousMaterialCode(online.getMaterialCode());
+            machine.setPreviousMaterialDesc(machine.getCurrentMaterialDesc());
+            machine.setCurrentMaterialCode(null);
+            machine.setCurrentMaterialDesc(null);
+            machine.setEstimatedEndTime(event.getCleanStartTime());
+            machine.setEnding(false);
+            log.info("旧装机独立喷砂资源登记, factoryCode: {}, batchNo: {}, machineCode: {}, "
+                            + "materialCode: {}, mouldCodes: {}, machineReadyTime: {}, mouldReadyTime: {}",
+                    context.getFactoryCode(), context.getBatchNo(), machine.getMachineCode(), online.getMaterialCode(),
+                    event.getMouldCode(), event.getCleanStartTime(), event.getCleanEndTime());
+        }
+    }
+
+    /**
+     * 从实际停机来源读取指定原模，不能把窗口中的全部SKU关系模具当作实际装机组。
+     *
+     * @param context 原始设备停机计划
+     * @param window 待登记的清洗窗口
+     * @return 来源明确指定的整组模具；缺少来源或未指定时返回空集合
+     */
+    private Set<String> resolveSourcePlanMoulds(LhScheduleContext context, MachineCleaningWindowDTO window) {
+        return context.getLoadedCleaningPlanShutList().stream()
+                .filter(Objects::nonNull)
+                .filter(plan -> Objects.nonNull(window.getSourcePlanId())
+                        && Objects.equals(window.getSourcePlanId(), plan.getId()))
+                .map(plan -> LhMouldCodeUtil.splitMouldCode(plan.getInMachineMouldCode()))
+                .map(moulds -> (Set<String>) moulds)
+                .findFirst()
+                .orElse(Collections.emptySet());
     }
 
     /**

@@ -1,5 +1,9 @@
 package com.zlt.aps.lh.service.impl;
 
+import com.zlt.aps.lh.engine.strategy.support.PreviousAlternateAdditionalMachinePolicy;
+import com.zlt.aps.lh.engine.strategy.support.StructureEndingContinuationPolicy;
+import com.zlt.aps.lh.engine.strategy.support.StructureEndingContinuationState;
+
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.lh.engine.strategy.impl.ContinuousProductionStrategy;
 import org.springframework.context.annotation.Lazy;
@@ -22,11 +26,13 @@ import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.lh.component.StructureEndingAlignmentService;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.LhShiftRemarkRuntime;
 import com.zlt.aps.lh.engine.strategy.support.ScheduleResultSceneTypeSupport;
 import com.zlt.aps.lh.engine.strategy.support.LhShiftDelayEvidence;
+import com.zlt.aps.lh.engine.strategy.support.LhShiftDelayReason;
 import com.zlt.aps.lh.engine.strategy.support.LhConstraintTimeDecision;
 import com.zlt.aps.lh.engine.factory.ScheduleStrategyFactory;
 import com.zlt.aps.lh.engine.strategy.impl.NewSpecProductionStrategy;
@@ -43,6 +49,7 @@ import com.zlt.aps.lh.engine.strategy.support.PreviousAlternatePlanReleaseEvent;
 import com.zlt.aps.lh.engine.strategy.support.PreviousAlternateStructureLimitExemptionPolicy;
 import com.zlt.aps.lh.engine.strategy.support.PreviousAlternateTrialSideAdmissionPolicy;
 import com.zlt.aps.lh.engine.strategy.support.PreviousAlternateActionPlan;
+import com.zlt.aps.lh.engine.strategy.support.PreviousAlternateExecutionPlan;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchCandidateScope;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchSchedulingPolicy;
 import com.zlt.aps.lh.engine.strategy.support.EmbryoSupplyNewMachineLimitPolicy;
@@ -152,10 +159,12 @@ public class PreviousAlternatePlanReuseService {
                     if (Objects.isNull(machine) || context.getPreviousAlternateReleaseEventMap().containsKey(machineCode)) {
                         return;
                     }
-                    boolean beforeNotScheduled = this.isBeforeMaterialNotScheduled(context, plan);
+                    LhMachineOnlineInfo transferredSource = this.resolveTransferredMouldSource(context, plan, machine);
+                    boolean beforeNotScheduled = Objects.nonNull(transferredSource)
+                            || this.isBeforeMaterialNotScheduled(context, plan);
                     String currentMaterialCode = machine.getCurrentMaterialCode();
                     // 仅移除第三种在机前料的拒绝；已在产后料仍沿用原准备身份准入。
-                    if (StringUtils.isBlank(currentMaterialCode)
+                    if ((StringUtils.isBlank(currentMaterialCode) && Objects.isNull(transferredSource))
                             || (!beforeNotScheduled && !StringUtils.equals(currentMaterialCode, plan.getBeforeMaterialCode())
                             && StringUtils.equals(currentMaterialCode, plan.getAfterMaterialCode()))) {
                         return;
@@ -163,7 +172,9 @@ public class PreviousAlternatePlanReuseService {
                     PreviousAlternatePlanReleaseEvent event = new PreviousAlternatePlanReleaseEvent();
                     event.setPlan(plan);
                     event.setMachineCode(machineCode);
-                    event.setMaterialCode(currentMaterialCode);
+                    event.setOriginalMouldsTransferred(Objects.nonNull(transferredSource));
+                    event.setMaterialCode(Objects.nonNull(transferredSource)
+                            ? transferredSource.getMaterialCode() : currentMaterialCode);
                     event.setBeforeMaterialNotScheduled(beforeNotScheduled);
                     // 历史班次编码与结果CLASS序号不同，按实际工作日和早中班配置冻结边界。
                     LhShiftConfigVO plannedShift = this.resolvePreviousAlternatePlanShift(context, plan, plan.getPlanDate());
@@ -172,9 +183,11 @@ public class PreviousAlternatePlanReuseService {
                     event.setHandoffWindowEndTime(handoffWindowEnd);
                     event.setNoProductionStartTime(this.resolvePreviousAlternatePlanShift(
                             context, plan, context.getScheduleDate()).getShiftStartDateTime());
-                    LhMachineOnlineInfo online = context.resolveContinuationOnlineInfo(machineCode);
+                    LhMachineOnlineInfo online = Objects.nonNull(transferredSource)
+                            ? transferredSource : context.resolveContinuationOnlineInfo(machineCode);
                     event.setProductStatus(Objects.nonNull(online) ? online.getProductStatus() : null);
-                    if (!StringUtils.equals(currentMaterialCode, plan.getBeforeMaterialCode())
+                    if (Objects.isNull(transferredSource)
+                            && !StringUtils.equals(currentMaterialCode, plan.getBeforeMaterialCode())
                             && !StringUtils.equals(currentMaterialCode, plan.getAfterMaterialCode())) {
                         this.traceAlternate(context, "历史交替实际前料变更",
                                 String.format("批次=%s, 计划ID=%s, 机台=%s, 历史前料=%s, 实际前料=%s, "
@@ -182,7 +195,17 @@ public class PreviousAlternatePlanReuseService {
                                         context.getBatchNo(), plan.getId(), machineCode, plan.getBeforeMaterialCode(),
                                         currentMaterialCode, event.getProductStatus(), plan.getAfterMaterialCode()));
                     }
-                    event.setOriginalMouldCodes(LhMouldCodeUtil.resolveInMachineMouldCodeSet(context, machineCode));
+                    // 已转移模具仅作为历史证据，事件不得再次释放其他机台的实体模具。
+                    if (!event.isOriginalMouldsTransferred()) {
+                        event.setOriginalMouldCodes(LhMouldCodeUtil.resolveInMachineMouldCodeSet(context, machineCode));
+                    } else {
+                        this.traceAlternate(context, "模具转移后历史指定承接",
+                                String.format("批次=%s, 计划ID=%s, 机台=%s, 历史前料=%s, 前料状态=%s, 后料=%s, "
+                                                + "原模具=%s, 处理=保留历史身份，不恢复续作或模具占用",
+                                        context.getBatchNo(), plan.getId(), machineCode, event.getMaterialCode(),
+                                        event.getProductStatus(), plan.getAfterMaterialCode(),
+                                        transferredSource.getInMachineMouldCode()));
+                    }
                     PreviousAlternateActionPlan action = PreviousAlternateActionPlan.resolve(context, event);
                     log.info("前日交替实际动作冻结, factoryCode: {}, batchNo: {}, planId: {}, machineCode: {}, "
                                     + "beforeMaterial: {}, afterMaterial: {}, historicalType: {}, actualType: {}, "
@@ -207,6 +230,30 @@ public class PreviousAlternatePlanReuseService {
     }
 
     /**
+     * 确认空机是否具有本轮模具全部转移的精确历史前料证据。
+     * 普通空机不能猜测前料，同料动作及仍有续作或停产保机的机台保持原规则。
+     *
+     * @param context 本轮资源归属和续作来源
+     * @param plan 已筛选有效日期的历史计划
+     * @param machine 当前精确运行机台
+     * @return 已转移旧MES来源；未满足限定条件时为空
+     */
+    private LhMachineOnlineInfo resolveTransferredMouldSource(LhScheduleContext context,
+            LhMouldChangePlan plan, MachineScheduleDTO machine) {
+        LhMachineOnlineInfo source = context.getTransferredMouldOnlineSourceMap().get(plan.getLhMachineCode());
+        if (Objects.isNull(source) || StringUtils.isNotBlank(machine.getCurrentMaterialCode())
+                || StringUtils.isBlank(source.getMaterialCode()) || StringUtils.isBlank(source.getProductStatus())
+                || !StringUtils.equals(source.getMaterialCode(), plan.getBeforeMaterialCode())
+                || StringUtils.equals(plan.getBeforeMaterialCode(), plan.getAfterMaterialCode())
+                || context.isContinuousStopHoldMachine(plan.getLhMachineCode())
+                || context.getContinuousSkuList().stream().anyMatch(sku ->
+                        StringUtils.equals(plan.getLhMachineCode(), sku.getContinuousMachineCode()))) {
+            return null;
+        }
+        return source;
+    }
+
+    /**
      * 读取S4.3清理之前冻结的历史前料硫化余量。
      * @param context 排程上下文
      * @param plan 前日交替计划
@@ -217,7 +264,8 @@ public class PreviousAlternatePlanReuseService {
     }
 
     /**
-     * 判断本机动作前物料是否无需在本次续作阶段生产，第三种在机物料按真实需求判断。
+     * 判断本机动作前物料是否无需在本次续作阶段生产，交班停产无库存的前料不再等待余量生产。
+     * 第三种在机物料仍按自身真实需求判断。
      *
      * @param context 排程上下文
      * @param plan 前日交替计划
@@ -234,6 +282,18 @@ public class PreviousAlternatePlanReuseService {
                     .noneMatch(sku -> StringUtils.equals(plan.getLhMachineCode(), sku.getContinuousMachineCode())
                             && StringUtils.equals(machine.getCurrentMaterialCode(), sku.getMaterialCode())
                             && targetScheduleQtyResolver.previewProductionRemainingQty(context, sku) > 0);
+        }
+        LhMachineOnlineInfo online = context.resolveContinuationOnlineInfo(plan.getLhMachineCode());
+        if (Objects.nonNull(machine) && Objects.nonNull(online)
+                && StringUtils.equals(machine.getCurrentMaterialCode(), plan.getBeforeMaterialCode())
+                && StringUtils.equals(online.getMaterialCode(), machine.getCurrentMaterialCode())) {
+            LocalDate firstDate = context.getScheduleDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+            FactoryMonthPlanProductionFinalResult beforePlan = MonthPlanDateResolver.resolvePlan(
+                    context, online.getMaterialCode(), online.getProductStatus(), firstDate);
+            if (Objects.nonNull(beforePlan)
+                    && PendingSkuUnscheduledRule.isHandoverStoppedWithoutStock(context, beforePlan.getEmbryoCode())) {
+                return true;
+            }
         }
         Integer surplusQty = this.resolveBeforeMaterialSurplus(context, plan);
         if (Objects.nonNull(surplusQty) && surplusQty == 0) {
@@ -354,6 +414,7 @@ public class PreviousAlternatePlanReuseService {
             return;
         }
         List<LhMouldChangePlan> plans = context.getEligiblePreviousAlternatePlans().stream()
+                .filter(plan -> StructureEndingContinuationPolicy.acceptsHistoricalPlan(context, plan))
                 .sorted(PreviousAlternatePlanEligibilityService.planOrder())
                 .collect(Collectors.toList());
         handoffExtensionService.continueFormalChains(context, plans,
@@ -472,7 +533,8 @@ public class PreviousAlternatePlanReuseService {
         Date windowEnd = context.getScheduleWindowShifts().stream()
                 .map(LhShiftConfigVO::getShiftEndDateTime).max(Date::compareTo).get();
         for (PreviousAlternatePlanReleaseEvent event : context.getPreviousAlternateReleaseEventMap().values()) {
-            if (event.isSharedEmbryoEndingPending() || event.isSupplementalReleasePending()
+            if (!StructureEndingContinuationPolicy.acceptsHistoricalPlan(context, event.getPlan())
+                    || event.isSharedEmbryoEndingPending() || event.isSupplementalReleasePending()
                     || event.isRemainderFinishDeferred()
                     || Objects.nonNull(event.getCompletedEmbryoEndingWindowEndTime())
                     || event.resolveProductionRole()
@@ -541,6 +603,7 @@ public class PreviousAlternatePlanReuseService {
         Set<String> completedMachineCodes = new LinkedHashSet<String>(machineCodes.size());
         List<LhMouldChangePlan> latestPlanList = index.values().stream()
                 .flatMap(List::stream)
+                .filter(plan -> StructureEndingContinuationPolicy.acceptsHistoricalPlan(context, plan))
                 .filter(plan -> !context.isTimedMachineOffLoadPreview()
                         || context.getNewSpecMachineResourceScopeCodeSet().contains(plan.getLhMachineCode()))
                 .sorted(PreviousAlternatePlanEligibilityService.planOrder())
@@ -896,6 +959,9 @@ public class PreviousAlternatePlanReuseService {
         }
         int order = 0;
         for (LhMouldChangePlan plan : plans) {
+            if (!StructureEndingContinuationPolicy.acceptsHistoricalPlan(context, plan)) {
+                continue;
+            }
             order++;
             if (StringUtils.equals(beforeMaterial, plan.getAfterMaterialCode())) {
                 this.trace(context, day, machine, beforeMaterial, availableTime, plan, order, null, null, false, "前后物料相同，无交替关系");
@@ -969,6 +1035,7 @@ public class PreviousAlternatePlanReuseService {
      */
     private void tryReuseReleasedGroup(LhScheduleContext context, DayScheduleContext day, Set<String> completed) {
         List<PreviousAlternatePlanReleaseEvent> events = context.getPreviousAlternateReleaseEventMap().values().stream()
+                .filter(event -> StructureEndingContinuationPolicy.acceptsHistoricalPlan(context, event.getPlan()))
                 .filter(event -> !event.isSupplementalReleasePending() && !event.isSharedEmbryoEndingPending())
                 .filter(event -> !StructureSwitchCandidateScope.shouldDefer(context,
                         context.getStructureSwitchCandidateSkuMap().get(MonthPlanDateResolver.buildMaterialStatusKey(
@@ -1001,6 +1068,9 @@ public class PreviousAlternatePlanReuseService {
         TimedMachineOffPreviewSnapshot snapshot = new TimedMachineOffPreviewSnapshot(context, sources);
         Set<String> previewCompleted = new LinkedHashSet<String>(completed);
         Map<String, List<String>> chosenMoulds = new LinkedHashMap<String, List<String>>(events.size());
+        Map<LhMouldChangePlan, PreviousAlternateExecutionPlan> chosenExecutions = new IdentityHashMap<>();
+        Map<LhMouldChangePlan, PreviousAlternateExecutionPlan> originalExecutions = new IdentityHashMap<>();
+        events.forEach(event -> originalExecutions.put(event.getPlan(), event.getExecutionPlan()));
         boolean originalPreview = context.isPreviousAlternateGroupPreview();
         try {
             context.setPreviousAlternateGroupPreview(true);
@@ -1011,6 +1081,12 @@ public class PreviousAlternatePlanReuseService {
                 if (!completed.contains(result.getLhMachineCode())) {
                     chosenMoulds.put(result.getLhMachineCode(), new ArrayList<String>(
                             LhMouldCodeUtil.splitMouldCode(result.getMouldCode())));
+                    PreviousAlternatePlanReleaseEvent selectedEvent = context.getPreviousAlternateReleaseEventMap()
+                            .get(result.getLhMachineCode());
+                    if (selectedEvent != null && selectedEvent.getPlan() == plan
+                            && selectedEvent.getExecutionPlan() != null) {
+                        chosenExecutions.put(plan, selectedEvent.getExecutionPlan());
+                    }
                 }
             });
         } finally {
@@ -1020,10 +1096,19 @@ public class PreviousAlternatePlanReuseService {
         try {
             context.getPreviousAlternatePlannedMouldMap().putAll(chosenMoulds);
             for (PreviousAlternatePlanReleaseEvent event : events) {
+                if (chosenExecutions.containsKey(event.getPlan())) {
+                    event.setExecutionPlan(chosenExecutions.get(event.getPlan()));
+                }
                 this.tryReuseReleasedMachineAcrossDays(context, day, event, completed);
             }
         } finally {
             context.getPreviousAlternatePlannedMouldMap().clear();
+            // 重放失败只撤销该任务的候选决定，已经兑现的动作留给清洗与结果后处理。
+            for (PreviousAlternatePlanReleaseEvent event : context.getPreviousAlternateReleaseEventMap().values()) {
+                if (!completed.contains(event.getMachineCode()) && originalExecutions.containsKey(event.getPlan())) {
+                    event.setExecutionPlan(originalExecutions.get(event.getPlan()));
+                }
+            }
         }
     }
 
@@ -1168,6 +1253,7 @@ public class PreviousAlternatePlanReuseService {
                         LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode()))))
                 .forEach(result -> {
                     context.getPreviousAlternateResultPlanMap().put(result, plan);
+                    StructureEndingContinuationPolicy.recordHistoricalCommit(context, plan, result);
                     ScheduleResultSceneTypeSupport.assign(result, LhScheduleSceneTypeEnum.PREVIOUS_ALTERNATE);
                     PreviousAlternateStructureLimitExemptionPolicy.logCommittedStatistics(context, plan, result);
                 });
@@ -1228,6 +1314,7 @@ public class PreviousAlternatePlanReuseService {
                             context, sourceSku, plan);
                     if (Objects.nonNull(pairPlan)) {
                         context.getPreviousAlternateResultPlanMap().put(result, pairPlan);
+                        StructureEndingContinuationPolicy.recordHistoricalCommit(context, pairPlan, result);
                         ScheduleResultSceneTypeSupport.assign(result, LhScheduleSceneTypeEnum.PREVIOUS_ALTERNATE);
                         log.info("历史指定试制量试成对来源登记, factoryCode: {}, batchNo: {}, materialCode: {}, "
                                         + "productStatus: {}, machineCode: {}, planId: {}, triggerPlanId: {}",
@@ -1333,7 +1420,8 @@ public class PreviousAlternatePlanReuseService {
     private void tryReuseReleasedMachineAcrossDays(LhScheduleContext context, DayScheduleContext preparationDay,
             PreviousAlternatePlanReleaseEvent event, Set<String> completed) {
         // 同组前一事件可能已同步提交配对侧，不能再执行其历史动作并重复占用资源。
-        if (completed.contains(event.getMachineCode())) {
+        if (!StructureEndingContinuationPolicy.acceptsHistoricalPlan(context, event.getPlan())
+                || completed.contains(event.getMachineCode())) {
             return;
         }
         Set<String> advancedCompleted = new LinkedHashSet<>(completed);
@@ -1357,6 +1445,9 @@ public class PreviousAlternatePlanReuseService {
      */
     private void reuseReleasedMachineAcrossProductionDays(LhScheduleContext context,
             DayScheduleContext preparationDay, PreviousAlternatePlanReleaseEvent event, Set<String> completed) {
+        if (!StructureEndingContinuationPolicy.acceptsHistoricalPlan(context, event.getPlan())) {
+            return;
+        }
         if (Objects.isNull(context.getMouldResourceContext())) {
             context.setMouldResourceContext(MouldResourceContext.from(context));
             context.getMouldResourceContext().refreshAvailability(context);
@@ -1454,6 +1545,7 @@ public class PreviousAlternatePlanReuseService {
             }
             ScheduleSubstitutionAttemptSnapshot snapshot = ScheduleSubstitutionAttemptSnapshot.capture(context, sources);
             PreviousAlternatePlanReleaseEvent previousEvent = context.getActivePreviousAlternateEvent();
+            PreviousAlternateExecutionPlan previousExecution = event.getExecutionPlan();
             boolean success = false;
             String reason = "指定组合未形成有效排产";
             try {
@@ -1465,6 +1557,12 @@ public class PreviousAlternatePlanReuseService {
                 DailyNewSpecCandidate demand = materialEligibilityService.resolvePreviousAlternateCandidate(
                         context, source, day.getScheduleDate(), event.getPlan(), event.getMachineCode());
                 previousAlternatePlanEligibilityService.fillMachineDemand(context, day.getScheduleDate(), demand);
+                // 实际动作先于指定增机资格确定，替代01不能在资格仍读取旧02之后才生效。
+                MachineScheduleDTO machine = context.getMachineScheduleMap().get(event.getMachineCode());
+                Date resourceTime = this.resolvePreviousAlternateResourceTime(context, event, machine);
+                LhConstraintTimeDecision mouldResourceDecision = this.resolvePreviousAlternateMouldResourceDecision(
+                        context, day, source, machine, resourceTime);
+                resourceTime = mouldResourceDecision.getStartTime();
                 if (this.prepareAdditionalMachineDemand(context, day, event, source, demand)) {
                     previousAlternatePlanEligibilityService.fillMachineDemand(context, day.getScheduleDate(), demand);
                 }
@@ -1502,12 +1600,6 @@ public class PreviousAlternatePlanReuseService {
                 candidateSku.setContinuationActiveMachineCount(candidate.getScheduledMachineCount());
                 candidateSku.setContinuationShortageMachineCount(Math.max(0,
                         candidate.getTargetMachineCount() - candidate.getScheduledMachineCount()));
-                MachineScheduleDTO machine = context.getMachineScheduleMap().get(event.getMachineCode());
-                // 指定交替按真实释放时刻预检准备资源，不能被后料生产日首班抬高到禁换模时段。
-                Date resourceTime = this.resolvePreviousAlternateResourceTime(context, event, machine);
-                LhConstraintTimeDecision mouldResourceDecision = this.resolvePreviousAlternateMouldResourceDecision(
-                        context, day, candidateSku, machine, resourceTime);
-                resourceTime = mouldResourceDecision.getStartTime();
                 context.getPreviousAlternateCandidateAvailableTimeMap().put(candidateSku, resourceTime);
                 log.info("前日交替准备资源时刻, batchNo: {}, planId: {}, businessDate: {}, machineCode: {}, "
                                 + "materialCode: {}, offlineTime: {}, resourceTime: {}",
@@ -1535,6 +1627,12 @@ public class PreviousAlternatePlanReuseService {
                 if (success) {
                     // 正式承接成功后按本次新增结果身份登记来源，避免同机其他结果误继承。
                     this.bindPreviousAlternateResults(context, event.getPlan(), before);
+                    // 试制准备窗口可能使用事件副本，成功动作仍须归还精确原任务供重放及后处理使用。
+                    PreviousAlternatePlanReleaseEvent canonicalEvent = context.getPreviousAlternateReleaseEventMap()
+                            .get(event.getMachineCode());
+                    if (canonicalEvent != null && canonicalEvent.getPlan() == event.getPlan()) {
+                        canonicalEvent.setExecutionPlan(event.getExecutionPlan());
+                    }
                     completedMachines.add(event.getMachineCode());
                     context.getScheduleResultList().stream()
                             .filter(result -> !before.contains(result))
@@ -1545,6 +1643,7 @@ public class PreviousAlternatePlanReuseService {
             } finally {
                 if (!success) {
                     snapshot.restore(context);
+                    event.setExecutionPlan(previousExecution);
                 }
                 context.setActivePreviousAlternateEvent(previousEvent);
                 // 失败证据在恢复后保存，指定身份和诊断不属于需要撤销的资源状态。
@@ -1585,32 +1684,11 @@ public class PreviousAlternatePlanReuseService {
         if (Objects.nonNull(context.resolvePreviousAlternateAdditionalMachineDemand(source))) {
             return true;
         }
-        if (!StringUtils.equals("S", source.getProductStatus()) || source.isStrictTargetQty()
-                || source.isStrictNewSpecShortageOnly() || context.isFutureOnlyEarlyProductionCandidate(source)
-                || StringUtils.equals(SkuScheduleSourceTypeEnum.DAY_PLAN_ADJUST.getCode(), source.getSourceType())
-                || StringUtils.equals(event.getMaterialCode(), source.getMaterialCode())
-                || !MouldChangeTypeEnum.REGULAR.getCode().equals(
-                        PreviousAlternateActionPlan.resolve(context, event).getChangeMouldType())
-                || candidate.getTargetMachineCount() <= 0
-                || candidate.getScheduledMachineCount() < candidate.getTargetMachineCount()
-                || day.getScheduleDate().isBefore(event.getPlan().getPlanDate().toInstant()
-                        .atZone(ZoneId.systemDefault()).toLocalDate())) {
-            return false;
-        }
-        Set<String> retainedMachines = context.getScheduleResultList().stream()
-                .filter(result -> StringUtils.equals(ScheduleTypeEnum.CONTINUOUS.getCode(), result.getScheduleType()))
-                .filter(result -> StringUtils.equals(source.getMaterialCode(), result.getMaterialCode())
-                        && StringUtils.equals(source.getProductStatus(), result.getProductStatus()))
-                .filter(result -> Objects.nonNull(result.getSpecEndTime()) && result.getSpecEndTime().after(day.getDayStartTime()))
-                .filter(result -> !context.getPreviousAlternateReleaseEventMap().containsKey(result.getLhMachineCode())
-                        && !context.getPreviousAlternateReleasedMachineTimeMap().containsKey(result.getLhMachineCode())
-                        && !context.getTimedMachineOffDecisionMap().containsKey(result)
-                        && !context.isContinuousStopHoldMachine(result.getLhMachineCode()))
-                .map(result -> LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode()))
-                .filter(code -> !StringUtils.equals(code,
-                        LhSingleControlMachineUtil.resolvePhysicalMachineCode(event.getMachineCode())))
-                .collect(Collectors.toCollection(LinkedHashSet::new));
-        if (retainedMachines.isEmpty() || source.getSurplusQty() <= 0) {
+        StructureEndingContinuationState endingState = StructureEndingContinuationPolicy.state(context, source);
+        PreviousAlternateAdditionalMachineDemand additional = endingState == null
+                ? PreviousAlternateAdditionalMachinePolicy.preview(context, day, event, source, candidate)
+                : endingState.getHistoricalAdditionalDemands().get(event.getPlan().getId());
+        if (additional == null || day.getScheduleDate().isBefore(additional.getProductionDate())) {
             return false;
         }
         int remaining = targetScheduleQtyResolver.applyProductionTargetState(
@@ -1618,15 +1696,13 @@ public class PreviousAlternatePlanReuseService {
         if (remaining <= 0) {
             return false;
         }
-        PreviousAlternateAdditionalMachineDemand additional = new PreviousAlternateAdditionalMachineDemand(
-                event.getPlan(), MonthPlanDateResolver.buildMaterialStatusKey(source.getMaterialCode(), source.getProductStatus()),
-                day.getScheduleDate(), candidate.getScheduledMachineCount() + 1, retainedMachines);
         context.getPreviousAlternateAdditionalMachineDemandMap().put(event.getMachineCode(), additional);
         this.traceAlternate(context, "历史指定增机保留原续作",
                 String.format("批次=%s, 计划ID=%s, 物料=%s, 状态=%s, 保留机台=%s, 指定机台=%s, 生效日=%s, "
                                 + "普通目标台数=%s, 指定目标台数=%s, 真实需求剩余=%s",
                         context.getBatchNo(), event.getPlan().getId(), source.getMaterialCode(), source.getProductStatus(),
-                        retainedMachines, event.getMachineCode(), day.getScheduleDate(), candidate.getTargetMachineCount(),
+                        additional.getRetainedMachineCodes(), event.getMachineCode(), day.getScheduleDate(),
+                                candidate.getTargetMachineCount(),
                         additional.getTargetMachineCount(), remaining));
         return true;
     }
@@ -1703,7 +1779,12 @@ public class PreviousAlternatePlanReuseService {
         if (event.isFixedHistoricalCutover() && event.getPlannedShiftStartTime().after(resourceTime)) {
             resourceTime = event.getPlannedShiftStartTime();
         }
-        return event.getOfflineTime().after(resourceTime) ? event.getOfflineTime() : resourceTime;
+        resourceTime = event.getOfflineTime().after(resourceTime) ? event.getOfflineTime() : resourceTime;
+        if (event.getExecutionPlan() != null
+                && event.getExecutionPlan().getResourceReadyTime() > resourceTime.getTime()) {
+            resourceTime = new Date(event.getExecutionPlan().getResourceReadyTime());
+        }
+        return resourceTime;
     }
 
     /**
@@ -1729,6 +1810,7 @@ public class PreviousAlternatePlanReuseService {
      * 解析关联交替可取得完整模具组的最早资源时刻。
      * <p>同日关联事件可能先后释放共用模具。目标机台早于关联模具释放时，不能直接判定模具不足，
      * 应按已登记的真实释放时刻依次重试，并把首个可用时刻继续传入正式换模时间轴。</p>
+     * 连续探测均为数量不足且最终可用时，记录已证实的等待区间，由上层资格校验后采纳。
      *
      * @param context 排程上下文
      * @param day 当前业务日
@@ -1748,26 +1830,39 @@ public class PreviousAlternatePlanReuseService {
                 || Objects.isNull(context.getMouldResourceContext())) {
             return initialResourceTime;
         }
-        MouldResourceAllocationResult initialAllocation = context.getMouldResourceContext()
-                .previewAllocate(sku.getMaterialCode(), machine.getMachineCode(), initialResourceTime);
+        PreviousAlternatePlanReleaseEvent event = context.getActivePreviousAlternateEvent();
+        boolean historicalAction = context.isPreviousAlternateAction(sku, machine.getMachineCode());
+        MouldResourceAllocationResult initialAllocation = historicalAction
+                ? context.getMouldResourceContext().previewHistoricalAllocation(event, initialResourceTime)
+                : context.getMouldResourceContext().previewAllocate(
+                        sku.getMaterialCode(), machine.getMachineCode(), initialResourceTime);
         if (initialAllocation.isAllowed()
                 || CollectionUtils.isEmpty(context.getPreScheduledMouldReleaseTimeMap())) {
             return initialResourceTime;
         }
         context.getShiftRemarkRuntime().recordMould(context, sku, initialAllocation, "HISTORICAL_MOULD_RELEASE_WAIT");
-        List<Date> releaseTimeList = context.getPreScheduledMouldReleaseTimeMap().values().stream()
-                .filter(Objects::nonNull)
-                .filter(releaseTime -> releaseTime.after(initialResourceTime))
-                .filter(releaseTime -> releaseTime.before(day.getDayEndTime()))
-                .distinct()
-                .sorted()
-                .collect(Collectors.toList());
+        boolean quantityShortageOnly = initialAllocation.isQuantityShortage();
+        Date deadline = historicalAction && event.getPreparationDeadline().before(day.getDayEndTime())
+                ? event.getPreparationDeadline() : day.getDayEndTime();
+        List<Date> releaseTimeList = context.getMouldResourceContext().resolveMouldReleaseTimes(
+                sku.getMaterialCode(), initialResourceTime, deadline);
         for (Date releaseTime : releaseTimeList) {
-            MouldResourceAllocationResult allocation = context.getMouldResourceContext()
-                    .previewAllocate(sku.getMaterialCode(), machine.getMachineCode(), releaseTime);
+            MouldResourceAllocationResult allocation = historicalAction
+                    ? context.getMouldResourceContext().previewHistoricalAllocation(event, releaseTime)
+                    : context.getMouldResourceContext().previewAllocate(
+                            sku.getMaterialCode(), machine.getMachineCode(), releaseTime);
             if (!allocation.isAllowed()) {
+                quantityShortageOnly = quantityShortageOnly && allocation.isQuantityShortage();
                 context.getShiftRemarkRuntime().recordMould(context, sku, allocation, "HISTORICAL_MOULD_RELEASE_WAIT");
                 continue;
+            }
+            // 原扫描已确认首个可用释放点，只补证据，不新增分配或外推模具释放后的准备等待。
+            if (quantityShortageOnly) {
+                context.getShiftRemarkRuntime().record(LhShiftDelayReason.MOULD_SHORTAGE,
+                        "HISTORICAL_MOULD_RELEASE_WAIT", machine.getMachineCode(), sku, initialResourceTime, releaseTime,
+                        "required=" + initialAllocation.getRequiredMouldQty()
+                                + ",remaining=" + initialAllocation.getRemainingAvailableMouldQty()
+                                + ",allocated=" + allocation.getAllocatedMouldCodeList());
             }
             log.info("前日关联交替等待共用模具释放, batchNo: {}, businessDate: {}, materialCode: {}, "
                             + "machineCode: {}, machineAvailableTime: {}, mouldAvailableTime: {}",

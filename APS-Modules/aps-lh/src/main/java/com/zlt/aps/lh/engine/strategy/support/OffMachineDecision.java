@@ -48,4 +48,9 @@ public class OffMachineDecision implements Serializable {
      * 命中的规则及实际释放原因。
      */
     private String reason;
+
+    /**
+     * 本次错班判断时冻结的 T 至 T+2 早班、中班及全天次数，后续额度复核和释放复算不得覆盖。
+     */
+    private String timedOffMouldChangeCount;
 }

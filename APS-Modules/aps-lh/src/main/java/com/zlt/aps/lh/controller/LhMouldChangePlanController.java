@@ -474,8 +474,10 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
     public Map<String, Object> buildExportTableMap(Date scheduleDate) {
         Map<String, Object> tableMap = new HashMap<>();
         String titleFormat = I18nUtil.getMessage("mouldChangePlan.export.title");
-        String cnFormatDate = DateUtil.format(scheduleDate, "yyyy年MM月dd日");
-        String vnFormatDate = DateUtil.format(scheduleDate, "dd/MM/yyyy");
+        // 表头日期按排程日期顺延 1 天展示；未传排程日期时保持原空值行为。
+        Date exportTitleDate = Objects.isNull(scheduleDate) ? null : DateUtil.offsetDay(scheduleDate, 1);
+        String cnFormatDate = DateUtil.format(exportTitleDate, "yyyy年MM月dd日");
+        String vnFormatDate = DateUtil.format(exportTitleDate, "dd/MM/yyyy");
         String versionDate = DateUtils.parseDateToStr("yyyyMMddHHmmss", new Date());
         String version = "版本phiên bản：" + versionDate;
         tableMap.put("title", String.format(titleFormat, cnFormatDate, vnFormatDate, versionDate));
@@ -1010,8 +1012,10 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
     }
 
     /**
-     * 按查询条件排程发布（仅支持单日排程日期）
-     * 排程日期早于当前日期的历史记录不允许发布
+     * 按查询条件排程发布（仅支持单日排程日期，全量发布）
+     * 全量发布说明：发布范围为该排程日期+工厂下全部记录（不区分发布状态，与勾选无关），
+     * 每次发布都是一个完整快照，下发到MES中间表时携带新的DATA_VERSION版本号，
+     * 历史版本保留仅供追溯，MES按最新版本号消费
      */
     @Log(title = "ui.data.column.lhMouldChangePlan.modelName", businessType = BusinessType.PUBLISH)
     @ApiOperation("按查询条件排程发布")
@@ -1032,12 +1036,12 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.hasHistoryDataByQuery"));
         }
 
-        // 忽略前端的发布状态筛选，强制下发 未发布/待发布
+        // 全量发布：查询该排程日期+工厂下全部记录，不区分发布状态（与勾选无关）
+        // 忽略前端的发布状态筛选，保证发布范围为该日期下全部数据
         queryVO.setIsRelease(null);
 
         QueryWrapper<LhMouldChangePlan> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, queryVO);
-        wrapper.in("IS_RELEASE", Arrays.asList(ApsConstant.NO_RELEASE, ReleaseStatusEnum.PENDING_RELEASE.getCode()));
         wrapper.select("ID");
         List<LhMouldChangePlan> list = lhMouldChangePlanMapper.selectList(wrapper);
         if (CollectionUtils.isEmpty(list)) {

@@ -7,6 +7,7 @@ import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
+import com.zlt.aps.lh.util.MonthPlanDayQtyUtil;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.FactoryParamMapper;
 import com.zlt.aps.maindata.utils.FactoryParamUtils;
@@ -41,6 +42,16 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 public class LhDailyMouldCalcServiceImpl implements ILhDailyMouldCalcService {
+
+    /**
+     * 跨月续作使用三日滚动视图的中间日执行既有增减模计算。
+     */
+    private static final int CROSS_MONTH_CALCULATION_DAY = 2;
+
+    /**
+     * 月计划日数量动态字段模板。
+     */
+    private static final String DAY_PLAN_FIELD_TEMPLATE = "day%d";
 
     /** 月计划调整引擎（无状态，直接实例化） */
     private final MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();
@@ -135,12 +146,12 @@ public class LhDailyMouldCalcServiceImpl implements ILhDailyMouldCalcService {
     }
 
     /**
-     * 获取单个SKU在指定日期(LocalDate)的模具数和机台数
+     * 获取单个SKU在指定自然日的模具数和机台数，月初续作按真实前日计划衔接。
      *
-     * @param context         排程上下文（需已加载 dailyCapacityLimitVoMap 和 mouldAdjustParamMap）
-     * @param monthPlanEntity date 所在月的月计划定稿实体（跨月时为对应月的计划行）
-     * @param localDate       目标日期（窗口内任意一天，可为跨月日期）
-     * @return 模具计算结果，mouldQty=模具数，machineQty=机台数(=模具数/2)
+     * @param context 已加载月计划、日产能限制和模具计算参数的排程上下文
+     * @param monthPlanEntity 目标自然日所属月份的月计划定稿实体
+     * @param localDate 目标自然日，可为跨月日期
+     * @return 保留实际自然日和月内日序号的模具数、机台数计算结果
      */
     private DailyMouldResult getDailyMouldByLocalDate(LhScheduleContext context,
                                                       FactoryMonthPlanProductionFinalResult monthPlanEntity,
@@ -163,20 +174,71 @@ public class LhDailyMouldCalcServiceImpl implements ILhDailyMouldCalcService {
             return null;
         }
 
-        // 3. 调用 MpWeekRollAdjustEngine.getMouldByDay 获取日模具数
+        // 3. 只调整独立计算视图，月初续作不能把当日计划当作前日计划而丢失增机。
+        int calculationDay = this.prepareCrossMonthContinuationView(context, monthPlanEntity, localDate, mpFinalVo);
         int mouldQty = weekRollAdjustEngine.getMouldByDay(
                 adjustDailyCapacityLimitObj,
                 context.getMouldAdjustParamMap(),
-                iDay,
+                calculationDay,
                 mpFinalVo,
                 dailyCapacityLimitVo
         );
+
+        if (calculationDay != iDay) {
+            log.info("月初续作目标机台数按真实前日计划衔接, 工厂: {}, 批次: {}, 物料: {}, 状态: {}, "
+                            + "日期: {}, 前日计划: {}, 当日计划: {}, 次日计划: {}, 目标模具数: {}",
+                    context.getFactoryCode(), context.getBatchNo(), monthPlanEntity.getMaterialCode(),
+                    monthPlanEntity.getProductStatus(), localDate,
+                    mpFinalVo.getFieldValueByFieldName(String.format(DAY_PLAN_FIELD_TEMPLATE, calculationDay - 1)),
+                    mpFinalVo.getFieldValueByFieldName(String.format(DAY_PLAN_FIELD_TEMPLATE, calculationDay)),
+                    mpFinalVo.getFieldValueByFieldName(String.format(DAY_PLAN_FIELD_TEMPLATE, calculationDay + 1)),
+                    mouldQty);
+        }
 
         DailyMouldResult result = new DailyMouldResult(monthPlanEntity.getMaterialCode(),
                 monthPlanEntity.getProductStatus(),
                 monthPlanEntity.getStructureName(), iDay, mouldQty);
         result.setDate(localDate);
         return result;
+    }
+
+    /**
+     * 月初存在同状态前月末正计划时，构建真实前日、当日和次日的独立滚动计算视图。
+     *
+     * @param context 已按物料、状态和年月加载月计划的上下文
+     * @param monthPlanEntity 当日所属月份的原始月计划
+     * @param productionDate 实际生产自然日
+     * @param calculationView 独立调整视图，仅改写其中三个日数量字段
+     * @return 原月内日序号，或跨月滚动视图的中间日序号
+     */
+    private int prepareCrossMonthContinuationView(LhScheduleContext context,
+            FactoryMonthPlanProductionFinalResult monthPlanEntity, LocalDate productionDate,
+            FactoryMonthPlanFinalAdjustVo calculationView) {
+        if (productionDate.getDayOfMonth() != 1) {
+            return productionDate.getDayOfMonth();
+        }
+        LocalDate previousDate = productionDate.minusDays(1);
+        String materialStatusKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                monthPlanEntity.getMaterialCode(), monthPlanEntity.getProductStatus());
+        FactoryMonthPlanProductionFinalResult previousPlan = context.getMonthPlanByMaterialMonthMap().get(
+                MonthPlanDateResolver.buildMaterialMonthKey(materialStatusKey,
+                        previousDate.getYear(), previousDate.getMonthValue()));
+        int previousQty = MonthPlanDayQtyUtil.resolveDayQty(previousPlan, previousDate.getDayOfMonth());
+        if (previousQty <= 0) {
+            return productionDate.getDayOfMonth();
+        }
+        // 先读取原值再改写视图，避免day2覆盖后丢失真实次日量；原实体和共享日计划账本均不修改。
+        Object currentQty = monthPlanEntity.getFieldValueByFieldName(
+                String.format(DAY_PLAN_FIELD_TEMPLATE, productionDate.getDayOfMonth()));
+        Object nextQty = monthPlanEntity.getFieldValueByFieldName(
+                String.format(DAY_PLAN_FIELD_TEMPLATE, productionDate.plusDays(1).getDayOfMonth()));
+        calculationView.setFieldValueByFieldName(
+                String.format(DAY_PLAN_FIELD_TEMPLATE, CROSS_MONTH_CALCULATION_DAY - 1), previousQty);
+        calculationView.setFieldValueByFieldName(
+                String.format(DAY_PLAN_FIELD_TEMPLATE, CROSS_MONTH_CALCULATION_DAY), currentQty);
+        calculationView.setFieldValueByFieldName(
+                String.format(DAY_PLAN_FIELD_TEMPLATE, CROSS_MONTH_CALCULATION_DAY + 1), nextQty);
+        return CROSS_MONTH_CALCULATION_DAY;
     }
 
     @Override

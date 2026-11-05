@@ -26,9 +26,8 @@ public final class InventoryPredictionEngine<C extends InventoryPredictionContex
         LocalDate scheduleDate = context.getScheduleDate();
         String factoryCode = context.getFactoryCode();
         List<String> taskProductCodes = policy.getTaskProductCodes(context);
-        Map<String, BigDecimal> sixClockStockMap = policy.querySixClockStock(factoryCode, scheduleDate);
-        List<String> productCodes = this.mergeInventoryProductCodes(taskProductCodes, sixClockStockMap);
-        context.setInventoryProductCodeSet(new LinkedHashSet<>(productCodes));
+        Map<String, BigDecimal> sixClockStockMap = context.getSixClockStockSnapshot();
+        List<String> productCodes = new ArrayList<>(context.getInventoryProductCodeSet());
         if (productCodes.isEmpty()) {
             context.setStockForecastMap(new HashMap<>());
             tracePort.logNoTasks();
@@ -36,9 +35,7 @@ public final class InventoryPredictionEngine<C extends InventoryPredictionContex
         }
 
         policy.handleMissingStock(context, taskProductCodes, sixClockStockMap, scheduleDate);
-        boolean useRecipe = policy.isRecipeMode(context);
-        Map<String, BigDecimal> firstShiftDemandMap = policy.queryFirstShiftDemand(
-                factoryCode, scheduleDate, productCodes, useRecipe);
+        Map<String, BigDecimal> firstShiftDemandMap = context.getFirstShiftDemandSnapshot();
         Map<String, BigDecimal> firstShiftPlanMap = policy.queryFirstShiftPlan(
                 factoryCode, scheduleDate, productCodes);
 
@@ -56,27 +53,4 @@ public final class InventoryPredictionEngine<C extends InventoryPredictionContex
         tracePort.logCompleted(stockForecastMap.size());
     }
 
-    /**
-     * 合并可排任务产品和前一天正净库存产品，形成库存预测产品集合。
-     *
-     * @param taskProductCodes 可排任务产品编码
-     * @param sixClockStockMap 前一天六点净库存
-     * @return 有序去重后的库存预测产品编码
-     */
-    private List<String> mergeInventoryProductCodes(List<String> taskProductCodes,
-                                                    Map<String, BigDecimal> sixClockStockMap) {
-        LinkedHashSet<String> productCodeSet = new LinkedHashSet<>();
-        if (taskProductCodes != null) {
-            productCodeSet.addAll(taskProductCodes);
-        }
-        if (sixClockStockMap != null) {
-            sixClockStockMap.entrySet().stream()
-                    .filter(entry -> entry.getKey() != null)
-                    .filter(entry -> entry.getValue() != null
-                            && entry.getValue().compareTo(BigDecimal.ZERO) > 0)
-                    .map(Map.Entry::getKey)
-                    .forEach(productCodeSet::add);
-        }
-        return new ArrayList<>(productCodeSet);
-    }
 }

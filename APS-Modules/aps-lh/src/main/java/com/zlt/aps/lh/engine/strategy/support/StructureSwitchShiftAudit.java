@@ -36,8 +36,6 @@ public final class StructureSwitchShiftAudit {
     private static final String NOT_OBSERVED = "NOT_OBSERVED";
     /** 明确标识为等结果。 */
     private static final int WAIT_NOTIFY = 1;
-    /** 首班结构上限。 */
-    private static final int FIRST_LIMIT = 1;
     /** 等结果第二班结构上限。 */
     private static final int SECOND_LIMIT = 2;
     /** 单条汇总最多展开的机台明细数；总数和分类汇总始终完整。 */
@@ -195,7 +193,7 @@ public final class StructureSwitchShiftAudit {
             return null;
         }
         CxEmbryoLhTime source = context.getStructureSwitchSourceMap().get(sku.getStructureName());
-        if (Objects.isNull(source)) {
+        if (Objects.isNull(source) || StructureTransferExemptionPolicy.shouldBypassStructureSwitch(context, sku)) {
             return null;
         }
         String physical = StringUtils.isEmpty(machineCode) ? null
@@ -250,6 +248,9 @@ public final class StructureSwitchShiftAudit {
     private static void append(LhScheduleContext context, List<LhShiftConfigVO> reportShifts, String phase) {
         List<LhShiftConfigVO> window = StructureSwitchSchedulingPolicy.orderedShifts(context);
         for (CxEmbryoLhTime source : context.getStructureSwitchSourceMap().values()) {
+            if (StructureTransferExemptionPolicy.isTransferStructure(context, source.getNextStructureName())) {
+                continue;
+            }
             List<LhScheduleResult> switchResults = context.getScheduleResultList().stream()
                     .filter(result -> Objects.nonNull(context.getStructureSwitchResultPlanMap().get(result)))
                     .filter(result -> Objects.equals(source.getId(), context.getStructureSwitchResultPlanMap()
@@ -297,7 +298,9 @@ public final class StructureSwitchShiftAudit {
     }
 
     /**
-     * 生成一个结构班次的上限、首台SKU目标和机台证据；普通班次不擅自声称普通上限通过。
+     * 生成一个结构班次的上限、首台SKU目标和机台证据；首班与准入共用配置。
+     * 普通班次不擅自声称普通上限通过。
+     *
      * @param context 原上下文
      * @param source 结构来源
      * @param firstResult 最终首台SKU
@@ -316,7 +319,7 @@ public final class StructureSwitchShiftAudit {
         Integer limit = null;
         String shiftStage = "后续班";
         if (isFirst) {
-            limit = FIRST_LIMIT;
+            limit = StructureSwitchSchedulingPolicy.resolveFirstShiftMachineLimit(context, source.getIsWaitNotify());
             shiftStage = "S0";
         } else if (isSecond) {
             shiftStage = "S1";

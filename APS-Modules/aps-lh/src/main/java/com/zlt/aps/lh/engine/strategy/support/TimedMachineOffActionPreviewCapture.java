@@ -168,19 +168,6 @@ public final class TimedMachineOffActionPreviewCapture {
     }
 
     /**
-     * 根据正式预演结果保留的来源身份取回精确输入，缺失表示内部链路不完整。
-     *
-     * @param source 结果登记的来源身份
-     * @param machineCode 结果机台
-     * @param start 结果动作开始时间
-     * @return 对应未消费输入
-     */
-    public PreparedAction require(SkuScheduleDTO source, String machineCode, Date start) {
-        return Objects.requireNonNull(this.find(source, machineCode, start),
-                "时间下机成功交接缺少同源未消费输入：" + machineCode);
-    }
-
-    /**
      * 查询已捕获的成功组合，正式基线中既有动作可能没有本轮描述。
      *
      * @param source 来源身份

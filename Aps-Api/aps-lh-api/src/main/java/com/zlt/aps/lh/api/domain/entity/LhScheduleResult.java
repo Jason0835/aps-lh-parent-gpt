@@ -1133,6 +1133,14 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     private String realtimeShiftChangeoverCount;
 
     /**
+     * 按时间下机选定错班节点时实际使用的窗口三日换模次数快照，未进入判断时为空。
+     * <p>格式：T=早班,中班,全天 T+1=早班,中班,全天 T+2=早班,中班,全天；全天为早班加中班。</p>
+     */
+    @ApiModelProperty(value = "按时间下机实时换模次数", name = "timedOffMouldChangeCount")
+    @TableField(value = "TIMED_OFF_MOULD_CHANGE_COUNT")
+    private String timedOffMouldChangeCount;
+
+    /**
      * 新增选机前当前结构按排程班次已经占用的物理硫化机台数。
      * <p>格式：{@code c1=1,c2=2,...,c8=2}，单控 L/R 按物理整机去重。</p>
      */

@@ -10,6 +10,10 @@ public class ContinuationMachineFinishPlan {
      * 精确历史指定交替前缀，独立于普通错峰收尾节点。
      */
     public static final String HISTORICAL_CUTOVER_RULE = "历史指定交替前缀";
+    /**
+     * 单台历史原机已在指定班末前完整完成严格余量，后料消费真实物理释放。
+     */
+    public static final String HISTORICAL_COMPLETE_REMAINDER_RULE = "历史原机班内完整收尾";
     /** 物理机台合计计划量。 */
     private int planQty;
     /** 最后正产量班次，零量时为空。 */

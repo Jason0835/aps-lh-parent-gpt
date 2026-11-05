@@ -519,6 +519,56 @@ public class EngineConstants {
     /** SYS1101016：切英寸时长（小时），默认1.5 */
     public static String TQ_INCH_SWITCH_TIME = "SYS1101016";
 
+    /** SYS1101042：口型切换时长（小时），默认0.75，T1机台切换感知：英寸相同口型板不同时的切换时长 */
+    public static String TQ_MOUTH_SWITCH_TIME = "SYS1101042";
+
+    /** SYS1101043：机台切换感知总开关，1=启用（默认），0=关闭保持历史口径 */
+    public static String TQ_MACHINE_SWITCH_AWARE = "SYS1101043";
+
+    /** SYS1101046：选机顺序新口径开关，1=启用（默认，S3.1执行序按供应时长升序+候选机台去利用率按编号升序一台台塞），0=关闭保持历史口径（执行序按6班计划量降序+候选按预计利用率升序负载均衡），用于双跑对比与回退 */
+    public static String TQ_ASSIGN_ORDER_MODE = "SYS1101046";
+
+    /** SYS1101045：备库分摊均衡开关，1=窗口均摊模式（产出分布跟随成型消耗节奏，实现多规格机台各班均衡满排），0=前倾模式（默认，逐班贪心满排阈值后延后），默认0 */
+    public static String TQ_BACKUP_BALANCE_MODE = "SYS1101045";
+
+    /** SYS1101047：备库窗口外推开关，1=启用（备库窗口超出成型8班时按最后三班(CLASS6/7/8)平均消耗外推，并以成型余量汇总×2封顶，对齐胎面capGuardFormingQty口径），0=关闭（默认，超出8班按剩余成型班数截断不外推），默认0 */
+    public static String TQ_BACKUP_EXTRAPOLATION = "SYS1101047";
+
+    /** SYS1101048：库存覆盖窗口班数，正整数，默认2（W仅决定备库触发判定面：班初库存&lt;成型(N+1)班起连续W班需求合计且≥两班保供时触发B区备库，备库总量与分摊班数按备库班数N计算不随W截断（2026-10-29判定用W、深度用N口径回归）；同时作为S5.6被动建库天花板窗口上限min(备库班数N,W)（未触发B区规格的富余产能预建库收口线）；W=2=历史两班触发面零变化基线，越南厂配3提前建库） */
+    public static String TQ_STOCK_START_SHIFT_COUNT = "SYS1101048";
+
+    /** SYS1101049：胎圈工装整车率（工装可用量折算系数：有效工装上限=工装车总数×整车率，对齐胎侧SYS0904006），默认1 */
+    public static String TQ_VEHICLE_RATE = "SYS1101049";
+
+    /** SYS1101050：胎圈工装账本开关，1=启用全局工装账本（对齐胎侧：总量×整车率上限-14点库存占用+成型当班消耗释放，逐规格实时扣减、班次结转），0=关闭保持历史规格隔离口径，默认0 */
+    public static String TQ_TOOLING_LEDGER_ENABLED = "SYS1101050";
+
+    /** 【已下线】SYS1101051：胎圈计划量顺延开关，2026-10-26 统一不顺延改造中废弃（备库规格溢出直接登记未排、非备库规格班1~5溢出并入下一班的口径已在策略层固化），常量保留仅为参数下线追溯 */
+
+    /** SYS1101052：胎圈被动备库建库开关（2026-10-23被动备库改造新增），1/未配置=启用常规规格被动建库（S5.6回填时已配置备库班数的常规规格按目标库存天花板被动建库），0=常规规格仅补未来缺口（与未配置规格同口径，缺口回填不可关），默认启用 */
+    public static String TQ_PASSIVE_BACKUP_ON = "SYS1101052";
+
+    /** SYS1101053：胎圈班次均衡调整开关（2026-10-23两班缺口收口改造新增），1=启用S5班次均衡（全场总量平滑，历史口径回退手段），0/未配置=跳过S5均衡（计划量保持S3两班缺口形态），默认关闭 */
+    public static String TQ_BALANCE_ADJUST_ON = "SYS1101053";
+
+    /**
+     * SYS1101054：胎圈实验规格提前排产班数，默认2班。
+     *
+     * <p>2026-11-05 新增，对齐胎面 SYS0803004「实验规格提前生产班数」：</p>
+     * <ul>
+     *   <li>实验规格识别口径：成型排程行产品状态 PRODUCT_STATUS ∈ (T,X)，即试制/量试规格，
+     *       对应引擎侧 EMBRYO_TYPE_FLAG=1（不区分试制 X 与量试 T）；</li>
+     *   <li>胎圈为规格聚合 + 6 班字段模型、无目标班次概念，故等价转译为"备库窗口班数下限"：
+     *       试制规格第 1 班主动触发备库，生效备库班数 =
+     *       max(备库配置班数, SYS1101033 新规格保底班数, 本参数实验规格提前排产班数)；</li>
+     *   <li>只对试制/量试规格生效，纯新规格（非试制）仍走"落点对齐+窗口全覆盖到第6班"口径，不受本参数影响。</li>
+     * </ul>
+     */
+    public static String TQ_EXPERIMENT_SPEC_ADVANCE_SHIFT_COUNT = "SYS1101054";
+
+    /** 胎圈实验规格提前排产班数默认值：2班（与 SYS1101033 默认值一致，保证不配置时行为零变化） */
+    public static final int DEFAULT_TQ_EXPERIMENT_SPEC_ADVANCE_SHIFT_COUNT = 2;
+
     /** SYS1101017：库消比高阈值，默认2.0 */
     public static String TQ_STOCK_CONSUME_RATIO_HIGH = "SYS1101017";
 
@@ -558,9 +608,6 @@ public class EngineConstants {
     /** SYS1101030：取整合并阈值（备库分摊时剩余量小于此值则合并到当前班次，不再新开一班向上取整），默认0不启用 */
     public static String TQ_ROUNDING_MERGE_THRESHOLD = "SYS1101030";
 
-    /** SYS1101031：机台定额超排容忍阈值（计划量超出机台剩余产能，且超出部分≤此值时允许当班超排，不延后到下一班），默认0不启用 */
-    public static String TQ_MACHINE_OVER_ASSIGN_TOLERANCE = "SYS1101031";
-
     /** SYS1101032：胎圈新规格回看天数（判定新规格时回看历史排程计划量的天数），默认7天 */
     public static String TQ_NEW_SPEC_LOOKBACK_DAYS = "SYS1101032";
 
@@ -590,4 +637,62 @@ public class EngineConstants {
 
     /** SYS1101039：胎圈工厂总库容上限（S5.95库容校验：逐班次库存轨迹总量超过此值告警；0=不校验，数值待业务提供；一期仅告警），默认0 */
     public static String TQ_WAREHOUSE_CAPACITY_LIMIT = "SYS1101039";
+
+    /** SYS1101040：胎圈自动排程中文过程日志级别（OFF=关闭不落库，SUMMARY=摘要，FULL=完整事件；对齐胎面 SYS0807001 口径），默认SUMMARY */
+    public static String TQ_PROCESS_LOG_LEVEL = "SYS1101040";
+
+    /** SYS1603009：钢丝圈自动排程中文过程日志级别（OFF=关闭不落库，SUMMARY=摘要，FULL=完整事件；对齐胎圈 SYS1101040 口径），默认SUMMARY */
+    public static String GSQ_PROCESS_LOG_LEVEL = "SYS1603009";
+
+    /** SYS1101041：胎圈成型数据来源模式（成型排程同一天可能并存算法生成版CXPC与手工导入版CXDR两个批次，胎圈取数按此参数选定版本），默认1 */
+    public static String TQ_CX_SOURCE_MODE = "SYS1101041";
+
+    /** 成型数据来源模式-自动导入优先（模式1）：当天存在CXDR导入版批次则取导入版，否则回退CXPC生成版 */
+    public static final int CX_SOURCE_MODE_AUTO_IMPORT_FIRST = 1;
+
+    /** 成型数据来源模式-仅算法生成版（模式2）：强制取CXPC前缀批次 */
+    public static final int CX_SOURCE_MODE_GENERATED_ONLY = 2;
+
+    /** 成型数据来源模式-仅导入版（模式3）：强制取CXDR前缀批次 */
+    public static final int CX_SOURCE_MODE_IMPORT_ONLY = 3;
+
+    /** 成型排程批次号前缀-手工导入版（CXDR + yyyyMMdd + 3位序号，DATA_SOURCE=2） */
+    public static final String CX_BATCH_PREFIX_IMPORT = "CXDR";
+
+    /** 成型排程批次号前缀-算法生成版（CXPC + yyyyMMdd + 序号，DATA_SOURCE=0/3） */
+    public static final String CX_BATCH_PREFIX_GENERATED = "CXPC";
+
+	/* ==================== 以下常量合并自 mix-engine-common（密炼排程） ==================== */
+
+	public static String PROCEDURE_CODE_GLUE = "0";
+	public static String PROCEDURE_CODE_MATERIAL = "1";
+	public static String DEMAND_PREFIX = "DEMAND";
+	public static String COLLECT_PREFIX = "COLLECT";
+	public static String DECOMPOSE_PREFIX = "DECOMPOSE";
+	public static String GLUE_SCHEDULE_PREFIX = "GLUE";
+	public static String MATERIAL_SCHEDULE_PREFIX = "MATERIAL";
+	public static String IS_FINISHING_YES = "1";
+	public static String MIX_AREA_DEFAULT = "0";
+	public static String RECIPE_TYPE_ZZ = "1";
+	public static String COMMONLY_USED_DAY = "COMMONLY_USED_DAY";
+	public static String SAFE_STOCK_RATE = "SAFE_STOCK_RATE";
+	public static String MATERIAL_INTERVAL_TIME = "MATERIAL_INTERVAL_TIME";
+	public static String PRE_PREPARE_TIME = "PRE_PREPARE_TIME";
+	public static String MACHINE_DEFAULT_CAPACITY = "MACHINE_DEFAULT_CAPACITY";
+	public static final String DINNER_TIME = "DINNER_TIME";
+	public static final String DECOMPOSE_GLUE_TYPE = "DECOMPOSE_GLUE_TYPE";
+	public static Integer CLASS_SHIFT_ONE = 1;
+	public static Integer CLASS_SHIFT_TWO = 2;
+	public static Integer CLASS_SHIFT_THREE = 3;
+	public static String CLASS_MID = "MID";
+	public static Integer COMMONLY_USED_YES = 1;
+	public static Integer COMMONLY_USED_NO = 0;
+	public static int ORDER_MULTIPLE = 10;
+	public static String DEMAND_PLANNING_DIVISION = "--";
+	public static String DECOMPOSE_GLUE_TYPE_0 = "0";
+
+	/* ==================== 以下常量合并自 mix-engine-common（密炼排程） ==================== */
+
+	public static String CLASS_NIGHT = "NIGHT";
+	public static String CLASS_DAY = "DAY";
 }

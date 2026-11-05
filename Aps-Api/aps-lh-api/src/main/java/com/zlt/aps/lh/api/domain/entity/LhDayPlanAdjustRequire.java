@@ -61,7 +61,7 @@ public class LhDayPlanAdjustRequire extends BaseEntity implements Serializable {
     @ApiModelProperty("MES物料编码")
     private String mesMaterialCode;
 
-    /** 调整序号，仅允许1、2、3 */
+    /** 调整序号，仅允许1、2、3、4 */
     @TableField("ADJUST_COUNT")
     @ApiModelProperty("调整序号")
     private Integer adjustCount;
@@ -103,6 +103,10 @@ public class LhDayPlanAdjustRequire extends BaseEntity implements Serializable {
     @TableField(exist = false)
     private Long adjustId3;
 
+    /** 调整4记录ID */
+    @TableField(exist = false)
+    private Long adjustId4;
+
     /** 调整1数量 */
     @TableField(exist = false)
     private BigDecimal adjustQty1;
@@ -114,6 +118,10 @@ public class LhDayPlanAdjustRequire extends BaseEntity implements Serializable {
     /** 调整3数量 */
     @TableField(exist = false)
     private BigDecimal adjustQty3;
+
+    /** 调整4数量 */
+    @TableField(exist = false)
+    private BigDecimal adjustQty4;
 
     /** 调整1原因 */
     @TableField(exist = false)
@@ -127,6 +135,10 @@ public class LhDayPlanAdjustRequire extends BaseEntity implements Serializable {
     @TableField(exist = false)
     private String adjustReason3;
 
+    /** 调整4原因 */
+    @TableField(exist = false)
+    private String adjustReason4;
+
     /** 调整1修改人 */
     @TableField(exist = false)
     private String adjuster1;
@@ -139,6 +151,10 @@ public class LhDayPlanAdjustRequire extends BaseEntity implements Serializable {
     @TableField(exist = false)
     private String adjuster3;
 
+    /** 调整4修改人 */
+    @TableField(exist = false)
+    private String adjuster4;
+
     /** 调整1修改时间 */
     @TableField(exist = false)
     private Date adjustTime1;
@@ -150,6 +166,10 @@ public class LhDayPlanAdjustRequire extends BaseEntity implements Serializable {
     /** 调整3修改时间 */
     @TableField(exist = false)
     private Date adjustTime3;
+
+    /** 调整4修改时间 */
+    @TableField(exist = false)
+    private Date adjustTime4;
 
     /** 调整后合计 */
     @TableField(exist = false)
@@ -173,7 +193,7 @@ public class LhDayPlanAdjustRequire extends BaseEntity implements Serializable {
     @TableField(exist = false)
     private Integer pageSize;
 
-    /** 列表排序字段，仅支持调整1、2、3 */
+    /** 列表排序字段，仅支持调整1、2、3、4 */
     @TableField(exist = false)
     private String orderByColumn;
 

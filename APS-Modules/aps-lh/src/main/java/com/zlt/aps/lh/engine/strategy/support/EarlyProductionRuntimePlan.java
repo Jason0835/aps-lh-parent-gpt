@@ -71,7 +71,10 @@ public class EarlyProductionRuntimePlan implements Serializable {
     /** 当前业务日所属月份、截至前一日的累计欠产量 */
     private int historyShortageQty;
 
-    /** 未来计划月剩余需求叠加当前月历史欠产后的运行态目标量 */
+    /**
+     * 未来计划月剩余需求叠加当前月历史欠产后的运行态目标量。
+     * 普通正规双模收尾已正式确认奇数归整时同步其合法总目标，跨日消费不回退到原始奇数余量。
+     */
     private int effectiveTargetQty;
 
     /** 提前生产结构化准入结论 */

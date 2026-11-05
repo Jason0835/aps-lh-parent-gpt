@@ -10,7 +10,6 @@ import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuDailyPlanQuotaDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
-import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
@@ -20,13 +19,13 @@ import com.zlt.aps.lh.component.*;
 import com.zlt.aps.lh.context.LhScheduleConfig;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IEndingJudgmentStrategy;
-import com.zlt.aps.lh.engine.strategy.support.EarlyProductionChecker;
-import com.zlt.aps.lh.engine.strategy.support.DailyMachineExpansionPlanner;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationSkuMatcher;
+import com.zlt.aps.lh.engine.strategy.support.DailyMachineExpansionPlanner;
+import com.zlt.aps.lh.engine.strategy.support.EarlyProductionChecker;
 import com.zlt.aps.lh.engine.strategy.support.PendingSkuUnscheduledRule;
 import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
-import com.zlt.aps.lh.service.impl.PreviousAlternateTrialDemandService;
 import com.zlt.aps.lh.service.impl.HistoricalBeforeMaterialContinuationService;
+import com.zlt.aps.lh.service.impl.PreviousAlternateTrialDemandService;
 import com.zlt.aps.lh.util.*;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
@@ -64,7 +63,9 @@ import java.util.*;
 @Component
 public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
 
-    /** 日计划清理前保留历史指定试制量试的独立需求。 */
+    /**
+     * 日计划清理前保留历史指定试制量试的独立需求。
+     */
     @Resource
     private PreviousAlternateTrialDemandService previousAlternateTrialDemandService;
 
@@ -153,7 +154,9 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     private SingleControlModeSnapshotInitializer singleControlModeSnapshotInitializer;
     @Resource
     private SkuDecrementChecker skuDecrementChecker;
-    /** 未排需求快照和最终结果统一管理入口。 */
+    /**
+     * 未排需求快照和最终结果统一管理入口。
+     */
     @Resource
     private UnscheduledResultCollector unscheduledResultCollector;
     @Resource
@@ -294,25 +297,20 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                 continue;
             }
 
+            // 在续作及历史前料分类前拦截，保留MES与装机模具事实供后料执行真实准备动作。
+            LhUnscheduledResult handoverStopped =
+                    PendingSkuUnscheduledRule.evaluateHandoverStoppedWithoutStock(context, dto);
+            if (Objects.nonNull(handoverStopped)) {
+                unscheduledResultCollector.add(context, dto, handoverStopped);
+                continue;
+            }
             int targetScheduleQty = dto.resolveTargetScheduleQty();
             LocalDate scheduleStartDate = toLocalDate(context.getScheduleDate());
             /*
              * MES精确在机是续作身份的源头。当前月TOTAL_QTY=0只应阻断新增和提前生产，
-             * 不能在续作识别前清零在机物料，否则原续作机台会被误释放给新增换模。
+             * 通过统一无计划门禁的在机物料不能被此总量路由清零，仍需由续作中心判定。
              */
             boolean exactOnlineContinuation = this.isExactOnlineContinuationCandidate(context, dto);
-            // 只对当前月无总计划量的例外场景落库，避免每个常规在机SKU都产生重复决策日志。
-            if (exactOnlineContinuation && safeInt(plan.getTotalQty()) <= 0) {
-                String detail = String.format("工厂: %s, 批次: %s, 排程日期: %s, 物料: %s, 产品状态: %s, "
-                                + "当前月TOTAL_QTY: %d, 硫化余量: %d, 胎胚库存: %d, 决策: 保留续作身份，"
-                                + "由S4.4续作中心规则继续判定",
-                        context.getFactoryCode(), context.getBatchNo(), scheduleStartDate,
-                        dto.getMaterialCode(), dto.getProductStatus(), safeInt(plan.getTotalQty()),
-                        Math.max(0, dto.getSurplusQty()), Math.max(0, dto.getEmbryoStock()));
-                log.info("MES精确在机SKU保留续作准入, {}", detail);
-                PriorityTraceLogHelper.appendProcessLog(
-                        context, MES_EXACT_ONLINE_CONTINUATION_LOG_TITLE, detail);
-            }
             /*
              * 目标量已经归零的纯历史欠产/收尾遗留SKU原本也不会进入续作或新增排产，
              * 退出前按公共顺序登记符合小余量或仅历史欠产规则的净余量，其余不生成“无目标量”未排记录。
@@ -342,8 +340,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
             if (!exactOnlineContinuation && EarlyProductionQuantityCalculator.applyCurrentMonthTotalRoute(
                     context, dto, scheduleStartDate, getTargetScheduleQtyResolver())) {
                 /*
-                 * 当前业务月 TOTAL_QTY=0 是排产路由硬门禁，与通用余量、欠产、收尾和胎胚库存
-                 * 无关。专用计算器已清零正常目标并尝试保留未来日计划候选；调用处只负责决定
+                 * 当前业务月 TOTAL_QTY=0 通常阻断正常排产；正库存胎胚收尾例外不进入此分支。
+                 * 专用计算器已清零正常目标并尝试保留未来日计划候选；调用处只负责决定
                  * 是否继续加入结构待排视图，禁止未来月余量反灌正常主链。
                  */
                 targetScheduleQty = 0;
@@ -363,18 +361,40 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
             /*
              * 窗口内无计划且无欠产余量时统一评估准入；固定提前范围内存在未来原始计划的
              * 正规新增SKU保留待排身份，只能由后续提前生产阶段竞争剩余资源。
-             * MES精确在机续作候选与停产收尾模式除外，仍由各自链路继续判定。
+             * MES精确在机及已证明的历史前料也必须经过此门禁，不能借未来计划提前续作。
+             * 命中后仅退出待排池，保留MES和装机模具事实；停产收尾模式沿用独立规则。
              */
-            if (!exactOnlineContinuation
-                    && !context.isStopProductionMode()
-                    && dto.getOriginalWindowPlanQty() <= 0
-                    && !dto.isOverdueSurplusFlag()) {
+            if (!context.isStopProductionMode()) {
                 LhUnscheduledResult noOverdueSurplusResult =
-                        PendingSkuUnscheduledRule.evaluateNoOverdueSurplusAdmission(context, dto);
+                        PendingSkuUnscheduledRule.evaluateNoOverdueSurplusAdmission(
+                                context, dto, exactOnlineContinuation);
                 if (Objects.nonNull(noOverdueSurplusResult)) {
                     unscheduledResultCollector.add(context, dto, noOverdueSurplusResult);
                     continue;
                 }
+            }
+
+            if (EmbryoEndingStockAdmissionPolicy.isEligible(context, dto)) {
+                String detail = String.format("工厂=%s，排程日期=%s，批次=%s，物料=%s，状态=%s，胎胚=%s，"
+                                + "窗口原始计划量=%d，欠产余量标识=%s，本轮库存=%d；保留库存收尾资格，实机准入后统一分摊",
+                        context.getFactoryCode(), scheduleStartDate, context.getBatchNo(), dto.getMaterialCode(),
+                        dto.getProductStatus(), dto.getEmbryoCode(), dto.getOriginalWindowPlanQty(),
+                        dto.isOverdueSurplusFlag(), dto.getEmbryoStock());
+                log.info("后半段无计划胎胚库存收尾放行, {}", detail);
+                PriorityTraceLogHelper.appendProcessLog(context, "后半段无计划胎胚库存收尾放行", detail);
+            }
+
+            // 无计划准入通过后再记录续作保留，避免被拦截SKU产生相反的决策日志。
+            if (exactOnlineContinuation && safeInt(plan.getTotalQty()) <= 0) {
+                String detail = String.format("工厂: %s, 批次: %s, 排程日期: %s, 物料: %s, 产品状态: %s, "
+                                + "当前月TOTAL_QTY: %d, 硫化余量: %d, 胎胚库存: %d, 决策: 保留续作身份，"
+                                + "由S4.4续作中心规则继续判定",
+                        context.getFactoryCode(), context.getBatchNo(), scheduleStartDate,
+                        dto.getMaterialCode(), dto.getProductStatus(), safeInt(plan.getTotalQty()),
+                        Math.max(0, dto.getSurplusQty()), Math.max(0, dto.getEmbryoStock()));
+                log.info("MES精确在机SKU保留续作准入, {}", detail);
+                PriorityTraceLogHelper.appendProcessLog(
+                        context, MES_EXACT_ONLINE_CONTINUATION_LOG_TITLE, detail);
             }
 
             // 排程窗口没有计划量但存在余量/正向结转目标量时，允许继续排产，并给出明确告警。
@@ -701,6 +721,109 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         log.info("共用胎胚零余量组最终归一化完成, factoryCode: {}, batchNo: {}, T日: {}, 胎胚集合: {}",
                 context.getFactoryCode(), context.getBatchNo(),
                 LhScheduleTimeUtil.formatDate(context.getScheduleDate()), normalizeEmbryoSet);
+    }
+
+    /**
+     * 准入清理后，为已无有效生产者的收尾胎胚恢复唯一原机库存承接物料。
+     * <p>只恢复本次零余量门禁剔除的MES续作；已冻结份额、已有实际产量或库存消费的组不得转量。
+     * 同物料状态多原机全部回到续作列表，结构池只登记一个来源，数量由统一库存账本共享。</p>
+     *
+     * @param context                当前准入及库存上下文
+     * @param originalContinuousSkus 零余量门禁前的续作来源快照
+     * @param continuousSkuList      准入清理后的续作列表
+     */
+    private void restoreOrphanEmbryoStockContinuation(LhScheduleContext context,
+                                                      List<SkuScheduleDTO> originalContinuousSkus, List<SkuScheduleDTO> continuousSkuList) {
+        Map<String, List<SkuScheduleDTO>> candidatesByEmbryo = originalContinuousSkus.stream()
+                .filter(sku -> this.isRestorableEmbryoStockContinuation(context, sku, continuousSkuList))
+                .collect(java.util.stream.Collectors.groupingBy(SkuScheduleDTO::getEmbryoCode,
+                        LinkedHashMap::new, java.util.stream.Collectors.toList()));
+        for (Map.Entry<String, List<SkuScheduleDTO>> entry : candidatesByEmbryo.entrySet()) {
+            String embryoCode = entry.getKey();
+            boolean hasProducer = java.util.stream.Stream.concat(this.collectStructureSkus(context).stream(),
+                            context.getPreviousAlternateTrialSkuMap().values().stream())
+                    .anyMatch(sku -> StringUtils.equals(embryoCode, sku.getEmbryoCode()));
+            // 实机成员或份额一旦确认，库存所有权不能因候选出队重新分配。
+            if (hasProducer || Objects.nonNull(context.getEmbryoStockRealMachineSkuKeys())
+                    || context.getSharedEmbryoStockEndingIdentityMap().containsValue(embryoCode)
+                    || context.getEmbryoStockConsumeLedgerMap().values().stream()
+                    .filter(Objects::nonNull)
+                    .anyMatch(ledger -> StringUtils.equals(embryoCode, ledger.getEmbryoCode())
+                            && Objects.nonNull(ledger.getConsumedQty()) && ledger.getConsumedQty() > 0)
+                    || context.getScheduleResultList().stream().filter(Objects::nonNull)
+                    .anyMatch(result -> StringUtils.equals(embryoCode, result.getEmbryoCode())
+                            && ShiftFieldUtil.resolveScheduledQty(result) > 0)) {
+                continue;
+            }
+            SkuScheduleDTO consumer = this.selectSharedEmbryoZeroSurplusConsumer(entry.getValue());
+            String consumerKey = this.buildSkuKey(consumer);
+            List<SkuScheduleDTO> restoredSkus = entry.getValue().stream()
+                    .filter(sku -> StringUtils.equals(consumerKey, this.buildSkuKey(sku)))
+                    .collect(java.util.stream.Collectors.toList());
+            int stockQty = context.getEmbryoRealtimeStockMap().get(embryoCode);
+            for (SkuScheduleDTO sku : restoredSkus) {
+                sku.setEmbryoStock(stockQty);
+                sku.setSkuTag(SkuTagEnum.ENDING.getCode());
+                sku.setEndingDaysRemaining(1);
+                sku.setStrictTargetQty(true);
+                sku.setTargetScheduleQty(stockQty);
+                sku.setRemainingScheduleQty(stockQty);
+                continuousSkuList.add(sku);
+            }
+            context.getStructureSkuMap().computeIfAbsent(consumer.getStructureName(),
+                    structure -> new ArrayList<>()).add(consumer);
+            if (Objects.nonNull(structureMinMachineRetentionService)) {
+                structureMinMachineRetentionService.includeRestoredContinuation(context, consumer);
+            }
+            // 仅撤销已失效的零余量诊断及其原因事件，其他来源的未排继续保留。
+            List<LhUnscheduledResult> staleResults = context.getUnscheduledResultList().stream()
+                    .filter(result -> unscheduledResultCollector.isSameDemand(context, consumer, result))
+                    .filter(result -> StringUtils.equals(SHARED_EMBRYO_ZERO_SURPLUS_UNSCHEDULED_REASON,
+                            result.getUnscheduledReason()))
+                    .collect(java.util.stream.Collectors.toList());
+            staleResults.forEach(result -> unscheduledResultCollector.discard(context, result));
+            String detail = String.format("工厂=%s, 日期=%s, 批次=%s, 胎胚=%s, 物料=%s, 状态=%s, "
+                            + "库存目标=%d, 原机=%s, 原因=其他有效生产者准入退出，恢复唯一MES续作承接库存",
+                    context.getFactoryCode(), LhScheduleTimeUtil.formatDate(context.getScheduleDate()),
+                    context.getBatchNo(), embryoCode, consumer.getMaterialCode(), consumer.getProductStatus(),
+                    stockQty, restoredSkus.stream().map(SkuScheduleDTO::getContinuousMachineCode)
+                            .collect(java.util.stream.Collectors.toList()));
+            PriorityTraceLogHelper.appendProcessLog(context, "收尾胎胚恢复原机库存承接者", detail);
+            log.info("收尾胎胚恢复原机库存承接者, {}", detail);
+        }
+    }
+
+    /**
+     * 核对库存承接恢复来源，防止新增、历史替代身份及其他准入拒绝借此重新入队。
+     *
+     * @param context           当前MES及准入上下文
+     * @param sku               门禁前的续作来源
+     * @param continuousSkuList 当前仍有效的续作列表
+     * @return 原MES精确匹配、正库存收尾且仅被零余量门禁剔除时返回true
+     */
+    private boolean isRestorableEmbryoStockContinuation(LhScheduleContext context, SkuScheduleDTO sku,
+                                                        List<SkuScheduleDTO> continuousSkuList) {
+        if (Objects.isNull(sku) || sku.getSurplusQty() > 0 || sku.getEmbryoStock() <= 0
+                || StringUtils.isEmpty(sku.getEmbryoCode()) || StringUtils.isEmpty(sku.getStructureName())
+                || !ScheduleTypeEnum.CONTINUOUS.getCode().equals(sku.getScheduleType())
+                || !this.getTargetScheduleQtyResolver().isEmbryoStockEndingFlagYes(context, sku.getEmbryoCode())
+                || context.getEmbryoRealtimeStockMap().getOrDefault(sku.getEmbryoCode(), 0) <= 0
+                || context.isFutureOnlyEarlyProductionCandidate(sku)
+                || continuousSkuList.stream().anyMatch(current -> StringUtils.equals(
+                current.getContinuousMachineCode(), sku.getContinuousMachineCode()))) {
+            return false;
+        }
+        LhMachineOnlineInfo online = context.getMachineOnlineInfoMap().get(sku.getContinuousMachineCode());
+        if (Objects.isNull(online) || !context.getMachineScheduleMap().containsKey(sku.getContinuousMachineCode())
+                || !StringUtils.equals(StringUtils.trim(online.getMaterialCode()), sku.getMaterialCode())
+                || !StringUtils.equals(this.normalizeOnlineProductStatus(online.getProductStatus()),
+                sku.getProductStatus())
+                || Objects.nonNull(PendingSkuUnscheduledRule.evaluateContinuousTrialDailyPlanAdmission(context, sku))) {
+            return false;
+        }
+        LhUnscheduledResult blocked = unscheduledResultCollector.find(context, sku);
+        return Objects.nonNull(blocked) && StringUtils.equals(SHARED_EMBRYO_ZERO_SURPLUS_UNSCHEDULED_REASON,
+                blocked.getUnscheduledReason());
     }
 
     /**
@@ -1159,13 +1282,15 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         LhMonthStartDayResult monthStartInfo = context.getMonthStartInfo();
         Integer startDay = monthStartInfo.getStartDay();
         //20260829+ 排产周期中间间断间隔限制
-        Integer maxDiscontinueDays = null;
+        Integer extendDays = null;
+        Integer skuMaxDiscontinueDays = null;
         LhScheduleConfig scheduleConfig = context.getScheduleConfig();
         if (null != scheduleConfig) {
-            maxDiscontinueDays = scheduleConfig.getEarlyProductionDaysThreshold();
+            extendDays = scheduleConfig.getEarlyProductionDaysThreshold();
+            skuMaxDiscontinueDays = scheduleConfig.getSkuMaxDiscontinueDays();
         }
         List<LhDayPlanAdjustVo> allLhDayPlanAdjustList = context.getAllLhDayPlanAdjustList();
-        LhSurplusProductionDayInfo productionDayInfo = new LhSurplusProductionDayInfo(productionYearMonth, startDay, monthStartInfo.isAddLastMonthOverdueQty(), allProductionDate, maxDiscontinueDays);
+        LhSurplusProductionDayInfo productionDayInfo = new LhSurplusProductionDayInfo(productionYearMonth, startDay, monthStartInfo.isAddLastMonthOverdueQty(), allProductionDate, extendDays, skuMaxDiscontinueDays);
         LhSurplusSkuInfo lhSurplusSkuInfo = new LhSurplusSkuInfo(plan, allMonthPlanList, monthOverdueQtyMap, actualFinishedQty, allLhDayPlanAdjustList);
         LhSurplusResultVo lhSurplusResult = MonthPlanSurplusCalculator.getSurplusInfo(productionDayInfo, lhSurplusSkuInfo);
         boolean isCrossMonth = context.isCrossMonthByProductionDateInfo();
@@ -1448,8 +1573,9 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         dto.setTrialDemandQty(safeInt(targetMonthPlan.getTrialQty()));
         dto.setTrial(isTrialStage(targetMonthPlan.getConstructionStage()));
         dto.setSkuTag(SkuTagEnum.NORMAL.getCode());
-        // 试制SKU严格限制目标量，不允许超出dayN补满班次；量试/正规仍可按后续策略补满可用班次。
-        if (StringUtils.equals(ConstructionStageEnum.TRIAL.getCode(), dto.getConstructionStage())) {
+        // 试制与本次库存收尾在份额冻结前按严格业务目标初始化账本，避免补满班次或硫化余量反灌。
+        if (StringUtils.equals(ConstructionStageEnum.TRIAL.getCode(), dto.getConstructionStage())
+                || EmbryoEndingStockAdmissionPolicy.isEligible(context, dto)) {
             dto.setStrictTargetQty(true);
         }
 
@@ -2343,6 +2469,11 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         List<SkuScheduleDTO> excludedLegacySkuList = new ArrayList<SkuScheduleDTO>(8);
         historicalBeforeMaterialContinuationService.activate(context);
         this.assignContinuousSkus(context, continuousSkuList);
+        // 保留原机来源引用，仅供准入结束后处理库存无人承接的混合余量组，不新增排产身份。
+        List<SkuScheduleDTO> originalContinuousSkus = continuousSkuList.stream()
+                .filter(sku -> sku.getSurplusQty() <= 0)
+                .filter(sku -> !CollectionUtils.isEmpty(this.collectPositiveSurplusSkus(context, sku.getEmbryoCode())))
+                .collect(java.util.stream.Collectors.toList());
 
         /*
          * 共用/非共用胎胚零余量门禁仅适用于续作阶段：必须使用上方已完成MES在机匹配的真实
@@ -2447,7 +2578,9 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                     PendingSkuUnscheduledRule.LEGACY_ONLY_EXCLUSION_REASON);
         }
 
-        // 新增准入出队完成后再收口全零余量续作承接者，确保按胎胚库存严格排产而不是被零日计划释放。
+        // 正余量来源可能全部在新增准入退出，先恢复唯一原机承接者，再统一建库存目标。
+        this.restoreOrphanEmbryoStockContinuation(context, originalContinuousSkus, continuousSkuList);
+        // 新增准入出队完成后再收口续作承接者，确保按胎胚库存严格排产而不是被零日计划释放。
         this.finalizeSharedEmbryoZeroSurplusGroups(context, normalizeZeroSurplusEmbryoSet);
 
         // 续作匹配完成后，在机物料本次不需要排程（余量为0/共用胎胚零余量/未排等）的机台，
@@ -2474,7 +2607,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 调用后仍由原准入分支写未排并执行完整清理，确保其他排产阶段行为不变。</p>
      *
      * @param context 排程上下文
-     * @param sku 无日计划SKU
+     * @param sku     无日计划SKU
      * @return void
      */
     private void preserveNoDailyPlanTrialVirtualCandidate(LhScheduleContext context,
@@ -2725,7 +2858,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     /**
      * 为同物料跨状态补位机台创建目标状态续作副本。
      *
-     * @param context 排程上下文
+     * @param context           排程上下文
      * @param continuousSkuList 续作SKU列表
      * @param targetSku         目标状态模板
      * @param onlineEntryList   MES在机记录
@@ -2837,7 +2970,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 公共收集器冻结真实余量，后续清理目标量不会覆盖舍弃数量。</p>
      *
      * @param context 排程上下文
-     * @param sku 已确定退出待排池的SKU
+     * @param sku     已确定退出待排池的SKU
      * @return 已登记真实小余量或历史欠产未排时返回true，否则返回false
      */
     private boolean recordNoPlanEndingDiscard(LhScheduleContext context, SkuScheduleDTO sku) {
@@ -2970,7 +3103,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     /**
      * 将只读身份匹配结果一次性登记为续作，保留首台原对象及后续机台共享账本副本。
      *
-     * @param context 已确认历史前料身份的上下文
+     * @param context           已确认历史前料身份的上下文
      * @param continuousSkuList 本次续作结果列表
      */
     private void assignContinuousSkus(LhScheduleContext context, List<SkuScheduleDTO> continuousSkuList) {
@@ -3163,7 +3296,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * <p>副本复制源SKU的核心计划量、产能、状态字段，并<b>共享</b> {@code dailyPlanQuotaMap}，
      * 确保多台机台排产时共用同一个日计划额度账本。</p>
      *
-     * @param context 排程上下文
+     * @param context     排程上下文
      * @param source      源SKU（模板）
      * @param machineCode 目标机台编码
      * @return 副本SKU，sharedDailyPlanQuotaMap 指向源SKU的同一实例

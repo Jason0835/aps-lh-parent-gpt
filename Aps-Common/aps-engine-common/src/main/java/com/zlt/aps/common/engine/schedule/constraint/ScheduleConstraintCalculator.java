@@ -115,6 +115,34 @@ public class ScheduleConstraintCalculator {
     }
 
     /**
+     * 按当日成型总余量额度封顶计划量。
+     *
+     * <p>额度为未配置（空）时保持原值；额度为零或负值时当日不允许排产，返回零；
+     * 计划量未超过额度时保持原值且不做整数取整，保证未超限任务继续走既有整卷取整；
+     * 超过额度时取额度并向上取整到整数米。</p>
+     *
+     * <p>向上取整可能使结果略微超过工装上限（不足一米），这是业务已接受的取舍，
+     * 调用方需记录 {@code tailQuotaToolOverdrawnQty} 证据。</p>
+     *
+     * @param planQty   封顶前计划量
+     * @param available 当日可用额度；为空表示未启用额度
+     * @return 封顶后的计划量
+     */
+    public BigDecimal capByTailQuota(BigDecimal planQty, BigDecimal available) {
+        BigDecimal normalizedPlanQty = this.nonNegative(planQty);
+        if (available == null) {
+            return normalizedPlanQty;
+        }
+        if (available.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+        if (normalizedPlanQty.compareTo(available) <= 0) {
+            return normalizedPlanQty;
+        }
+        return available.setScale(0, RoundingMode.CEILING);
+    }
+
+    /**
      * 计算两个相邻任务之间的切换产能。
      *
      * @param previousTask 前置任务；班次没有有效前置时可为空
@@ -154,7 +182,33 @@ public class ScheduleConstraintCalculator {
     public ScheduleTailPlanQtyAdjustmentResult calculateTailPlanQtyAfterLoss(BigDecimal planBaseQty,
                                                                              BigDecimal tailLimitQty,
                                                                              BigDecimal lossRatePercent,
+                                                                             BigDecimal tailMinPlanQty,
                                                                              int calculationScale) {
+        return this.calculateTailPlanQtyAfterLoss(planBaseQty, tailLimitQty, lossRatePercent,
+                tailMinPlanQty, calculationScale, false);
+    }
+
+    /**
+     * 分别计算收尾计划候选和收尾上限候选的含损耗数量，并取两者较小值。
+     *
+     * <p>{@code ceilToInteger} 为真时，选中候选的最终计划量向上取整到整数米；收尾最低量分支的
+     * 最小起排调整量改为按取整后的值计算，避免出现超出最低量的负向调整。损耗后计划量始终保留
+     * 真实结算值，不被取整结果回写。</p>
+     *
+     * @param planBaseQty      计划候选损耗前数量
+     * @param tailLimitQty     收尾上限损耗前数量
+     * @param lossRatePercent  损耗率百分比
+     * @param tailMinPlanQty   收尾最低起排量
+     * @param calculationScale 计算小数位数
+     * @param ceilToInteger    是否把选中候选向上取整到整数米
+     * @return 两类候选及最终选中候选
+     */
+    public ScheduleTailPlanQtyAdjustmentResult calculateTailPlanQtyAfterLoss(BigDecimal planBaseQty,
+                                                                             BigDecimal tailLimitQty,
+                                                                             BigDecimal lossRatePercent,
+                                                                             BigDecimal tailMinPlanQty,
+                                                                             int calculationScale,
+                                                                             boolean ceilToInteger) {
         SchedulePlanQtyAdjustmentResult planCandidate = this.calculatePlanQtyAfterLoss(
                 planBaseQty, lossRatePercent, null, null, true, calculationScale);
         SchedulePlanQtyAdjustmentResult tailLimitCandidate = this.calculatePlanQtyAfterLoss(
@@ -162,10 +216,57 @@ public class ScheduleConstraintCalculator {
         ScheduleTailPlanQtyAdjustmentResult result = new ScheduleTailPlanQtyAdjustmentResult();
         result.setPlanCandidate(planCandidate);
         result.setTailLimitCandidate(tailLimitCandidate);
-        result.setSelectedCandidate(planCandidate.getFinalPlanQty()
+        SchedulePlanQtyAdjustmentResult selected = planCandidate.getFinalPlanQty()
                 .compareTo(tailLimitCandidate.getFinalPlanQty()) <= 0
-                ? planCandidate : tailLimitCandidate);
+                ? planCandidate : tailLimitCandidate;
+
+        int normalizedScale = Math.max(calculationScale, 0);
+        SchedulePlanQtyAdjustmentResult finalSelected = new SchedulePlanQtyAdjustmentResult();
+        finalSelected.setPreLossPlanQty(selected.getPreLossPlanQty());
+        finalSelected.setLossAddQty(selected.getLossAddQty());
+        finalSelected.setPlanQtyAfterLoss(selected.getPlanQtyAfterLoss());
+        finalSelected.setRoundAdjustQty(selected.getRoundAdjustQty());
+
+        BigDecimal ceiledQty = ceilToInteger
+                ? selected.getFinalPlanQty().setScale(0, RoundingMode.CEILING)
+                .setScale(normalizedScale, RoundingMode.HALF_UP)
+                : selected.getFinalPlanQty();
+
+        BigDecimal normalizedTailMinPlanQty = this.nonNegative(tailMinPlanQty)
+                .setScale(normalizedScale, RoundingMode.HALF_UP);
+        BigDecimal currentPlanQty = selected.getFinalPlanQty();
+        if (currentPlanQty.compareTo(BigDecimal.ZERO) > 0
+                && normalizedTailMinPlanQty.compareTo(BigDecimal.ZERO) > 0
+                && currentPlanQty.compareTo(normalizedTailMinPlanQty) < 0) {
+            // 收尾最低量分支：取整开启时用取整后的值做被减数，否则沿用损耗后计划量
+            BigDecimal subtrahend = ceilToInteger ? ceiledQty : selected.getPlanQtyAfterLoss();
+            finalSelected.setPlanQtyAfterMinStart(normalizedTailMinPlanQty);
+            finalSelected.setMinStartAdjustQty(normalizedTailMinPlanQty.subtract(subtrahend)
+                    .setScale(normalizedScale, RoundingMode.HALF_UP));
+            finalSelected.setFinalPlanQty(normalizedTailMinPlanQty);
+        } else {
+            finalSelected.setPlanQtyAfterMinStart(selected.getPlanQtyAfterMinStart());
+            finalSelected.setMinStartAdjustQty(selected.getMinStartAdjustQty());
+            finalSelected.setFinalPlanQty(ceiledQty);
+        }
+        result.setSelectedCandidate(finalSelected);
         return result;
+    }
+
+    /**
+     * 分别计算收尾计划候选和收尾上限候选的含损耗数量，并取两者较小值。
+     *
+     * @param planBaseQty      计划候选损耗前数量
+     * @param tailLimitQty     收尾上限损耗前数量
+     * @param lossRatePercent  损耗率百分比
+     * @param calculationScale 计算小数位数
+     * @return 两类候选及最终选中候选
+     */
+    public ScheduleTailPlanQtyAdjustmentResult calculateTailPlanQtyAfterLoss(BigDecimal planBaseQty,
+                                                                             BigDecimal tailLimitQty,
+                                                                             BigDecimal lossRatePercent,
+                                                                             int calculationScale) {
+        return this.calculateTailPlanQtyAfterLoss(planBaseQty, tailLimitQty, lossRatePercent, null, calculationScale);
     }
 
     /**

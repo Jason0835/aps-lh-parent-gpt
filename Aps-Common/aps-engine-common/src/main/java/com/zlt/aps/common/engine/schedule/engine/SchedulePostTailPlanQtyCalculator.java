@@ -27,6 +27,19 @@ public final class SchedulePostTailPlanQtyCalculator {
     }
 
     /**
+     * 两阶段禁排缺口同时考虑基础两班与原保证窗口。
+     *
+     * @param task 当前任务
+     * @return 禁排计划量结果
+     */
+    public static SchedulePlanQtyResultModel calculateTwoPhase(ScheduleTaskDraftModel task) {
+        if (task == null) {
+            return null;
+        }
+        return calculate(task, new SchedulePlanQtyResultModel(), true);
+    }
+
+    /**
      * 使用调用方创建的结果对象构造收尾间隔内禁排结果，保留 TM/TC 的具体结果类型。
      *
      * @param <R>    计划量结果类型
@@ -36,13 +49,30 @@ public final class SchedulePostTailPlanQtyCalculator {
      */
     public static <R extends SchedulePlanQtyResultModel> R calculate(
             ScheduleTaskDraftModel task, R result) {
+        return calculate(task, result, false);
+    }
+
+    /**
+     * 计算禁排班次待承接量并保留真实库存消耗。
+     *
+     * @param <R>      结果类型
+     * @param task     当前任务
+     * @param result   待填充的结果对象
+     * @param twoPhase 是否使用两阶段基础请求口径
+     * @return 填充后的结果对象
+     */
+    private static <R extends SchedulePlanQtyResultModel> R calculate(
+            ScheduleTaskDraftModel task, R result, boolean twoPhase) {
         if (task == null || result == null) {
             return result;
         }
         BigDecimal currentDemandQty = nvl(task.getCurrentShiftDemandQty());
         BigDecimal guardDemandQty = nvl(task.getGuardDemandQty());
         BigDecimal stockQty = nvl(task.getRollingStockQty());
-        BigDecimal grossDemandQty = currentDemandQty.add(guardDemandQty);
+        // 两阶段基础请求独立于备库窗口，禁排缺口须覆盖两者较大值。
+        BigDecimal demandAfterCurrent = twoPhase ? guardDemandQty.max(nvl(task.getNextShiftDemandQty()))
+                : guardDemandQty;
+        BigDecimal grossDemandQty = currentDemandQty.add(demandAfterCurrent);
         BigDecimal blockedQty = grossDemandQty.subtract(stockQty).max(BigDecimal.ZERO);
         BigDecimal stockDeductQty = stockQty.min(grossDemandQty).max(BigDecimal.ZERO);
         task.setPostTailBlockedQty(blockedQty);

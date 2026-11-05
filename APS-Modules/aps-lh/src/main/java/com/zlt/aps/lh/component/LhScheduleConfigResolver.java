@@ -28,7 +28,9 @@ import java.util.Map;
 @Component
 public class LhScheduleConfigResolver {
 
-    /** 参数 Map 预估容量，减少扩容开销 */
+    /**
+     * 参数 Map 预估容量，减少扩容开销
+     */
     private static final int DEFAULT_PARAM_CAPACITY = 64;
 
     @Resource
@@ -99,6 +101,9 @@ public class LhScheduleConfigResolver {
 
         // 本批次只读同一开关快照，独立下一班窗口也继承该值。
         this.putStructureSwitchSchedulingEnabled(resolvedParamMap, lhParamsMap);
+        this.putPositiveIntValue(resolvedParamMap, lhParamsMap,
+                LhScheduleParamConstant.STRUCTURE_SWITCH_NO_WAIT_FIRST_SHIFT_MACHINE_LIMIT,
+                LhScheduleConstant.STRUCTURE_SWITCH_NO_WAIT_FIRST_SHIFT_MACHINE_LIMIT);
         // 大换英寸延迟只作用于该次切换的首个批量生产班。
         this.putNonNegativeIntValue(resolvedParamMap, lhParamsMap,
                 LhScheduleParamConstant.LARGE_INCH_FIRST_BATCH_DELAY_HOURS,
@@ -316,7 +321,8 @@ public class LhScheduleConfigResolver {
                 LhScheduleConstant.SMALL_BATCH_SKU_THRESHOLD, 1);
         // 试制量试参与新增排产开关只允许0/1，非法配置统一回到默认（新增排产不参与，续作不受影响）。
         putTrialMassTrialSchedulingEnabled(resolvedParamMap, lhParamsMap);
-
+        //20261031+ ZLT 连续生产最大间隔天数
+        putStringValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.SKU_MAX_DISCONTINUE_DAYS, null);
         return new LhScheduleConfig(resolvedParamMap);
     }
 
@@ -324,10 +330,10 @@ public class LhScheduleConfigResolver {
      * 将清洗模具校验开关解析为本批次固定快照，缺省或非法值使用默认关闭。
      *
      * @param resolvedParamMap 已解析参数快照
-     * @param lhParamsMap 当前工厂的原始硫化参数
+     * @param lhParamsMap      当前工厂的原始硫化参数
      */
     private void putCleaningOnlineMouldCheckEnabled(Map<String, String> resolvedParamMap,
-            Map<String, String> lhParamsMap) {
+                                                    Map<String, String> lhParamsMap) {
         String paramCode = LhScheduleParamConstant.CLEANING_ONLINE_MOULD_CHECK_ENABLED;
         String value = StringUtils.trim(lhParamsMap.get(paramCode));
         if (!StringUtils.equals("0", value) && !StringUtils.equals("1", value)) {
@@ -342,11 +348,12 @@ public class LhScheduleConfigResolver {
 
     /**
      * 按现有0/1开关口径解析结构切换总开关；缺省及非法值使用已明确的默认1。
+     *
      * @param resolvedParamMap 已解析快照
-     * @param lhParamsMap 工厂参数
+     * @param lhParamsMap      工厂参数
      */
     private void putStructureSwitchSchedulingEnabled(Map<String, String> resolvedParamMap,
-            Map<String, String> lhParamsMap) {
+                                                     Map<String, String> lhParamsMap) {
         String paramCode = LhScheduleParamConstant.STRUCTURE_SWITCH_SCHEDULING_ENABLED;
         String value = StringUtils.trim(lhParamsMap.get(paramCode));
         if (!StringUtils.equals("0", value) && !StringUtils.equals("1", value)) {
@@ -364,10 +371,10 @@ public class LhScheduleConfigResolver {
      * 续作排产不受该参数影响，试制量试月计划始终完整进入排程源数据。</p>
      *
      * @param resolvedParamMap 解析后参数
-     * @param lhParamsMap 原始硫化参数
+     * @param lhParamsMap      原始硫化参数
      */
     private void putTrialMassTrialSchedulingEnabled(Map<String, String> resolvedParamMap,
-                                                     Map<String, String> lhParamsMap) {
+                                                    Map<String, String> lhParamsMap) {
         String paramCode = LhScheduleParamConstant.TRIAL_MASS_TRIAL_SCHEDULING_ENABLED;
         int defaultValue = LhScheduleConstant.TRIAL_MASS_TRIAL_SCHEDULING_ENABLED;
         String value = lhParamsMap.get(paramCode);
@@ -409,7 +416,7 @@ public class LhScheduleConfigResolver {
      * @param minValue         最小值（null 表示不限制）
      */
     private void putIntValue(Map<String, String> resolvedParamMap, Map<String, String> lhParamsMap,
-            String paramCode, int defaultValue, Integer minValue) {
+                             String paramCode, int defaultValue, Integer minValue) {
         int resolvedValue = defaultValue;
         String value = lhParamsMap.get(paramCode);
         if (StringUtils.isNotEmpty(value)) {
@@ -430,9 +437,9 @@ public class LhScheduleConfigResolver {
      * 解析必须大于零的整数参数，非法值统一回到业务默认值。
      *
      * @param resolvedParamMap 解析后参数
-     * @param lhParamsMap 原始参数
-     * @param paramCode 参数编码
-     * @param defaultValue 业务默认值
+     * @param lhParamsMap      原始参数
+     * @param paramCode        参数编码
+     * @param defaultValue     业务默认值
      */
     private void putPositiveIntValue(Map<String, String> resolvedParamMap,
                                      Map<String, String> lhParamsMap,
@@ -461,9 +468,9 @@ public class LhScheduleConfigResolver {
      * 解析非负整数参数，空值、非数字或负数统一使用业务默认值。
      *
      * @param resolvedParamMap 解析后参数
-     * @param lhParamsMap 原始参数
-     * @param paramCode 参数编码
-     * @param defaultValue 业务默认值
+     * @param lhParamsMap      原始参数
+     * @param paramCode        参数编码
+     * @param defaultValue     业务默认值
      */
     private void putNonNegativeIntValue(Map<String, String> resolvedParamMap,
                                         Map<String, String> lhParamsMap,
@@ -495,7 +502,7 @@ public class LhScheduleConfigResolver {
      * 越界值均使用常量默认值，避免上限被修正为1、时长被修正为0或扣减量被修正为0后改变业务语义。</p>
      *
      * @param resolvedParamMap 解析后参数
-     * @param lhParamsMap 原始参数
+     * @param lhParamsMap      原始参数
      */
     private void putCapsuleReplacementParams(Map<String, String> resolvedParamMap,
                                              Map<String, String> lhParamsMap) {
@@ -514,10 +521,10 @@ public class LhScheduleConfigResolver {
      * 解析单个换胶囊整数参数。
      *
      * @param resolvedParamMap 解析后参数
-     * @param lhParamsMap 原始参数
-     * @param paramCode 参数编码
-     * @param defaultValue 默认值
-     * @param allowZero 是否允许配置为0
+     * @param lhParamsMap      原始参数
+     * @param paramCode        参数编码
+     * @param defaultValue     默认值
+     * @param allowZero        是否允许配置为0
      */
     private void putCapsuleReplacementParam(Map<String, String> resolvedParamMap,
                                             Map<String, String> lhParamsMap,
@@ -585,7 +592,7 @@ public class LhScheduleConfigResolver {
      * <p>只有0和1是合法值；未配置、空值或非法值均按默认1生效，保持现有排程行为兼容。</p>
      *
      * @param resolvedParamMap 解析后参数
-     * @param lhParamsMap 原始参数
+     * @param lhParamsMap      原始参数
      */
     private void putEndingAutoFillEnabled(Map<String, String> resolvedParamMap,
                                           Map<String, String> lhParamsMap) {
@@ -602,7 +609,7 @@ public class LhScheduleConfigResolver {
         if (StringUtils.equals(String.valueOf(
                 LhScheduleConstant.NEW_SPEC_MACHINE_RESOURCE_SHIFT_BY_ENDING_TIME), trimmedValue)
                 || StringUtils.equals(String.valueOf(
-                LhScheduleConstant.NEW_SPEC_MACHINE_RESOURCE_SHIFT_BY_ACTUAL_AVAILABLE_TIME),
+                        LhScheduleConstant.NEW_SPEC_MACHINE_RESOURCE_SHIFT_BY_ACTUAL_AVAILABLE_TIME),
                 trimmedValue)) {
             resolvedParamMap.put(paramCode, trimmedValue);
             return;
@@ -618,7 +625,7 @@ public class LhScheduleConfigResolver {
      * 未配置、空值或非法值均回落默认1，避免配置异常把资源提前归入错误班次。</p>
      *
      * @param resolvedParamMap 解析后参数
-     * @param lhParamsMap 原始硫化参数
+     * @param lhParamsMap      原始硫化参数
      */
     private void putNewSpecMachineResourceShiftMode(
             Map<String, String> resolvedParamMap,
@@ -647,10 +654,10 @@ public class LhScheduleConfigResolver {
      * <p>业务允许范围为1～3天，空值、非数字和越界值均使用默认值2，避免无效配置扩大月计划读取范围。</p>
      *
      * @param resolvedParamMap 解析后的参数快照
-     * @param lhParamsMap 原始硫化参数
+     * @param lhParamsMap      原始硫化参数
      */
     private void putContinuousMouldOfflineCheckDays(Map<String, String> resolvedParamMap,
-                                                     Map<String, String> lhParamsMap) {
+                                                    Map<String, String> lhParamsMap) {
         String paramCode = LhScheduleParamConstant.CONTINUOUS_MOULD_OFFLINE_CHECK_DAYS;
         int defaultValue = LhScheduleConstant.CONTINUOUS_MOULD_OFFLINE_CHECK_DAYS;
         String value = lhParamsMap.get(paramCode);
@@ -681,14 +688,14 @@ public class LhScheduleConfigResolver {
      * 解析非负高精度阈值；未配置、非数字或负数均关闭对应功能。
      *
      * @param resolvedParamMap 解析后的参数快照
-     * @param lhParamsMap 原始硫化参数
-     * @param paramCode 参数编码
-     * @param disabledValue 关闭功能的默认值
+     * @param lhParamsMap      原始硫化参数
+     * @param paramCode        参数编码
+     * @param disabledValue    关闭功能的默认值
      */
     private void putNonNegativeBigDecimalOrDisabled(Map<String, String> resolvedParamMap,
-                                                     Map<String, String> lhParamsMap,
-                                                     String paramCode,
-                                                     BigDecimal disabledValue) {
+                                                    Map<String, String> lhParamsMap,
+                                                    String paramCode,
+                                                    BigDecimal disabledValue) {
         String value = lhParamsMap.get(paramCode);
         if (StringUtils.isEmpty(value)) {
             resolvedParamMap.put(paramCode, disabledValue.toPlainString());
@@ -713,10 +720,10 @@ public class LhScheduleConfigResolver {
      * 解析机台选SKU胎胚等待阈值，缺省或非法配置沿用业务默认4小时。
      *
      * @param resolvedParamMap 已解析参数快照
-     * @param lhParamsMap 工厂原始参数
+     * @param lhParamsMap      工厂原始参数
      */
     private void putMachineSkuEmbryoMaxWaitHours(Map<String, String> resolvedParamMap,
-                                               Map<String, String> lhParamsMap) {
+                                                 Map<String, String> lhParamsMap) {
         String paramCode = LhScheduleParamConstant.MACHINE_SKU_EMBRYO_MAX_WAIT_HOURS;
         String value = lhParamsMap.get(paramCode);
         BigDecimal hours = LhScheduleConstant.MACHINE_SKU_EMBRYO_MAX_WAIT_HOURS;
@@ -746,7 +753,7 @@ public class LhScheduleConfigResolver {
      * @param defaultValue     默认值
      */
     private void putDoubleValue(Map<String, String> resolvedParamMap, Map<String, String> lhParamsMap,
-            String paramCode, double defaultValue) {
+                                String paramCode, double defaultValue) {
         double resolvedValue = defaultValue;
         String value = lhParamsMap.get(paramCode);
         if (StringUtils.isNotEmpty(value)) {
@@ -769,7 +776,7 @@ public class LhScheduleConfigResolver {
      * @param defaultValue     默认值
      */
     private void putStringValue(Map<String, String> resolvedParamMap, Map<String, String> lhParamsMap,
-            String paramCode, String defaultValue) {
+                                String paramCode, String defaultValue) {
         String value = lhParamsMap.get(paramCode);
         resolvedParamMap.put(paramCode, StringUtils.isNotEmpty(value) ? value.trim() : defaultValue);
     }

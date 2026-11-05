@@ -17,4 +17,9 @@ public class InventoryPredictQtyRow {
 
     /** 汇总数量，需求量查询表示早班需求量，计划量查询表示早班计划量。 */
     private BigDecimal qty;
+
+    /**
+     * 成型需求查询命中的来源批次号，多个批次使用逗号分隔。
+     */
+    private String sourceBatchNos;
 }

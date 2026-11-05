@@ -210,7 +210,8 @@ public final class EarlyProductionQuantityCalculator {
      *
      * <p>当前月 TOTAL_QTY 大于0时不改变 SKU；等于0或当前月记录缺失时，清除正常排产
      * 目标并同步实际消费账本，然后仅对满足正规新增范围且未来有原始日计划的 SKU
-     * 注册候选视图。该方法不修改通用 surplusQty、完成量或超欠产计算结果。</p>
+     * 注册候选视图。后半段无计划的单胎胚或非共用胎胚正库存收尾继续正常排产，不受零月总量路由限制。
+     * 该方法不修改通用 surplusQty、完成量或超欠产计算结果。</p>
      *
      * @param context 排程上下文
      * @param sku SKU
@@ -225,7 +226,8 @@ public final class EarlyProductionQuantityCalculator {
             TargetScheduleQtyResolver targetScheduleQtyResolver) {
         int currentMonthTotalQty =
                 resolveCurrentMonthTotalQty(context, sku, scheduleStartDate);
-        if (currentMonthTotalQty > 0) {
+        // 正库存胎胚收尾是本轮独立库存需求，不能被零月总量转为纯未来候选或清零。
+        if (currentMonthTotalQty > 0 || EmbryoEndingStockAdmissionPolicy.isEligible(context, sku)) {
             return false;
         }
         int originalTargetQty = sku.resolveTargetScheduleQty();

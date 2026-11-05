@@ -1,24 +1,23 @@
 package com.zlt.aps.lh.context;
 
-import com.zlt.aps.lh.engine.strategy.support.ContinuationRemainderFinishGroup;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.zlt.aps.common.engine.domain.LhDayPlanAdjustVo;
 import com.zlt.aps.common.engine.domain.LhMonthStartDayResult;
 import com.zlt.aps.common.engine.utils.MonthPlanSurplusCalculator;
+import com.zlt.aps.cx.entity.config.CxEmbryoLhTime;
 import com.zlt.aps.lh.api.domain.dto.*;
 import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.SingleControlMachineModeEnum;
+import com.zlt.aps.lh.component.EmbryoEndingStructureMachineExemptionPolicy;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.StructureEarlyProductionAdmission;
 import com.zlt.aps.lh.component.StructureShiftInMachineIndex;
-import com.zlt.aps.lh.component.EmbryoEndingStructureMachineExemptionPolicy;
 import com.zlt.aps.lh.engine.strategy.support.*;
-import com.zlt.aps.cx.entity.config.CxEmbryoLhTime;
+import com.zlt.aps.lh.handler.LhSkuSurplusDataInfo;
 import com.zlt.aps.lh.handler.SkuMonthPlanCalculator;
 import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
-import com.zlt.aps.lh.engine.strategy.support.ContinuationEndingAllocationSnapshot;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.lh.util.SkuConstructionRefResolverUtil;
@@ -69,6 +68,10 @@ public class LhScheduleContext {
      * 以及是否需要含上个月超欠产标记
      */
     private LhMonthStartDayResult lhMonthStartDayInfo;
+    /**
+     * 硫化余量计算数据信息对象
+     */
+    private LhSkuSurplusDataInfo lhSkuSurplusDataInfo;
     /**
      * 分厂编号
      */
@@ -339,12 +342,22 @@ public class LhScheduleContext {
      * 硫化机台信息Map, key=machineCode
      */
     private Map<String, LhMachineInfo> machineInfoMap = new LinkedHashMap<>();
-    /** 年月与排产版本 → 结构 → 只读专供快照，禁止跨月合并关系。 */
+    /**
+     * 年月与排产版本 → 结构 → 只读专供快照，禁止跨月合并关系。
+     */
     private Map<String, Map<String, StructureDedicatedMachineContext>> structureDedicatedMachineContextMap = new LinkedHashMap<>(4);
-    /** 成型机 → 有效专供硫化机物理编码集合。 */
+    /**
+     * 成型机 → 有效专供硫化机物理编码集合。
+     */
     private Map<String, Set<String>> formingMachineSupplyLhMachineMap = new LinkedHashMap<>(16);
-    /** 物理硫化机 → 专供成型机集合，支持多对多关系。 */
+    /**
+     * 物理硫化机 → 专供成型机集合，支持多对多关系。
+     */
     private Map<String, Set<String>> supplyFormingMachinesByLhMachineMap = new LinkedHashMap<>(16);
+    /**
+     * 胎胚最近在机日期的实际成型来源，只读输入，候选预演和回滚不得修改。
+     */
+    private Map<String, Set<String>> embryoFormingMachineMap = Collections.emptyMap();
     /**
      * 新增排产机台资源作用域。
      * <p>空集合表示沿用原主流程全部机台；班次9独立上下文写入班次8真实释放机台编码，
@@ -370,6 +383,41 @@ public class LhScheduleContext {
     private Map<String, Date> structureEarliestLhTimeMap = new HashMap<>();
 
     /**
+     * 有效成型批次的后结构转产快照，同批同后结构任一记录为1即转产；新批按结构覆盖。
+     */
+    private Map<String, Boolean> structureTransferMap = Collections.emptyMap();
+
+    /**
+     * 有效成型批次中前结构的最晚收尾时间，与后结构供胚索引独立。
+     */
+    private Map<String, Date> structureContinuationEndingTimeMap = new LinkedHashMap<>();
+
+    /**
+     * 有效成型批次的后结构到前结构集合，与最早供胚时间是否存在无关；新批按后结构整体覆盖。
+     */
+    private Map<String, Set<String>> structureContinuationPreviousStructureMap = Collections.emptyMap();
+
+    /**
+     * 按物料和产品状态冻结的结构收尾续作资格及三步执行状态。
+     */
+    private Map<String, StructureEndingContinuationState> structureEndingContinuationStates = new LinkedHashMap<>();
+
+    /**
+     * 已接管历史关系按物理机台建立的只读索引，候选热循环不重复扫描全部历史计划。
+     */
+    private Map<String, List<LhMouldChangePlan>> structureEndingHistoricalMachinePlans = new LinkedHashMap<>();
+
+    /**
+     * 结构切换之后的专用增机回补作用域，普通阶段不能消费已接管需求。
+     */
+    private boolean structureEndingContinuationScheduling;
+
+    /**
+     * 当前单组合或绑定的生产截止，嵌套试排退出时恢复外层边界。
+     */
+    private Date activeStructureEndingProductionDeadline;
+
+    /**
      * 是否启用「更新结构最早可供硫化时间」（前端复选框透传：1-是、0-否，缺省 false）。
      *
      * <p>置位时，{@code loadStructureEarliestLhTime} 除窗口第一天批次（T 日）外，
@@ -385,13 +433,19 @@ public class LhScheduleContext {
      */
     private String structureLhTimeOverriddenDetail = "";
 
-    /** 本批结构首班限量只读快照：结构名称 -> 胎胚编码 -> 含首检总量上限。 */
+    /**
+     * 本批结构首班限量只读快照：结构名称 -> 胎胚编码 -> 含首检总量上限。
+     */
     private Map<String, Map<String, Integer>> structureTreadCountMap = Collections.emptyMap();
 
-    /** 班次9副本冻结原窗口在供胚首班的已用量；主窗口为空。 */
+    /**
+     * 班次9副本冻结原窗口在供胚首班的已用量；主窗口为空。
+     */
     private Map<String, Map<String, Integer>> structureTreadBaselineQtyMap = Collections.emptyMap();
 
-    /** 后结构对应的有效供胚来源记录；时间与两个标识必须来自同一行。 */
+    /**
+     * 后结构对应的有效供胚来源记录；时间与两个标识必须来自同一行。
+     */
     private Map<String, CxEmbryoLhTime> structureSwitchSourceMap =
             new LinkedHashMap<>(16);
 
@@ -424,19 +478,29 @@ public class LhScheduleContext {
      */
     private Map<String, String> structureSwitchFailureReasonMap = new LinkedHashMap<>(16);
 
-    /** 同一次结构切换的已提交首班状态，键为后结构，生命周期限定本次配置快照。 */
+    /**
+     * 同一次结构切换的已提交首班状态，键为后结构，生命周期限定本次配置快照。
+     */
     private Map<String, StructureSwitchRuntimeState> structureSwitchRuntimeMap = new LinkedHashMap<>(16);
 
-    /** 逐班审计标量快照，不参与业务回滚；原窗口保存前汇总，班次9副本禁止写入。 */
+    /**
+     * 逐班审计标量快照，不参与业务回滚；原窗口保存前汇总，班次9副本禁止写入。
+     */
     private Map<String, StructureSwitchShiftAuditEntry> structureSwitchShiftAuditMap = new LinkedHashMap<>(32);
 
-    /** 独立窗口复制的已提交首班基线，原窗口为空；不得因副本清空结果而重置S0。 */
+    /**
+     * 独立窗口复制的已提交首班基线，原窗口为空；不得因副本清空结果而重置S0。
+     */
     private Map<String, StructureSwitchRuntimeState> structureSwitchBaselineRuntimeMap = Collections.emptyMap();
 
-    /** 已落地结果对应的冻结切换计划；单控两侧可引用同一计划。 */
+    /**
+     * 已落地结果对应的冻结切换计划；单控两侧可引用同一计划。
+     */
     private Map<LhScheduleResult, StructureSwitchPlan> structureSwitchResultPlanMap = new IdentityHashMap<>(16);
 
-    /** 已写入结果的首检分摊，供保存前保护各班真实数量；L/R两侧分别关联单侧计划。 */
+    /**
+     * 已写入结果的首检分摊，供保存前保护各班真实数量；L/R两侧分别关联单侧计划。
+     */
     private Map<LhScheduleResult, FirstInspectionAllocationPlan> firstInspectionResultPlanMap = new IdentityHashMap<>(16);
 
     /**
@@ -444,10 +508,14 @@ public class LhScheduleContext {
      */
     private Map<LhScheduleResult, LhScheduleResult> committedWholeSingleControlPairMap = new IdentityHashMap<>(8);
 
-    /** 正式提交作用域内的冻结计划，仅供分量调用，退出提交作用域即恢复。 */
+    /**
+     * 正式提交作用域内的冻结计划，仅供分量调用，退出提交作用域即恢复。
+     */
     private Map<String, StructureSwitchPlan> structureSwitchAttemptPlanMap = new LinkedHashMap<>(4);
 
-    /** 仅在无供胚等待的选料基准预演中置位，不参与业务资源或首班状态。 */
+    /**
+     * 仅在无供胚等待的选料基准预演中置位，不参与业务资源或首班状态。
+     */
     private boolean structureSwitchSelectionProbe;
 
 
@@ -529,6 +597,10 @@ public class LhScheduleContext {
      */
     private Map<String, LhMachineOnlineInfo> machineOnlineInfoMap = new HashMap<>();
     /**
+     * 本轮因模具全部转移而移除的旧MES来源，仅供历史身份追溯，不参与续作或资源占用。
+     */
+    private Map<String, LhMachineOnlineInfo> transferredMouldOnlineSourceMap = new HashMap<>();
+    /**
      * 硫化定点机台Map, key=materialCode（表字段SPEC_CODE实际维护物料编码）
      */
     private Map<String, List<LhSpecifyMachine>> specifyMachineMap = new HashMap<>();
@@ -578,7 +650,9 @@ public class LhScheduleContext {
      */
     private List<LhPrecisionPlan> orderedMaintenancePlanList = new ArrayList<>();
 
-    /** 本批设备计划判定、候选时间约束、待复评及最终安排，与预演快照同步回滚。 */
+    /**
+     * 本批设备计划判定、候选时间约束、待复评及最终安排，与预演快照同步回滚。
+     */
     private EquipmentPlanRuntimeState equipmentPlanRuntimeState = new EquipmentPlanRuntimeState();
 
     /**
@@ -586,7 +660,9 @@ public class LhScheduleContext {
      */
     private CleaningPlanRuntimeState cleaningPlanRuntimeState = new CleaningPlanRuntimeState();
 
-    /** 每条续作实际消费记录，仅用于精度晚阶段受控撤销与重算，按结果身份关联。 */
+    /**
+     * 每条续作实际消费记录，仅用于精度晚阶段受控撤销与重算，按结果身份关联。
+     */
     private Map<LhScheduleResult, ContinuousProductionConsumption> continuousProductionConsumptionMap = new IdentityHashMap<>();
     /**
      * 是否由本批精度中心统一决策。
@@ -647,13 +723,21 @@ public class LhScheduleContext {
      */
     private List<LhMouldChangePlan> historicalReverseMouldChangePlanList = new ArrayList<>();
 
-    /** 前日交替强制下机快照；只影响事件时刻之后的资源。 */
+    /**
+     * 前日交替强制下机快照；只影响事件时刻之后的资源。
+     */
     private Map<String, PreviousAlternatePlanReleaseEvent> previousAlternateReleaseEventMap = new LinkedHashMap<>(16);
-    /** 已实际退出的机台时刻，包含明确允许的等台数承载置换。 */
+    /**
+     * 已实际退出的机台时刻，包含明确允许的等台数承载置换。
+     */
     private Map<String, Date> previousAlternateReleasedMachineTimeMap = new LinkedHashMap<>(16);
-    /** 已退出物料状态键，供新开机需求计数使用，不修改生产事实索引。 */
+    /**
+     * 已退出物料状态键，供新开机需求计数使用，不修改生产事实索引。
+     */
     private Map<String, String> previousAlternateReleasedSkuKeyMap = new LinkedHashMap<>(16);
-    /** 历史动作与最终结果精确关联，同料同模具也必须生成交替计划。 */
+    /**
+     * 历史动作与最终结果精确关联，同料同模具也必须生成交替计划。
+     */
     private Map<LhScheduleResult, LhMouldChangePlan> previousAlternateResultPlanMap = new IdentityHashMap<>(16);
     /**
      * 已成功换块且残量保留到新增流程的候选身份，仅用于冻结结果场景，不参与排程决策。
@@ -675,10 +759,14 @@ public class LhScheduleContext {
      */
     private Map<LhScheduleResult, LhMouldChangePlan> previousAlternateBeforeMaterialSourceMap =
             new IdentityHashMap<>(16);
-    /** 按历史目标机台登记的独立增机需求；不可变值对象随尝试及负荷预演整体回滚。 */
+    /**
+     * 按历史目标机台登记的独立增机需求；不可变值对象随尝试及负荷预演整体回滚。
+     */
     private Map<String, PreviousAlternateAdditionalMachineDemand>
             previousAlternateAdditionalMachineDemandMap = new LinkedHashMap<>(16);
-    /** 当前指定交替指令，只在一次预演和正式提交的作用域内存在。 */
+    /**
+     * 当前指定交替指令，只在一次预演和正式提交的作用域内存在。
+     */
     private PreviousAlternatePlanReleaseEvent activePreviousAlternateEvent;
     /**
      * 当前执行的原机续排绑定，供历史指定正规规则校验，不作为候选全局豁免。
@@ -689,16 +777,23 @@ public class LhScheduleContext {
      * 不表示机台已经释放，不参与资源、结构切换专用名额或机台统计扣除。
      */
     private transient PreviousAlternateStructureLimitExemptionPolicy.Scope activePreviousAlternateStructureLimitScope;
-    /** 仅标识历史关联预演日志，不参与排程决策。 */
+    /**
+     * 仅标识历史关联预演日志，不参与排程决策。
+     */
     private boolean previousAlternateGroupPreview;
-    /** 同日关联预演冻结的目标模具，仅在重放提交作用域内使用。 */
+    /**
+     * 同日关联预演冻结的目标模具，仅在重放提交作用域内使用。
+     */
     private Map<String, List<String>> previousAlternatePlannedMouldMap = new LinkedHashMap<>(16);
-    /** 仅历史释放衍生候选的真实可用时刻，不限制同SKU其他正常候选。 */
+    /**
+     * 仅历史释放衍生候选的真实可用时刻，不限制同SKU其他正常候选。
+     */
     private Map<SkuScheduleDTO, Date> previousAlternateCandidateAvailableTimeMap = new IdentityHashMap<>(16);
 
     /**
      * 当前预演或提交是否为指定的历史交替动作。
-     * @param sku 待排物料
+     *
+     * @param sku         待排物料
      * @param machineCode 运行态机台
      * @return 是否命中当前动作
      */
@@ -707,16 +802,17 @@ public class LhScheduleContext {
                 && StringUtils.equals(activePreviousAlternateEvent.getMachineCode(), machineCode)
                 // 历史计划的产品状态属于后物料，事件中的状态属于实际下机前物料。
                 && this.matchesPreviousAlternateAfterMaterial(activePreviousAlternateEvent.getPlan(),
-                        sku.getMaterialCode(), sku.getProductStatus());
+                sku.getMaterialCode(), sku.getProductStatus());
     }
 
     /**
      * 查询当前精确历史动作登记的增机需求，普通候选不能借用该名额。
+     *
      * @param sku 后物料及状态
      * @return 当前计划对应的不可变需求，未命中时为空
      */
     public PreviousAlternateAdditionalMachineDemand
-            resolvePreviousAlternateAdditionalMachineDemand(SkuScheduleDTO sku) {
+    resolvePreviousAlternateAdditionalMachineDemand(SkuScheduleDTO sku) {
         if (Objects.isNull(activePreviousAlternateEvent)
                 || !this.isPreviousAlternateAction(sku, activePreviousAlternateEvent.getMachineCode())) {
             return null;
@@ -725,14 +821,15 @@ public class LhScheduleContext {
                 previousAlternateAdditionalMachineDemandMap.get(activePreviousAlternateEvent.getMachineCode());
         return Objects.nonNull(demand) && demand.getPlan() == activePreviousAlternateEvent.getPlan()
                 && StringUtils.equals(demand.getSkuKey(),
-                        MonthPlanDateResolver.buildMaterialStatusKey(sku.getMaterialCode(), sku.getProductStatus()))
+                MonthPlanDateResolver.buildMaterialStatusKey(sku.getMaterialCode(), sku.getProductStatus()))
                 ? demand : null;
     }
 
     /**
      * 指定动作共用登记后的目标份数；普通新增仍读取原统一Map。
-     * @param sku 当前物料
-     * @param businessDate 实际生产业务日
+     *
+     * @param sku            当前物料
+     * @param businessDate   实际生产业务日
      * @param ordinaryTarget 原普通目标
      * @return 当前指定动作获准的目标份数
      */
@@ -758,19 +855,19 @@ public class LhScheduleContext {
         }
         return Objects.nonNull(activePreviousAlternateEvent) && Objects.nonNull(sku)
                 && this.matchesPreviousAlternateAfterMaterial(activePreviousAlternateEvent.getPlan(),
-                        sku.getMaterialCode(), sku.getProductStatus());
+                sku.getMaterialCode(), sku.getProductStatus());
     }
 
     /**
      * 按历史后物料及产品状态识别同一排产需求，供资格、承接和结果关联共用。
      *
-     * @param plan 前日交替计划，产品状态描述历史后物料
-     * @param materialCode 当前候选或结果物料编码
+     * @param plan          前日交替计划，产品状态描述历史后物料
+     * @param materialCode  当前候选或结果物料编码
      * @param productStatus 当前候选或结果产品状态
      * @return 历史身份完整且物料、状态均相同时返回true；缺失状态不推测为正规
      */
     public boolean matchesPreviousAlternateAfterMaterial(LhMouldChangePlan plan,
-            String materialCode, String productStatus) {
+                                                         String materialCode, String productStatus) {
         return Objects.nonNull(plan)
                 && StringUtils.isNotEmpty(plan.getAfterMaterialCode())
                 && StringUtils.isNotEmpty(plan.getProductStatus())
@@ -780,13 +877,14 @@ public class LhScheduleContext {
 
     /**
      * 校验调用携带的计划确属本批有效历史关系，且精确指向当前机台和后料状态。
-     * @param sku 待排物料
-     * @param plan 已经最新批次和日期过滤的源计划
+     *
+     * @param sku         待排物料
+     * @param plan        已经最新批次和日期过滤的源计划
      * @param machineCode 本次指定运行态机台，不能把单侧关系扩散到另一侧
      * @return 是否为有效指定组合
      */
     public boolean isEligiblePreviousAlternateCombination(SkuScheduleDTO sku,
-            LhMouldChangePlan plan, String machineCode) {
+                                                          LhMouldChangePlan plan, String machineCode) {
         return Objects.nonNull(sku) && Objects.nonNull(plan)
                 && eligiblePreviousAlternatePlans.stream().anyMatch(eligible -> eligible == plan)
                 && StringUtils.equals(plan.getLhMachineCode(), machineCode)
@@ -802,11 +900,12 @@ public class LhScheduleContext {
     public boolean hasPreviousAlternateTrialPlan(SkuScheduleDTO sku) {
         return PendingSkuUnscheduledRule.isTrialOrMassTrialSku(sku)
                 && eligiblePreviousAlternatePlans.stream().anyMatch(plan ->
-                        this.matchesPreviousAlternateAfterMaterial(plan, sku.getMaterialCode(), sku.getProductStatus()));
+                this.matchesPreviousAlternateAfterMaterial(plan, sku.getMaterialCode(), sku.getProductStatus()));
     }
 
     /**
      * 冻结命中关系的原始候选身份，不修改数量和资源，也不随失败预演撤销。
+     *
      * @param sku 可能被后续阶段移出待排池的候选
      */
     public void registerPreviousAlternateTrialSku(SkuScheduleDTO sku) {
@@ -818,7 +917,8 @@ public class LhScheduleContext {
 
     /**
      * 获取当前业务日已经退出的同物料物理机台，用于承载需求扣除。
-     * @param sku 当前候选
+     *
+     * @param sku          当前候选
      * @param businessDate 需求计算日期
      * @return 已释放的物理机台，历史生产记录保持不变
      */
@@ -837,14 +937,15 @@ public class LhScheduleContext {
 
     /**
      * 原机台重新上机同物料后属于新的有效承载，不能继续沿用旧释放排除。
-     * @param sku 待判断物料
-     * @param machineCode 原运行态机台
+     *
+     * @param sku          待判断物料
+     * @param machineCode  原运行态机台
      * @param releasedTime 原下机时刻
      * @param businessDate 当前业务日
      * @return 是否已有本日有效重新上机结果
      */
     private boolean hasPreviousAlternateReplacementResult(SkuScheduleDTO sku, String machineCode,
-            Date releasedTime, LocalDate businessDate) {
+                                                          Date releasedTime, LocalDate businessDate) {
         return scheduleResultList.stream()
                 .filter(result -> StringUtils.equals(machineCode, result.getLhMachineCode()))
                 .filter(result -> StringUtils.equals(sku.getMaterialCode(), result.getMaterialCode())
@@ -954,11 +1055,17 @@ public class LhScheduleContext {
      * 新增SKU列表，续作和换活字块未消费完的 SKU 会继续保留到 S4.5 新增链路
      */
     private List<SkuScheduleDTO> newSpecSkuList = new ArrayList<>();
-    /** 独立调整需求只准备一次，历史指定承接与 S4.5.2 共用原对象和日计划账本。 */
+    /**
+     * 独立调整需求只准备一次，历史指定承接与 S4.5.2 共用原对象和日计划账本。
+     */
     private List<SkuScheduleDTO> dayPlanAdjustSkuList = new ArrayList<>(8);
-    /** 空候选也标记已准备，禁止后置阶段重新汇总并恢复已消费需求。 */
+    /**
+     * 空候选也标记已准备，禁止后置阶段重新汇总并恢复已消费需求。
+     */
     private boolean dayPlanAdjustPrepared;
-    /** 无窗口日计划的指定试制量试独立需求，普通新增、换活字块及虚拟机不可读取。 */
+    /**
+     * 无窗口日计划的指定试制量试独立需求，普通新增、换活字块及虚拟机不可读取。
+     */
     private List<SkuScheduleDTO> previousAlternateTrialDemandList = new ArrayList<>(4);
 
     /**
@@ -978,6 +1085,7 @@ public class LhScheduleContext {
                 .forEach(candidates::add);
         return candidates;
     }
+
     /**
      * 试制/量试虚拟机台兜底候选快照。
      * <p>S4.3 保留无日计划但有硫化余量的试制/量试，S4.5 再合并参数拦截前的正常新增候选；
@@ -985,16 +1093,22 @@ public class LhScheduleContext {
      * 也不持久化虚拟机台主数据。</p>
      */
     private List<SkuScheduleDTO> trialVirtualMachineCandidateList = new ArrayList<>();
-    /** 本批最新有效历史关系，只提供指定组合资格，不授予普通新增开关豁免。 */
+    /**
+     * 本批最新有效历史关系，只提供指定组合资格，不授予普通新增开关豁免。
+     */
     private List<LhMouldChangePlan> eligiblePreviousAlternatePlans = new ArrayList<>(16);
 
     /**
      * 续作决策前冻结的前日交替物理机台顺序，预演和正式计算共同只读消费。
      */
     private PreviousAlternateMachineOrder previousAlternateMachineOrder = PreviousAlternateMachineOrder.EMPTY;
-    /** 命中指定交替的试制量试原始候选，失败恢复不删除，最终按真实结果核对未排。 */
+    /**
+     * 命中指定交替的试制量试原始候选，失败恢复不删除，最终按真实结果核对未排。
+     */
     private Map<String, SkuScheduleDTO> previousAlternateTrialSkuMap = new LinkedHashMap<>(16);
-    /** 指定交替实际失败证据，资源恢复后仍保留，不能被普通开关拦截覆盖。 */
+    /**
+     * 指定交替实际失败证据，资源恢复后仍保留，不能被普通开关拦截覆盖。
+     */
     private Map<String, String> previousAlternateTrialFailureMap = new LinkedHashMap<>(16);
     /**
      * 班次9独立后置计划候选快照。
@@ -1002,9 +1116,13 @@ public class LhScheduleContext {
      * 班次9实际可排量必须重新读取全部前置阶段完成后的生产剩余账本，禁止直接使用快照中的旧余量。</p>
      */
     private List<SkuScheduleDTO> nextShiftNewPlanCandidateList = new ArrayList<>();
-    /** 班次9候选最终生效日期池，按物料和产品状态记录，不保存前置阶段数量。 */
+    /**
+     * 班次9候选最终生效日期池，按物料和产品状态记录，不保存前置阶段数量。
+     */
     private Map<String, LocalDate> nextShiftNewPlanPoolDateMap = new LinkedHashMap<>(16);
-    /** 仅班次9独立副本启用：沿用前置最终日期池，不重新归池或登记原窗口候选。 */
+    /**
+     * 仅班次9独立副本启用：沿用前置最终日期池，不重新归池或登记原窗口候选。
+     */
     private boolean isolatedNextShiftPlan;
 
     /**
@@ -1099,9 +1217,19 @@ public class LhScheduleContext {
      */
     private List<ContinuationRemainderFinishGroup> continuationRemainderFinishGroups =
             new ArrayList<>(16);
-    /** 同料多状态专用链锁定的来源键，传递给最终补偿收口。 */
+    /**
+     * 前置分流已确认降模节奏下无法清量的原续作来源，按对象身份覆盖同组副本。
+     * 本集合仅在S4.4前置决策写入，后续试排只读，不随候选回滚或补量重新分类。
+     */
+    private Set<SkuScheduleDTO> continuationTimedReductionSkus =
+            Collections.newSetFromMap(new IdentityHashMap<SkuScheduleDTO, Boolean>(16));
+    /**
+     * 同料多状态专用链锁定的来源键，传递给最终补偿收口。
+     */
     private Set<String> continuationFinishLockedFormalSkuKeys = new LinkedHashSet<>(4);
-    /** 已由新服务接管的单机及多机结果身份，阻止旧补量、均衡与保存前归整。 */
+    /**
+     * 已由新服务接管的单机及多机结果身份，阻止旧补量、均衡与保存前归整。
+     */
     private Set<LhScheduleResult> continuationSurplusEndingAllocatedResults =
             Collections.newSetFromMap(new IdentityHashMap<LhScheduleResult, Boolean>(16));
     /**
@@ -1287,10 +1415,14 @@ public class LhScheduleContext {
      */
     private MouldResourceContext mouldResourceContext;
 
-    /** 前置指定组合已提交的在机绑定；后续日驱动直接接续同一结果与需求对象。 */
+    /**
+     * 前置指定组合已提交的在机绑定；后续日驱动直接接续同一结果与需求对象。
+     */
     private List<ActiveMachineBinding> preScheduledMachineBindingList = new ArrayList<ActiveMachineBinding>(16);
 
-    /** 前置结果换下的旧模具最早释放时刻，防止后续从窗口首日开始排产时提前使用未来资源。 */
+    /**
+     * 前置结果换下的旧模具最早释放时刻，防止后续从窗口首日开始排产时提前使用未来资源。
+     */
     private Map<String, Date> preScheduledMouldReleaseTimeMap = new LinkedHashMap<String, Date>(16);
 
     // ========== 机台分配状态 ==========
@@ -1336,11 +1468,17 @@ public class LhScheduleContext {
      */
     private Map<String, int[]> dailyMouldChangeCountMap = new LinkedHashMap<>();
 
-    /** 本次原窗口的历史限额快照；只读共享，不预占真实或模拟次数。 */
+    /**
+     * 本次原窗口的历史限额快照；只读共享，不预占真实或模拟次数。
+     */
     private MouldChangeQuotaSnapshot mouldChangeQuotaSnapshot;
-    /** 前置选机冻结的按时间下机需求，顺序与原下机优先级一致。 */
+    /**
+     * 前置选机冻结的按时间下机需求，顺序与原下机优先级一致。
+     */
     private List<TimedMachineOffRequest> timedMachineOffRequests = new ArrayList<>(8);
-    /** 本批一次性时间下机负荷预演标记，仅限制预演扫描，不改变正式排程。 */
+    /**
+     * 本批一次性时间下机负荷预演标记，仅限制预演扫描，不改变正式排程。
+     */
     private boolean timedMachineOffLoadPreview;
     /**
      * 时间下机决定形成后的隔离承接预演，模拟正式补充释放及历史准备窗口并在退出时恢复。
@@ -1360,10 +1498,14 @@ public class LhScheduleContext {
      */
     private TimedMachineOffActionPreviewCapture timedMachineOffActionPreviewCapture;
 
-    /** 已提交时间边界以结果身份索引，零量生产行移除后仍保留资源释放事实。 */
+    /**
+     * 已提交时间边界以结果身份索引，零量生产行移除后仍保留资源释放事实。
+     */
     private Map<LhScheduleResult, OffMachineDecision> timedMachineOffDecisionMap = new IdentityHashMap<>(8);
 
-    /** @param result 原始结果 @return 是否已登记独立按时间下机需求 */
+    /**
+     * @param result 原始结果 @return 是否已登记独立按时间下机需求
+     */
     public boolean hasTimedMachineOffRequest(LhScheduleResult result) {
         return timedMachineOffRequests.stream().anyMatch(request -> request.getProfile().getOriginals().stream()
                 .anyMatch(original -> original == result));
@@ -1371,6 +1513,7 @@ public class LhScheduleContext {
 
     /**
      * 获取物理机台尚待首次承接的按时间下机占用截止，供正式换模入口统一遵守。
+     *
      * @param machineCode 当前物理机台或单控侧编码
      * @return 已提交占用截止；不属于本规则或已经正式承接时为空
      */
@@ -1489,7 +1632,9 @@ public class LhScheduleContext {
      * 全量SKU排程信息索引Map，key=materialCode_productStatus，供后置阶段精确查找来源SKU
      */
     private Map<String, SkuScheduleDTO> allSkuScheduleDtoMap = new LinkedHashMap<>();
-    /** S4.3清理待排SKU之前按物料汇总的硫化余量，避免历史计划后料状态误当作前料状态。 */
+    /**
+     * S4.3清理待排SKU之前按物料汇总的硫化余量，避免历史计划后料状态误当作前料状态。
+     */
     private Map<String, Integer> initialMaterialSurplusQtyMap = new LinkedHashMap<>();
 
     /**
@@ -1534,8 +1679,8 @@ public class LhScheduleContext {
     /**
      * 按运行侧、物料及状态判断结果是否来自已确认的历史前料续作。
      *
-     * @param machineCode 运行侧机台
-     * @param materialCode 物料编码
+     * @param machineCode   运行侧机台
+     * @param materialCode  物料编码
      * @param productStatus 产品状态
      * @return 精确命中本轮前料身份时返回true
      */
@@ -1544,6 +1689,7 @@ public class LhScheduleContext {
         return Objects.nonNull(source) && StringUtils.equals(source.getMaterialCode(), materialCode)
                 && StringUtils.equals(source.getProductStatus(), productStatus);
     }
+
     /**
      * SKU减量清单四维索引，key=year|month|materialCode|productStatus。
      * 年月取自来源月计划，文本归一化后匹配；S4.2批量加载，S4.3统一过滤。
@@ -1561,6 +1707,11 @@ public class LhScheduleContext {
      * 硫化排程结果列表
      */
     private List<LhScheduleResult> scheduleResultList = new ArrayList<>();
+    /**
+     * 专供转产成功生成的后料结果，按对象身份在最终正量班次追加原因。
+     */
+    private Set<LhScheduleResult> dedicatedSupplyTransferResults =
+            Collections.newSetFromMap(new IdentityHashMap<>());
     /**
      * 硫化未排结果列表
      */
@@ -2116,7 +2267,7 @@ public class LhScheduleContext {
     /**
      * 在现有候选池完成日期调整后登记最终归属；后续合法归池覆盖先前记录。
      *
-     * @param sku 本轮候选对象，保留最新日计划等业务属性
+     * @param sku      本轮候选对象，保留最新日计划等业务属性
      * @param poolDate 实际日期池 Map 的日期，不能使用调整前的原始日期
      */
     public void registerNextShiftNewPlanPool(SkuScheduleDTO sku, LocalDate poolDate) {
@@ -2166,7 +2317,8 @@ public class LhScheduleContext {
      * 按实际业务日判断未来候选是否仍只能提前生产。
      * <p>原候选身份保留供审计及日期回放使用；进入有总计划的来源月份且计划日已到达后，
      * 普通新增和指定承接使用正常准入，不能继续被窗口开始月的零总量隔离。</p>
-     * @param sku 原需求
+     *
+     * @param sku          原需求
      * @param businessDate 实际业务日期
      * @return 是否仍仅允许提前生产
      */
@@ -2237,6 +2389,7 @@ public class LhScheduleContext {
 
     /**
      * 读取尚未激活的未来需求基数，仅用于生命周期和剩余需求判断，不授予生产资格。
+     *
      * @param sku 原需求或同物料状态的后置副本
      * @return 未激活需求基数；没有此类需求或已有正式消费账本时为空
      */
@@ -2303,7 +2456,7 @@ public class LhScheduleContext {
      * 本方法仅供业务数量判断，原日期账本、SKU计数和持久化实际展示保持不变。
      *
      * @param productionDate 业务日期
-     * @param structureName 结构名称
+     * @param structureName  结构名称
      * @return 应计入当日结构配额的去重物理机台数
      */
     public int getEffectiveStructureScheduledMachineCount(LocalDate productionDate, String structureName) {
@@ -2463,9 +2616,9 @@ public class LhScheduleContext {
     /**
      * 获取指定业务日、指定SKU排除部分物理机台后的已排机台数。
      *
-     * @param productionDate 业务日期
-     * @param materialCode SKU物料编码
-     * @param productStatus 产品状态
+     * @param productionDate                 业务日期
+     * @param materialCode                   SKU物料编码
+     * @param productStatus                  产品状态
      * @param excludedPhysicalMachineCodeSet 不再视为在机的物理机台编码
      * @return 排除后的已排物理机台数
      */
@@ -2560,7 +2713,7 @@ public class LhScheduleContext {
      * 按需求日期解析仍失效的强制释放机台，包含已确认历史强制交接。
      * 释放前业务日及普通补机重新上机后的有效承载不按历史释放排除。
      *
-     * @param sku 当前物料及产品状态
+     * @param sku          当前物料及产品状态
      * @param businessDate 统计需求的业务日期；为空时保留原释放事实
      * @return 尚未在该业务日由新结果重新承接的物理机台集合
      */
@@ -2583,7 +2736,7 @@ public class LhScheduleContext {
             if (Objects.nonNull(event) && Objects.nonNull(event.getCleanStartTime())
                     && !this.isTemporaryFaultOriginalMachine(sku, machineCode)
                     && this.hasPreviousAlternateReplacementResult(sku, machineCode,
-                            event.getCleanStartTime(), businessDate)) {
+                    event.getCleanStartTime(), businessDate)) {
                 // 只撤销已被正式正量结果替代的旧释放排除，不能提前计入尚未开产的未来绑定。
                 machines.remove(LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode));
             }
@@ -2594,9 +2747,9 @@ public class LhScheduleContext {
     /**
      * 判断候选机台是否为当前仅喷砂释放 SKU 已退出的原物理机台。
      *
-     * @param sku 仅喷砂回流候选
+     * @param sku         仅喷砂回流候选
      * @param machineCode 候选运行态机台
-     * @return true-本次重新排产禁止选回的原喷砂物理机台
+     * @return true-属于本次喷砂来源原机，仅表示身份，不表示禁止回装
      */
     public boolean isOnlySandBlastOriginalMachine(SkuScheduleDTO sku, String machineCode) {
         if (Objects.isNull(sku) || StringUtils.isEmpty(machineCode)) {
@@ -2632,7 +2785,7 @@ public class LhScheduleContext {
                 || StringUtils.isNotEmpty(event.getReplacementMouldCode())
                 || !StringUtils.equals(event.getContinuationMaterialCode(), sku.getMaterialCode())
                 || !StringUtils.equals(StringUtils.trimToEmpty(event.getContinuationProductStatus()),
-                        StringUtils.trimToEmpty(sku.getProductStatus()))) {
+                StringUtils.trimToEmpty(sku.getProductStatus()))) {
             return Collections.emptyList();
         }
         return Collections.singletonList(event);
@@ -2658,7 +2811,7 @@ public class LhScheduleContext {
     /**
      * 判断候选机台是否为当前故障SKU已经退出的原物理机台。
      *
-     * @param sku 故障回流候选
+     * @param sku         故障回流候选
      * @param machineCode 候选运行态机台
      * @return true-本次迁移禁止选回的原故障物理机台
      */
@@ -3052,8 +3205,8 @@ public class LhScheduleContext {
      * @param shiftIndexes   实际停产保机班次序号
      */
     public void registerContinuousStopHoldShifts(String machineCode,
-                                                  LocalDate productionDate,
-                                                  Collection<Integer> shiftIndexes) {
+                                                 LocalDate productionDate,
+                                                 Collection<Integer> shiftIndexes) {
         if (StringUtils.isEmpty(machineCode) || Objects.isNull(productionDate)
                 || CollectionUtils.isEmpty(shiftIndexes)) {
             return;

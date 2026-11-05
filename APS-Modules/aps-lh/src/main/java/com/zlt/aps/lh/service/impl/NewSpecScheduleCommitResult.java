@@ -17,12 +17,26 @@ public final class NewSpecScheduleCommitResult {
     /** 是否因未形成有效结果而完整恢复运行态 */
     private final boolean rolledBack;
 
+    /**
+     * 回滚前冻结的拒绝原因，成功及无明确拒绝原因时为空。
+     */
+    private final String failureReason;
+
+    /**
+     * 保存提交状态及独立于资源快照的失败证据。
+     *
+     * @param scheduledCount 有效结果数
+     * @param stateChanged 是否保留正式状态
+     * @param rolledBack 是否完整恢复
+     * @param failureReason 回滚原因
+     */
     private NewSpecScheduleCommitResult(int scheduledCount,
                                         boolean stateChanged,
-                                        boolean rolledBack) {
+                                        boolean rolledBack, String failureReason) {
         this.scheduledCount = Math.max(0, scheduledCount);
         this.stateChanged = stateChanged;
         this.rolledBack = rolledBack;
+        this.failureReason = failureReason;
     }
 
     /**
@@ -32,7 +46,7 @@ public final class NewSpecScheduleCommitResult {
      * @return 提交结果
      */
     public static NewSpecScheduleCommitResult resultCommitted(int scheduledCount) {
-        return new NewSpecScheduleCommitResult(scheduledCount, true, false);
+        return new NewSpecScheduleCommitResult(scheduledCount, true, false, null);
     }
 
     /**
@@ -41,7 +55,7 @@ public final class NewSpecScheduleCommitResult {
      * @return 提交结果
      */
     public static NewSpecScheduleCommitResult terminalStateCommitted() {
-        return new NewSpecScheduleCommitResult(0, true, false);
+        return new NewSpecScheduleCommitResult(0, true, false, null);
     }
 
     /**
@@ -50,7 +64,26 @@ public final class NewSpecScheduleCommitResult {
      * @return 提交结果
      */
     public static NewSpecScheduleCommitResult rolledBack() {
-        return new NewSpecScheduleCommitResult(0, false, true);
+        return rolledBack(null);
+    }
+
+    /**
+     * 构造携带明确拒绝证据的完整回滚结果。
+     *
+     * @param failureReason 资源恢复前捕获的拒绝原因
+     * @return 不携带试排资源状态的回滚结果
+     */
+    public static NewSpecScheduleCommitResult rolledBack(String failureReason) {
+        return new NewSpecScheduleCommitResult(0, false, true, failureReason);
+    }
+
+    /**
+     * 读取回滚前冻结的失败原因。
+     *
+     * @return 明确拒绝原因，无明确原因时为空
+     */
+    public String getFailureReason() {
+        return failureReason;
     }
 
     public int getScheduledCount() {

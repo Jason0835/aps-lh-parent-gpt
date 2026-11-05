@@ -23,6 +23,7 @@ import com.zlt.aps.lh.service.ILhBaseDataService;
 import com.zlt.aps.lh.service.ILhShiftConfigService;
 import com.zlt.aps.lh.service.impl.LhCleaningScheduleService;
 import com.zlt.aps.lh.service.impl.LhMaintenanceScheduleService;
+import com.zlt.aps.lh.util.LhInventoryPlanMatcher;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.MachineCleaningOverlapUtil;
@@ -169,7 +170,7 @@ public class DataInitHandler extends AbsScheduleStepHandler {
      * <p>
      * 为每台硫化机台初始化 {@link MachineScheduleDTO}，包含：
      * 机台基本信息、在产规格（从MES在机信息获取）、
-         * 设备停机信息、设备停机来源清洗窗口、保养/维修计划、胶囊使用次数等
+     * 设备停机信息（盘点按硫化线优先）、设备停机来源清洗窗口、保养/维修计划、胶囊使用次数等
      * </p>
      *
      * @param context 排程上下文
@@ -222,38 +223,38 @@ public class DataInitHandler extends AbsScheduleStepHandler {
             // 临时性故障、盘点等类型。其中干冰清洗(07)和喷砂清洗(08)已在 buildScheduledCleaningWindowMap
             // 中剥离并转换为运行态清洗窗口，此处遍历的均为非清洗类停机。
             // 盘点(09)停机只扣时间产能，不触发换模、换活字块、预热等逻辑；盘点结束后机台可直接排产。
-            for (MdmDevicePlanShut planShut : context.getDevicePlanShutList()) {
-                if (machineCode.equals(planShut.getMachineCode())) {
-                    if (dto.getPlanStopStartTime() == null
-                            || (planShut.getBeginDate() != null && planShut.getBeginDate().before(dto.getPlanStopStartTime()))) {
-                        dto.setPlanStopStartTime(planShut.getBeginDate());
-                        dto.setPlanStopEndTime(planShut.getEndDate());
-                        dto.setStopType(planShut.getMachineStopType());
-                    }
-                    MachineStopTypeEnum stopTypeEnum = MachineStopTypeEnum.getByCode(planShut.getMachineStopType());
-                    // 临时故障(06)已独立登记为产能窗口，不设置维修标记或抬高机台准备就绪时间。
-                    // 计划性维修(05)不复用旧的全局抬时字段：维修开始班次按SYS0308010固定排产，
-                    // 维修结束后由统一容量时间轴追加SYS0307009预热；同物料仍保持续作身份。
-                    // 盘点(09)、精度校验(00)等其他停机类型仅保留停机窗口用于产能扣减，
-                    // 不触发换模、换活字块、首检、预热等逻辑。
-                    if (stopTypeEnum == MachineStopTypeEnum.PLANNED_REPAIR) {
-                        log.info("机台存在计划性维修停机计划，开始班次按SYS0308010固定排产，"
-                                        + "维修结束后按SYS0307009预热并保留原物料续作, 机台: {}, "
-                                        + "维修开始: {}, 维修结束: {}, 固定排产量: {}, 预热分钟数: {}",
-                                machineCode,
-                                LhScheduleTimeUtil.formatDateTime(planShut.getBeginDate()),
-                                LhScheduleTimeUtil.formatDateTime(planShut.getEndDate()),
-                                context.getParamIntValue(LhScheduleParamConstant.PLANNED_REPAIR_FIXED_QTY,
-                                        LhScheduleConstant.PLANNED_REPAIR_FIXED_QTY),
-                                LhScheduleTimeUtil.getCapsulePreheatMinutes(context));
-                    }
-                    // 盘点停机计划日志：记录机台、盘点时间段，便于排查盘点扣产能问题
-                    if (stopTypeEnum == MachineStopTypeEnum.TAKE_STOCK) {
-                        log.info("机台存在盘点停机计划, 机台: {}, 盘点开始: {}, 盘点结束: {}",
-                                machineCode,
-                                LhScheduleTimeUtil.formatDateTime(planShut.getBeginDate()),
-                                LhScheduleTimeUtil.formatDateTime(planShut.getEndDate()));
-                    }
+            for (MdmDevicePlanShut planShut : LhInventoryPlanMatcher.matchStopPlans(
+                    context.getDevicePlanShutList(), machineCode)) {
+                if (dto.getPlanStopStartTime() == null
+                        || (planShut.getBeginDate() != null
+                            && planShut.getBeginDate().before(dto.getPlanStopStartTime()))) {
+                    dto.setPlanStopStartTime(planShut.getBeginDate());
+                    dto.setPlanStopEndTime(planShut.getEndDate());
+                    dto.setStopType(planShut.getMachineStopType());
+                }
+                MachineStopTypeEnum stopTypeEnum = MachineStopTypeEnum.getByCode(planShut.getMachineStopType());
+                // 临时故障(06)已独立登记为产能窗口，不设置维修标记或抬高机台准备就绪时间。
+                // 计划性维修(05)不复用旧的全局抬时字段：维修开始班次按SYS0308010固定排产，
+                // 维修结束后由统一容量时间轴追加SYS0307009预热；同物料仍保持续作身份。
+                // 盘点(09)、精度校验(00)等其他停机类型仅保留停机窗口用于产能扣减，
+                // 不触发换模、换活字块、首检、预热等逻辑。
+                if (stopTypeEnum == MachineStopTypeEnum.PLANNED_REPAIR) {
+                    log.info("机台存在计划性维修停机计划，开始班次按SYS0308010固定排产，"
+                                    + "维修结束后按SYS0307009预热并保留原物料续作, 机台: {}, "
+                                    + "维修开始: {}, 维修结束: {}, 固定排产量: {}, 预热分钟数: {}",
+                            machineCode,
+                            LhScheduleTimeUtil.formatDateTime(planShut.getBeginDate()),
+                            LhScheduleTimeUtil.formatDateTime(planShut.getEndDate()),
+                            context.getParamIntValue(LhScheduleParamConstant.PLANNED_REPAIR_FIXED_QTY,
+                                    LhScheduleConstant.PLANNED_REPAIR_FIXED_QTY),
+                            LhScheduleTimeUtil.getCapsulePreheatMinutes(context));
+                }
+                // 盘点停机计划日志：记录机台、盘点时间段，便于排查盘点扣产能问题
+                if (stopTypeEnum == MachineStopTypeEnum.TAKE_STOCK) {
+                    log.info("机台存在盘点停机计划, 机台: {}, 来源计划: {}, 硫化线: {}, 盘点开始: {}, 盘点结束: {}",
+                            machineCode, planShut.getId(), planShut.getVulcanizingLine(),
+                            LhScheduleTimeUtil.formatDateTime(planShut.getBeginDate()),
+                            LhScheduleTimeUtil.formatDateTime(planShut.getEndDate()));
                 }
             }
 
@@ -327,27 +328,27 @@ public class DataInitHandler extends AbsScheduleStepHandler {
             }
         }
 
-        for (MdmDevicePlanShut planShut : context.getDevicePlanShutList()) {
-            if (StringUtils.equals(machineCode, planShut.getMachineCode())) {
-                if (dto.getPlanStopStartTime() == null
-                        || (planShut.getBeginDate() != null && planShut.getBeginDate().before(dto.getPlanStopStartTime()))) {
-                    dto.setPlanStopStartTime(planShut.getBeginDate());
-                    dto.setPlanStopEndTime(planShut.getEndDate());
-                    dto.setStopType(planShut.getMachineStopType());
-                }
-                MachineStopTypeEnum stopTypeEnum = MachineStopTypeEnum.getByCode(planShut.getMachineStopType());
-                // 临时故障(06)不进入本业务列表；计划性维修(05)不设置旧全局维修标记，
-                // 而是由统一容量时间轴处理开始班次固定量、真实维修停机和SYS0307009预热。
-                if (stopTypeEnum == MachineStopTypeEnum.PLANNED_REPAIR) {
-                    log.info("机台存在计划性维修停机计划，运行态保留原物料续作并在维修后执行预热, "
-                                    + "机台: {}, 维修开始: {}, 维修结束: {}, 固定排产量: {}, 预热分钟数: {}",
-                            machineCode,
-                            LhScheduleTimeUtil.formatDateTime(planShut.getBeginDate()),
-                            LhScheduleTimeUtil.formatDateTime(planShut.getEndDate()),
-                            context.getParamIntValue(LhScheduleParamConstant.PLANNED_REPAIR_FIXED_QTY,
-                                    LhScheduleConstant.PLANNED_REPAIR_FIXED_QTY),
-                            LhScheduleTimeUtil.getCapsulePreheatMinutes(context));
-                }
+        for (MdmDevicePlanShut planShut : LhInventoryPlanMatcher.matchStopPlans(
+                context.getDevicePlanShutList(), machineCode)) {
+            if (dto.getPlanStopStartTime() == null
+                    || (planShut.getBeginDate() != null
+                        && planShut.getBeginDate().before(dto.getPlanStopStartTime()))) {
+                dto.setPlanStopStartTime(planShut.getBeginDate());
+                dto.setPlanStopEndTime(planShut.getEndDate());
+                dto.setStopType(planShut.getMachineStopType());
+            }
+            MachineStopTypeEnum stopTypeEnum = MachineStopTypeEnum.getByCode(planShut.getMachineStopType());
+            // 临时故障(06)不进入本业务列表；计划性维修(05)不设置旧全局维修标记，
+            // 而是由统一容量时间轴处理开始班次固定量、真实维修停机和SYS0307009预热。
+            if (stopTypeEnum == MachineStopTypeEnum.PLANNED_REPAIR) {
+                log.info("机台存在计划性维修停机计划，运行态保留原物料续作并在维修后执行预热, "
+                                + "机台: {}, 维修开始: {}, 维修结束: {}, 固定排产量: {}, 预热分钟数: {}",
+                        machineCode,
+                        LhScheduleTimeUtil.formatDateTime(planShut.getBeginDate()),
+                        LhScheduleTimeUtil.formatDateTime(planShut.getEndDate()),
+                        context.getParamIntValue(LhScheduleParamConstant.PLANNED_REPAIR_FIXED_QTY,
+                                LhScheduleConstant.PLANNED_REPAIR_FIXED_QTY),
+                        LhScheduleTimeUtil.getCapsulePreheatMinutes(context));
             }
         }
 

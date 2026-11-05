@@ -1,5 +1,9 @@
 package com.zlt.aps.lh.util;
 
+import com.zlt.aps.lh.service.impl.LhInventoryOverlapResolver;
+import com.zlt.aps.cx.entity.config.CxEmbryoLhTime;
+import com.zlt.aps.lh.engine.strategy.support.HistoricalStructureHandoffPolicy;
+import com.zlt.aps.lh.engine.strategy.support.StructureSwitchSchedulingPolicy;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
@@ -389,6 +393,24 @@ public final class FirstInspectionAllocationUtil {
                 ? new Date(inspectionStartTime.getTime() + durationMillis)
                 : inspectionReferenceTime;
 
+        // 仅切换计件首检适用盘点后移；设备精度及清洗固定首检保留原契约。
+        Date inventoryReady = changeoverQuantity && fixedDurationSeconds == 0L
+                ? LhInventoryOverlapResolver.resolveInspectionNotBefore(
+                        context, machineCode, inspectionStartTime, inspectionEndTime) : null;
+        if (inventoryReady != null) {
+            Date nextInspectionStart = resolveLaterTime(inventoryReady, inspectionNotBeforeTime);
+            // 只重建同一次首检，不移动真实切换或登记资源；新班次重新解析参数和完整容量。
+            return buildPlan(context, sku, shifts, changeoverEndTime, nextInspectionStart,
+                    shiftCapacity, remainingQty, scheduleType, machineCode, availableCapacityMap,
+                    FirstInspectionTimingMode.START_AT_OCCUPATION_BOUNDARY, fixedDurationSeconds, changeoverQuantity);
+        }
+
+        // 首检必须完整落在本次结构收尾截止内，不允许裁掉部分首检后仍占用完整首检资格。
+        Date productionDeadline = context.getActiveStructureEndingProductionDeadline();
+        if (productionDeadline != null && inspectionEndTime.after(productionDeadline)) {
+            return FirstInspectionAllocationPlan.invalid(com.zlt.aps.lh.api.enums.UnscheduledReasonEnum
+                    .CAPACITY_INSUFFICIENT.getDescription(), countingShift, inspectionEndTime);
+        }
         List<FirstInspectionShiftAllocation> allocations = new ArrayList<FirstInspectionShiftAllocation>(4);
         long coveredMillis = 0L;
         long endMillis = inspectionEndTime.getTime();
@@ -580,6 +602,30 @@ public final class FirstInspectionAllocationUtil {
                 context, sku, shifts, changeoverEndTime, inspectionNotBeforeTime,
                 shiftCapacity, remainingQty, scheduleType, machineCode,
                 availableCapacityMap, decision.getTimingMode());
+        CxEmbryoLhTime historicalSource = StructureSwitchSchedulingPolicy.resolveSource(context, sku);
+        if (!context.isStructureSwitchSelectionProbe()
+                && HistoricalStructureHandoffPolicy.isWaitingExempt(context, sku, machineCode)
+                && Objects.nonNull(historicalSource) && Objects.nonNull(historicalSource.getEarliestLhTime())
+                && Objects.nonNull(allocationPlan.getInspectionStartTime())
+                && allocationPlan.getInspectionStartTime().before(historicalSource.getEarliestLhTime())) {
+            // 同步冻结正向模式及完整分摊，不能只后移正式生产而保留供胚前的首检。
+            Date historicalHardGate = resolveLaterTime(productionOccupationNotBeforeTime, combinedReadyTime);
+            if (Objects.nonNull(productionReadyTime) && productionReadyTime.after(changeoverEndTime)) {
+                historicalHardGate = resolveLaterTime(historicalHardGate, productionReadyTime);
+            }
+            inspectionNotBeforeTime = resolveLaterTime(historicalHardGate, historicalSource.getEarliestLhTime());
+            decision = FirstInspectionTimingModeDecision.of(FirstInspectionTimingMode.START_AT_OCCUPATION_BOUNDARY,
+                    "历史指定承接从真实供胚及其他硬门禁之后执行完整首检");
+            allocationPlan = buildPlan(context, sku, shifts, changeoverEndTime, inspectionNotBeforeTime,
+                    shiftCapacity, remainingQty, scheduleType, machineCode, availableCapacityMap, decision.getTimingMode());
+        }
+        // 普通倒推计划只有盘点适配会越过原切换终点；冻结实际模式，不能按新班次时长反推旧区间。
+        if (!isForwardTimingMode(decision.getTimingMode()) && allocationPlan.isValid()
+                && allocationPlan.getInspectionEndTime() != null
+                && allocationPlan.getInspectionEndTime().after(changeoverEndTime)) {
+            decision = FirstInspectionTimingModeDecision.of(FirstInspectionTimingMode.START_AT_OCCUPATION_BOUNDARY,
+                    "盘点禁产，受影响的同一次首检在盘点后执行，不重新换模");
+        }
         Date formalProductionStartTime = isForwardTimingMode(decision.getTimingMode())
                         ? resolveLaterTime(
                         resolveLaterTime(productionReadyTime, changeoverEndTime),

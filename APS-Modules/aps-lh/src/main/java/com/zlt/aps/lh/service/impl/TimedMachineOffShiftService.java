@@ -1,5 +1,7 @@
 package com.zlt.aps.lh.service.impl;
 
+import com.zlt.aps.lh.engine.strategy.support.StructureEndingContinuationPolicy;
+
 import cn.hutool.core.bean.BeanUtil;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
@@ -33,9 +35,11 @@ import java.util.List;
 import java.util.Objects;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * 按时间下机的独立班次决策与提交服务。
@@ -54,6 +58,10 @@ public class TimedMachineOffShiftService {
      */
     private static final int AFTERNOON_INDEX = 1;
     /**
+     * 时间下机次数快照固定覆盖 T、T+1、T+2 三个业务日。
+     */
+    private static final int TIMED_OFF_WINDOW_DAYS = 3;
+    /**
      * 结果分析中统一标明独立时间边界。
      */
     private static final String TIMED_OFF_ANALYSIS = "按时间下机边界调整";
@@ -67,13 +75,13 @@ public class TimedMachineOffShiftService {
     private final TimedMachineOffReleaseResolver releaseResolver = new TimedMachineOffReleaseResolver();
 
     /**
-     * 从需求日逐日读取正式次数，选择窗口内合法的早班或中班。
+     * 从需求日逐日读取正式次数，选择窗口内合法的早班或中班，并应用有效历史交替的最晚边界。
      *
      * @param context 本批上下文，包含参数、真实班次和正式次数账本
      * @param startDate 前置选机确定的需求日期
-     * @param machineCode 已选定机台，仅用于日志
-     * @param sku 已选定机台的来源 SKU，仅用于日志
-     * @return 决策；无合法班次时下机时间为空，占用保持到窗口末端
+     * @param machineCode 已选定的精确机台，用于历史事件匹配和日志
+     * @param sku 已选定机台的前料身份，用于历史边界准入和日志
+     * @return 下机决策；无时间规则节点及可用历史边界时占用保持到窗口末端
      */
     public OffMachineDecision resolveOffMachineTime(LhScheduleContext context, LocalDate startDate,
             String machineCode, SkuScheduleDTO sku) {
@@ -98,7 +106,8 @@ public class TimedMachineOffShiftService {
     }
 
     /**
-     * 在真实班次、配额及前序历史机台释放边界内确定合法下机时间。
+     * 在真实班次、配额及前序历史机台释放边界内选班，再以本机历史交替起点限制最晚下机。
+     * 历史边界只约束前料，后料仍独立校验正式换模次数及准备窗口。
      *
      * @param context 上下文
      * @param startDate 最早日期
@@ -119,15 +128,21 @@ public class TimedMachineOffShiftService {
         LocalDate lastDate = shifts.stream().map(shift -> this.toLocalDate(shift.getWorkDate()))
                 .max(LocalDate::compareTo).get();
         Date orderBoundary = Objects.isNull(request) ? null : this.resolvePreviousReleaseBoundary(context, request);
+        List<String> machineCodes = Objects.isNull(request) ? Collections.emptyList()
+                : request.getProfile().getOriginals().stream().map(LhScheduleResult::getLhMachineCode)
+                        .collect(Collectors.toList());
+        String countSnapshot = null;
         for (LocalDate date = startDate; !date.isAfter(lastDate); date = date.plusDays(1)) {
             // 逐日重新读取限额及其中位阈值，不沿用顺延前日期的历史上限。
             int morningMax = LhScheduleTimeUtil.getMorningMouldChangeLimit(context, date.toString());
             int middleMax = LhScheduleTimeUtil.getAfternoonMouldChangeLimit(context, date.toString());
             int dailyMax = LhScheduleTimeUtil.getDailyMouldChangeLimit(context, date.toString());
 
-            int[] counts = Objects.isNull(preview) ? context.getDailyMouldChangeCountMap().get(date.toString())
-                    : preview.countsFor(date, request.getProfile().getOriginals().stream()
-                            .map(LhScheduleResult::getLhMachineCode).collect(Collectors.toList()));
+            int[] counts = this.readMouldChangeCounts(context, preview, machineCodes, date);
+            if (Objects.isNull(countSnapshot)) {
+                // 在事件迁移及实际释放计算前冻结一次；复用本日实际判断值，其他日期读取同一账本。
+                countSnapshot = this.captureTimedOffMouldChangeCount(context, preview, machineCodes, date, counts);
+            }
             int morning = Objects.nonNull(counts) ? counts[MORNING_INDEX] : 0;
             int middle = Objects.nonNull(counts) ? counts[AFTERNOON_INDEX] : 0;
             // 日额度独立于班次额度；用长整数避免求和或中位比较溢出。
@@ -142,8 +157,7 @@ public class TimedMachineOffShiftService {
             String reason = deferredDay ? "6.1.7 顺延日优先早班，逐班检查硬约束"
                     : this.resolveRuleReason(morning, middle, morningMax);
             String handoffReason = preferStructureHandoff && Objects.nonNull(preview)
-                    ? preview.structureHandoffCandidateReason(request.getProfile().getOriginals().stream()
-                            .map(LhScheduleResult::getLhMachineCode).collect(Collectors.toList()), date) : null;
+                    ? preview.structureHandoffCandidateReason(machineCodes, date) : null;
             if (preferStructureHandoff && (Objects.isNull(handoffReason) || morning >= morningMax)) {
                 continue;
             }
@@ -177,6 +191,7 @@ public class TimedMachineOffShiftService {
                 decision.setOffMachineTime(candidate.getShiftStartDateTime());
                 decision.setOccupancyEndTime(candidate.getShiftStartDateTime());
                 decision.setReason(slot == firstSlot ? reason : reason + "；首选不合法，改用当天中班");
+                decision.setTimedOffMouldChangeCount(countSnapshot);
                 if (Objects.nonNull(request) && !this.isPhysicalReleaseFeasible(context, request, decision)) {
                     this.logDecision(context, sku, machineCode, date, morning, middle, morningMax,
                             middleMax, dailyMax, null, "候选班次=" + shiftType + "，早于真实物理交接时间，尝试下一候选");
@@ -184,10 +199,11 @@ public class TimedMachineOffShiftService {
                 }
                 this.logDecision(context, sku, machineCode, date, morning, middle, morningMax,
                         middleMax, dailyMax, decision, decision.getReason());
-                return decision;
+                return this.constrainByHistoricalShift(context, startDate, machineCode, sku, request, decision);
             }
         }
         OffMachineDecision decision = new OffMachineDecision();
+        decision.setTimedOffMouldChangeCount(countSnapshot);
         decision.setOccupancyEndTime(shifts.stream().map(LhShiftConfigVO::getShiftEndDateTime)
                 .max(Date::compareTo).get());
         decision.setReason("排程窗口内无合法规则节点，先计算窗口内生产量，再按实际完成时间释放");
@@ -196,7 +212,108 @@ public class TimedMachineOffShiftService {
                 decision.getReason());
         log.info("按时间下机窗口未安排, {}", detail);
         PriorityTraceLogHelper.appendProcessLog(context, "按时间下机窗口未安排", detail);
-        return decision;
+        return this.constrainByHistoricalShift(context, startDate, machineCode, sku, request, decision);
+    }
+
+    /**
+     * 用当前普通时间下机前料的有效历史班次限制最晚规则节点，预演和正式选班共用。
+     * 不回裁需求日前已冻结的生产前缀，不改变严格收尾及固定动作；设备占用仍优先校验。
+     *
+     * @param context 本批历史事件及真实班次
+     * @param startDate 时间下机需求日
+     * @param machineCode 无画像预览时的精确机台
+     * @param sku 本次普通时间下机前料
+     * @param request 冻结物理机画像，纯班次预览时为空
+     * @param decision 原时间均衡决定
+     * @return 受历史班次约束的独立决定，未命中或不可物理释放时保持原决定
+     */
+    private OffMachineDecision constrainByHistoricalShift(LhScheduleContext context, LocalDate startDate,
+            String machineCode, SkuScheduleDTO sku, TimedMachineOffRequest request, OffMachineDecision decision) {
+        if (sku.isStrictTargetQty()) {
+            return decision;
+        }
+        List<String> machineCodes = Objects.isNull(request) ? Collections.singletonList(machineCode)
+                : request.getProfile().getOriginals().stream().map(LhScheduleResult::getLhMachineCode)
+                        .collect(Collectors.toList());
+        PreviousAlternatePlanReleaseEvent historical = machineCodes.stream()
+                .map(context.getPreviousAlternateReleaseEventMap()::get).filter(Objects::nonNull)
+                .filter(event -> !event.isRemainderFinishDeferred() && !event.isSingleMouldReplacement()
+                        && !event.isBeforeMaterialNotScheduled())
+                .filter(event -> StringUtils.equals(event.getMaterialCode(), sku.getMaterialCode())
+                        && StringUtils.equals(StringUtils.defaultIfBlank(event.getProductStatus(), "S"),
+                        StringUtils.defaultIfBlank(sku.getProductStatus(), "S")))
+                .filter(event -> !StringUtils.equals(event.getPlan().getBeforeMaterialCode(),
+                        event.getPlan().getAfterMaterialCode()))
+                .filter(event -> Objects.nonNull(event.getPlannedShiftStartTime()))
+                .filter(event -> context.getScheduleWindowShifts().stream().anyMatch(shift ->
+                        event.getPlannedShiftStartTime().equals(shift.getShiftStartDateTime())
+                                && !this.toLocalDate(shift.getWorkDate()).isBefore(startDate)
+                                && shift.isAllowMouldChange()
+                                && !LhScheduleTimeUtil.isNoMouldChangeTime(context, shift.getShiftStartDateTime())))
+                .min(Comparator.comparing(PreviousAlternatePlanReleaseEvent::getPlannedShiftStartTime)).orElse(null);
+        if (Objects.isNull(historical)
+                || !historical.getPlannedShiftStartTime().before(decision.getOccupancyEndTime())) {
+            return decision;
+        }
+        Date boundary = historical.getPlannedShiftStartTime();
+        OffMachineDecision constrained = BeanUtil.copyProperties(decision, OffMachineDecision.class);
+        constrained.setPlanDate(this.toLocalDate(historical.getPlan().getPlanDate()));
+        constrained.setShift(historical.getPlan().getClassIndex());
+        constrained.setRuleOffMachineTime(boundary);
+        constrained.setOffMachineTime(boundary);
+        constrained.setOccupancyEndTime(boundary);
+        constrained.setReason("历史交替班次优先，计划ID=" + historical.getPlan().getId()
+                + "；原时间规则=" + decision.getReason());
+        boolean feasible = Objects.isNull(request) || this.isPhysicalReleaseFeasible(context, request, constrained);
+        String detail = String.format("工厂=%s, 批次=%s, 计划ID=%s, 机台=%s, 前料=%s, 状态=%s, "
+                        + "原规则节点=%s, 历史最晚节点=%s, 物理可释放=%s, 处理=%s",
+                context.getFactoryCode(), context.getBatchNo(), historical.getPlan().getId(),
+                historical.getMachineCode(), sku.getMaterialCode(), sku.getProductStatus(),
+                LhScheduleTimeUtil.formatDateTime(decision.getRuleOffMachineTime()),
+                LhScheduleTimeUtil.formatDateTime(boundary), feasible,
+                feasible ? "采用历史班次，后料独立校验" : "保留真实物理占用，不提前释放");
+        log.info("按时间下机历史班次约束, {}", detail);
+        PriorityTraceLogHelper.appendProcessLog(context, "按时间下机历史班次约束", detail);
+        return feasible ? constrained : decision;
+    }
+
+    /**
+     * 读取现有错班判断使用的次数，预演时继续排除当前物理机台自身首次动作。
+     *
+     * @param context 正式次数所在上下文
+     * @param preview 当前决策使用的独立预演账本，空值表示读取正式次数
+     * @param machineCodes 当前物理机台的各侧运行态编码
+     * @param date 判断业务日
+     * @return 早班和中班次数，正式账本未登记该日时为空；调用方不得修改返回数组
+     */
+    private int[] readMouldChangeCounts(LhScheduleContext context, TimedMachineOffLoadPreview preview,
+            List<String> machineCodes, LocalDate date) {
+        return Objects.isNull(preview) ? context.getDailyMouldChangeCountMap().get(date.toString())
+                : preview.countsFor(date, machineCodes);
+    }
+
+    /**
+     * 在首次实际计数判断时冻结三日字符串，不持有可变账本或数组，也不登记任何次数。
+     *
+     * @param context 包含窗口起点 T 的当前上下文
+     * @param preview 本次判断采用的独立预演账本
+     * @param machineCodes 本次物理机台的运行态编码
+     * @param evaluatedDate 已读取判断次数的业务日
+     * @param evaluatedCounts 已读取的当日实际次数，空值沿用现有零次口径
+     * @return 固定格式的 T、T+1、T+2 早班、中班及全天次数快照
+     */
+    private String captureTimedOffMouldChangeCount(LhScheduleContext context, TimedMachineOffLoadPreview preview,
+            List<String> machineCodes, LocalDate evaluatedDate, int[] evaluatedCounts) {
+        LocalDate firstDate = this.toLocalDate(context.getScheduleDate());
+        return IntStream.range(0, TIMED_OFF_WINDOW_DAYS).mapToObj(offset -> {
+            LocalDate date = firstDate.plusDays(offset);
+            int[] counts = date.equals(evaluatedDate) ? evaluatedCounts
+                    : this.readMouldChangeCounts(context, preview, machineCodes, date);
+            int morning = Objects.nonNull(counts) ? counts[MORNING_INDEX] : 0;
+            int middle = Objects.nonNull(counts) ? counts[AFTERNOON_INDEX] : 0;
+            String label = offset == 0 ? "T" : "T+" + offset;
+            return label + "=" + morning + "," + middle + "," + ((long) morning + middle);
+        }).collect(Collectors.joining(" "));
     }
 
     /**
@@ -561,7 +678,8 @@ public class TimedMachineOffShiftService {
                     || context.getOnlySandBlastContinuationReleaseWindowMap().containsKey(code)
                     || context.getContinuationTemporaryFaultTransferEventMap().containsKey(code)
                     || context.isContinuousStopHoldMachine(code)
-                    || context.getContinuationSurplusEndingAllocatedResults().contains(result)
+                    || (context.getContinuationSurplusEndingAllocatedResults().contains(result)
+                    && StructureEndingContinuationPolicy.state(context, request.getSourceSku()) == null)
                     || (Objects.nonNull(machine) && !CollectionUtils.isEmpty(machine.getMaintenanceWindowList())
                     && machine.getMaintenanceWindowList().stream().anyMatch(window -> window.isForceDown()))) {
                 return true;

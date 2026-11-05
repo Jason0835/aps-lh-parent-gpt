@@ -3,6 +3,7 @@ package com.zlt.aps.common.engine.schedule.engine;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Map;
+import java.util.function.Function;
 
 /**
  * TM/TC 自动排程任务排序公共策略接口。
@@ -46,5 +47,15 @@ public interface IScheduleTaskSortStrategy<C extends ScheduleContextModel<T, ?, 
      */
     default Map<String, Object> buildSortEvidence(C context, T task) {
         return Collections.emptyMap();
+    }
+
+    /**
+     * 为当前稳定排序轮次创建证据提供器，旧策略保持原逐任务计算行为。
+     *
+     * @param context 本轮排程上下文
+     * @return 按任务生成排序证据的函数
+     */
+    default Function<T, Map<String, Object>> prepareSortEvidence(C context) {
+        return task -> this.buildSortEvidence(context, task);
     }
 }

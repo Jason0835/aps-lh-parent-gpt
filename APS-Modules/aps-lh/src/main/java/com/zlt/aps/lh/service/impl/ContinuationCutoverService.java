@@ -100,39 +100,41 @@ public class ContinuationCutoverService {
     }
 
     /**
-     * 对指定结果集合复用截断和账本恢复，调用者负责机台和模具退出。
+     * 对调用者已校验的同SKU结果集合复用截断和账本恢复，支持续作及新增的末段转产。
+     * 调用者必须先捕获完整快照，保护已有后继计划，并负责机台和模具退出。
+     *
      * @param context 排程上下文
      * @param sourceSku 原物料
      * @param physicalMachineCode 原物理机台
      * @param offlineTime 截断时刻
-     * @param continuationResultList 同物料状态的结果集合
+     * @param continuationResultList 同物料状态、允许截断的结果集合
      * @param restoreReason 本次恢复账本的业务来源
      * @return 截断结果
      */
-    private ContinuationCutoverResult cutoverResults(LhScheduleContext context, SkuScheduleDTO sourceSku,
+    ContinuationCutoverResult cutoverResults(LhScheduleContext context, SkuScheduleDTO sourceSku,
             String physicalMachineCode, Date offlineTime, List<LhScheduleResult> continuationResultList, String restoreReason) {
         if (CollectionUtils.isEmpty(continuationResultList)) {
             throw new IllegalStateException("原物理机台不存在可截断的冻结续作结果: " + physicalMachineCode);
         }
         Map<LhScheduleResult, LhScheduleResult> originalStateMap =
-                copyResultStateMap(continuationResultList);
+                this.copyResultStateMap(continuationResultList);
         ContinuationCutoverResult cutoverResult = new ContinuationCutoverResult();
         cutoverResult.setRetainedResultList(continuationResultList);
         int totalRemovedQty = 0;
         for (LhScheduleResult result : continuationResultList) {
-            totalRemovedQty += truncateResult(
+            totalRemovedQty += this.truncateResult(
                     context, sourceSku, result, offlineTime,
                     cutoverResult.getRemovedQtyByDate());
         }
         cutoverResult.setRemovedQty(totalRemovedQty);
-        synchronizeScheduledMachineMaps(
+        this.synchronizeScheduledMachineMaps(
                 context, originalStateMap.values(), continuationResultList);
         if (totalRemovedQty > 0) {
             // 调用处明确记录本次联动来源，便于生产余量账本日志按 A/B 置换检索。
             targetScheduleQtyResolver.restoreProductionRemainingQty(
                     context, sourceSku, totalRemovedQty,
                     restoreReason, physicalMachineCode);
-            restoreTruncatedDailyQuota(
+            this.restoreTruncatedDailyQuota(
                     context, sourceSku, cutoverResult.getRemovedQtyByDate());
         }
         return cutoverResult;

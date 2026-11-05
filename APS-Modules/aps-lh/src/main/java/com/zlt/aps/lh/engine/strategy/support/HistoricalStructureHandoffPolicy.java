@@ -26,6 +26,19 @@ public final class HistoricalStructureHandoffPolicy {
     }
 
     /**
+     * 判断当前组合是否具有有效历史指定的等待差值豁免，复用原局部身份及侧别边界。
+     *
+     * @param context 当前历史执行作用域
+     * @param sku 当前后物料和产品状态
+     * @param machineCode 当前运行侧或整机编码
+     * @return 精确命中有效历史关系且不是隔离班次九时为 true
+     */
+    public static boolean isWaitingExempt(LhScheduleContext context, SkuScheduleDTO sku, String machineCode) {
+        return Objects.nonNull(context) && !context.isIsolatedNextShiftPlan()
+                && Objects.nonNull(PreviousAlternateStructureLimitExemptionPolicy.resolvePlan(context, sku, machineCode));
+    }
+
+    /**
      * 读取历史关系的当前状态，正式承接和需求耗尽优先于先前等待诊断。
      *
      * @param context 本批数量和历史关系上下文

@@ -6,6 +6,7 @@ import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.api.enums.ConstructionStageEnum;
 import com.zlt.aps.lh.api.enums.UnscheduledReasonEnum;
 import com.zlt.aps.lh.component.EarlyProductionQuantityCalculator;
+import com.zlt.aps.lh.component.EmbryoEndingStockAdmissionPolicy;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
@@ -14,15 +15,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
+import java.text.MessageFormat;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Objects;
 
 /**
- * 新增待排SKU前置未排规则。
+ * 待排SKU前置未排规则。
  *
  * <p>统一处理新增SKU日计划准入、窗口无计划且无欠产余量未排、纯遗留SKU静默出队、
- * 收尾小余量和仅历史欠产规则，
+ * 交班停产无胎胚、收尾小余量和仅历史欠产规则，
  * 以及硫化参数SYS0311004=0时新增排产链路试制量试SKU的参数拦截。
  * 换活字块和新增排产必须复用本规则，避免SKU在S4.4被提前消费后绕过S4.5判断。</p>
  *
@@ -62,6 +64,63 @@ public final class PendingSkuUnscheduledRule {
     }
 
     /**
+     * 判断已确认交班停产收尾的胎胚是否没有本轮可用库存。
+     * 缺库存仅在已确认停产的范围内按无可用库存处理，不改变普通缺库存续作例外。
+     *
+     * @param context 本轮交班停产证据及T日库存快照
+     * @param sku 待判断的物料及产品状态来源
+     * @return 已确认交班停产且本轮库存缺失或非正时返回true
+     */
+    public static boolean isHandoverStoppedWithoutStock(LhScheduleContext context, SkuScheduleDTO sku) {
+        return Objects.nonNull(sku) && isHandoverStoppedWithoutStock(context, sku.getEmbryoCode());
+    }
+
+    /**
+     * 按胎胚判断交班停产后的可用库存，供历史前料来源复用相同禁排口径。
+     *
+     * @param context 本轮交班停产证据及T日库存快照
+     * @param embryoCode 实际来源的胎胚编码
+     * @return 已确认交班停产且本轮库存缺失或非正时返回true
+     */
+    public static boolean isHandoverStoppedWithoutStock(LhScheduleContext context, String embryoCode) {
+        return Objects.nonNull(context) && StringUtils.isNotEmpty(embryoCode)
+                && context.getCxHandoverStoppedEndingEmbryoSet().contains(embryoCode)
+                && context.getEmbryoRealtimeStockMap().getOrDefault(embryoCode, 0) <= 0;
+    }
+
+    /**
+     * 为交班已停产且无可用胎胚的来源构造未排说明，不改写需求或资源事实。
+     * 合法库存生产目标为0，仍保留未排说明，硫化余量在详情中独立记录。
+     *
+     * @param context 本轮交班停产证据及库存快照
+     * @param sku 待评估的月计划、续作或独立来源
+     * @return 命中时返回零库存未排说明，未命中返回null
+     */
+    public static LhUnscheduledResult evaluateHandoverStoppedWithoutStock(
+            LhScheduleContext context, SkuScheduleDTO sku) {
+        if (!isHandoverStoppedWithoutStock(context, sku)) {
+            return null;
+        }
+        UnscheduledReasonEnum reason = UnscheduledReasonEnum.HANDOVER_STOPPED_NO_EMBRYO_STOCK;
+        String detail = MessageFormat.format(
+                "工厂={0}，排程日期={1}，T日={2}，批次={3}，物料={4}，状态={5}，胎胚={6}，"
+                        + "存在本轮库存记录={7}，本轮库存={8}，硫化余量={9}，合法库存生产目标=0；交班已停产收尾且无可用胎胚",
+                context.getFactoryCode(), LhScheduleTimeUtil.formatDate(context.getScheduleTargetDate()),
+                LhScheduleTimeUtil.formatDate(context.getScheduleDate()),
+                context.getBatchNo(), sku.getMaterialCode(), sku.getProductStatus(), sku.getEmbryoCode(),
+                context.getEmbryoRealtimeStockMap().containsKey(sku.getEmbryoCode()),
+                context.getEmbryoRealtimeStockMap().getOrDefault(sku.getEmbryoCode(), 0),
+                Math.max(0, sku.getSurplusQty()));
+        log.info("交班停产收尾无胎胚不排产, {}", detail);
+        PriorityTraceLogHelper.appendProcessLog(context, "交班停产收尾无胎胚不排产", detail);
+        LhUnscheduledResult result = buildUnscheduledResult(context, sku, 0,
+                reason.getSummary(), reason, detail);
+        result.setMonthPlanVersion(sku.getMonthPlanVersion());
+        result.setProductionVersion(sku.getProductionVersion());
+        return result;
+    }
+
+    /**
      * 判断正规新增SKU是否只剩历史欠产或收尾遗留目标。
      *
      * <p>窗口原始DAY_N为0，并且从窗口结束日之后到已加载月计划末日都没有正计划量时，
@@ -70,6 +129,8 @@ public final class PendingSkuUnscheduledRule {
      *
      * <p>试制、量试、续作补偿、换活字块回流等非正规新增来源继续执行各自既有规则；
      * 当前月TOTAL_QTY为0但已注册未来计划候选的SKU必须保留，等待提前生产阶段逐日准入。</p>
+     *
+     * <p>后半段无计划的单胎胚或非共用胎胚正库存收尾属于有效库存需求，不作为纯遗留目标剔除。</p>
      *
      * @param context 排程上下文
      * @param sku 待评估SKU
@@ -81,6 +142,7 @@ public final class PendingSkuUnscheduledRule {
                 || Objects.isNull(context.getWindowEndDate())
                 || !EarlyProductionChecker.isEligibleNewProductionSku(sku)
                 || sku.getOriginalWindowPlanQty() > 0
+                || EmbryoEndingStockAdmissionPolicy.isEligible(context, sku)
                 || context.isFutureOnlyEarlyProductionCandidate(sku)) {
             return false;
         }
@@ -102,6 +164,8 @@ public final class PendingSkuUnscheduledRule {
      * <p>日计划严格沿用物料编码和产品状态复合维度，不以历史交替日期替代本次实际需求日期。</p>
      * <p>本方法只负责判断和构造未排结果，不修改SKU目标量、排产集合、胎胚库存或日计划账本。</p>
      *
+     * <p>后半段无计划的单胎胚或非共用胎胚正库存收尾不依赖原始日计划准入。</p>
+     *
      * @param context 排程上下文，提供排程窗口、提前生产参数和跨月月计划数据
      * @param sku 待评估的新增SKU
      * @return 命中规则时返回未排结果；未命中返回null
@@ -109,7 +173,8 @@ public final class PendingSkuUnscheduledRule {
     public static LhUnscheduledResult evaluateDailyPlanAdmission(LhScheduleContext context,
                                                                   SkuScheduleDTO sku) {
         if (Objects.isNull(context) || Objects.isNull(sku)
-                || Objects.isNull(context.getWindowEndDate())) {
+                || Objects.isNull(context.getWindowEndDate())
+                || EmbryoEndingStockAdmissionPolicy.isEligible(context, sku)) {
             return null;
         }
         LocalDate windowStartDate = toLocalDate(context.getScheduleDate());
@@ -166,8 +231,10 @@ public final class PendingSkuUnscheduledRule {
      * 窗口内无计划量且欠产余量标识为false时，通常列入未排；正规新增候选在固定提前
      * 生产截止日内存在未来原始计划时保留候选资格，后续只能经提前生产中心和资源门禁排产。
      * 不得单凭硫化余量、调整量或账面结转放行，也不得为试制量试扩大观察窗口。</p>
-     * <p>调用方负责豁免MES精确在机续作候选、停产收尾模式等特殊链路；本方法只负责判断和
+     * <p>SKU尚未完成续作分类时，调用方须使用带显式续作身份的重载，防止在机及历史前料
+     * 借新增提前生产例外绕过门禁。停产收尾模式由调用方豁免；本方法只负责判断和
      * 构造未排结果，不修改SKU目标量、排产集合、胎胚库存或日计划账本。</p>
+     * <p>后半段无计划且为单胎胚或非共用胎胚、胎胚收尾且本轮库存为正时保留资格，后续按库存硬目标及资源约束排产。</p>
      *
      * @param context 排程上下文
      * @param sku 待评估SKU
@@ -175,10 +242,26 @@ public final class PendingSkuUnscheduledRule {
      */
     public static LhUnscheduledResult evaluateNoOverdueSurplusAdmission(LhScheduleContext context,
                                                                         SkuScheduleDTO sku) {
+        return evaluateNoOverdueSurplusAdmission(context, sku, false);
+    }
+
+    /**
+     * 按已确认的续作身份评估窗口无计划且无欠产余量的统一未排准入。
+     * <p>真实MES在机及已证明历史前料均不适用新增提前生产例外。仅构造未排结果，
+     * 不清理MES、模具事实，不消费生产、日计划或胎胚账本。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 待评估SKU
+     * @param continuationCandidate 是否为归集阶段已确认的在机或历史前料续作候选
+     * @return 命中规则时返回未排结果；窗口有计划、存在欠产余量或合法新增提前候选时返回null
+     */
+    public static LhUnscheduledResult evaluateNoOverdueSurplusAdmission(
+            LhScheduleContext context, SkuScheduleDTO sku, boolean continuationCandidate) {
         if (Objects.isNull(context) || Objects.isNull(sku)
                 || sku.getOriginalWindowPlanQty() > 0
                 || sku.isOverdueSurplusFlag()
-                || hasEligibleFutureOriginalPlan(context, sku)) {
+                || EmbryoEndingStockAdmissionPolicy.isEligible(context, sku)
+                || (!continuationCandidate && hasEligibleFutureOriginalPlan(context, sku))) {
             return null;
         }
         LocalDate windowStartDate = toLocalDate(context.getScheduleDate());
@@ -231,6 +314,8 @@ public final class PendingSkuUnscheduledRule {
      * 前日T+1交替计划仍不得放行无余量的全窗口为零SKU。</p>
      * <p>本方法只负责判断和构造未排结果，不修改续作列表、机台或日计划账本。</p>
      *
+     * <p>后半段无计划的单胎胚或非共用胎胚正库存收尾保留续作资格，试制量试独立规则继续生效。</p>
+     *
      * @param context 排程上下文，提供排程窗口和跨月月计划数据
      * @param sku 已识别为续作的SKU
      * @return 命中规则时返回未排结果；非试制量试、窗口内有计划或仍有硫化余量时返回null
@@ -239,7 +324,8 @@ public final class PendingSkuUnscheduledRule {
             LhScheduleContext context, SkuScheduleDTO sku) {
         if (Objects.isNull(context) || Objects.isNull(sku)
                 || !isTrialOrMassTrialSku(sku)
-                || Objects.isNull(context.getWindowEndDate())) {
+                || Objects.isNull(context.getWindowEndDate())
+                || EmbryoEndingStockAdmissionPolicy.isEligible(context, sku)) {
             return null;
         }
         LocalDate windowStartDate = toLocalDate(context.getScheduleDate());
@@ -454,7 +540,7 @@ public final class PendingSkuUnscheduledRule {
      * @param embryoStockEndingTargetApplied 是否已经应用胎胚库存硬目标
      * @param smallEndingRuleQty 小余量规则使用的有效余量
      * @param monthlyHistoryShortageQty 调用方已确认的本月历史欠产来源
-     * @return 首个真实命中的未排结果；两规则均未命中时返回null
+     * @return 首个真实命中的未排结果；交班停产、小余量和历史欠产均未命中时返回null
      */
     public static LhUnscheduledResult evaluate(LhScheduleContext context,
                                                SkuScheduleDTO sku,
@@ -464,6 +550,10 @@ public final class PendingSkuUnscheduledRule {
                                                int monthlyHistoryShortageQty) {
         if (Objects.isNull(context) || Objects.isNull(sku)) {
             return null;
+        }
+        LhUnscheduledResult handoverStopped = evaluateHandoverStoppedWithoutStock(context, sku);
+        if (Objects.nonNull(handoverStopped)) {
+            return handoverStopped;
         }
         int genericSurplusQty = Math.max(0, sku.getSurplusQty());
         int resolvedSmallEndingRuleQty = Math.max(0, smallEndingRuleQty);

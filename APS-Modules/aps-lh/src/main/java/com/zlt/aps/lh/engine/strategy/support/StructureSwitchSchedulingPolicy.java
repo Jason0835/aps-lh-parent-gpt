@@ -100,7 +100,8 @@ public final class StructureSwitchSchedulingPolicy {
      * @return 有效的同一供胚来源；未满足对应场景资格时为空
      */
     public static CxEmbryoLhTime resolveSource(LhScheduleContext context, SkuScheduleDTO sku, LocalDate currentDate) {
-        if (!isEnabled(context) || context.isStructureSwitchSelectionProbe()
+        if (!isEnabled(context) || StructureTransferExemptionPolicy.shouldBypassStructureSwitch(context, sku)
+                || context.isStructureSwitchSelectionProbe()
                 || Objects.isNull(sku) || StringUtils.isEmpty(sku.getStructureName())) {
             return null;
         }
@@ -177,9 +178,10 @@ public final class StructureSwitchSchedulingPolicy {
                 || !earlyProductionDecision.isAllowed()) {
             return false;
         }
-        return StringUtils.equals(
+        return (StringUtils.equals(
                 EarlyProductionDecision.SCENE_STRUCTURE_SWITCH,
                 earlyProductionDecision.getSceneType())
+                && !StructureTransferExemptionPolicy.shouldBypassStructureSwitch(context, sku))
                 || StringUtils.equals(
                 EarlyProductionDecision.SCENE_STRUCTURE_ENDING,
                 earlyProductionDecision.getSceneType());
@@ -272,7 +274,8 @@ public final class StructureSwitchSchedulingPolicy {
     public static StructureSwitchPlan createPlan(LhScheduleContext context, CxEmbryoLhTime source,
             FirstInspectionAllocationPlan inspection, LhShiftConfigVO formalShift,
             Date baseStart, Date productionStart) {
-        if (!isEnabled(context)) {
+        if (!isEnabled(context) || (source != null
+                && StructureTransferExemptionPolicy.isTransferStructure(context, source.getNextStructureName()))) {
             return null;
         }
         LhShiftConfigVO first = formalShift;
@@ -538,6 +541,35 @@ public final class StructureSwitchSchedulingPolicy {
     }
 
     /**
+     * 获取结构切换首班上限，仅明确非等结果使用本批配置，其他标识保持原规则。
+     *
+     * @param context 本批次配置上下文
+     * @param waitNotify 同一来源的等结果标识
+     * @return 规则首班物理机台数上限
+     */
+    public static int resolveFirstShiftMachineLimit(LhScheduleContext context, Integer waitNotify) {
+        if (!Objects.equals(0, waitNotify)) {
+            return FIRST_SHIFT_LIMIT;
+        }
+        return Objects.isNull(context.getScheduleConfig())
+                ? LhScheduleConstant.STRUCTURE_SWITCH_NO_WAIT_FIRST_SHIFT_MACHINE_LIMIT
+                : context.getScheduleConfig().getStructureSwitchNoWaitFirstShiftMachineLimit();
+    }
+
+    /**
+     * 读取结构切换专用分班上限，普通供胚入口继续使用无上下文的原规则。
+     *
+     * @param context 本批次配置上下文
+     * @param waitNotify 同一来源的等结果标识
+     * @param shiftOffset 相对规则首班的连续班次偏移
+     * @return 当前班专用上限，最大整数表示不附加限制
+     */
+    public static int shiftLimit(LhScheduleContext context, Integer waitNotify, int shiftOffset) {
+        return shiftOffset == 0 ? resolveFirstShiftMachineLimit(context, waitNotify)
+                : shiftLimit(waitNotify, shiftOffset);
+    }
+
+    /**
      * 返回临时分班上限，恢复正常使用最大值表示不增加限制。
      * @param waitNotify 等结果标识，空按不等结果
      * @param shiftOffset 距离S0的连续班次偏移
@@ -600,6 +632,9 @@ public final class StructureSwitchSchedulingPolicy {
             return null;
         }
         String structure = plan.getSource().getNextStructureName();
+        if (StructureTransferExemptionPolicy.isTransferStructure(context, structure)) {
+            return null;
+        }
         LhShiftConfigVO ruleFirst = resolveFirstShift(context, plan);
         if (Objects.isNull(ruleFirst)) {
             return rejectedFirstShift(context, plan, sku, machineCode, plan.getFirstShiftDecision().getReason());
@@ -634,7 +669,7 @@ public final class StructureSwitchSchedulingPolicy {
                     && Objects.equals(shift.getShiftStartDateTime(), secondShift.getShiftStartDateTime())) {
                 offset = FIRST_SHIFT_LIMIT;
             }
-            int limit = shiftLimit(plan.getSource().getIsWaitNotify(), offset);
+            int limit = shiftLimit(context, plan.getSource().getIsWaitNotify(), offset);
             if (!occupies || limit == Integer.MAX_VALUE) {
                 continue;
             }
@@ -1285,11 +1320,7 @@ public final class StructureSwitchSchedulingPolicy {
         if (Objects.isNull(second) || !Objects.equals(second.getShiftStartDateTime(), shift.getShiftStartDateTime())) {
             return -1;
         }
-        if (StringUtils.equals(state.getMaterialCode(), sku.getMaterialCode())
-                && StringUtils.equals(state.getProductStatus(), sku.getProductStatus())) {
-            return 0;
-        }
-        return StringUtils.equals(state.getEmbryoCode(), sku.getEmbryoCode()) ? 1 : 2;
+        return skuRelationRank(state, sku);
     }
 
     /**
@@ -1396,5 +1427,45 @@ public final class StructureSwitchSchedulingPolicy {
             return second;
         }
         return Objects.isNull(second) || first.after(second) ? first : second;
+    }
+
+    /**
+     * 在非等结果规则首班按已提交参照稳定排序，保留所有候选供硬约束失败后继续尝试。
+     *
+     * @param context 当前成功提交状态
+     * @param source 本结构冻结的供胚来源
+     * @param shift 当前竞争班次
+     * @param candidates 原业务顺序候选
+     * @return 首班局部排序副本；不适用时返回原列表
+     */
+    public static List<SkuScheduleDTO> prioritizeNoWaitFirstShift(LhScheduleContext context,
+            CxEmbryoLhTime source, LhShiftConfigVO shift, List<SkuScheduleDTO> candidates) {
+        if (!isEnabled(context) || !context.isStructureSwitchScheduling() || Objects.isNull(source)
+                || !Objects.equals(0, source.getIsWaitNotify())) {
+            return candidates;
+        }
+        StructureSwitchRuntimeState state = context.getStructureSwitchRuntimeMap().get(source.getNextStructureName());
+        if (Objects.isNull(state) || !Objects.equals(source.getId(), state.getSourceId())
+                || !Objects.equals(state.getFirstShiftStart(), shift.getShiftStartDateTime())
+                || StringUtils.isBlank(state.getEmbryoCode())) {
+            return candidates;
+        }
+        return candidates.stream().sorted(Comparator.comparingInt(sku -> skuRelationRank(state, sku)))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 比较候选与已提交参照的SKU及胎胚关系，供原扩机和非等结果首班共用。
+     *
+     * @param state 已提交的首台参照
+     * @param sku 当前候选
+     * @return 同SKU为0、同胎胚为1、其他为2
+     */
+    private static int skuRelationRank(StructureSwitchRuntimeState state, SkuScheduleDTO sku) {
+        if (StringUtils.equals(state.getMaterialCode(), sku.getMaterialCode())
+                && StringUtils.equals(state.getProductStatus(), sku.getProductStatus())) {
+            return 0;
+        }
+        return StringUtils.equals(state.getEmbryoCode(), sku.getEmbryoCode()) ? 1 : 2;
     }
 }

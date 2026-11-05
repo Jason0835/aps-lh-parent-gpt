@@ -89,6 +89,7 @@ public final class StructureSwitchCandidateScope {
      */
     public static boolean owns(LhScheduleContext context, SkuScheduleDTO sku) {
         return StructureSwitchSchedulingPolicy.isEnabled(context) && !context.isIsolatedNextShiftPlan()
+                && !StructureTransferExemptionPolicy.shouldBypassStructureSwitch(context, sku)
                 && Objects.nonNull(sku) && context.getStructureSwitchCandidateSourceMap().containsKey(skuKey(sku));
     }
 
@@ -100,6 +101,9 @@ public final class StructureSwitchCandidateScope {
      * @return 普通入口是否应交给独立步骤
      */
     public static boolean shouldDefer(LhScheduleContext context, SkuScheduleDTO sku) {
+        if (StructureEndingContinuationPolicy.state(context, sku) != null) {
+            return StructureEndingContinuationPolicy.shouldDefer(context, sku);
+        }
         return owns(context, sku) && !context.isStructureSwitchScheduling()
                 && !context.isPreviousAlternateScheduling();
     }
@@ -112,11 +116,22 @@ public final class StructureSwitchCandidateScope {
      * @return 待评估或暂时等待的指定关系；已承接、无需求或本窗口不可承接时为空
      */
     public static LhMouldChangePlan resolvePendingHistoricalPlan(LhScheduleContext context, String machineCode) {
+        LhMouldChangePlan deferredPlan = StructureEndingContinuationPolicy.pendingHistoricalPlan(context, machineCode);
+        if (deferredPlan != null) {
+            return deferredPlan;
+        }
         if (!isEnabledForHistoricalProtection(context) || StringUtils.isEmpty(machineCode)) {
             return null;
         }
         String physical = LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode);
         return context.getEligiblePreviousAlternatePlans().stream()
+                .filter(plan -> {
+                    // 已迁移关系只由上方专用门禁保护，结束后不能回落旧PENDING状态再次锁住机台。
+                    StructureEndingContinuationState ending = context.getStructureEndingContinuationStates().get(
+                            MonthPlanDateResolver.buildMaterialStatusKey(
+                                    plan.getAfterMaterialCode(), plan.getProductStatus()));
+                    return ending == null || !ending.getHistoricalPlanIds().contains(plan.getId());
+                })
                 .filter(plan -> StringUtils.equals(physical,
                         LhSingleControlMachineUtil.resolvePhysicalMachineCode(plan.getLhMachineCode())))
                 .filter(plan -> StringUtils.equals(plan.getLhMachineCode(), physical)

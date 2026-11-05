@@ -11,6 +11,7 @@ import com.zlt.aps.lh.check.LhScheduleChecker;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.text.MessageFormat;
@@ -46,6 +47,7 @@ import java.util.Map;
  */
 @Slf4j
 @Component
+@Order(4)
 public class EmbryoEndingShiftGapChecker implements LhScheduleChecker {
 
     /** 收尾班差阈值：绝对班序号差超过该值才记异常（1 天 = 3 个班型单位） */

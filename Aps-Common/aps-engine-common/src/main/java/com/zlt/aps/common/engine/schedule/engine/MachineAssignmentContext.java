@@ -11,7 +11,16 @@ import java.util.Map;
  *
  * @param <T> 任务类型
  */
-public interface MachineAssignmentContext<T extends ScheduleTaskDraftModel> {
+public interface MachineAssignmentContext<T extends ScheduleTaskDraftModel> extends TwoPhaseScheduleContext {
+
+    /**
+     * 获取与生产草稿分离的活动需求消费快照。
+     *
+     * @return 活动班次到物料消费量，旧入口默认空
+     */
+    default Map<Integer, Map<String, BigDecimal>> getTwoPhaseConsumptionMap() {
+        return java.util.Collections.emptyMap();
+    }
 
     /**
      * 获取领域允许参与自动排程的最大班次序号。
@@ -20,6 +29,18 @@ public interface MachineAssignmentContext<T extends ScheduleTaskDraftModel> {
      */
     default int getMaxShiftOrder() {
         return Integer.MAX_VALUE;
+    }
+
+    /**
+     * 获取当日成型总余量额度台账。
+     *
+     * <p>默认返回空映射，兼容不接入额度的上下文实现。</p>
+     *
+     * @return 额度桶键到台账的映射
+     */
+    default Map<String, com.zlt.aps.common.engine.schedule.constraint.ScheduleTailQuotaLedger>
+    getTailQuotaLedgerMap() {
+        return java.util.Collections.emptyMap();
     }
 
     List<T> getTaskDraftList();

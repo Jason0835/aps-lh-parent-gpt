@@ -66,6 +66,29 @@ public interface PlanCalculationPolicy<C, T extends ScheduleTaskDraftModel,
     void sortPlanCalcShiftTasks(C context, List<T> shiftTaskList);
 
     /**
+     * 解析来源任务的成型总余量条数，用于建立当日额度台账。
+     *
+     * <p>必须返回保留空值语义的字段：空表示未配置余量，不启用额度；零表示余量已耗尽，
+     * 当日该产品排零。返回空即关闭额度能力。</p>
+     *
+     * @param task 来源任务
+     * @return 成型总余量条数；未配置时返回空
+     */
+    default BigDecimal resolveTailQuotaRemainQty(T task) {
+        return null;
+    }
+
+    /**
+     * 解析来源任务的单位长度，用于把余量条数折算为米。
+     *
+     * @param task 来源任务
+     * @return 单位长度，单位米；未配置时返回空
+     */
+    default BigDecimal resolveTailQuotaUnitLength(T task) {
+        return null;
+    }
+
+    /**
      * 记录逐班计划计算排序轮次；默认空实现兼容未接入解释表的领域策略。
      *
      * @param context        排程上下文

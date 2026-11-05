@@ -1,5 +1,6 @@
 package com.zlt.aps.lh.service.impl;
 
+import com.zlt.aps.cx.entity.config.CxEmbryoLhTime;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.MachineFaultWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
@@ -10,10 +11,16 @@ import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.LhShiftDelayEvidence;
 import com.zlt.aps.lh.engine.strategy.support.LhShiftRemarkRuntime;
+import com.zlt.aps.lh.engine.strategy.support.StructureSwitchPlan;
+import com.zlt.aps.lh.engine.strategy.support.StructureSwitchRuntimeState;
+import com.zlt.aps.lh.engine.strategy.support.StructureSwitchSchedulingPolicy;
+import com.zlt.aps.lh.engine.strategy.support.StructureTransferExemptionPolicy;
+import com.zlt.aps.lh.util.LhInventoryPlanMatcher;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.lh.util.CleaningDispositionResolver;
 import com.zlt.aps.lh.util.MachineCleaningOverlapUtil;
+import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
@@ -32,7 +39,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * 最终班次备注投影，只读取已确认的延后证据、历史来源、故障事实及最终正量。
+ * 最终班次备注投影，只读取已确认的延后证据、历史来源、结构切换限制、故障、盘点事实及最终正量。
  * 一次建立机台班次占用索引，不重新调用约束、模具分配或数据库查询。
  *
  * @author APS
@@ -46,9 +53,17 @@ public class LhShiftAnalysisRemarkService {
      */
     private static final String SPECIFIED_MACHINE_ANALYSIS = "指定上机";
     /**
+     * 等结果结构指定机台等待供胚及首班受限时的实际空班说明。
+     */
+    private static final String STRUCTURE_SWITCH_WAIT_AVAILABLE_ANALYSIS = "结构切换等结果最早可供硫化时间受限";
+    /**
      * 故障与班次有实际交集时展示的固定备注项。
      */
     private static final String TEMPORARY_FAULT_ANALYSIS = "临时性故障维修";
+    /**
+     * 盘点与班次有实际交集时展示的固定备注项。
+     */
+    private static final String TAKE_STOCK_ANALYSIS = "盘点";
     /**
      * 来源生产行被清理后仍需展示的独立喷砂占用，不代表后料在该班已经生产。
      */
@@ -87,6 +102,12 @@ public class LhShiftAnalysisRemarkService {
                 }
             }
         }
+        firstPositiveShifts.forEach((result, shift) -> {
+            if (context.getDedicatedSupplyTransferResults().contains(result)) {
+                ShiftFieldUtil.appendShiftAnalysis(result, shift.getShiftIndex(),
+                        DedicatedSupplyTransferService.TRANSFER_ANALYSIS);
+            }
+        });
         Set<String> written = new HashSet<>();
         Map<LhScheduleResult, List<LhShiftDelayEvidence>> confirmedEvidence =
                 context.getShiftRemarkRuntime().getResultEvidence();
@@ -120,9 +141,44 @@ public class LhShiftAnalysisRemarkService {
                 }
             }
         }
-        this.appendSpecifiedMachine(context, firstPositiveShifts);
+        this.appendSpecifiedMachine(context, firstPositiveShifts, shifts, occupied);
         this.appendTemporaryFaultRemarks(context, shifts, firstPositiveShifts);
+        this.appendTakeStockRemarks(context, shifts, firstPositiveShifts);
         this.appendOrphanSandBlastRemarks(context, shifts, firstPositiveShifts);
+    }
+
+    /**
+     * 将已加载的有效盘点窗口投影到相交班次，仅追加原因，不重新计算停机或产能。
+     *
+     * @param context 含盘点来源计划的最终上下文
+     * @param shifts 本轮实际班次
+     * @param firstPositiveShifts 最终有效结果的首个正量班次
+     */
+    private void appendTakeStockRemarks(LhScheduleContext context, List<LhShiftConfigVO> shifts,
+            Map<LhScheduleResult, LhShiftConfigVO> firstPositiveShifts) {
+        Map<String, List<LhScheduleResult>> resultsByMachine = context.getScheduleResultList().stream()
+                .filter(firstPositiveShifts::containsKey)
+                .sorted(Comparator.comparing(result -> firstPositiveShifts.get(result).getShiftIndex()))
+                .collect(Collectors.groupingBy(LhScheduleResult::getLhMachineCode));
+        for (Map.Entry<String, List<LhScheduleResult>> entry : resultsByMachine.entrySet()) {
+            // 与容量共用线级优先规则；机台级配置继续保留精确的左右侧范围。
+            List<MdmDevicePlanShut> stops = LhInventoryPlanMatcher.matchInventoryPlans(
+                    context.getDevicePlanShutList(), entry.getKey());
+            if (stops.isEmpty()) {
+                continue;
+            }
+            for (LhShiftConfigVO shift : shifts) {
+                boolean affected = stops.stream().anyMatch(plan ->
+                        plan.getBeginDate().before(shift.getShiftEndDateTime())
+                                && plan.getEndDate().after(shift.getShiftStartDateTime()));
+                if (affected) {
+                    // 整班停机仍可由已有的后续或前序结果承载空班原因，不新增零量结果。
+                    LhScheduleResult carrier = this.resolveStopRemarkCarrier(
+                            entry.getValue(), firstPositiveShifts, shift.getShiftIndex());
+                    this.appendItem(carrier, shift.getShiftIndex(), TAKE_STOCK_ANALYSIS);
+                }
+            }
+        }
     }
 
     /**
@@ -204,7 +260,7 @@ public class LhShiftAnalysisRemarkService {
                     continue;
                 }
                 // 同侧同班仅选一条承载结果；原续作行被裁空移除后仍可由后续物料展示机台故障。
-                LhScheduleResult carrier = this.resolveFaultRemarkCarrier(
+                LhScheduleResult carrier = this.resolveStopRemarkCarrier(
                         entry.getValue(), firstPositiveShifts, shift.getShiftIndex());
                 this.appendItem(carrier, shift.getShiftIndex(), TEMPORARY_FAULT_ANALYSIS);
             }
@@ -212,14 +268,14 @@ public class LhShiftAnalysisRemarkService {
     }
 
     /**
-     * 为同一运行侧的故障备注选择承载行：当班有量优先，其次后续首行，最后前序末行。
+     * 为同一运行侧的停机备注选择承载行：当班有量优先，其次后续首行，最后前序末行。
      *
      * @param results 按首个正量班次升序排列的同侧有效结果，至少一条
      * @param firstPositiveShifts 最终结果的首个正量班次
-     * @param shiftIndex 故障相交班次
+     * @param shiftIndex 停机相交班次
      * @return 唯一承载结果，不新增零产量行
      */
-    private LhScheduleResult resolveFaultRemarkCarrier(List<LhScheduleResult> results,
+    private LhScheduleResult resolveStopRemarkCarrier(List<LhScheduleResult> results,
             Map<LhScheduleResult, LhShiftConfigVO> firstPositiveShifts, int shiftIndex) {
         LhScheduleResult producing = results.stream()
                 .filter(result -> this.quantity(result, shiftIndex) > 0).findFirst().orElse(null);
@@ -249,13 +305,16 @@ public class LhShiftAnalysisRemarkService {
     }
 
     /**
-     * 按正式历史任务与实际侧位选择最终首个正量班，整机拆两侧分别标首次。
+     * 按正式历史任务与实际侧位标记首次正量，并补充结构切换等待期间的实际空班说明。
      *
      * @param context 正式历史来源映射
      * @param firstPositiveShifts 最终有效结果的首个正量班次索引
+     * @param shifts 按时间排序的窗口班次
+     * @param occupied 最终结果的运行侧和物理机台正量索引
      */
     private void appendSpecifiedMachine(LhScheduleContext context,
-            Map<LhScheduleResult, LhShiftConfigVO> firstPositiveShifts) {
+            Map<LhScheduleResult, LhShiftConfigVO> firstPositiveShifts, List<LhShiftConfigVO> shifts,
+            Map<String, BitSet> occupied) {
         Map<LhMouldChangePlan, Map<String, LhScheduleResult>> earliestByPlan = new IdentityHashMap<>();
         for (LhScheduleResult result : context.getScheduleResultList()) {
             LhMouldChangePlan plan = context.getPreviousAlternateResultPlanMap().get(result);
@@ -279,8 +338,77 @@ public class LhShiftAnalysisRemarkService {
                 bySide.put(sideKey, result);
             }
         }
-        earliestByPlan.values().forEach(bySide -> bySide.values().forEach(result ->
-                this.appendItem(result, firstPositiveShifts.get(result).getShiftIndex(), SPECIFIED_MACHINE_ANALYSIS)));
+        earliestByPlan.values().forEach(bySide -> bySide.values().forEach(result -> {
+            LhShiftConfigVO firstPositive = firstPositiveShifts.get(result);
+            this.appendItem(result, firstPositive.getShiftIndex(), SPECIFIED_MACHINE_ANALYSIS);
+            this.appendStructureSwitchEmptyShift(context, result, firstPositive, shifts, occupied);
+        }));
+    }
+
+    /**
+     * 为等结果结构指定上机补充供胚前及规则首班的实际空班说明，不推断候选曾被拒绝。
+     * 供胚前等待从实际换模准备起点计算；同物理机已有其他生产时不展示空班说明。
+     *
+     * @param context 最终结构切换来源和共享规则首班
+     * @param result 已核对正式历史来源和侧位的首个有效结果
+     * @param firstPositive 本结果首次正量班次
+     * @param shifts 按时间排序的窗口班次
+     * @param occupied 最终结果的运行侧和物理机台正量索引
+     */
+    private void appendStructureSwitchEmptyShift(LhScheduleContext context, LhScheduleResult result,
+            LhShiftConfigVO firstPositive, List<LhShiftConfigVO> shifts, Map<String, BitSet> occupied) {
+        StructureSwitchPlan plan = context.getStructureSwitchResultPlanMap().get(result);
+        if (!StructureSwitchSchedulingPolicy.isEnabled(context) || plan == null
+                || StructureTransferExemptionPolicy.isTransferStructure(context, result.getStructureName())) {
+            return;
+        }
+        CxEmbryoLhTime source = plan.getSource();
+        StructureSwitchRuntimeState state = context.getStructureSwitchRuntimeMap().get(result.getStructureName());
+        if (source == null || source.getId() == null || state == null
+                || !Objects.equals(source.getId(), state.getSourceId())
+                || !StringUtils.equals(source.getNextStructureName(), result.getStructureName())
+                || !Objects.equals(1, source.getIsWaitNotify()) || source.getEarliestLhTime() == null) {
+            return;
+        }
+        LhShiftConfigVO firstShift = shifts.stream()
+                .filter(shift -> Objects.equals(shift.getShiftStartDateTime(), state.getFirstShiftStart()))
+                .findFirst().orElse(null);
+        if (firstShift == null || source.getEarliestLhTime().before(firstShift.getShiftStartDateTime())
+                || !source.getEarliestLhTime().before(firstShift.getShiftEndDateTime())) {
+            return;
+        }
+        String physicalMachine = LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode());
+        BitSet machineOccupied = occupied.get(physicalMachine);
+        // 实际准备之前的空班没有本次等待依据；供胚所在班若能开产，不按整班等待处理。
+        Date preparationStart = result.getMouldChangeStartTime();
+        if (preparationStart != null && preparationStart.before(source.getEarliestLhTime())) {
+            for (LhShiftConfigVO shift : shifts) {
+                if (shift.getShiftEndDateTime().after(preparationStart)
+                        && !shift.getShiftEndDateTime().after(source.getEarliestLhTime())
+                        && shift.getShiftStartDateTime().before(firstPositive.getShiftStartDateTime())
+                        && (machineOccupied == null || !machineOccupied.get(shift.getShiftIndex()))) {
+                    this.appendItem(result, shift.getShiftIndex(), STRUCTURE_SWITCH_WAIT_AVAILABLE_ANALYSIS);
+                }
+            }
+        }
+        // 供胚所在规则首班仍沿用原第二班指定开机条件，不能把全部延后原因归为供胚。
+        if (state.getSecondShift() == null
+                || !Objects.equals(firstPositive.getShiftStartDateTime(),
+                state.getSecondShift().getShiftStartDateTime())) {
+            return;
+        }
+        if (machineOccupied != null && machineOccupied.get(firstShift.getShiftIndex())) {
+            return;
+        }
+        // 只按最终正量核对首班已由其他物理机占满，不生成拒绝附件或重新执行准入。
+        boolean firstShiftOccupied = context.getScheduleResultList().stream()
+                .filter(item -> StringUtils.equals(result.getStructureName(), item.getStructureName()))
+                .anyMatch(item -> this.quantity(item, firstShift.getShiftIndex()) > 0
+                        && !Objects.equals(physicalMachine,
+                        LhSingleControlMachineUtil.resolvePhysicalMachineCode(item.getLhMachineCode())));
+        if (firstShiftOccupied) {
+            this.appendItem(result, firstShift.getShiftIndex(), STRUCTURE_SWITCH_WAIT_AVAILABLE_ANALYSIS);
+        }
     }
 
     /**

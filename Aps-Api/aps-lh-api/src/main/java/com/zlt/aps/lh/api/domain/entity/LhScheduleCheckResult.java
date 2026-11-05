@@ -62,7 +62,7 @@ public class LhScheduleCheckResult extends BaseEntity {
     private Date scheduleDate;
 
     /**
-     * 检查项编码（IDLE_SHIFT/ENDING_SHIFT_GAP/ENDING_STOCK/MOULD_SHELL/CAPSULE_CHUCK）
+     * 检查项编码（IDLE_SHIFT/EMPTY_MACHINE/MOULD_SHELL_TURNOVER/ENDING_SHIFT_GAP/ENDING_STOCK/MOULD_SHELL/CAPSULE_CHUCK/CX_NO_SCHEDULE）
      */
     @ApiModelProperty(value = "检查项编码")
     private String checkCode;

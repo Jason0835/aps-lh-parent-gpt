@@ -36,11 +36,14 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.Map;
+import java.util.LinkedHashMap;
 import java.util.HashSet;
 import java.util.stream.Collectors;
 
 /**
- * 收尾优先规则，完整收尾时跳过对应05，候选和续作均以独立容量视图证明。
+ * 收尾优先规则，先判断在机SKU的固定08:00边界，再保留原完整收尾豁免。
+ * 候选和续作均以扣账前独立容量视图证明，未知收尾不取消维修。
  * 原始05来源和06故障保持不变，作用域内只发布独立执行视图，不扣减任何数量账本。
  *
  * @author APS
@@ -136,8 +139,11 @@ public final class LhRepairEndingDeferralPolicy {
                 machines.add(physical + "R");
             }
         }
-        List<Object> sides = machines.stream().map(context.getMachineScheduleMap()::containsKey)
-                .collect(Collectors.toList());
+        List<Object> sides = machines.stream().map(machineCode -> {
+            MachineScheduleDTO initial = context.getInitialMachineScheduleMap().get(machineCode);
+            return Arrays.asList(context.getMachineScheduleMap().containsKey(machineCode),
+                    initial == null ? null : initial.getCurrentMaterialCode());
+        }).collect(Collectors.toList());
         List<Object> results = new ArrayList<>();
         Set<String> occupyingSkus = new HashSet<>();
         for (LhScheduleResult result : context.getScheduleResultList()) {
@@ -148,10 +154,15 @@ public final class LhRepairEndingDeferralPolicy {
             Date start = first > 0 ? ShiftFieldUtil.getShiftStartTime(result, first) : null;
             results.add(Arrays.asList(result.getLhMachineCode(), result.getMaterialCode(), result.getProductStatus(),
                     result.getMouldSurplusQty(), ShiftFieldUtil.resolveScheduledQty(result), millis(start),
-                    millis(result.getSpecEndTime()), result.getIsEmbryoEnding()));
+                    millis(result.getSpecEndTime()), result.getIsEmbryoEnding(),
+                    result.getIsChangeMould(), result.getIsTypeBlock()));
             if (start != null && result.getSpecEndTime() != null && plans.stream().anyMatch(plan ->
                     isRepair(plan) && samePhysical(plan.getMachineCode(), result.getLhMachineCode())
-                            && start.before(plan.getBeginDate()) && result.getSpecEndTime().after(plan.getBeginDate()))) {
+                            && ((start.before(plan.getBeginDate()) && result.getSpecEndTime().after(plan.getBeginDate()))
+                            || LhPlannedRepairAdmissionPolicy.shouldSkip(plan,
+                                    LhPlannedRepairAdmissionPolicy.isInMachine(context, result, start,
+                                            LhPlannedRepairAdmissionPolicy.resolveBoundary(plan)),
+                                    result.getSpecEndTime())))) {
                 occupyingSkus.add(MonthPlanDateResolver.buildMaterialStatusKey(
                         result.getMaterialCode(), result.getProductStatus()));
             }
@@ -170,7 +181,8 @@ public final class LhRepairEndingDeferralPolicy {
                                 : group.getOriginalMachineFinishPlan().getRemainingQty()))
                 .collect(Collectors.toList());
         return Arrays.asList(sources, sides, results, peers, targets,
-                new java.util.HashMap<>(context.getSharedEmbryoStockEndingInitialQuotaMap()));
+                new java.util.HashMap<>(context.getSharedEmbryoStockEndingInitialQuotaMap()),
+                new LinkedHashMap<>(context.getRepairPlanRuntimeState().getAdmissionProofMap()));
     }
 
     /**
@@ -250,7 +262,7 @@ public final class LhRepairEndingDeferralPolicy {
                     .filter(result -> ShiftFieldUtil.resolveFirstPlannedShiftIndex(result) > 0)
                     .forEach(result -> {
                         int first = ShiftFieldUtil.resolveFirstPlannedShiftIndex(result);
-                        ShiftFieldUtil.appendShiftAnalysis(result, first, "收尾+计划性维修");
+                        ShiftFieldUtil.appendShiftAnalysis(result, first, "收尾跳过计划性维修（未执行）");
                         if ("1".equals(result.getIsChangeMould()) && !"1".equals(result.getIsTypeBlock())) {
                             ShiftFieldUtil.appendShiftAnalysis(result, first, "换模");
                         }
@@ -258,9 +270,11 @@ public final class LhRepairEndingDeferralPolicy {
             PriorityTraceLogHelper.appendProcessLog(context, "收尾跳过计划性维修",
                     "工厂=" + context.getFactoryCode() + ", 批次=" + context.getBatchNo()
                             + ", 来源=" + source.getId() + ", 物理机台=" + source.getMachineCode()
+                            + ", 判断基准=" + LhScheduleTimeUtil.formatDateTime(
+                                    LhPlannedRepairAdmissionPolicy.resolveBoundary(repair))
                             + ", 原实际开始=" + LhScheduleTimeUtil.formatDateTime(repair.getBeginDate())
                             + ", 实际收尾=" + LhScheduleTimeUtil.formatDateTime(finish)
-                            + ", 处理=05不执行且不追加预热，后料按实际切换首检");
+                            + ", 处理=05不执行、不追加预热且SCHEDULE_DATE保持原值，后料按实际切换首检");
         }
     }
 
@@ -416,22 +430,66 @@ public final class LhRepairEndingDeferralPolicy {
     }
 
     /**
-     * 仅以维修时刻正在生产的当前SKU及整机侧位完成证明跳过05，不借用更早前料。
+     * 优先使用固定08:00规则，未命中时沿用原实际维修起点与同周收尾规则。
      *
-     * @param context 已提交结果
+     * @param context 已提交的收尾事实
      * @param plan 原实际维修
-     * @return 完整收尾晚于原维修起点且在同周时的实际整机完成点
+     * @return 对应规则证明的整机收尾时刻；无法确认时为空
      */
     private static Date resolveCommittedEnding(LhScheduleContext context, MdmDevicePlanShut plan) {
         if (!isRepair(plan)) {
             return null;
         }
+        List<Object> proof = context.getRepairPlanRuntimeState().getAdmissionProofMap().get(plan.getId());
+        if (proof != null) {
+            Date finish = resolveCommittedEnding(context, plan, true);
+            if (finish != null && proof.equals(admissionProof(context, plan, finish))) {
+                return finish;
+            }
+        }
+        return resolveCommittedEnding(context, plan, false);
+    }
+
+    /**
+     * 固化来源和收尾SKU身份，不持有可变日期，也不把后续其他SKU结果纳入取消证明。
+     *
+     * @param context 完整收尾结果
+     * @param repair 有效维修来源
+     * @param finish 已核验整机完成点
+     * @return 来源、物料状态及真实收尾点的不可变事实列表
+     */
+    private static List<Object> admissionProof(LhScheduleContext context, MdmDevicePlanShut repair, Date finish) {
+        LhScheduleResult completed = context.getScheduleResultList().stream()
+                .filter(result -> samePhysical(result.getLhMachineCode(), repair.getMachineCode()))
+                .filter(result -> finish.equals(result.getSpecEndTime()))
+                .filter(result -> isInMachineAtBoundary(context, result, repair)).findFirst().orElse(null);
+        return Collections.unmodifiableList(Arrays.asList(repair.getMachineCode(),
+                millis(repair.getBeginDate()), millis(repair.getEndDate()),
+                completed == null ? null : completed.getMaterialCode(),
+                completed == null ? null : completed.getProductStatus(), millis(finish)));
+    }
+
+    /**
+     * 按选定边界核验当前SKU完整目标及整机配对侧，禁止以窗口结束代替完整收尾。
+     * 固定08:00规则不限维修当周，原规则继续保留同周与实际维修起点条件。
+     *
+     * @param context 已提交结果及冻结目标
+     * @param plan 有效05实际维修
+     * @param fixedBoundary 是否使用独立08:00边界
+     * @return 完整收尾的实际整机完成点，证据不足时为空
+     */
+    private static Date resolveCommittedEnding(LhScheduleContext context, MdmDevicePlanShut plan,
+            boolean fixedBoundary) {
         List<LhScheduleResult> occupying = context.getScheduleResultList().stream()
                 .filter(result -> samePhysical(result.getLhMachineCode(), plan.getMachineCode()))
-                .filter(result -> result.getSpecEndTime() != null
-                        && result.getSpecEndTime().after(plan.getBeginDate())
-                        && !result.getSpecEndTime().after(weekEnd(plan.getBeginDate())))
-                .filter(result -> startsBefore(result, plan.getBeginDate())).collect(Collectors.toList());
+                .filter(result -> result.getSpecEndTime() != null)
+                .filter(result -> fixedBoundary
+                        ? LhPlannedRepairAdmissionPolicy.shouldSkip(plan,
+                                isInMachineAtBoundary(context, result, plan), result.getSpecEndTime())
+                        : result.getSpecEndTime().after(plan.getBeginDate())
+                                && !result.getSpecEndTime().after(weekEnd(plan.getBeginDate()))
+                                && startsBefore(result, plan.getBeginDate()))
+                .collect(Collectors.toList());
         if (occupying.isEmpty()) {
             return null;
         }
@@ -458,10 +516,27 @@ public final class LhRepairEndingDeferralPolicy {
                         && StringUtils.equals(last.getMaterialCode(), result.getMaterialCode())
                         && StringUtils.equals(last.getProductStatus(), result.getProductStatus())
                         && result.getSpecEndTime() != null && !result.getSpecEndTime().after(last.getSpecEndTime())
-                        && startsBefore(result, plan.getBeginDate()))) {
+                        && (fixedBoundary ? isInMachineAtBoundary(context, result, plan)
+                                : startsBefore(result, plan.getBeginDate())))) {
             return null;
         }
         return last.getSpecEndTime();
+    }
+
+    /**
+     * 使用首个正量生产段及初始在机快照核验维修当天的在机身份。
+     *
+     * @param context 当前排程上下文
+     * @param result 真实结果身份
+     * @param repair 有效05计划
+     * @return 存在在机生产依据时返回true
+     */
+    private static boolean isInMachineAtBoundary(LhScheduleContext context, LhScheduleResult result,
+            MdmDevicePlanShut repair) {
+        int first = ShiftFieldUtil.resolveFirstPlannedShiftIndex(result);
+        Date start = first > 0 ? ShiftFieldUtil.getShiftStartTime(result, first) : null;
+        return LhPlannedRepairAdmissionPolicy.isInMachine(context, result, start,
+                LhPlannedRepairAdmissionPolicy.resolveBoundary(repair));
     }
 
     /**
@@ -559,6 +634,10 @@ public final class LhRepairEndingDeferralPolicy {
          * 本次试算前的完整有效视图，用于逐条恢复缺少收尾证据的05。
          */
         private final List<MdmDevicePlanShut> original;
+        /**
+         * 本次尚未扣账的试算已经确认的固定08:00豁免，不在退出或异常时自动发布。
+         */
+        private final Map<Long, Date> previewedAdmissionFinishes = new LinkedHashMap<>();
 
         /**
          * 发布本次候选视图。
@@ -608,7 +687,8 @@ public final class LhRepairEndingDeferralPolicy {
         }
 
         /**
-         * 用整组清量及本物理机台的真实生产段证明收尾跨过维修起点，零量释放不取得豁免。
+         * 用整组清量及本机真实生产段前置核验08:00边界，未命中时保留原维修起点规则。
+         * 固定边界只接受完成状态，强制退出和窗口未完成不得冒充SKU收尾。
          *
          * @param repair 本次拟跳过的05
          * @param profiles 合法容量画像
@@ -617,6 +697,7 @@ public final class LhRepairEndingDeferralPolicy {
          */
         private boolean provesEnding(MdmDevicePlanShut repair, List<ContinuationEndingMachineProfile> profiles,
                 ContinuationFinishScheduleResult calculated) {
+            previewedAdmissionFinishes.remove(repair.getId());
             if (calculated.getRemainingQty() > 0) {
                 return false;
             }
@@ -627,14 +708,16 @@ public final class LhRepairEndingDeferralPolicy {
                     continue;
                 }
                 ContinuationMachineFinishPlan plan = calculated.getMachinePlans().get(index);
-                if (plan.getPlanQty() <= 0 || plan.getFinishTime() == null
-                        || !plan.getFinishTime().after(repair.getBeginDate())
-                        || plan.getFinishTime().after(weekEnd(repair.getBeginDate()))) {
+                if (plan.getPlanQty() <= 0 || plan.getFinishTime() == null) {
                     return false;
                 }
                 List<LhScheduleResult> proposed = profile.getOriginals().stream()
                         .map(result -> new LhScheduleResult()).collect(Collectors.toList());
                 profile.writePlan(proposed, plan.getPlanQty());
+                boolean fixedBoundary = LhPlannedRepairAdmissionPolicy.shouldSkip(repair, true, plan.getFinishTime())
+                        && plan.getFinishState() == ContinuationMachineFinishPlan.FinishState.SURPLUS_COMPLETED;
+                boolean legacyBoundary = plan.getFinishTime().after(repair.getBeginDate())
+                        && !plan.getFinishTime().after(weekEnd(repair.getBeginDate()));
                 for (int side = 0; side < proposed.size(); side++) {
                     String code = profile.getOriginals().get(side).getLhMachineCode();
                     String pair = LhSingleControlMachineUtil.resolvePairMachineCode(code);
@@ -642,13 +725,41 @@ public final class LhRepairEndingDeferralPolicy {
                             && profile.getOriginals().stream().noneMatch(result -> pair.equals(result.getLhMachineCode()))) {
                         return false;
                     }
-                    if (!startsBefore(proposed.get(side), repair.getBeginDate())) {
-                        return false;
-                    }
+                    int first = ShiftFieldUtil.resolveFirstPlannedShiftIndex(proposed.get(side));
+                    Date productionStart = first > 0 ? ShiftFieldUtil.getShiftStartTime(proposed.get(side), first) : null;
+                    fixedBoundary &= LhPlannedRepairAdmissionPolicy.isInMachine(context,
+                            profile.getOriginals().get(side), productionStart,
+                            LhPlannedRepairAdmissionPolicy.resolveBoundary(repair));
+                    legacyBoundary &= startsBefore(proposed.get(side), repair.getBeginDate());
                 }
-                return true;
+                if (fixedBoundary) {
+                    previewedAdmissionFinishes.put(repair.getId(), RepairPlanRuntimeState.copyDate(plan.getFinishTime()));
+                }
+                return fixedBoundary || legacyBoundary;
             }
             return false;
+        }
+
+        /**
+         * 正式收尾分配成功后发布已在扣账前确认的豁免，失败候选和异常退出不发布。
+         * 正式结果必须与试算一致，不能把已按无维修容量提交的结果重新挂回维修约束。
+         *
+         * @throws IllegalStateException 正式收尾与扣账前维修准入证明不一致
+         */
+        public void commitAdmissionProofs() {
+            Map<Long, List<Object>> confirmed = new LinkedHashMap<>();
+            for (MdmDevicePlanShut repair : original) {
+                Date previewed = previewedAdmissionFinishes.get(repair.getId());
+                if (previewed == null) {
+                    continue;
+                }
+                Date committed = resolveCommittedEnding(context, repair, true);
+                if (!previewed.equals(committed)) {
+                    throw new IllegalStateException("正式收尾与08:00维修前置判断不一致，计划ID=" + repair.getId());
+                }
+                confirmed.put(repair.getId(), admissionProof(context, repair, committed));
+            }
+            context.getRepairPlanRuntimeState().getAdmissionProofMap().putAll(confirmed);
         }
 
         /**

@@ -1,5 +1,8 @@
 package com.zlt.aps.lh.service.impl;
 
+import com.zlt.aps.lh.engine.strategy.support.StructureEndingContinuationPolicy;
+import com.zlt.aps.lh.engine.strategy.support.StructureEndingContinuationState;
+
 import cn.hutool.core.bean.BeanUtil;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
@@ -20,6 +23,7 @@ import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.LhMouldCodeUtil;
 import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -36,13 +40,14 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * 胎胚收尾公共事实的兼容消费入口，不再分配逐机数量或维护独立的完成判定。
- * 数量、节点及释放由现有公共收尾生成，正式消费或设备回裁后一起复核。
+ * 胎胚及普通余量收尾公共事实的复核入口，不再分配逐机数量。
+ * 数量、节点及释放由现有公共收尾生成，正式消费或设备回裁后一起复核；库存投影仍限胎胚组。
  *
  * @author APS
  * @date 2026/10/22
  */
 @Component
+@Slf4j
 public class SharedEmbryoEndingScheduleService {
 
     /**
@@ -68,14 +73,15 @@ public class SharedEmbryoEndingScheduleService {
     }
 
     /**
-     * 正式扣账回裁或设备复评后同步胎胚组、逐机快照及兼容任务视图。
-     * 未达到总份额的机台只有已有强制退出事实可以释放，不能凭本机任务完成释放。
+     * 正式扣账回裁或设备复评后同步胎胚及普通余量组的逐机快照和完成事实。
+     * 未达到冻结总目标的机台只有已有独立退出事实可以释放，不能凭旧收尾节点释放。
+     * 胎胚兼容任务视图仅投影库存组，普通余量不取得库存身份。
      *
      * @param context 已完成本轮数量调整的上下文
      */
     public void refreshCommonFinishFacts(LhScheduleContext context) {
         List<ContinuationRemainderFinishGroup> groups = context.getContinuationRemainderFinishGroups().stream()
-                .filter(group -> group.getEndingType() == ContinuationRemainderFinishGroup.EndingType.EMBRYO_STOCK)
+                .filter(group -> Objects.nonNull(group.getFinalTargetQty()))
                 .collect(Collectors.toList());
         if (groups.isEmpty()) {
             return;
@@ -89,6 +95,8 @@ public class SharedEmbryoEndingScheduleService {
                         Integer::sum, LinkedHashMap::new));
         Date windowEnd = context.getScheduleWindowShifts().get(context.getScheduleWindowShifts().size() - 1).getShiftEndDateTime();
         for (ContinuationRemainderFinishGroup group : groups) {
+            boolean embryoStockGroup = group.getEndingType()
+                    == ContinuationRemainderFinishGroup.EndingType.EMBRYO_STOCK;
             String key = MonthPlanDateResolver.buildMaterialStatusKey(
                     group.getSourceSku().getMaterialCode(), group.getSourceSku().getProductStatus());
             int remaining = Math.max(0, group.getFinalTargetQty() - scheduled.getOrDefault(key, 0));
@@ -108,7 +116,7 @@ public class SharedEmbryoEndingScheduleService {
                 for (LhScheduleResult result : originals) {
                     ContinuationEndingAllocationSnapshot old = context.getContinuationSurplusEndingSnapshotMap().get(result);
                     if (Objects.isNull(old)) {
-                        throw new IllegalStateException("公共胎胚收尾缺少已提交机台快照：" + result.getLhMachineCode());
+                        throw new IllegalStateException("公共续作收尾缺少已提交机台快照：" + result.getLhMachineCode());
                     }
                     ContinuationEndingAllocationSnapshot snapshot = BeanUtil.copyProperties(old, ContinuationEndingAllocationSnapshot.class);
                     int[] quantities = context.getScheduleWindowShifts().stream().mapToInt(shift -> {
@@ -120,7 +128,26 @@ public class SharedEmbryoEndingScheduleService {
                             || !Objects.equals(old.getProductionEndTime(), productionEnd);
                     snapshot.setShiftQuantities(quantities);
                     snapshot.setProductionEndTime(productionEnd);
-                    if (changed) {
+                    if (!embryoStockGroup) {
+                        snapshot.setProductionStartTime(Objects.nonNull(productionEnd)
+                                ? ShiftFieldUtil.getShiftStartTime(result, ShiftFieldUtil.resolveFirstPlannedShiftIndex(result)) : null);
+                    }
+                    StructureEndingContinuationState structureEnding =
+                            StructureEndingContinuationPolicy.state(context, group.getSourceSku());
+                    if (structureEnding != null) {
+                        // 专用三步仍有余量时按已提交生产释放，不能被旧整窗未完成状态重新锁到窗口末。
+                        snapshot.setFinishState(completed ? ContinuationMachineFinishPlan.FinishState.SURPLUS_COMPLETED
+                                : ContinuationMachineFinishPlan.FinishState.FORCED_RELEASE);
+                        if (changed && productionEnd != null) {
+                            snapshot.setReleaseTime(profile.physicalReadyTime(productionEnd));
+                        }
+                    } else if (!embryoStockGroup
+                            && (old.getFinishState() == ContinuationMachineFinishPlan.FinishState.FORCED_RELEASE
+                            || context.hasTimedMachineOffRequest(result)
+                            || context.getTimedMachineOffDecisionMap().containsKey(result))) {
+                        // 普通余量的独立硬退出不依赖整组收尾，回裁只更新实际生产，保留已确认释放。
+                        snapshot.setFinishState(ContinuationMachineFinishPlan.FinishState.FORCED_RELEASE);
+                    } else if (changed) {
                         // 数量改变后旧规则节点不再证明强制退出；设备硬退出先更新数组的事实仍可保留。
                         snapshot.setFinishState(completed ? ContinuationMachineFinishPlan.FinishState.SURPLUS_COMPLETED
                                 : ContinuationMachineFinishPlan.FinishState.WINDOW_UNFINISHED);
@@ -134,10 +161,21 @@ public class SharedEmbryoEndingScheduleService {
                     if (snapshot.getFinishState() == ContinuationMachineFinishPlan.FinishState.WINDOW_UNFINISHED) {
                         snapshot.setReleaseTime(windowEnd);
                     }
+                    if (!embryoStockGroup && (changed || old.getFinishState() != snapshot.getFinishState())) {
+                        log.info("普通余量扣账后收尾事实复核, factoryCode: {}, batchNo: {}, materialCode: {}, "
+                                        + "productStatus: {}, machineCode: {}, finalQty: {}, groupRemainingQty: {}, "
+                                        + "beforeState: {}, afterState: {}, releaseTime: {}",
+                                context.getFactoryCode(), context.getBatchNo(), result.getMaterialCode(),
+                                result.getProductStatus(), result.getLhMachineCode(), java.util.Arrays.stream(quantities).sum(),
+                                remaining, old.getFinishState(), snapshot.getFinishState(),
+                                LhScheduleTimeUtil.formatDateTime(snapshot.getReleaseTime()));
+                    }
                     context.getContinuationSurplusEndingSnapshotMap().put(result, snapshot);
-                    // 兼容映射仅是公共快照的投影，不能再以本机任务量推导完成。
-                    context.getSharedEmbryoStockEndingMachineQuotaMap().put(result, java.util.Arrays.stream(quantities).sum());
-                    context.getSharedEmbryoStockEndingMachineReleaseMap().put(result, snapshot.getReleaseTime());
+                    if (embryoStockGroup) {
+                        // 库存兼容映射仅投影胎胚组，普通余量不得因复核取得库存硬目标身份。
+                        context.getSharedEmbryoStockEndingMachineQuotaMap().put(result, java.util.Arrays.stream(quantities).sum());
+                        context.getSharedEmbryoStockEndingMachineReleaseMap().put(result, snapshot.getReleaseTime());
+                    }
                 }
                 ContinuationEndingAllocationSnapshot fact = context.getContinuationSurplusEndingSnapshotMap().get(originals.get(0));
                 ContinuationMachineFinishPlan plan = plans.get(position);
@@ -145,6 +183,14 @@ public class SharedEmbryoEndingScheduleService {
                 plan.setFinishState(fact.getFinishState());
                 plan.setFinishTime(fact.getProductionEndTime());
                 int lastShift = ShiftFieldUtil.resolveLastPlannedShiftIndex(originals.get(0));
+                if (!embryoStockGroup) {
+                    // 普通整机L/R按物理单元核对，不能仅用左侧时间证明右侧已经完成。
+                    plan.setFinishTime(originals.stream().filter(live::contains)
+                            .map(resultSupport::resolveLastPositiveProductionEndTime).filter(Objects::nonNull)
+                            .max(Date::compareTo).orElse(null));
+                    lastShift = originals.stream().filter(live::contains)
+                            .mapToInt(ShiftFieldUtil::resolveLastPlannedShiftIndex).max().orElse(0);
+                }
                 plan.setFinishShiftIndex(lastShift > 0 ? lastShift : null);
                 plan.setOfflineTime(fact.getReleaseTime());
             }
@@ -262,7 +308,138 @@ public class SharedEmbryoEndingScheduleService {
     }
 
     /**
-     * 发布正式消费后的公共释放；未完成或零份额机台继续占用至窗口末端。
+     * 最终扣账及零量清理后，为有精确历史异料动作的零份额生产单元确认物理退出。
+     * 仅冻结总份额为零时适用；剩余预算为零、单台零量及固定状态链均不能取得该资格。
+     *
+     * @param context 数量已稳定、零量结果已清理的续作上下文
+     */
+    public void confirmZeroQuotaHistoricalReleases(LhScheduleContext context) {
+        if (!context.isContinuousDailyQuotaSynced()
+                || (context.isTimedMachineOffLoadPreview() && !context.isTimedMachineOffHandoffPreview())) {
+            return;
+        }
+        Date windowEnd = context.getScheduleWindowShifts()
+                .get(context.getScheduleWindowShifts().size() - 1).getShiftEndDateTime();
+        for (ContinuationRemainderFinishGroup group : context.getContinuationRemainderFinishGroups()) {
+            if (group.getEndingType() != ContinuationRemainderFinishGroup.EndingType.EMBRYO_STOCK
+                    || !Integer.valueOf(0).equals(group.getFinalTargetQty())
+                    || Objects.isNull(group.getOriginalMachineFinishPlan())) {
+                continue;
+            }
+            List<ContinuationMachineFinishPlan> plans = new ArrayList<>(
+                    group.getOriginalMachineFinishPlan().getMachinePlans());
+            for (int position = 0; position < group.getMachineProfiles().size(); position++) {
+                ContinuationEndingMachineProfile profile = group.getMachineProfiles().get(position);
+                if (!this.canReleaseZeroQuotaHistoricalUnit(context, group, profile)) {
+                    continue;
+                }
+                // 不能读取已被零份额规则延长的estimatedEndTime；从历史零产量起点校验真实物理占用。
+                Date start = profile.getOriginals().stream()
+                        .map(result -> context.getPreviousAlternateReleaseEventMap().get(result.getLhMachineCode()))
+                        .map(PreviousAlternatePlanReleaseEvent::getNoProductionStartTime)
+                        .max(Date::compareTo).get();
+                Date unitReady = profile.switchReadyTime(0);
+                if (unitReady.after(start)) {
+                    start = unitReady;
+                }
+                Date release = profile.physicalReadyTime(start);
+                if (!release.before(windowEnd)) {
+                    continue;
+                }
+                for (LhScheduleResult result : profile.getOriginals()) {
+                    ContinuationEndingAllocationSnapshot snapshot = BeanUtil.copyProperties(
+                            context.getContinuationSurplusEndingSnapshotMap().get(result),
+                            ContinuationEndingAllocationSnapshot.class);
+                    snapshot.setFinishState(ContinuationMachineFinishPlan.FinishState.FORCED_RELEASE);
+                    snapshot.setReleaseTime(release);
+                    context.getContinuationSurplusEndingSnapshotMap().put(result, snapshot);
+                    context.getSharedEmbryoStockEndingMachineReleaseMap().put(result, release);
+                    PreviousAlternatePlanReleaseEvent event = context.getPreviousAlternateReleaseEventMap()
+                            .get(result.getLhMachineCode());
+                    event.setBeforeMaterialNotScheduled(true);
+                    resultSupport.logPreviousAlternateReleaseDecision(context, event,
+                            "冻结胎胚份额为0且最终无生产，按历史异料动作确认物理退出；释放="
+                                    + LhScheduleTimeUtil.formatDateTime(release));
+                }
+                ContinuationMachineFinishPlan plan = BeanUtil.copyProperties(
+                        plans.get(position), ContinuationMachineFinishPlan.class);
+                plan.setFinishState(ContinuationMachineFinishPlan.FinishState.FORCED_RELEASE);
+                plan.setOfflineTime(release);
+                plans.set(position, plan);
+            }
+            ContinuationFinishScheduleResult updated = BeanUtil.copyProperties(
+                    group.getOriginalMachineFinishPlan(), ContinuationFinishScheduleResult.class);
+            updated.setMachinePlans(plans);
+            group.setOriginalMachineFinishPlan(updated);
+        }
+    }
+
+    /**
+     * 核对零份额单元的精确历史关系及真实占用，整机L/R必须同时满足后料和退出边界。
+     * 停产保机、时间下机、仅喷砂及故障迁移仍使用原独立退出流程。
+     *
+     * @param context 最终续作及已冻结历史事件
+     * @param group 冻结总份额为零的胎胚组
+     * @param profile 按冻结模式成组的原机画像
+     * @return 历史异料关系完整且没有生产或独立占用时返回true
+     */
+    private boolean canReleaseZeroQuotaHistoricalUnit(LhScheduleContext context,
+            ContinuationRemainderFinishGroup group, ContinuationEndingMachineProfile profile) {
+        boolean whole = LhSingleControlMachineUtil.isWholeMachineGranularitySku(context, group.getSourceSku());
+        String unitCode = profile.getOriginals().get(0).getLhMachineCode();
+        boolean occupied = context.getScheduleResultList().stream()
+                .filter(result -> this.sameUnit(unitCode, result.getLhMachineCode(), whole))
+                .anyMatch(result -> ShiftFieldUtil.resolveScheduledQty(result) > 0
+                        || java.util.stream.IntStream.rangeClosed(1, LhScheduleConstant.MAX_SHIFT_SLOT_COUNT)
+                        .anyMatch(index -> StringUtils.contains(ShiftFieldUtil.getShiftAnalysis(result, index),
+                                LhScheduleConstant.SAME_MATERIAL_STATUS_CONTINUATION_ANALYSIS)));
+        if (occupied) {
+            return false;
+        }
+        String afterMaterial = null;
+        String afterStatus = null;
+        for (LhScheduleResult result : profile.getOriginals()) {
+            String code = result.getLhMachineCode();
+            PreviousAlternatePlanReleaseEvent event = context.getPreviousAlternateReleaseEventMap().get(code);
+            ContinuationEndingAllocationSnapshot snapshot = context.getContinuationSurplusEndingSnapshotMap()
+                    .get(result);
+            if (Objects.isNull(event)
+                    || !StructureEndingContinuationPolicy.acceptsHistoricalPlan(context, event.getPlan())
+                    || event.resolveProductionRole()
+                            != PreviousAlternatePlanReleaseEvent.ProductionRole.BEFORE_MATERIAL_PRODUCTION
+                    || !StringUtils.equals(event.getMaterialCode(), result.getMaterialCode())
+                    || !StringUtils.equals(event.getProductStatus(), result.getProductStatus())
+                    || StringUtils.isBlank(event.getPlan().getAfterMaterialCode())
+                    || Objects.isNull(event.getNoProductionStartTime()) || event.isSupplementalReleasePending()
+                    || Objects.nonNull(event.getForcedHandoffReleaseTime())) {
+                return false;
+            }
+            if (context.isContinuousStopHoldMachine(code)
+                    || context.getTimedMachineOffRequests().stream()
+                            .flatMap(request -> request.getProfile().getOriginals().stream())
+                            .anyMatch(original -> this.sameUnit(code, original.getLhMachineCode(), whole))
+                    || Objects.nonNull(context.getTimedMachineOffBoundary(code))
+                    || context.getOnlySandBlastContinuationReleaseWindowMap().containsKey(code)
+                    || context.getContinuationTemporaryFaultTransferEventMap().containsKey(code)) {
+                return false;
+            }
+            if (Objects.isNull(snapshot) || Objects.nonNull(snapshot.getProductionEndTime())
+                    || java.util.Arrays.stream(snapshot.getShiftQuantities()).anyMatch(quantity -> quantity != 0)) {
+                return false;
+            }
+            if (Objects.nonNull(afterMaterial)
+                    && (!StringUtils.equals(afterMaterial, event.getPlan().getAfterMaterialCode())
+                    || !StringUtils.equals(afterStatus, event.getPlan().getProductStatus()))) {
+                return false;
+            }
+            afterMaterial = event.getPlan().getAfterMaterialCode();
+            afterStatus = event.getPlan().getProductStatus();
+        }
+        return true;
+    }
+
+    /**
+     * 发布正式消费后的公共释放；未完成或没有独立退出依据的零份额机台继续占用至窗口末端。
      *
      * @param context 正式扣账后的公共组与机台状态
      */

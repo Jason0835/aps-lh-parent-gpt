@@ -58,12 +58,41 @@ public class ScheduleIssueCollector {
     public void addConstructionIssue(ScheduleIssueLevelEnum level, ScheduleIssueCategoryEnum category,
                                      String sourceOrderNo, String embryoCode, String recipeNo,
                                      Integer shiftOrder, String fieldName, String message) {
+        // 未指定工序专属建议key时使用问题类别绑定的公共建议（胎面/胎侧行为保持不变）
+        this.addConstructionIssue(level, category, sourceOrderNo, embryoCode, recipeNo,
+                shiftOrder, fieldName, message, null);
+    }
+
+    /**
+     * 记录施工匹配异常，并允许调用方指定工序专属的“建议处理”国际化文案。
+     *
+     * <p>问题类别与建议文案默认是全局一一对应的（如 CONSTRUCTION_MISSING 默认建议面向胎面/胎侧），
+     * 胎圈（TQ）复用工类别别时措辞需要工序分化，故通过 suggestionKey 覆盖默认建议。</p>
+     *
+     * @param level 异常级别
+     * @param category 异常类别
+     * @param sourceOrderNo 来源工单号
+     * @param embryoCode 胎胚代码
+     * @param recipeNo 示方书编号
+     * @param shiftOrder 班次顺序
+     * @param fieldName 字段名称
+     * @param message 异常说明
+     * @param suggestionKey 建议处理文案的国际化key；为空时回退到问题类别绑定的公共建议
+     */
+    public void addConstructionIssue(ScheduleIssueLevelEnum level, ScheduleIssueCategoryEnum category,
+                                     String sourceOrderNo, String embryoCode, String recipeNo,
+                                     Integer shiftOrder, String fieldName, String message,
+                                     String suggestionKey) {
         ScheduleIssueModel issue = this.createIssue(level, ScheduleStepEnum.BOOTSTRAP, category, message);
         issue.setSourceOrderNo(sourceOrderNo);
         issue.setEmbryoCode(embryoCode);
         issue.setRecipeNo(recipeNo);
         issue.setShiftOrder(shiftOrder);
         issue.setFieldName(fieldName);
+        // 指定工序专属建议key时覆盖类别默认建议，按当前语言解析
+        if (suggestionKey != null && !suggestionKey.trim().isEmpty()) {
+            issue.setSuggestion(I18nUtil.getMessage(suggestionKey));
+        }
         this.append(issue);
     }
 
@@ -238,6 +267,17 @@ public class ScheduleIssueCollector {
             return Collections.emptyList();
         }
         return this.issues.stream().map(this::copy).collect(Collectors.toList());
+    }
+
+    /**
+     * 创建独立的问题收集器副本，避免备库试算改变基础阶段问题集合。
+     *
+     * @return 包含当前问题快照的新收集器
+     */
+    public ScheduleIssueCollector copy() {
+        ScheduleIssueCollector copy = new ScheduleIssueCollector();
+        this.copyIssues().forEach(copy::append);
+        return copy;
     }
 
     /**

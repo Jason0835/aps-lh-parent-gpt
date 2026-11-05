@@ -199,7 +199,9 @@ public class MonthPlanSurplusCalculator {
         Integer startDay = productionDateInfo.getStartDay();
         boolean addLastMonthOverdueQty = productionDateInfo.isAddLastMonthOverdueQty();
         List<Date> realProductionCycleList = productionDateInfo.getRealProductionCycleList();
-        Integer maxDiscontinueDays = productionDateInfo.getMaxDiscontinueDays();
+        Integer extendDays = productionDateInfo.getExtendDays();
+        Integer skuMaxDiscontinueDays = productionDateInfo.getSkuMaxDiscontinueDays();
+        Integer maxDiscontinueDays = productionDateInfo.getSkuMaxDiscontinueDays();
         List<FactoryMonthPlanProductionFinalResult> allMonthPlanList = calculateSkuInfo.getAllMonthPlanList();
         Map<YearMonth, Integer> monthOverdueQtyMap = calculateSkuInfo.getMonthOverdueQtyMap();
         Integer finishedQty = calculateSkuInfo.getFinishedQty();
@@ -223,7 +225,7 @@ public class MonthPlanSurplusCalculator {
             return beforeSurplusInfo;
         }
         //周期排产内有计划量或是没有计划也没有余量：需要扩展判断计划量的日期
-        List<Date> calculateDayQtyList = getAllProductionDateByDiscontinueDays(realProductionCycleList, maxDiscontinueDays);
+        List<Date> calculateDayQtyList = getAllProductionDateByExtendDays(realProductionCycleList, extendDays);
         Map<YearMonth, List<Date>> calculateProductionDayMap = getYearMonthProductionDateInfo(calculateDayQtyList);
         Map<YearMonth, FactoryMonthPlanProductionFinalResult> calculateProductionDayMonthPlanMap = getHasProductionPlan(allMonthPlanList, calculateProductionDayMap, skuInfo);
         //周期排产内有计划量，扩展到间隔天数，看符合条件的排产日信息
@@ -235,7 +237,7 @@ public class MonthPlanSurplusCalculator {
         FactoryMonthPlanProductionFinalResult firstMonthPlan = montPlanMap.get(productionYearMonth);
         List<Date> firstMonthDateList = effectiveProductionDayMap.get(productionYearMonth);
         Integer firstMonthEndDay = productionYearMonth.lengthOfMonth();
-        Integer planQty = getMonthPlanQty(firstMonthPlan, startDay, firstMonthDateList, yearMonthLhDayAdjustInfo, productionYearMonth, maxDiscontinueDays);
+        Integer planQty = getMonthPlanQty(firstMonthPlan, startDay, firstMonthDateList, yearMonthLhDayAdjustInfo, maxDiscontinueDays, skuMaxDiscontinueDays, true);
         Integer sumQty = getMonthPlanSumQty(firstMonthPlan, productionYearMonth, startDay, firstMonthEndDay, yearMonthLhDayAdjustInfo);
         Integer monthOverdueQty = getLastMonthOverdueQty(addLastMonthOverdueQty, productionYearMonth, monthOverdueQtyMap);
         if (!isFindNextMonth) {
@@ -245,7 +247,7 @@ public class MonthPlanSurplusCalculator {
         FactoryMonthPlanProductionFinalResult nextMonthPlan = montPlanMap.get(nextMonth);
         List<Date> nextMonthDateList = effectiveProductionDayMap.get(nextMonth);
         Integer nextMonthEndDay = productionYearMonth.lengthOfMonth();
-        planQty = planQty + getMonthPlanQty(nextMonthPlan, BigDecimal.ONE.intValue(), nextMonthDateList, yearMonthLhDayAdjustInfo, nextMonth, maxDiscontinueDays);
+        planQty = planQty + getMonthPlanQty(nextMonthPlan, BigDecimal.ONE.intValue(), nextMonthDateList, yearMonthLhDayAdjustInfo, maxDiscontinueDays, skuMaxDiscontinueDays, false);
         sumQty = sumQty + getMonthPlanSumQty(nextMonthPlan, nextMonth, BigDecimal.ONE.intValue(), nextMonthEndDay, yearMonthLhDayAdjustInfo);
         return new LhSurplusResultVo(skuInfo, monthOverdueQty, planQty, sumQty, finishedQty);
     }
@@ -566,17 +568,26 @@ public class MonthPlanSurplusCalculator {
      * @param startDay                 计划计算起始日
      * @param monthProductionDateList  对应月排产日集合
      * @param yearMonthLhDayAdjustInfo 日硫化计划日调整信息
-     * @param yearMonth                排产月份
      * @param maxDiscontinueDays       最大间隔天数
+     * @param skuMaxDiscontinueDays    Sku连续排产最大间隔天数
+     * @param isAddLhDayAdjust         是否加入日硫化调整量
      * @return
      */
-    private static Integer getMonthPlanQty(FactoryMonthPlanProductionFinalResult skuYearMonth, Integer startDay, List<Date> monthProductionDateList, YearMonthLhDayAdjustVo yearMonthLhDayAdjustInfo, YearMonth yearMonth, Integer maxDiscontinueDays) {
+    private static Integer getMonthPlanQty(FactoryMonthPlanProductionFinalResult skuYearMonth,
+                                           Integer startDay,
+                                           List<Date> monthProductionDateList,
+                                           YearMonthLhDayAdjustVo yearMonthLhDayAdjustInfo,
+                                           Integer maxDiscontinueDays,
+                                           Integer skuMaxDiscontinueDays,
+                                           boolean isAddLhDayAdjust) {
         if (null == skuYearMonth) {
             return BigDecimal.ZERO.intValue();
         }
-        Integer planQty = getEarliestContinuousPlanQty(skuYearMonth, startDay, monthProductionDateList, maxDiscontinueDays);
+        Integer planQty = getEarliestContinuousPlanQty(skuYearMonth, startDay, monthProductionDateList, maxDiscontinueDays, skuMaxDiscontinueDays);
         //增加日计划的调整量
-        planQty = planQty + getYearMonthLhDayAdjustQty(yearMonthLhDayAdjustInfo, yearMonth);
+        if (isAddLhDayAdjust) {
+            planQty = planQty + getAllLhDayAdjustQty(yearMonthLhDayAdjustInfo);
+        }
         return planQty;
     }
 
@@ -727,12 +738,14 @@ public class MonthPlanSurplusCalculator {
      * @param startDay               计算计划量起始日
      * @param dateList               有计划量排产日集合
      * @param maxDiscontinueDays     周期日最大可允许间隔天数
+     * @param skuMaxDiscontinueDays  Sku连续生产最大间隔天数
      * @return
      */
     private static Integer getEarliestContinuousPlanQty(FactoryMonthPlanProductionFinalResult skuMonthProductionInfo,
                                                         Integer startDay,
                                                         List<Date> dateList,
-                                                        Integer maxDiscontinueDays) {
+                                                        Integer maxDiscontinueDays,
+                                                        Integer skuMaxDiscontinueDays) {
         if (null == skuMonthProductionInfo || CollectionUtils.isEmpty(dateList)) {
             return BigDecimal.ZERO.intValue();
         }
@@ -766,7 +779,8 @@ public class MonthPlanSurplusCalculator {
             }
             return statisticsPlanQtyEndDay(startDay, nextContinueEndDay, skuMonthProductionInfo);
         }
-        Integer earliestContinuousDay = getEarliestContinuousDay(lastDay, realYearMonth, skuMonthProductionInfo);
+        //20261031+ ZLT 取得从lastDay开始往后看第一个排产量日开始，之后第一个连续maxDiscontinueDays天都是空排产的有排产量日
+        Integer earliestContinuousDay = getEarliestContinuousByMaxDiscontinueDays(lastDay, skuMaxDiscontinueDays, realYearMonth, skuMonthProductionInfo);
         //不能小于1
         if (null == earliestContinuousDay || earliestContinuousDay < BigDecimal.ONE.intValue()) {
             return BigDecimal.ZERO.intValue();
@@ -809,6 +823,27 @@ public class MonthPlanSurplusCalculator {
             return BigDecimal.ZERO.intValue();
         }
         return yearMonthLhDayAdjustInfo.getYearMonthDayLhAdjustQty(yearMonth);
+    }
+
+    /**
+     * 获取某个年月的日计划调整量
+     *
+     * @param yearMonthLhDayAdjustInfo
+     * @return
+     */
+    private static Integer getAllLhDayAdjustQty(YearMonthLhDayAdjustVo yearMonthLhDayAdjustInfo) {
+        if (null == yearMonthLhDayAdjustInfo) {
+            return BigDecimal.ZERO.intValue();
+        }
+        Map<YearMonth, Integer> yearMonthDayLhAdjustQtyMap = yearMonthLhDayAdjustInfo.getYearMonthDayLhAdjustQtyMap();
+        if (CollectionUtils.isEmpty(yearMonthDayLhAdjustQtyMap)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        List<Integer> monthQtyList = Lists.newArrayList(yearMonthDayLhAdjustQtyMap.values());
+        if (CollectionUtils.isEmpty(monthQtyList)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        return monthQtyList.stream().mapToInt(Integer::intValue).sum();
     }
 
     /**
@@ -874,12 +909,12 @@ public class MonthPlanSurplusCalculator {
     }
 
     /**
-     * 排产日是否有排产计划量
+     * 获取指定排产日期范围内存在正日计划量的月份及对应物料状态计划。
      *
      * @param allMonthPlanList       所有排产计划
-     * @param yearMonthMap           年-月信息
-     * @param skuMonthProductionInfo Sku信息
-     * @return
+     * @param yearMonthMap           待判断的年月及排产日期，适用于原始窗口和扩展窗口
+     * @param skuMonthProductionInfo 用于匹配物料和产品状态的计划信息
+     * @return 指定日期内存在正日计划量的月份映射，无正计划时返回空映射
      */
     private static Map<YearMonth, FactoryMonthPlanProductionFinalResult> getHasProductionPlan(List<FactoryMonthPlanProductionFinalResult> allMonthPlanList,
                                                                                               Map<YearMonth, List<Date>> yearMonthMap,
@@ -893,8 +928,12 @@ public class MonthPlanSurplusCalculator {
             if (null == skuYearMonth) {
                 return;
             }
-            Integer lastDay = getLastHasPlanQtyDay(getMonthDayList(dateList), skuYearMonth);
-            if (null == lastDay) {
+            // 日期定位方法在无正计划时仍可返回默认日期，不能用于判定窗口是否有计划。
+            // 原始窗口与扩展窗口均按真实正日计划判断，避免漏掉前段欠产余量分支。
+            boolean hasPositivePlan = getMonthDayList(dateList).stream()
+                    .map(skuYearMonth::getDayQty)
+                    .anyMatch(planQty -> planQty != null && planQty > 0);
+            if (!hasPositivePlan) {
                 return;
             }
             hasProductionPlanMap.put(yearMonth, skuYearMonth);
@@ -1006,6 +1045,9 @@ public class MonthPlanSurplusCalculator {
             if (null == lastDay || lastDay < dateIndex) {
                 lastDay = dateIndex;
             }
+        }
+        if (null == lastDay) {
+            lastDay = dayList.get(dayList.size() - BigDecimal.ONE.intValue());
         }
         return lastDay;
     }
@@ -1158,6 +1200,64 @@ public class MonthPlanSurplusCalculator {
     }
 
     /**
+     * 获取从startDay开始往后，得到第一个间断天数= maxDiscontinueDays值的最早一个排产日
+     * 间断判断条件：前一日有值，当天没值则为间断
+     * <p>
+     * 计算逻辑：
+     * 1、从startDay日开始往后逐日查看月计划中当日的排产量；
+     * 2、找到第一个满足条件的排产日：该日有排产量，且从该日往后连续 maxDiscontinueDays 天
+     * 的排产量都为0或为空。示例：maxDiscontinueDays = 3，day日有排产量，day+1、day+2、day+3
+     * 日均没有排产量，则返回day日；
+     * 3、若一直到月末都没有出现满足条件的排产日，则返回当月的月末最后一天（如31日）。
+     * </p>
+     *
+     * @param startDay               开始日
+     * @param maxDiscontinueDays     最大间断天数
+     * @param yearMonth              年份-月份
+     * @param skuMonthProductionInfo sku月排产信息
+     * @return 断点日；参数非法返回null
+     */
+    private static Integer getEarliestContinuousByMaxDiscontinueDays(Integer startDay, Integer maxDiscontinueDays, YearMonth yearMonth,
+                                                                     FactoryMonthPlanProductionFinalResult skuMonthProductionInfo) {
+        //参数校验
+        if (null == startDay || null == yearMonth || null == skuMonthProductionInfo) {
+            return null;
+        }
+        //当月月末最后一天（28/29/30/31）
+        Integer monthEndDay = yearMonth.lengthOfMonth();
+        //开始日不能小于1
+        Integer beginDay = startDay;
+        if (beginDay < BigDecimal.ONE.intValue()) {
+            beginDay = BigDecimal.ONE.intValue();
+        }
+        //开始日已超过月末，直接返回月末最后一天
+        if (beginDay > monthEndDay) {
+            return monthEndDay;
+        }
+        //不限制间断天数，等同于获取从startDay开始连续有计划量的最后一个排产日
+        if (!isLimit(maxDiscontinueDays)) {
+            return getEarliestContinuousDay(beginDay, yearMonth, skuMonthProductionInfo);
+        }
+        Integer stepSize = maxDiscontinueDays + BigDecimal.ONE.intValue();
+        //从startDay日开始，逐日往后查看排产量
+        for (int currentDay = beginDay; currentDay <= monthEndDay; currentDay++) {
+            Integer currentQty = skuMonthProductionInfo.getDayQty(currentDay);
+            //断点日当天必须有排产量，没有排产量则继续看下一日
+            if (null == currentQty || currentQty <= BigDecimal.ZERO.intValue()) {
+                continue;
+            }
+            //判断当日往后连续 maxDiscontinueDays 天内是否都没有排产量（超月末的日期按没有排产量处理）
+            boolean allDiscontinue = hasFindNextDay(currentDay, stepSize, skuMonthProductionInfo);
+            if (!allDiscontinue) {
+                //第一次出现连续 maxDiscontinueDays 天没有排产量，返回该断点日
+                return currentDay;
+            }
+        }
+        //一直没有满足条件的排产日，则为月末最后一天
+        return monthEndDay;
+    }
+
+    /**
      * 获取从startDay开始，连续有计划量的最后一个排产日：
      * 即获取最早没有计划排产量的排产日的前一日
      *
@@ -1306,29 +1406,29 @@ public class MonthPlanSurplusCalculator {
      * 获取间断排产天数所有排产周期日
      *
      * @param realProductionCycleList 当前周期排产日(3天8个班)
-     * @param maxDiscontinueDays
+     * @param extendDays
      * @return
      */
-    private static List<Date> getAllProductionDateByDiscontinueDays(List<Date> realProductionCycleList, Integer maxDiscontinueDays) {
+    private static List<Date> getAllProductionDateByExtendDays(List<Date> realProductionCycleList, Integer extendDays) {
         if (CollectionUtils.isEmpty(realProductionCycleList)) {
             return Collections.emptyList();
         }
-        List<Date> discontinueDateList = Lists.newArrayList();
-        realProductionCycleList.forEach(realProductionDate -> discontinueDateList.add(realProductionDate));
-        if (!isLimit(maxDiscontinueDays)) {
-            return discontinueDateList;
+        List<Date> allProductionDateList = Lists.newArrayList();
+        realProductionCycleList.forEach(realProductionDate -> allProductionDateList.add(realProductionDate));
+        if (!isLimit(extendDays)) {
+            return allProductionDateList;
         }
-        //按日期从早到晚升序排序
+        //按日期从早到晚升序排序s
         realProductionCycleList.sort(null);
         int endIndex = realProductionCycleList.size() - BigDecimal.ONE.intValue();
         Date realProductionEndDate = realProductionCycleList.get(endIndex);
         LocalDate addStartDatge = getDate(realProductionEndDate);
-        for (int addDays = BigDecimal.ONE.intValue(); addDays <= maxDiscontinueDays; addDays++) {
+        for (int addDays = BigDecimal.ONE.intValue(); addDays <= extendDays; addDays++) {
             LocalDate addDate = addStartDatge.plusDays(addDays);
             Date addNextDate = getDate(addDate);
-            discontinueDateList.add(addNextDate);
+            allProductionDateList.add(addNextDate);
         }
-        return discontinueDateList;
+        return allProductionDateList;
     }
 
     /**
@@ -1344,6 +1444,26 @@ public class MonthPlanSurplusCalculator {
             return false;
         }
         return maxDiscontinueDays > BigDecimal.ZERO.intValue();
+    }
+
+    /**
+     * 是否需要查找下一天
+     * 返回值 true 表示不需要查找 false 表示需要查找
+     *
+     * @param currentDay             当前天
+     * @param maxDiscontinueDays     最大间隔
+     * @param skuMonthProductionInfo 月计划排产信息
+     * @return
+     */
+    private static boolean hasFindNextDay(Integer currentDay, Integer maxDiscontinueDays, FactoryMonthPlanProductionFinalResult skuMonthProductionInfo) {
+        for (int nextDay = currentDay + BigDecimal.ONE.intValue(); nextDay <= currentDay + maxDiscontinueDays; nextDay++) {
+            Integer nextDayQty = skuMonthProductionInfo.getDayQty(nextDay);
+            if (null != nextDayQty && nextDayQty > BigDecimal.ZERO.intValue()) {
+                //间隔天数内还有排产量，不是间断日
+                return true;
+            }
+        }
+        return false;
     }
 
 }

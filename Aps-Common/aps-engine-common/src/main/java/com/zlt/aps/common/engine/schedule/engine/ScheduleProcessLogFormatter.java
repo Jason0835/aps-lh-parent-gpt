@@ -12,6 +12,28 @@ import java.util.stream.Collectors;
 /** TM/TC 自动排程过程日志公共格式化组件。 */
 public final class ScheduleProcessLogFormatter {
 
+    /**
+     * 展示两阶段基础候选取整与最终实际分量，避免用全量缺口拼接基础段调整公式。
+     *
+     * @param task 当前两阶段普通任务
+     * @return 直接读取计算快照的中文数量说明，基础候选补量与追加实际量分开显示
+     */
+    public String buildTwoPhasePlanQuantityDetail(ScheduleTaskDraftModel task) {
+        return "两阶段基础候选：损耗前请求=" + this.displayQuantity(task.getPreLossPlanQty())
+                + "米，损耗补量=" + this.displayQuantity(task.getLossAddQty())
+                + "米，最小起排补量=" + this.displayQuantity(task.getMinStartAdjustQty())
+                + "米，卷长补量=" + this.displayQuantity(task.getTailRoundAdjustQty())
+                + "米，补整卷后=" + this.displayQuantity(task.getIntegerRoundingBeforeQty())
+                + "米，整数补量=" + this.displayQuantity(task.getIntegerRoundingAddedQty())
+                + "米；基础合法目标=" + this.displayQuantity(task.getBaseRequired())
+                + "米，全量合法目标=" + this.displayQuantity(task.getTargetCommittedQty())
+                + "米；实际计划量=基础实际" + this.displayQuantity(task.getBaseAssignQty())
+                + "+备库实际" + this.displayQuantity(task.getExtraAssignQty())
+                + "=" + this.displayQuantity(this.nvl(task.getBaseAssignQty()).add(this.nvl(task.getExtraAssignQty())))
+                + "米；当前任务量=" + this.displayQuantity(task.getPlanQty())
+                + "米，数量阶段=" + task.getQuantityStage() + "。";
+    }
+
     public String buildToolUsageSummary(ScheduleTaskDraftModel task,
                                         Map<String, ScheduleToolLedgerSnapshot> snapshotMap,
                                         String disabledParameterCode) {
@@ -339,6 +361,169 @@ public final class ScheduleProcessLogFormatter {
 
     public String displayQuantity(BigDecimal quantity) {
         return quantity == null ? "未计算" : quantity.stripTrailingZeros().toPlainString();
+    }
+
+    /**
+     * 构建保证范围逐班需求按成型余量封顶的两行过程日志。
+     *
+     * @param task               当前计划量任务
+     * @param sourceTaskList     计划组来源任务；为空时使用当前任务
+     * @param productLengthLabel 产品长度中文标签
+     * @return 保证范围封顶明细；当前任务为空时返回空字符串
+     */
+    public String buildGuardDemandCapDetail(ScheduleTaskDraftModel task,
+                                            Collection<? extends ScheduleTaskDraftModel> sourceTaskList,
+                                            String productLengthLabel) {
+        if (task == null) {
+            return "";
+        }
+        List<ScheduleTaskDraftModel> sourceTasks = sourceTaskList == null ? new ArrayList<>()
+                : sourceTaskList.stream().filter(Objects::nonNull)
+                .map(sourceTask -> (ScheduleTaskDraftModel) sourceTask).collect(Collectors.toList());
+        if (sourceTasks.isEmpty()) {
+            sourceTasks.add(task);
+        }
+        boolean groupedSources = sourceTasks.size() > 1;
+        Set<String> displayedSourceKeys = new LinkedHashSet<>();
+        List<String> detailLines = new ArrayList<>();
+        BigDecimal sourceEffectiveDemandQty = BigDecimal.ZERO;
+        for (ScheduleTaskDraftModel sourceTask : sourceTasks) {
+            String sourceKey = this.buildGuardDemandCapSourceKey(sourceTask);
+            if (!displayedSourceKeys.add(sourceKey)) {
+                continue;
+            }
+            String sourceLabel = groupedSources
+                    ? "成型代码=" + this.displayEmbryoCode(sourceTask.getEmbryoCode()) + "，" : "";
+            ScheduleGuardDemandCapLogSnapshot snapshot = sourceTask.getGuardDemandCapLogSnapshot();
+            if (!this.hasCompleteGuardDemandCapSnapshot(snapshot)) {
+                BigDecimal effectiveDemandQty = this.nvl(sourceTask.getGuardDemandQty());
+                detailLines.add(sourceLabel + "逐班封顶明细未记录，当前有效保证需求="
+                        + this.displayQuantity(effectiveDemandQty) + "米。");
+                sourceEffectiveDemandQty = sourceEffectiveDemandQty.add(effectiveDemandQty);
+                continue;
+            }
+            BigDecimal rawTotal = snapshot.getRawFormingQtyByShift().values().stream()
+                    .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+            String rawByShift = snapshot.getRawFormingQtyByShift().entrySet().stream()
+                    .sorted(Map.Entry.comparingByKey())
+                    .map(entry -> "成型班" + entry.getKey() + "=" + this.displayQuantity(entry.getValue()) + "条")
+                    .collect(Collectors.joining("，"));
+            detailLines.add(sourceLabel + "保证范围原始需求："
+                    + (rawByShift.isEmpty() ? "无" : rawByShift)
+                    + "；合计" + this.displayQuantity(rawTotal) + "条。");
+
+            BigDecimal cappedTotal = snapshot.getCappedFormingQtyByShift().values().stream()
+                    .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+            String cappedByShift = snapshot.getCappedFormingQtyByShift().entrySet().stream()
+                    .sorted(Map.Entry.comparingByKey())
+                    .map(entry -> "班" + entry.getKey() + "=" + this.displayQuantity(entry.getValue()) + "条")
+                    .collect(Collectors.joining("，"));
+            String cxRemainDetail = snapshot.getCxRemainQty() == null
+                    ? "成型余量未配置，不封顶"
+                    : "成型余量=" + this.displayQuantity(snapshot.getCxRemainQty()) + "条"
+                    + (snapshot.getCxRemainQty().compareTo(BigDecimal.ZERO) < 0 ? "，负数按0条处理" : "");
+            String effectiveDemandFormula = this.buildGuardDemandEffectiveFormula(snapshot,
+                    cappedTotal, productLengthLabel);
+            detailLines.add(sourceLabel + "保证范围需求封顶：" + cxRemainDetail
+                    + "；按班次先后分配，"
+                    + (cappedByShift.isEmpty() ? "无" : cappedByShift)
+                    + "；有效需求=" + effectiveDemandFormula + "。");
+            sourceEffectiveDemandQty = sourceEffectiveDemandQty.add(this.calculateGuardDemandEffectiveQty(snapshot));
+        }
+        if (sourceEffectiveDemandQty.compareTo(this.nvl(task.getGuardDemandQty())) != 0) {
+            detailLines.add("当前任务有效保证需求=" + this.displayQuantity(task.getGuardDemandQty()) + "米。");
+        }
+        return String.join("\n", detailLines);
+    }
+
+    /**
+     * 判断逐班封顶日志快照是否包含原始量、封顶量和各班长度。
+     *
+     * @param snapshot 保证范围封顶日志快照
+     * @return 数据完整时返回 true
+     */
+    private boolean hasCompleteGuardDemandCapSnapshot(ScheduleGuardDemandCapLogSnapshot snapshot) {
+        return snapshot != null && snapshot.getRawFormingQtyByShift() != null
+                && !snapshot.getRawFormingQtyByShift().isEmpty()
+                && snapshot.getCappedFormingQtyByShift() != null
+                && snapshot.getRawFormingQtyByShift().keySet().equals(snapshot.getCappedFormingQtyByShift().keySet())
+                && snapshot.getProductLengthByShift() != null
+                && snapshot.getRawFormingQtyByShift().keySet().equals(snapshot.getProductLengthByShift().keySet())
+                && snapshot.getProductLengthByShift().values().stream().allMatch(Objects::nonNull);
+    }
+
+    /**
+     * 构建单个来源的去重键，要求成型来源、窗口和封顶快照一致。
+     *
+     * @param sourceTask 计划组来源任务
+     * @return 来源及封顶快照组合键
+     */
+    private String buildGuardDemandCapSourceKey(ScheduleTaskDraftModel sourceTask) {
+        String sourceIdentity = this.isNotBlank(sourceTask.getFormingSourceKey())
+                ? sourceTask.getFormingSourceKey()
+                : String.valueOf(sourceTask.getOrderNo()) + "|" + sourceTask.getProcessCode()
+                + "|" + sourceTask.getShiftOrder();
+        ScheduleGuardDemandCapLogSnapshot snapshot = sourceTask.getGuardDemandCapLogSnapshot();
+        if (snapshot == null) {
+            return sourceIdentity + "|NO_SNAPSHOT|" + this.toComparableMap(sourceTask.getFormingGuardWindowQtyMap());
+        }
+        return sourceIdentity + "|" + this.toComparableMap(snapshot.getRawFormingQtyByShift())
+                + "|" + this.toComparableMap(snapshot.getCappedFormingQtyByShift())
+                + "|" + this.toComparableMap(snapshot.getProductLengthByShift())
+                + "|" + this.displayQuantity(snapshot.getCxRemainQty());
+    }
+
+    /**
+     * 将班次映射按班次顺序转换为稳定的比较文本。
+     *
+     * @param values 班次数值映射
+     * @return 班次排序后的比较文本
+     */
+    private String toComparableMap(Map<Integer, BigDecimal> values) {
+        if (values == null) {
+            return "null";
+        }
+        return new TreeMap<>(values).entrySet().stream()
+                .map(entry -> entry.getKey() + "=" + this.displayQuantity(entry.getValue()))
+                .collect(Collectors.joining(",", "{", "}"));
+    }
+
+    /**
+     * 展开逐班封顶条数与产品长度，计算有效保证需求公式。
+     *
+     * @param snapshot           保证范围封顶日志快照
+     * @param cappedTotal        封顶后保证需求条数合计
+     * @param productLengthLabel 产品长度中文标签
+     * @return 逐班条数乘长度后的米数公式
+     */
+    private String buildGuardDemandEffectiveFormula(ScheduleGuardDemandCapLogSnapshot snapshot,
+                                                    BigDecimal cappedTotal, String productLengthLabel) {
+        Map<Integer, BigDecimal> lengthByShift = snapshot.getProductLengthByShift();
+        List<BigDecimal> distinctLengths = lengthByShift.values().stream().filter(Objects::nonNull)
+                .distinct().collect(Collectors.toList());
+        BigDecimal effectiveDemandQty = this.calculateGuardDemandEffectiveQty(snapshot);
+        if (distinctLengths.size() == 1) {
+            return this.displayQuantity(cappedTotal) + "条×" + this.displayQuantity(distinctLengths.get(0))
+                    + "米/条=" + this.displayQuantity(effectiveDemandQty) + "米";
+        }
+        return snapshot.getCappedFormingQtyByShift().entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> this.displayQuantity(entry.getValue()) + "条×" + productLengthLabel
+                        + this.displayQuantity(lengthByShift.get(entry.getKey())) + "米/条")
+                .collect(Collectors.joining("+"))
+                + "=" + this.displayQuantity(effectiveDemandQty) + "米";
+    }
+
+    /**
+     * 按快照中逐班条数和长度计算有效保证需求。
+     *
+     * @param snapshot 保证范围封顶日志快照
+     * @return 有效保证需求，单位米
+     */
+    private BigDecimal calculateGuardDemandEffectiveQty(ScheduleGuardDemandCapLogSnapshot snapshot) {
+        return snapshot.getCappedFormingQtyByShift().entrySet().stream()
+                .map(entry -> this.nvl(entry.getValue()).multiply(snapshot.getProductLengthByShift().get(entry.getKey())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     /**

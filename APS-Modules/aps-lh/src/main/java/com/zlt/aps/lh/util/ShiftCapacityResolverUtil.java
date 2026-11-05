@@ -1005,10 +1005,8 @@ public final class ShiftCapacityResolverUtil {
         }
 
         List<Date[]> overlapIntervals = new ArrayList<>();
-        for (MdmDevicePlanShut planShut : devicePlanShutList) {
-            if (Objects.isNull(planShut)
-                    || !StringUtils.equals(machineCode, planShut.getMachineCode())
-                    || Objects.isNull(planShut.getBeginDate())
+        for (MdmDevicePlanShut planShut : LhInventoryPlanMatcher.matchStopPlans(devicePlanShutList, machineCode)) {
+            if (Objects.isNull(planShut.getBeginDate())
                     || Objects.isNull(planShut.getEndDate())
                     || !planShut.getBeginDate().before(planShut.getEndDate())) {
                 continue;
@@ -1332,7 +1330,10 @@ public final class ShiftCapacityResolverUtil {
                     maintenanceWindowList, machineCode, windowStartTime, fixedQtyEnd);
             int availableQty = resolveShiftCapacity(shiftCapacity, lhTimeSeconds, mouldQty,
                     shiftDurationSeconds, productiveSeconds, retainRawQuantity);
-            return Math.min(Math.max(0, plannedRepairFixedQty), availableQty);
+            // 固定量按物理双模机配置，单控L/R各承接一半，不能让两侧分别领取整机固定量。
+            int machineFixedQty = LhSingleControlMachineUtil.isSingleMouldMachine(machineCode)
+                    ? plannedRepairFixedQty / 2 : plannedRepairFixedQty;
+            return Math.min(Math.max(0, machineFixedQty), availableQty);
         }
         boolean repairCapacityConstrained = isPlannedRepairAffectingCapacity(
                 maintenanceWindowList, machineCode, windowStartTime, windowEndTime);
@@ -2065,10 +2066,8 @@ public final class ShiftCapacityResolverUtil {
         }
 
         List<MdmDevicePlanShut> machineStops = new ArrayList<>();
-        for (MdmDevicePlanShut planShut : devicePlanShutList) {
-            if (Objects.isNull(planShut)
-                    || !StringUtils.equals(machineCode, planShut.getMachineCode())
-                    || Objects.isNull(planShut.getBeginDate())
+        for (MdmDevicePlanShut planShut : LhInventoryPlanMatcher.matchStopPlans(devicePlanShutList, machineCode)) {
+            if (Objects.isNull(planShut.getBeginDate())
                     || Objects.isNull(planShut.getEndDate())
                     || !planShut.getBeginDate().before(planShut.getEndDate())
                     || !planShut.getEndDate().after(productionStartTime)) {
@@ -2409,6 +2408,13 @@ public final class ShiftCapacityResolverUtil {
      * 取交集后合并区间，统一折算扣减班次可生产秒数。</p>
      * <p>盘点（{@link MachineStopTypeEnum#TAKE_STOCK}）与其他停机类型一样
      * 只扣时间产能，不触发换模、换活字块、首检、预热等逻辑；盘点结束后机台可直接进入生产排产。</p>
+     * 盘点来源由统一匹配器按硫化线优先选择，其他停机保持精确机台匹配。
+     *
+     * @param devicePlanShutList 原入口加载的设备停机计划
+     * @param machineCode 当前运行侧机台编码
+     * @param windowStartTime 统计窗口起点
+     * @param windowEndTime 统计窗口终点，为空时统计至计划自身结束
+     * @return 与目标窗口相交后合并的停机区间
      */
     private static List<Date[]> collectMergedPlannedStopIntervals(List<MdmDevicePlanShut> devicePlanShutList,
                                                                   String machineCode,
@@ -2420,10 +2426,8 @@ public final class ShiftCapacityResolverUtil {
                 || Objects.isNull(windowStartTime)) {
             return stopIntervals;
         }
-        for (MdmDevicePlanShut planShut : devicePlanShutList) {
-            if (Objects.isNull(planShut)
-                    || !StringUtils.equals(machineCode, planShut.getMachineCode())
-                    || Objects.isNull(planShut.getBeginDate())
+        for (MdmDevicePlanShut planShut : LhInventoryPlanMatcher.matchStopPlans(devicePlanShutList, machineCode)) {
+            if (Objects.isNull(planShut.getBeginDate())
                     || Objects.isNull(planShut.getEndDate())
                     || !planShut.getBeginDate().before(planShut.getEndDate())) {
                 continue;

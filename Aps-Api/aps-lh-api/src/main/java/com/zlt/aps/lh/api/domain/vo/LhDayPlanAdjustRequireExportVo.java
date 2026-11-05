@@ -72,4 +72,14 @@ public class LhDayPlanAdjustRequireExportVo extends BaseEntity implements Serial
     @ApiModelProperty("调整3原因")
     private String adjustReason3;
 
+    /** 调整4数量 */
+    @Excel(name = "ui.data.column.lhDayPlanAdjustRequire.importAdjustQty4", width = 14)
+    @ApiModelProperty("调整4数量")
+    private BigDecimal adjustQty4;
+
+    /** 调整4原因 */
+    @Excel(name = "ui.data.column.lhDayPlanAdjustRequire.importAdjustReason4", width = 32)
+    @ApiModelProperty("调整4原因")
+    private String adjustReason4;
+
 }

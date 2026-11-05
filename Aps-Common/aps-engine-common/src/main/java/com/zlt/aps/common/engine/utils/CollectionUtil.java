@@ -89,4 +89,27 @@ public class CollectionUtil extends CollectionUtils {
         }
         return result;
     }
+
+	/* ==================== 以下方法合并自 mix-engine-common ==================== */
+
+    public static <E> List<E> emptyList() {
+    	return new ArrayList<>(0);
+    }
+    
+	/**
+	 * 删除
+	 * 
+	 * @param <E>
+	 * @param list 待删除列表
+	 * @param obj  待删除元素
+	 * @return
+	 */
+	public static <E> E remove(List<E> list, E obj) {
+		for (int i = 0, size = list.size(); i < size; i++) {
+			if (obj == list.get(i)) {
+				return list.remove(i);
+			}
+		}
+		return obj;
+	}
 }

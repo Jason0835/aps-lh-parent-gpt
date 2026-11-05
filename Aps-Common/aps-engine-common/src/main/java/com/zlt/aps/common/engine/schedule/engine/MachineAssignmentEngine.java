@@ -1,6 +1,8 @@
 package com.zlt.aps.common.engine.schedule.engine;
 
 import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.util.*;
@@ -17,6 +19,16 @@ public final class MachineAssignmentEngine<C extends MachineAssignmentContext<T>
         T extends ScheduleTaskDraftModel, M extends ScheduleMachineCandidateModel, P> {
 
     /**
+     * 逐班机台分配性能计时日志，用于定位分配主流程各分段耗时。
+     */
+    private static final Logger PERF_LOG = LoggerFactory.getLogger(MachineAssignmentEngine.class);
+
+    /**
+     * 单任务分配耗时超过该阈值时输出慢任务日志，避免高频明细刷屏。
+     */
+    private static final long SLOW_TASK_LOG_THRESHOLD_MS = 50L;
+
+    /**
      * 执行逐班机台分配主流程。
      *
      * @param context 排程上下文
@@ -28,7 +40,7 @@ public final class MachineAssignmentEngine<C extends MachineAssignmentContext<T>
                 ? Collections.emptyList() : new ArrayList<>(context.getTaskDraftList());
         Map<Integer, List<ScheduleShiftToolDemand>> shiftToolDemandMap = policy.snapshotShiftToolDemand(context);
         if (taskDraftList.isEmpty()
-                && shiftToolDemandMap.isEmpty()) {
+                && shiftToolDemandMap.isEmpty() && context.getTwoPhaseConsumptionMap().isEmpty()) {
             return;
         }
         if (context.getCurrentAvailableToolQty() == null) {
@@ -36,6 +48,9 @@ public final class MachineAssignmentEngine<C extends MachineAssignmentContext<T>
         }
         Map<String, BigDecimal> runtimeStockMap = new java.util.HashMap<>(context.getInitialStockMap());
         boolean inventoryClosedLoopEnabled = policy.isInventoryClosedLoopEnabled(context);
+        if (context.isTwoPhaseEnabled() && !inventoryClosedLoopEnabled) {
+            throw new IllegalStateException("Two-phase scheduling requires inventory closed loop");
+        }
         Map<Integer, List<T>> shiftTaskMap = taskDraftList.stream()
                 .filter(Objects::nonNull)
                 .filter(task -> !Boolean.TRUE.equals(task.getSourceExplainTask()))
@@ -43,20 +58,58 @@ public final class MachineAssignmentEngine<C extends MachineAssignmentContext<T>
                         context.getMaxShiftOrder()),
                         TreeMap::new, Collectors.toList()));
         int maxShiftOrder = this.resolveMaxShiftOrder(context, shiftTaskMap, shiftToolDemandMap);
+        // 进度上报：本次需要分配的任务总数，与逐班分配循环使用同一过滤口径（排除来源解释任务）。
+        int totalAssignableCount = (int) taskDraftList.stream()
+                .filter(Objects::nonNull)
+                .filter(task -> !Boolean.TRUE.equals(task.getSourceExplainTask()))
+                .filter(policy::isMachineAssignmentRequired)
+                .count();
+        int assignedCount = 0;
+        // 性能计时：总入口和批次号，逐班输出分段耗时
+        long assignStartMs = System.currentTimeMillis();
+        String batchNo = context.getBatchNo();
         for (int shiftOrder = 1; shiftOrder <= maxShiftOrder; shiftOrder++) {
+            long shiftStartMs = System.currentTimeMillis();
             BigDecimal availableToolQtyBeforeShift = context.getCurrentAvailableToolQty();
             List<ScheduleShiftToolDemand> currentShiftDemandList = shiftToolDemandMap.getOrDefault(
                     shiftOrder, Collections.emptyList());
+            // 分段计时：班次工装台账准备
+            long prepareLedgerStartMs = System.currentTimeMillis();
             BigDecimal availableToolQtyBeforePlan = policy.prepareShiftToolLedger(context, shiftOrder,
                     availableToolQtyBeforeShift, currentShiftDemandList);
             context.setCurrentAvailableToolQty(availableToolQtyBeforePlan);
-            List<T> shiftTaskList = shiftTaskMap.getOrDefault(shiftOrder, Collections.emptyList());
-            if (!shiftTaskList.isEmpty()) {
-                if (inventoryClosedLoopEnabled) {
+            long prepareLedgerMs = System.currentTimeMillis() - prepareLedgerStartMs;
+            List<T> shiftTaskList = context.isTwoPhaseEnabled()
+                    ? this.resolveTwoPhaseShiftTasks(context, shiftOrder)
+                    : shiftTaskMap.getOrDefault(shiftOrder, Collections.emptyList());
+            // 分段计时：班内计划量重算（两阶段含基础顺延准备）
+            long recalcMs = 0L;
+            if (context.isTwoPhaseEnabled()) {
+                long recalcStartMs = System.currentTimeMillis();
+                if (!shiftTaskList.isEmpty()) {
                     policy.recalculateShiftPlans(context, shiftTaskList, runtimeStockMap);
                 }
+                policy.prepareBaseCarryTasks(shiftOrder, shiftTaskList, context);
+                recalcMs = System.currentTimeMillis() - recalcStartMs;
+            }
+            // 分段计时：分配主循环与班尾钩子
+            int shiftTaskCount = shiftTaskList.size();
+            long orderMs = 0L;
+            long assignLoopMs = 0L;
+            long idleFillMs = 0L;
+            long closeInventoryMs = 0L;
+            long slowTaskMs = 0L;
+            int slowTaskCount = 0;
+            if (!shiftTaskList.isEmpty()) {
+                if (inventoryClosedLoopEnabled && !context.isTwoPhaseEnabled()) {
+                    long recalcStartMs = System.currentTimeMillis();
+                    policy.recalculateShiftPlans(context, shiftTaskList, runtimeStockMap);
+                    recalcMs += System.currentTimeMillis() - recalcStartMs;
+                }
                 List<T> ledgerOrderedTaskList = new ArrayList<>(shiftTaskList);
+                long orderStartMs = System.currentTimeMillis();
                 policy.prepareTaskOrder(ledgerOrderedTaskList);
+                orderMs = System.currentTimeMillis() - orderStartMs;
                 List<T> remainingTaskList = ledgerOrderedTaskList.stream()
                         .filter(policy::isMachineAssignmentRequired)
                         .collect(Collectors.toCollection(LinkedList::new));
@@ -71,8 +124,10 @@ public final class MachineAssignmentEngine<C extends MachineAssignmentContext<T>
                         .filter(Objects::nonNull)
                         .filter(task -> !policy.isMachineAssignmentRequired(task))
                         .collect(Collectors.toCollection(LinkedList::new));
+                long assignLoopStartMs = System.currentTimeMillis();
                 int assignmentSequence = 0;
                 while (!remainingTaskList.isEmpty()) {
+                    long taskStartMs = System.currentTimeMillis();
                     T task = policy.selectNextTask(remainingTaskList, context, ++assignmentSequence);
                     while (!nonAssignedTaskList.isEmpty()
                             && this.resolveLedgerOrder(ledgerOrderMap, nonAssignedTaskList.get(0))
@@ -81,23 +136,116 @@ public final class MachineAssignmentEngine<C extends MachineAssignmentContext<T>
                     }
                     remainingTaskList.remove(task);
                     policy.assignSingleTask(task, context);
+                    assignedCount++;
+                    // 进度上报：每完成一个任务推进一次，由领域策略自行节流，避免高频写库。
+                    policy.reportAssignProgress(context, assignedCount, totalAssignableCount);
+                    if (context.isTwoPhaseEnabled()) {
+                        policy.afterBaseAssignmentAttempt(context, task);
+                    }
                     if (!policy.isMachineAssignmentRequired(task)) {
                         policy.settleNonAssignedTaskToolLedger(context, task);
+                    }
+                    // 分段计时：单任务从取队首到工装结算的完整耗时，超阈值输出慢任务
+                    long taskElapsedMs = System.currentTimeMillis() - taskStartMs;
+                    if (taskElapsedMs >= SLOW_TASK_LOG_THRESHOLD_MS) {
+                        slowTaskCount++;
+                        slowTaskMs += taskElapsedMs;
+                        PERF_LOG.info("[SCHEDULE_PERF] 逐班机台分配慢任务 batchNo={}, shiftOrder={}, businessKey={}, ms={}",
+                                batchNo, shiftOrder, task == null ? null : task.getBusinessKey(), taskElapsedMs);
                     }
                 }
                 while (!nonAssignedTaskList.isEmpty()) {
                     policy.settleNonAssignedTaskToolLedger(context, nonAssignedTaskList.remove(0));
                 }
-                policy.fillCurrentShiftIdleCapacity(shiftOrder, shiftTaskMap, context);
-                if (inventoryClosedLoopEnabled) {
+                assignLoopMs = System.currentTimeMillis() - assignLoopStartMs;
+                // 分段计时：班内闲置产能填充或两阶段原地扩增
+                long idleFillStartMs = System.currentTimeMillis();
+                if (context.isTwoPhaseEnabled()) {
+                    policy.expandExtraInPlace(shiftOrder, shiftTaskList, context);
+                } else {
+                    policy.fillCurrentShiftIdleCapacity(shiftOrder, shiftTaskMap, context);
+                }
+                idleFillMs = System.currentTimeMillis() - idleFillStartMs;
+                if (inventoryClosedLoopEnabled && !context.isTwoPhaseEnabled()) {
                     // 通过领域策略生命周期钩子关账，确保 TM/TC 在公共库存结算后执行各自的实际收尾确认。
+                    long closeStartMs = System.currentTimeMillis();
                     policy.closeShiftInventory(context, shiftOrder, shiftTaskList, runtimeStockMap);
+                    closeInventoryMs = System.currentTimeMillis() - closeStartMs;
                 }
             }
+            // 分段计时：两阶段新行与班末关账（非两阶段恒为0）
+            long extraCreateMs = 0L;
+            if (context.isTwoPhaseEnabled()) {
+                // 空基础班也保留入口；新行成功必须先入链，再由唯一关账读取实际生产。
+                long extraStartMs = System.currentTimeMillis();
+                new ScheduleExtraCreateEngine<C, T>().create(context, shiftOrder, policy.extraCreatePolicy());
+                // 新行工作区发布会替换上下文任务对象；关账和后续班次必须读取发布后的同一批任务。
+                shiftTaskList = this.resolveTwoPhaseShiftTasks(context, shiftOrder);
+                extraCreateMs = System.currentTimeMillis() - extraStartMs;
+                // 活动需求独立于生产行，空班也必须扣需求并形成后班开库存。
+                long closeStartMs = System.currentTimeMillis();
+                policy.closeShiftInventory(context, shiftOrder, shiftTaskList, runtimeStockMap);
+                closeInventoryMs += System.currentTimeMillis() - closeStartMs;
+            }
+            // 班末清空成型总余量预扣：预扣只在班内有效，残留会压低后续班次的可用额度。
+            this.clearTailQuotaReservations(context);
+            // 分段计时：班末台账清空与工装结算
+            long ledgerTailStartMs = System.currentTimeMillis();
             policy.settleShiftToolLedger(context, shiftOrder, availableToolQtyBeforeShift,
                     shiftToolDemandMap.getOrDefault(shiftOrder + 1, Collections.emptyList()));
+            long ledgerTailMs = System.currentTimeMillis() - ledgerTailStartMs;
+            long shiftMs = System.currentTimeMillis() - shiftStartMs;
+            // 进度上报：班次收尾补报一次，保证空班或全部未分配时进度条也能推进。
+            policy.reportAssignProgress(context, assignedCount, totalAssignableCount);
+            PERF_LOG.info("[SCHEDULE_PERF] 逐班机台分配分段耗时 batchNo={}, shiftOrder={}, taskCount={}, "
+                            + "ledgerPrepare={}ms, recalc={}ms, order={}ms, assignLoop={}ms, idleFill={}ms, "
+                            + "closeInventory={}ms, extraCreate={}ms, ledgerTail={}ms, shiftTotal={}ms, "
+                            + "slowTaskCount={}, slowTaskMs={}ms",
+                    batchNo, shiftOrder, shiftTaskCount, prepareLedgerMs, recalcMs, orderMs, assignLoopMs,
+                    idleFillMs, closeInventoryMs, extraCreateMs, ledgerTailMs, shiftMs, slowTaskCount, slowTaskMs);
         }
         policy.finishAssignment(context);
+        // 性能计时：逐班机台分配总耗时，与模板步骤耗时、逐班分段日志配合定位热点
+        PERF_LOG.info("[SCHEDULE_PERF] 逐班机台分配总耗时 batchNo={}, maxShiftOrder={}, ms={}",
+                batchNo, maxShiftOrder, System.currentTimeMillis() - assignStartMs);
+    }
+
+    /**
+     * 清空成型总余量额度台账的班内预扣。
+     *
+     * @param context 排程上下文
+     */
+    private void clearTailQuotaReservations(C context) {
+        Map<String, com.zlt.aps.common.engine.schedule.constraint.ScheduleTailQuotaLedger> ledgerMap =
+                context.getTailQuotaLedgerMap();
+        if (ledgerMap == null || ledgerMap.isEmpty()) {
+            return;
+        }
+        for (com.zlt.aps.common.engine.schedule.constraint.ScheduleTailQuotaLedger ledger
+                : ledgerMap.values()) {
+            if (ledger != null) {
+                ledger.clearReservations();
+            }
+        }
+    }
+
+    /**
+     * 从当前上下文读取指定班次任务，兼容新行隔离工作区发布后的任务对象替换。
+     *
+     * @param context    当前排程上下文
+     * @param shiftOrder 班次顺序
+     * @return 不包含来源解释任务的班次可变副本列表
+     */
+    private List<T> resolveTwoPhaseShiftTasks(C context, int shiftOrder) {
+        if (context.getTaskDraftList() == null) {
+            return new ArrayList<>();
+        }
+        return context.getTaskDraftList().stream()
+                .filter(Objects::nonNull)
+                .filter(task -> !Boolean.TRUE.equals(task.getSourceExplainTask()))
+                .filter(task -> this.normalizeShiftOrder(task.getShiftOrder(), context.getMaxShiftOrder())
+                        == shiftOrder)
+                .collect(Collectors.toCollection(ArrayList::new));
     }
 
     /**
@@ -125,7 +273,9 @@ public final class MachineAssignmentEngine<C extends MachineAssignmentContext<T>
         if (configuredMaxShiftOrder > 0 && configuredMaxShiftOrder < Integer.MAX_VALUE) {
             return configuredMaxShiftOrder;
         }
-        return Stream.concat(shiftTaskMap.keySet().stream(), shiftToolDemandMap.keySet().stream())
+        return Stream.concat(Stream.concat(shiftTaskMap.keySet().stream(),
+                                shiftToolDemandMap.keySet().stream()),
+                        context.getTwoPhaseConsumptionMap().keySet().stream())
                 .filter(Objects::nonNull)
                 .max(Integer::compareTo)
                 .orElse(0);
@@ -200,6 +350,10 @@ public final class MachineAssignmentEngine<C extends MachineAssignmentContext<T>
                 .collect(Collectors.groupingBy(policy::getProductCode, java.util.LinkedHashMap::new,
                         Collectors.reducing(BigDecimal.ZERO,
                                 task -> this.nvl(task.getCurrentShiftDemandQty()), BigDecimal::max)));
+        if (context.isTwoPhaseEnabled()) {
+            demandQtyMap = new LinkedHashMap<>(context.getTwoPhaseConsumptionMap()
+                    .getOrDefault(shiftOrder, Collections.emptyMap()));
+        }
         Map<String, BigDecimal> assignedQtyMap = context.getTaskChainGroup().values().stream()
                 .filter(Objects::nonNull)
                 .flatMap(chain -> chain.toList().stream())
@@ -243,6 +397,8 @@ public final class MachineAssignmentEngine<C extends MachineAssignmentContext<T>
     public boolean isMachineAssignmentRequired(T task) {
         return task != null && (this.nvl(task.getPlanQty()).compareTo(BigDecimal.ZERO) > 0
                 || this.nvl(task.getToolOverflowQty()).compareTo(BigDecimal.ZERO) > 0)
+                && !Boolean.TRUE.equals(task.getDispatchBlocked())
+                && task.getSettlementMode() != ScheduleSettlementMode.RETAINED_FACT
                 && this.isBlank(task.getUnplannedReasonCode());
     }
 

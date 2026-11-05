@@ -1,5 +1,6 @@
 package com.zlt.aps.lh.engine.strategy.support;
 
+import com.zlt.aps.lh.service.impl.LhInventoryOverlapResolver;
 import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
@@ -313,7 +314,7 @@ public final class ContinuationEndingMachineProfile {
                 Date sideReady = MachineCleaningOverlapUtil.resolveEarliestAvailableTime(readyTime,
                         Objects.nonNull(machine) ? machine.getCleaningWindowList() : null,
                         Objects.nonNull(machine) ? machine.getPlanStopStartTime() : null,
-                        Objects.nonNull(machine) ? machine.getPlanStopEndTime() : null);
+                        LhInventoryOverlapResolver.resolvePreparationStopEnd(machine));
                 if (sideReady.after(readyTime)) {
                     readyTime = sideReady;
                 }
@@ -377,7 +378,7 @@ public final class ContinuationEndingMachineProfile {
     }
 
     /**
-     * 在历史联合尝试的精确正规换模节点检查物理交接，保留其他清洗及全部真实设备占用。
+     * 在历史联合尝试的精确正规换模节点检查物理交接，结合冻结画像与当前维护安排推进就绪时刻。
      *
      * @param completedOrAvailable 实际生产完成或零量需求日起点
      * @param changeStart 候选正规换模节点；为空时只认可已提交取消事实
@@ -402,12 +403,17 @@ public final class ContinuationEndingMachineProfile {
                         CleaningDispositionResolver.resolvePhysicalReleaseWindows(context,
                                 originals.get(side).getLhMachineCode(), cleaningWindows.get(side), changeStart),
                         Objects.nonNull(machine) ? machine.getPlanStopStartTime() : null,
-                        Objects.nonNull(machine) ? machine.getPlanStopEndTime() : null);
+                        LhInventoryOverlapResolver.resolvePreparationStopEnd(machine));
                 if (Objects.nonNull(machine)) {
                     available = MachineCleaningOverlapUtil.resolveEarliestAvailableTime(available,
                             CleaningDispositionResolver.resolvePhysicalReleaseWindows(context,
                                     originals.get(side).getLhMachineCode(), machine.getCleaningWindowList(), changeStart),
-                            machine.getPlanStopStartTime(), machine.getPlanStopEndTime());
+                            machine.getPlanStopStartTime(), LhInventoryOverlapResolver.resolvePreparationStopEnd(machine));
+                    // 最终设备复评可能晚于画像冻结，交接必须同时遵守当前正式维护安排。
+                    for (MachineMaintenanceWindowDTO window : machine.getMaintenanceWindowList()) {
+                        available = this.afterOccupiedWindow(available,
+                                window.getMaintenanceStartTime(), window.getMaintenanceEndTime());
+                    }
                 }
                 for (MachineMaintenanceWindowDTO window : maintenanceWindows.get(side)) {
                     available = this.afterOccupiedWindow(available,
@@ -415,7 +421,9 @@ public final class ContinuationEndingMachineProfile {
                 }
             }
             for (MdmDevicePlanShut stop : deviceStops) {
-                available = this.afterOccupiedWindow(available, stop.getBeginDate(), stop.getEndDate());
+                if (!LhInventoryOverlapResolver.isInventory(stop)) {
+                    available = this.afterOccupiedWindow(available, stop.getBeginDate(), stop.getEndDate());
+                }
             }
             for (CapsuleReplacementTimeWindowDTO window : capsuleWindows) {
                 available = this.afterOccupiedWindow(available,
@@ -465,14 +473,16 @@ public final class ContinuationEndingMachineProfile {
                 available = MachineCleaningOverlapUtil.resolveEarliestAvailableTime(
                         available, cleaningWindows.get(side),
                         Objects.nonNull(machine) ? machine.getPlanStopStartTime() : null,
-                        Objects.nonNull(machine) ? machine.getPlanStopEndTime() : null);
+                        LhInventoryOverlapResolver.resolvePreparationStopEnd(machine));
                 for (MachineMaintenanceWindowDTO window : maintenanceWindows.get(side)) {
                     available = this.afterOccupiedWindow(available,
                             window.getMaintenanceStartTime(), window.getMaintenanceEndTime());
                 }
             }
             for (MdmDevicePlanShut stop : deviceStops) {
-                available = this.afterOccupiedWindow(available, stop.getBeginDate(), stop.getEndDate());
+                if (!LhInventoryOverlapResolver.isInventory(stop)) {
+                    available = this.afterOccupiedWindow(available, stop.getBeginDate(), stop.getEndDate());
+                }
             }
             for (CapsuleReplacementTimeWindowDTO window : capsuleWindows) {
                 available = this.afterOccupiedWindow(available,

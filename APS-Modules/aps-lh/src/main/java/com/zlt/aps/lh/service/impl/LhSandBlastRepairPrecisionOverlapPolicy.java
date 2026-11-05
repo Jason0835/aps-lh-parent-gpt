@@ -14,6 +14,7 @@ import com.zlt.aps.lh.engine.strategy.support.EquipmentPlanRuntimeState;
 import com.zlt.aps.lh.engine.strategy.support.EquipmentPlanTimeline;
 import com.zlt.aps.lh.util.CleaningDispositionResolver;
 import com.zlt.aps.lh.util.CleaningScheduleRuleUtil;
+import com.zlt.aps.lh.util.LhInventoryPlanMatcher;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.MachineCleaningOverlapUtil;
@@ -220,8 +221,8 @@ public class LhSandBlastRepairPrecisionOverlapPolicy {
         Date start = source.getCleanStartTime();
         Date end = timeline.getProductionResumeTime();
         String physical = timeline.getPhysicalMachineCode();
-        boolean stopConflict = context.getDevicePlanShutList().stream().filter(Objects::nonNull)
-                .filter(plan -> samePhysical(physical, plan.getMachineCode()))
+        boolean stopConflict = LhInventoryPlanMatcher.matchPhysicalStopPlans(
+                context.getDevicePlanShutList(), physical).stream()
                 .filter(plan -> overlaps(start, end, plan.getBeginDate(), plan.getEndDate()))
                 .anyMatch(plan -> !MachineStopTypeEnum.PLANNED_REPAIR.getCode().equals(plan.getMachineStopType())
                         || !overlaps(source.getCleanStartTime(), source.getCleanEndTime(),
