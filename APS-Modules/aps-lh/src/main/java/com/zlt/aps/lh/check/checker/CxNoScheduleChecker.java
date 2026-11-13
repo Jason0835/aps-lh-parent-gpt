@@ -1,6 +1,7 @@
 package com.zlt.aps.lh.check.checker;
 
 import cn.hutool.json.JSONUtil;
+import com.ruoyi.common.core.utils.DictUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleCheckResult;
@@ -33,6 +34,8 @@ import java.util.stream.Stream;
  *   <li><b>成型侧</b>：同工厂、同排程日的成型排程结果（{@code T_CX_SCHEDULE_RESULT}）中
  *       class1~class8 计划量合计 &gt; 0 的行，同样按「胎胚描述 + 产品状态」建集合；</li>
  *   <li><b>判定</b>：硫化有排产、成型侧查不到对应排产 → 记一条异常；同一「描述 + 状态」多机台只报一条；</li>
+ *   <li><b>收尾说明</b>：硫化结果行 {@code IS_EMBRYO_ENDING=1}（成型本批不再安排、胎胚已收尾）时，
+ *       该异常仍保留展示，但明细标记 {@code embryoEnding=true}，并由系统直接置为已了解（可解释异常，不阻塞操作）；</li>
  *   <li><b>状态兜底</b>：硫化行产品状态为空时只按胎胚描述匹配，避免状态缺失造成误报；</li>
  *   <li><b>跳过</b>：成型排程结果整体为空时跳过，避免全量误报；胎胚描述为空的行无法判定，跳过并计数。</li>
  * </ul>
@@ -58,6 +61,15 @@ public class CxNoScheduleChecker implements LhScheduleChecker {
 
     /** 产品状态为空时的展示占位 */
     private static final String BLANK_STATUS_DISPLAY = "-";
+
+    /** 胎胚收尾标识：是（IS_EMBRYO_ENDING=1，表示成型本批不再安排该胎胚、胎胚收尾） */
+    private static final String EMBRYO_ENDING_YES = "1";
+
+    /** 产品状态字典类型（与硫化排程结果列 PRODUCT_STATUS 的 @Excel dictType 一致） */
+    private static final String PRODUCT_STATUS_DICT_TYPE = "lh_trial_status";
+
+    /** 成型导入批次的数据来源标识：导入行不是算法排产，不能作为“成型有排产”的依据 */
+    private static final String CX_DATA_SOURCE_IMPORT = "2";
 
     /** 全角空格 */
     private static final String FULL_WIDTH_SPACE = "\u3000";
@@ -114,8 +126,15 @@ public class CxNoScheduleChecker implements LhScheduleChecker {
      */
     private CxScheduleIndex buildCxScheduleIndex(List<CxScheduleResult> cxScheduleResultList) {
         CxScheduleIndex cxIndex = new CxScheduleIndex();
+        int importRowCount = 0;
         for (CxScheduleResult cxResult : cxScheduleResultList) {
             if (cxResult == null || this.sumPlanQty(cxResult) <= 0) {
+                continue;
+            }
+            // 导入行（如 CXDR 批次）虽然有描述、状态和计划量，但不是算法排产，
+            // 不能把“成型未排产”误判成“成型已有计划”。
+            if (CX_DATA_SOURCE_IMPORT.equals(StringUtils.trimToEmpty(cxResult.getDataSource()))) {
+                importRowCount++;
                 continue;
             }
             String embryoDesc = this.normalizeText(cxResult.getMainMaterialDesc());
@@ -124,6 +143,9 @@ public class CxNoScheduleChecker implements LhScheduleChecker {
             }
             cxIndex.getDescKeys().add(embryoDesc);
             cxIndex.getDescStatusKeys().add(this.buildKey(embryoDesc, this.normalizeText(cxResult.getProductStatus())));
+        }
+        if (importRowCount > 0) {
+            log.info("成型未排产检查：排除成型导入行 {} 条，不作为成型排产依据", importRowCount);
         }
         return cxIndex;
     }
@@ -161,6 +183,10 @@ public class CxNoScheduleChecker implements LhScheduleChecker {
             if (StringUtils.isNotEmpty(machineCode)) {
                 aggregate.getMachineCodes().add(machineCode);
             }
+            // 胎胚收尾标识：成型本批不再安排该胎胚，成型未排产属可解释异常
+            if (EMBRYO_ENDING_YES.equals(StringUtils.trimToEmpty(result.getIsEmbryoEnding()))) {
+                aggregate.setEmbryoEnding(true);
+            }
         }
         if (blankDescRowCount > 0) {
             log.debug("成型未排产检查：{} 条硫化结果行胎胚描述为空，已跳过, factoryCode={}",
@@ -193,8 +219,7 @@ public class CxNoScheduleChecker implements LhScheduleChecker {
      * @return 异常记录
      */
     private LhScheduleCheckResult buildAbnormal(LhEmbryoAggregate aggregate) {
-        String productStatusDisplay = StringUtils.isEmpty(aggregate.getProductStatus())
-                ? BLANK_STATUS_DISPLAY : aggregate.getProductStatus();
+        String productStatusDisplay = this.resolveProductStatusLabel(aggregate.getProductStatus());
         LhScheduleCheckResult abnormal = new LhScheduleCheckResult();
         abnormal.setCheckCode(this.getCode());
         abnormal.setDimensionKey(aggregate.getEmbryoDesc());
@@ -206,7 +231,13 @@ public class CxNoScheduleChecker implements LhScheduleChecker {
         detail.put("lhPlanQty", aggregate.getPlanQty());
         detail.put("lhRowCount", aggregate.getRowCount());
         detail.put("lhMachineCodes", String.join(",", aggregate.getMachineCodes()));
+        detail.put("embryoEnding", aggregate.isEmbryoEnding());
         abnormal.setDetailJson(JSONUtil.toJsonStr(detail));
+        if (aggregate.isEmbryoEnding()) {
+            // 成型已收尾（本批不再安排该胎胚）属可解释异常：仍保留记录供前端展示，
+            // 但由系统直接标记已了解，避免这类已知原因阻塞发布/导出等操作
+            abnormal.setAcknowledged(LhScheduleCheckResult.ACKNOWLEDGED_YES);
+        }
         return abnormal;
     }
 
@@ -242,6 +273,28 @@ public class CxNoScheduleChecker implements LhScheduleChecker {
                 .filter(Objects::nonNull)
                 .mapToInt(BigDecimal::intValue)
                 .sum();
+    }
+
+    /**
+     * 产品状态编码转字典名称（如 S→量产），字典未配置时回退原始编码。
+     *
+     * <p>字典读取失败只影响文案展示，不能让整个检查项抛异常被框架降级，因此这里做一次兜底。</p>
+     *
+     * @param productStatus 产品状态编码
+     * @return 展示名称
+     */
+    private String resolveProductStatusLabel(String productStatus) {
+        if (StringUtils.isEmpty(productStatus)) {
+            return BLANK_STATUS_DISPLAY;
+        }
+        String dictLabel;
+        try {
+            dictLabel = DictUtils.getLabel(PRODUCT_STATUS_DICT_TYPE, productStatus);
+        } catch (Exception exception) {
+            log.warn("成型未排产检查：产品状态字典翻译失败，回退原始编码, productStatus={}", productStatus, exception);
+            return productStatus;
+        }
+        return StringUtils.defaultIfBlank(dictLabel, productStatus);
     }
 
     /**
@@ -299,5 +352,8 @@ public class CxNoScheduleChecker implements LhScheduleChecker {
 
         /** 涉及机台 */
         private final Set<String> machineCodes = new LinkedHashSet<>(8);
+
+        /** 是否命中胎胚收尾（IS_EMBRYO_ENDING=1）：成型本批不再安排，属可解释异常 */
+        private boolean embryoEnding;
     }
 }

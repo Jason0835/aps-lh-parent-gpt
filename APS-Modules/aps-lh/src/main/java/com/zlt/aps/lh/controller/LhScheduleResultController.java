@@ -33,6 +33,7 @@ import com.zlt.aps.lh.api.domain.vo.LhScheduleResultTemplateImportVO;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
 import com.zlt.aps.lh.api.domain.vo.ScheduleSummaryReportVO;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
+import com.zlt.aps.lh.component.LhIssueFingerprintStore;
 import com.zlt.aps.lh.component.ScheduleExecutionGuard;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.mapper.MdmMaterialInfoMapper;
@@ -113,6 +114,12 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
 
     @Autowired
     private ScheduleExecutionGuard scheduleExecutionGuard;
+
+    /**
+     * 下发内容指纹存储组件：用于识别重复发布，避免生成内容相同的多个版本
+     */
+    @Autowired
+    private LhIssueFingerprintStore lhIssueFingerprintStore;
 
     @Autowired
     private IScheduleSummaryReportService scheduleSummaryReportService;
@@ -892,7 +899,11 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
                         // 发布成功：该日期下全部记录置为已发布
                         filteredList.forEach(item -> item.setIsRelease(ApsConstant.IS_RELEASE));
                         lhScheduleResultService.batchUpdateReleaseStatus(filteredList);
-                        return AjaxResult.success(I18nUtil.getMessage("ui.data.column.scheduleResult.successPublish"));
+                        // 透传下发接口的原始提示：内容未变化时为“数据未变化，无需重复下发”，正常下发时为“发布成功！”
+                        Object issueMsg = issueResult.get(AjaxResult.MSG_TAG);
+                        return AjaxResult.success(issueMsg == null
+                                ? I18nUtil.getMessage("ui.data.column.scheduleResult.successPublish")
+                                : String.valueOf(issueMsg));
                     } else {
                         log.warn("第{}次硫化排程发布失败, 耗时={}ms, 原因: {}", retryCount + 1, costTime, issueResult);
                         retryCount++;
@@ -1026,7 +1037,24 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         // 下发前补全MES物料编码和示方号（数据准备应在aps-lh模块完成，而非itf层）
         enrichMaterialAndExampleInfo(allIssueList);
 
-        return FeignTokenHelper.callWithToken(() -> mesItfService.issueLhScheduleResult(allIssueList));
+        // 内容指纹校验：本次下发内容与上一次成功下发完全一致时跳过下发，
+        // 避免重复点击发布等重复触发场景生成内容相同的多个DATA_VERSION版本
+        String factoryCode = StringUtils.defaultIfBlank(allIssueList.get(0).getFactoryCode(),
+                FactoryConstant.DEFAULT_FACTORY_CODE);
+        String fingerprint = lhIssueFingerprintStore.computeFingerprint(allIssueList);
+        String lastFingerprint = lhIssueFingerprintStore.getLastFingerprint(factoryCode, scheduleLocalDate);
+        if (StringUtils.isNotBlank(lastFingerprint) && lastFingerprint.equals(fingerprint)) {
+            log.info("硫化排程结果内容未变化，跳过下发MES，排程日期={}, 工厂={}, 记录数={}",
+                    scheduleLocalDate, factoryCode, allIssueList.size());
+            return AjaxResult.success(I18nUtil.getMessage("ui.data.column.scheduleResult.dataNotChanged"));
+        }
+
+        AjaxResult issueResult = FeignTokenHelper.callWithToken(() -> mesItfService.issueLhScheduleResult(allIssueList));
+        // 仅下发成功时记录指纹；下发失败保留上一次指纹，保证重试仍能正常下发
+        if (issueResult != null && Objects.equals(HttpStatus.SUCCESS, issueResult.get(AjaxResult.CODE_TAG))) {
+            lhIssueFingerprintStore.saveFingerprint(factoryCode, scheduleLocalDate, fingerprint);
+        }
+        return issueResult;
     }
 
 

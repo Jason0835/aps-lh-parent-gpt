@@ -40,9 +40,11 @@ import java.util.Set;
 /**
  * S4.5.3 试制/量试虚拟机台最终兜底处理器。
  *
- * <p>该步骤只处理 S4.5 正常新增排产前冻结的试制/量试候选。在全部实际机台排产和置换
- * 完成后，按已排结果重新计算硫化余量，为每个仍有余量的 SKU 分配一台本批次内唯一的
+ * <p>该步骤处理已登记的普通新增、无日计划保留及有效历史指定试制/量试候选。
+ * 在全部实际机台排产和置换完成后，按已排结果重新计算硫化余量，为每个仍有余量的 SKU 分配一台本批次内唯一的
  * V1001～V9999 虚拟机台，并从排程窗口首个中班开始按标准班产连续排量。</p>
+ *
+ * <p>虚拟补量按合法硫化需求计算，胎胚收尾标识和实时库存仅用于展示及审计。</p>
  *
  * <p>虚拟机台只写排程结果，不写 {@code machineScheduleMap}、机台班次产能、模具、换模、
  * 换活字块、首检或胎胚库存资源账本，因此不会参与任何后续真实资源竞争。</p>
@@ -83,8 +85,9 @@ public class TrialVirtualMachineProductionHandler extends AbsScheduleStepHandler
     /**
      * 执行试制/量试虚拟机台最终兜底排产。
      *
+     * <p>先校验减量清单，再按最终既有排量核算合法缺口；胎胚收尾及非正库存允许进入虚拟补量。</p>
+     *
      * @param context 排程上下文
-     * @return void
      */
     @Override
     protected void doHandle(LhScheduleContext context) {
@@ -124,16 +127,6 @@ public class TrialVirtualMachineProductionHandler extends AbsScheduleStepHandler
                                 + "materialCode: {}, productStatus: {}, surplusQty: {}",
                         context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(),
                         sku.getProductStatus(), sku.getSurplusQty());
-                continue;
-            }
-            // 成型胎胚已收尾且无库存：不会再有胎胚供应，虚拟机台兜底不再排产，
-            // 落未排记录保留需求可见性（避免产生永远缺料的幻影计划）
-            if (this.isEndingEmbryoWithoutStock(context, sku)) {
-                this.recordEndingEmbryoUnscheduled(context, sku);
-                log.info("试制量试虚拟机台排产跳过, materialCode: {}, productStatus: {}, 胎胚: {}, "
-                                + "surplusQty: {}, reason: 成型胎胚已收尾且无库存",
-                        sku.getMaterialCode(), sku.getProductStatus(), sku.getEmbryoCode(),
-                        sku.getSurplusQty());
                 continue;
             }
             String skuKey = this.buildSkuKey(sku);
@@ -277,6 +270,11 @@ public class TrialVirtualMachineProductionHandler extends AbsScheduleStepHandler
                 .append(", materialCode=").append(sku.getMaterialCode())
                 .append(", productStatus=").append(sku.getProductStatus())
                 .append(", constructionStage=").append(sku.getConstructionStage())
+                .append(", embryoCode=").append(sku.getEmbryoCode())
+                .append(", embryoEndingFlag=").append(
+                        context.getEmbryoEndingFlagMap().getOrDefault(sku.getEmbryoCode(), 0))
+                .append(", embryoRealtimeStock=").append(
+                        context.getEmbryoRealtimeStockMap().get(sku.getEmbryoCode()))
                 .append(", originalUnscheduledReason=").append(originalUnscheduledReason)
                 .append(", surplusQty=").append(sku.getSurplusQty())
                 .append(", virtualMachineCode=").append(virtualMachineCode)
@@ -524,52 +522,6 @@ public class TrialVirtualMachineProductionHandler extends AbsScheduleStepHandler
                 .append(", originalReason=").append(originalReason)
                 .toString());
         unscheduledResultCollector.add(context, sku, retainedResult);
-    }
-
-    /**
-     * 判断当前 SKU 的成型胎胚是否「已收尾且无库存」——不会再有胎胚可供硫化。
-     *
-     * <p>口径与示方书校验的跳过条件一致（{@code 胎胚收尾标识=1 且 胎胚实时库存为空或<=0}）：
-     * 胎胚收尾表示成型不再生产该胎胚，库存为 0 时虚拟机台兜底排出的量永远缺料，
-     * 因此不再生成排产结果，改为落未排记录保留需求可见性。</p>
-     *
-     * @param context 排程上下文
-     * @param sku 当前SKU
-     * @return true-胎胚已收尾且无库存，虚拟机台兜底不应排产
-     */
-    private boolean isEndingEmbryoWithoutStock(LhScheduleContext context, SkuScheduleDTO sku) {
-        if (Objects.isNull(context) || Objects.isNull(sku) || StringUtils.isEmpty(sku.getEmbryoCode())) {
-            return false;
-        }
-        // 胎胚收尾标识必须为 1（由 S4.2 loadEmbryoEndingFlagMap 判定）
-        if (!targetScheduleQtyResolver.isEmbryoStockEndingFlagYes(context, sku.getEmbryoCode())) {
-            return false;
-        }
-        // 胎胚实时库存为空或<=0：没有可消耗的胎胚
-        Integer embryoStock = context.getEmbryoRealtimeStockMap().get(sku.getEmbryoCode());
-        return Objects.isNull(embryoStock) || embryoStock <= 0;
-    }
-
-    /**
-     * 为「成型胎胚已收尾且无库存」的 SKU 重写未排记录。
-     *
-     * <p>先清掉前面阶段残留的同需求未排投影，再按“胎胚库存不足”原因重新落一条，
-     * 保证未排原因唯一、可控，避免出现同一需求多条未排记录或原因错位。</p>
-     *
-     * @param context 排程上下文
-     * @param sku 当前SKU
-     */
-    private void recordEndingEmbryoUnscheduled(LhScheduleContext context, SkuScheduleDTO sku) {
-        context.getUnscheduledResultList().removeIf(result -> Objects.nonNull(result)
-                && unscheduledResultCollector.isSameDemand(context, sku, result));
-        int unscheduledQty = Math.max(0, sku.getSurplusQty());
-        LhUnscheduledResult result = unscheduledResultCollector.buildResult(
-                context, sku, unscheduledQty,
-                UnscheduledReasonEnum.EMBRYO_STOCK_INSUFFICIENT,
-                "成型胎胚已收尾且无库存，虚拟机台兜底不排产",
-                "embryoCode=" + sku.getEmbryoCode() + ", surplusQty=" + unscheduledQty);
-        result.setMouldQty(VIRTUAL_MACHINE_MOULD_QTY);
-        unscheduledResultCollector.add(context, sku, result);
     }
 
     /**

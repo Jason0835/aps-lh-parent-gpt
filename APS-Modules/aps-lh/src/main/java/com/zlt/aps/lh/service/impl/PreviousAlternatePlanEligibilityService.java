@@ -3,6 +3,7 @@
  */
 package com.zlt.aps.lh.service.impl;
 
+import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.enums.SkuScheduleSourceTypeEnum;
 import com.zlt.aps.lh.engine.strategy.support.NewSpecCandidatePoolBuilder;
@@ -41,7 +42,7 @@ import java.util.stream.Stream;
 /**
  * 前日交替计划资格公共服务。
  *
- * <p>统一最近有效批次、精确机台加前物料关系、后物料排产资格和目标机台缺口口径，
+ * <p>统一前日有效计划、精确机台加前物料关系、后物料排产资格和目标机台缺口口径，
  * 供续作降模排序与后续独立复用阶段共同使用。历史关系只提供释放优先级，
  * 不预占机台、模具、月计划、日计划或生产余量。</p>
  */
@@ -75,10 +76,12 @@ public class PreviousAlternatePlanEligibilityService {
     private ILhDailyMouldCalcService lhDailyMouldCalcService;
 
     /**
-     * 先锁定前日最近有效批次，再冻结尚未过期的交替关系。
+     * 从已按工厂和前日排程日期加载的有效计划中冻结尚未过期的交替关系。
+     * 硫化批次号仅保留来源信息，空值及不同批次号均参与资格判断。
+     * 空历史前料按本轮真实在机身份建立匹配键，源计划保持原值及对象身份。
      *
      * @param context 排程上下文
-     * @return 机台加前物料对应的有序计划
+     * @return 机台加匹配前物料对应的有序计划，真实空机使用空前料键
      */
     public Map<String, List<LhMouldChangePlan>> buildPlanIndex(LhScheduleContext context) {
         if (Objects.isNull(context)
@@ -86,31 +89,17 @@ public class PreviousAlternatePlanEligibilityService {
             return Collections.emptyMap();
         }
         List<LhMouldChangePlan> source = context.getHistoricalReverseMouldChangePlanList();
-        LhMouldChangePlan latest = source.stream()
-                .filter(Objects::nonNull)
-                .filter(plan -> StringUtils.isNotEmpty(plan.getLhResultBatchNo()))
-                .max(Comparator.comparing(LhMouldChangePlan::getCreateTime,
-                                Comparator.nullsFirst(Date::compareTo))
-                        .thenComparing(LhMouldChangePlan::getId,
-                                Comparator.nullsFirst(Long::compareTo)))
-                .orElse(null);
-        if (Objects.isNull(latest)) {
-            return Collections.emptyMap();
-        }
         Map<String, List<LhMouldChangePlan>> index =
                 new LinkedHashMap<String, List<LhMouldChangePlan>>(source.size());
         source.stream()
                 .filter(Objects::nonNull)
-                .filter(plan -> StringUtils.equals(
-                        latest.getLhResultBatchNo(), plan.getLhResultBatchNo()))
                 .filter(plan -> StringUtils.isNotEmpty(plan.getLhMachineCode())
-                        && StringUtils.isNotEmpty(plan.getBeforeMaterialCode())
                         && StringUtils.isNotEmpty(plan.getAfterMaterialCode()))
-                // 过期动作不能再参与强制下机、余量收尾纠偏或指定承接，也不补捞旧批次。
+                // 过期动作不能再参与强制下机、余量收尾纠偏或指定承接。
                 .filter(plan -> this.isUnexpiredPlan(context, plan))
                 .sorted(PLAN_ORDER)
                 .forEach(plan -> index.computeIfAbsent(
-                        this.buildKey(plan.getLhMachineCode(), plan.getBeforeMaterialCode()),
+                        this.buildKey(plan.getLhMachineCode(), resolveMatchBeforeMaterial(context, plan)),
                         ignored -> new ArrayList<LhMouldChangePlan>(2)).add(plan));
         // 资格快照只保存已过滤的关系；早于资源尝试冻结，失败不能重新获得虚拟机资格。
         context.setEligiblePreviousAlternatePlans(index.values().stream()
@@ -125,7 +114,7 @@ public class PreviousAlternatePlanEligibilityService {
      * 按实际动作日期排除窗口开始前已经截止的历史交替。
      *
      * @param context 本次固定窗口上下文
-     * @param plan 最新历史批次的交替计划
+     * @param plan 前日有效交替计划
      * @return 动作日期有效且未早于窗口起点时返回true
      */
     private boolean isUnexpiredPlan(LhScheduleContext context, LhMouldChangePlan plan) {
@@ -180,7 +169,7 @@ public class PreviousAlternatePlanEligibilityService {
      * @param context 已加载目标日前一日历史计划的上下文
      * @param materialCode 当前续作前物料
      * @param machineCodes 当前收尾组运行态机台编码
-     * @return 最新有效批次内可唯一对应且日期、早中班有效的计划；歧义机台不参与纠偏
+     * @return 前日有效集合内可唯一对应且日期、早中班有效的计划；歧义机台不参与纠偏
      */
     public Map<String, LhMouldChangePlan> resolveRemainingFinishPlans(LhScheduleContext context,
             String materialCode, List<String> machineCodes) {
@@ -257,8 +246,29 @@ public class PreviousAlternatePlanEligibilityService {
         PreviousAlternatePlanReleaseEvent event = context.getPreviousAlternateReleaseEventMap()
                 .get(plan.getLhMachineCode());
         String beforeMaterial = Objects.nonNull(event) && event.getPlan() == plan
-                ? event.resolveBeforeMaterialCode() : plan.getBeforeMaterialCode();
+                ? event.resolveBeforeMaterialCode() : resolveMatchBeforeMaterial(context, plan);
         return StringUtils.equals(materialCode, beforeMaterial);
+    }
+
+    /**
+     * 解析历史关系的匹配前料，空历史前料使用本轮实际机台身份。
+     * 已冻结事件优先，后续释放、候选提交及索引重建沿用原始身份，源计划前料字段保留原值。
+     *
+     * @param context 本轮运行态机台与已冻结历史事件
+     * @param plan 当前有效历史计划
+     * @return 匹配前料编码，历史与实际机台均无前料时返回空字符串
+     */
+    public static String resolveMatchBeforeMaterial(LhScheduleContext context, LhMouldChangePlan plan) {
+        if (StringUtils.isNotBlank(plan.getBeforeMaterialCode())) {
+            return plan.getBeforeMaterialCode();
+        }
+        PreviousAlternatePlanReleaseEvent event = context.getPreviousAlternateReleaseEventMap()
+                .get(plan.getLhMachineCode());
+        if (Objects.nonNull(event) && event.getPlan() == plan) {
+            return StringUtils.defaultIfBlank(event.getMaterialCode(), "");
+        }
+        MachineScheduleDTO machine = context.getMachineScheduleMap().get(plan.getLhMachineCode());
+        return Objects.isNull(machine) ? "" : StringUtils.defaultIfBlank(machine.getCurrentMaterialCode(), "");
     }
 
     /**
@@ -346,7 +356,7 @@ public class PreviousAlternatePlanEligibilityService {
     }
 
     /**
-     * 构建精确运行态机台与前物料键，不合并左右侧历史关系。
+     * 构建精确运行态机台与前物料键，空前料统一为空字符串，侧别按原编码匹配。
      *
      * @param machineCode 机台编码
      * @param beforeMaterial 前物料
@@ -356,7 +366,7 @@ public class PreviousAlternatePlanEligibilityService {
         return new StringBuilder(64)
                 .append(machineCode)
                 .append('|')
-                .append(beforeMaterial)
+                .append(StringUtils.defaultIfBlank(beforeMaterial, ""))
                 .toString();
     }
 }

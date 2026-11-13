@@ -1,5 +1,8 @@
 package com.zlt.aps.lh.service.impl;
 
+import com.zlt.aps.lh.engine.strategy.support.DailyUnscheduledSkuSubstitutionPolicy;
+import com.zlt.aps.lh.engine.strategy.support.ActiveMachineBinding;
+import com.zlt.aps.lh.component.NewProductionDateAdmissionPolicy;
 import com.zlt.aps.lh.engine.strategy.support.StructureEndingContinuationPolicy;
 
 import com.zlt.aps.cx.entity.config.CxEmbryoLhTime;
@@ -28,6 +31,7 @@ import com.zlt.aps.lh.engine.strategy.support.PreviousAlternatePlanReleaseEvent;
 import com.zlt.aps.lh.engine.strategy.support.PreviousAlternateStructureLimitExemptionPolicy;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchCandidateScope;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchPriorityPolicy;
+import com.zlt.aps.lh.engine.strategy.support.StructureSwitchSecondShiftSelectionPolicy;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchSchedulingPolicy;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchShiftAudit;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
@@ -149,7 +153,8 @@ public class StructureSwitchSchedulingService {
     }
 
     /**
-     * 按真实班次执行结构切换，退出时恢复日期和执行作用域，保留已消费视图供后处理读取。
+     * 按真实班次执行结构切换，T日仅执行历史指定及已有绑定续排。
+     * 退出时恢复日期和执行作用域，保留已消费视图供后处理读取。
      *
      * @param context 本批次唯一资源及需求账本
      */
@@ -177,6 +182,11 @@ public class StructureSwitchSchedulingService {
                 dayIndex++;
                 DayScheduleContext day = new DayScheduleContext(entry.getKey(), entry.getValue(),
                         dayIndex == 1, dayIndex == days.size());
+                if (!NewProductionDateAdmissionPolicy.isAllowed(context, day.getScheduleDate())) {
+                    log.info("结构切换T日跳过普通新增选料，仅保留历史交替及在机续排, factoryCode: {}, "
+                                    + "batchNo: {}, businessDate: {}",
+                            context.getFactoryCode(), context.getBatchNo(), day.getScheduleDate());
+                }
                 context.setCurrentScheduleDate(LhScheduleTimeUtil.clearTime(entry.getValue().get(0).getWorkDate()));
                 if (Objects.nonNull(context.getMouldResourceContext())) {
                     context.getMouldResourceContext().refreshAvailability(context);
@@ -186,7 +196,7 @@ public class StructureSwitchSchedulingService {
                         .collect(Collectors.toList());
                 candidates.forEach(sku -> materialEligibilityService.prepareNormalPlanOnDueDate(context, sku, entry
                     .getKey()));
-                // 业务排序一天一次；非等结果首班的同胎胚偏好仅在每轮同等级竞争内生效。
+                // 业务排序一天一次；班次关系优先级在每轮选择时读取已提交首台状态。
                 strategyFactory.getSkuPriorityStrategy().sortNewSpecPoolByPriority(context, candidates);
                 Map<String, List<SkuScheduleDTO>> groups = this.groupBySupplyTime(context, candidates);
                 for (LhShiftConfigVO shift : entry.getValue()) {
@@ -216,6 +226,77 @@ public class StructureSwitchSchedulingService {
             context.getStructureEarlyProductionAdmissionMap().values()
                     .forEach(admissions -> admissions.keySet().removeAll(structures));
             context.rebuildStructureSkuMapFromPending(context.getNewSpecSkuList());
+        }
+    }
+
+    /**
+     * 在当前日为被置换物料选择新的合法机台，成功后补齐该绑定当日剩余班次。
+     * 调用方负责整组快照，失败时连同接管结果一并恢复。
+     *
+     * @param context 本批共享资源
+     * @param day 当前业务日
+     * @param sku 被置换的原物料
+     * @param excludedPhysicalMachines 原机及本轮已置换的物理机台
+     * @return 新提交的结构切换绑定，无合法组合时为空
+     */
+    public ActiveMachineBinding relocateCurrentDay(LhScheduleContext context, DayScheduleContext day,
+            SkuScheduleDTO sku, Set<String> excludedPhysicalMachines) {
+        boolean originalScope = context.isStructureSwitchScheduling();
+        DailySchedulePhase originalPhase = day.getCurrentPhase();
+        context.setStructureSwitchScheduling(true);
+        try {
+            LhShiftConfigVO lastShift = Collections.max(day.getDayShifts(),
+                    Comparator.comparing(LhShiftConfigVO::getShiftEndDateTime));
+            List<String> machines = context.getMachineScheduleMap().keySet().stream()
+                    .filter(code -> this.hasRemainingCapacity(context, context.getMachineScheduleMap().get(code), lastShift))
+                    .filter(code -> !excludedPhysicalMachines.contains(
+                            LhSingleControlMachineUtil.resolvePhysicalMachineCode(code)))
+                    .filter(code -> !DailyUnscheduledSkuSubstitutionPolicy.isHistoricalMachineProtected(context, code))
+                    .collect(Collectors.toList());
+            if (machines.isEmpty()) {
+                this.recordFailure(context, sku, "当日剩余窗口内无可迁移机台");
+                return null;
+            }
+            Map<String, DailyNewSpecCandidate> candidates = new LinkedHashMap<>();
+            Map<String, List<SkuScheduleDTO>> groups = this.groupBySupplyTime(context,
+                    Collections.singletonList(sku));
+            Set<String> failed = new LinkedHashSet<>();
+            NewSpecProposalRoundCache cache = new NewSpecProposalRoundCache(1);
+            for (LhShiftConfigVO shift : day.getDayShifts()) {
+                Selection selected;
+                while ((selected = this.selectNext(context, day, shift, groups, machines,
+                        Collections.emptyMap(), failed, cache, candidates)) != null) {
+                    if (!productionStrategy.executeIsolatedMachineAssignment(context, day, selected.assignment,
+                            strategyFactory.getMachineMatchStrategy(), strategyFactory.getMouldChangeBalanceStrategy(),
+                            strategyFactory.getFirstInspectionBalanceStrategy(), strategyFactory.getCapacityCalculateStrategy())) {
+                        failed.add(selected.failureKey);
+                        candidates.clear();
+                        continue;
+                    }
+                    String committedMachineCode = selected.machineCode;
+                    ActiveMachineBinding migrated = context.getPreScheduledMachineBindingList().stream()
+                            .filter(binding -> binding.getSku() == sku)
+                            .filter(binding -> !excludedPhysicalMachines.contains(
+                                    LhSingleControlMachineUtil.resolvePhysicalMachineCode(binding.getMachineCode())))
+                            .filter(binding -> binding.getMachineCode().equals(committedMachineCode))
+                            .reduce((first, last) -> last).orElse(null);
+                    if (Objects.isNull(migrated)) {
+                        return null;
+                    }
+                    for (LhShiftConfigVO remaining : day.getDayShifts()) {
+                        if (!remaining.getShiftStartDateTime().before(shift.getShiftStartDateTime())) {
+                            productionStrategy.continueStructureSwitchShift(context, day, remaining,
+                                    Collections.singletonList(migrated));
+                        }
+                    }
+                    migrated.setPreparedThroughDate(day.getScheduleDate());
+                    return migrated;
+                }
+            }
+            return null;
+        } finally {
+            context.setStructureSwitchScheduling(originalScope);
+            day.setCurrentPhase(originalPhase);
         }
     }
 
@@ -300,7 +381,7 @@ public class StructureSwitchSchedulingService {
     }
 
     /**
-     * 按结构供胚时间和同结构四级组合顺序选择下一条合法提案。
+     * 按结构供胚时间、班次选料关系及四级机台组合顺序选择下一条合法提案。
      *
      * @param context 上下文
      * @param day 业务日
@@ -310,11 +391,32 @@ public class StructureSwitchSchedulingService {
      * @param history 历史索引
      * @param failed 本版本失败键
      * @param cache 本版本预演缓存
-     * @return 第一可行结构中最高组合等级、最先SKU的合法机台
+     * @return 第一可行结构中按当前班次关系及组合等级选出的合法机台
      */
     private Selection selectNext(LhScheduleContext context, DayScheduleContext day, LhShiftConfigVO shift,
             Map<String, List<SkuScheduleDTO>> groups, List<String> machineCodes,
             Map<String, List<LhMouldChangePlan>> history, Set<String> failed, NewSpecProposalRoundCache cache) {
+        return this.selectNext(context, day, shift, groups, machineCodes, history, failed, cache, new LinkedHashMap<>());
+    }
+
+    /**
+     * 在资源版本未变化时复用日级物料资格，真实班次与组合门禁仍逐次校验。
+     *
+     * @param context 共享上下文
+     * @param day 当前业务日
+     * @param shift 当前竞争班次
+     * @param groups 有序结构候选
+     * @param machineCodes 本轮可用机台编码
+     * @param history 有效历史关系
+     * @param failed 本资源版本失败组合
+     * @param cache 只读组合缓存
+     * @param candidates 当前日资源版本内的资格缓存，提交或失败恢复后由调用方清理
+     * @return 最优合法组合，无可用组合时为空
+     */
+    private Selection selectNext(LhScheduleContext context, DayScheduleContext day, LhShiftConfigVO shift,
+            Map<String, List<SkuScheduleDTO>> groups, List<String> machineCodes,
+            Map<String, List<LhMouldChangePlan>> history, Set<String> failed, NewSpecProposalRoundCache cache,
+            Map<String, DailyNewSpecCandidate> candidates) {
         for (List<SkuScheduleDTO> original : groups.values()) {
             CxEmbryoLhTime source = context.getStructureSwitchCandidateSourceMap()
                     .get(StructureSwitchCandidateScope.skuKey(original.get(0)));
@@ -325,29 +427,33 @@ public class StructureSwitchSchedulingService {
                                 : "胎胚最早可供硫化时间尚未进入当前班次"));
                 continue;
             }
-            // 先完成同结构全部SKU的高等级组合，再进入低等级，避免前序普通SKU先占名额。
-            // 同胎胚偏好只作用于非等结果首班，不越过历史指定、活字块或专供组合等级。
+            // 非等结果首班沿用同组合等级内偏好；等结果第二班先消费关系组，再选择组内机台组合。
             List<SkuScheduleDTO> ordered = StructureSwitchSchedulingPolicy.prioritizeNoWaitFirstShift(
                     context, source, shift, original);
-            Map<String, DailyNewSpecCandidate> candidates = new LinkedHashMap<>();
-            for (int combinationRank = StructureSwitchPriorityPolicy.HISTORICAL;
-                    combinationRank <= StructureSwitchPriorityPolicy.ORDINARY; combinationRank++) {
-                for (SkuScheduleDTO sku : ordered) {
-                    if (targetScheduleQtyResolver.previewUnfulfilledProductionRemainingQty(context, sku) <= 0) {
-                        continue;
+            for (List<SkuScheduleDTO> relationGroup : StructureSwitchSecondShiftSelectionPolicy.groupCandidates(
+                    context, source, shift, ordered)) {
+                for (int combinationRank = StructureSwitchPriorityPolicy.HISTORICAL;
+                        combinationRank <= StructureSwitchPriorityPolicy.ORDINARY; combinationRank++) {
+                    if (day.isFirstScheduleDay() && combinationRank != StructureSwitchPriorityPolicy.HISTORICAL) {
+                        break;
                     }
-                    String skuKey = StructureSwitchCandidateScope.skuKey(sku);
-                    // 同一选择轮资源不变，只解析一次普通物料资格；成功提交后下一轮重新读取。
-                    DailyNewSpecCandidate ordinary = candidates.computeIfAbsent(skuKey, ignored -> {
-                        DailyNewSpecCandidate candidate = materialEligibilityService.resolveCandidate(
-                                context, sku, day.getScheduleDate());
-                        candidatePoolBuilder.refreshRemainingMachineCount(context, day.getScheduleDate(), candidate);
-                        return candidate;
-                    });
-                    Selection selection = this.selectMachine(context, day, shift, sku, machineCodes,
-                            history.getOrDefault(skuKey, Collections.emptyList()), ordinary, combinationRank, failed, cache);
-                    if (Objects.nonNull(selection)) {
-                        return selection;
+                    for (SkuScheduleDTO sku : relationGroup) {
+                        if (targetScheduleQtyResolver.previewUnfulfilledProductionRemainingQty(context, sku) <= 0) {
+                            continue;
+                        }
+                        String skuKey = StructureSwitchCandidateScope.skuKey(sku);
+                        // 同一选择轮资源不变，只解析一次普通物料资格；成功提交后下一轮重新读取。
+                        DailyNewSpecCandidate ordinary = candidates.computeIfAbsent(skuKey, ignored -> {
+                            DailyNewSpecCandidate candidate = materialEligibilityService.resolveCandidate(
+                                    context, sku, day.getScheduleDate());
+                            candidatePoolBuilder.refreshRemainingMachineCount(context, day.getScheduleDate(), candidate);
+                            return candidate;
+                        });
+                        Selection selection = this.selectMachine(context, day, shift, sku, machineCodes,
+                                history.getOrDefault(skuKey, Collections.emptyList()), ordinary, combinationRank, failed, cache);
+                        if (Objects.nonNull(selection)) {
+                            return selection;
+                        }
                     }
                 }
             }
@@ -409,6 +515,8 @@ public class StructureSwitchSchedulingService {
                     return Objects.isNull(plan) ? Stream.of(ordinarySelection)
                             : Stream.of(new Selection(machine.getMachineCode(), plan), ordinarySelection);
                 })
+                // T日仅保留精确历史组合，历史失败后的普通回落留到T+1重新竞争。
+                .filter(selection -> NewProductionDateAdmissionPolicy.isAllowed(context, day.getScheduleDate()) || Objects.nonNull(selection.history))
                 .filter(selection -> !ordinary.getReasons().isEmpty() || Objects.nonNull(selection.history))
                 .peek(selection -> selection.rank = StructureSwitchPriorityPolicy.resolveRank(context, sku,
                         context.getMachineScheduleMap().get(selection.machineCode), selection.history,

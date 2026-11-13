@@ -1,5 +1,7 @@
 package com.zlt.aps.common.engine.schedule;
 
+import com.zlt.aps.common.engine.schedule.engine.ScheduleMachineCandidateModel;
+
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -93,17 +95,27 @@ public abstract class AbstractMachineCandidateOrderStrategy<T, M> {
      * 获取候选机台评分。
      *
      * @param candidate 候选机台
-     * @return 评分
+     * @return 评分，默认从候选机台模型获取
      */
-    protected abstract BigDecimal getScore(M candidate);
+    protected BigDecimal getScore(M candidate) {
+        if (candidate instanceof ScheduleMachineCandidateModel) {
+            return ((ScheduleMachineCandidateModel) candidate).getScore();
+        }
+        return null;
+    }
 
     /**
      * 获取候选机台编码。
      *
      * @param candidate 候选机台
-     * @return 机台编码
+     * @return 机台编码，默认从候选机台模型获取
      */
-    protected abstract String getMachineCode(M candidate);
+    protected String getMachineCode(M candidate) {
+        if (candidate instanceof ScheduleMachineCandidateModel) {
+            return ((ScheduleMachineCandidateModel) candidate).getMachineCode();
+        }
+        return null;
+    }
 
     /**
      * 判断两个候选机台是否为同一机台。

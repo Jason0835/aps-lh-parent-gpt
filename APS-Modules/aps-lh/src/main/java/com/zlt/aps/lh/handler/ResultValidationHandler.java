@@ -24,7 +24,6 @@ import com.zlt.aps.lh.service.ILhMouldChangePlanService;
 import com.zlt.aps.lh.service.impl.*;
 import com.zlt.aps.lh.util.*;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
-import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -2225,7 +2224,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
      * 生成模具交替计划。
      * <p>
      * 收集排程结果中换模的机台，生成对应的模具交替计划记录。<br/>
-     * 计划顺序按机台和真实换模开始时间稳定排序。
+     * 计划顺序按机台和真实换模开始时间稳定排序，同料仅喷砂回装或整组新模具置换保留真实动作。
      * </p>
      *
      * @param context 排程上下文
@@ -2244,6 +2243,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
 
         List<LhMouldChangePlan> plans = context.getMouldChangePlanList();
         Map<LhMouldChangePlan, String> planProductStatusMap = new IdentityHashMap<LhMouldChangePlan, String>();
+        List<LhMouldChangePlan> replacementPlans = new ArrayList<>();
         // rollingStateMap 用于在同一机台连续换模时逐条推进前规格。
         Map<String, RollingMachineState> rollingStateMap = new HashMap<>();
         Set<String> observedChangeMachines = new HashSet<>();
@@ -2256,7 +2256,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             LhMouldChangePlan beforeSource = this.resolveMouldChangeBeforeSource(
                     context, result, observedChangeMachines.add(result.getLhMachineCode()));
             if (Objects.isNull(beforeSource) && shouldSkipSameMaterialMouldChangePlan(state, result)
-                    && !this.isOnlySandBlastReinstallation(context, result)) {
+                    && !this.isOnlySandBlastReinstallation(context, result)
+                    && !cleaningScheduleService.isOnlySandBlastReplacement(context, result)) {
                 log.info("前后物料编码相同，跳过模具交替计划生成, 工厂: {}, 批次: {}, 机台: {}, 前物料: {}, "
                                 + "后物料: {}, 交替类型: {}, 产品状态: {}",
                         context.getFactoryCode(), context.getBatchNo(), result.getLhMachineCode(),
@@ -2282,6 +2283,11 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             plan.setLeftRightMould(this.resolveMouldChangePlanLeftRightMould(context, result));
             // 精确历史后料的首次换模继承前规格，包括历史阶段未成功、随后普通竞争承接的结果。
             this.fillMouldChangeBeforeMaterial(context, result, plan, state, beforeSource);
+            if (cleaningScheduleService.isOnlySandBlastReplacement(context, result)) {
+                // 已由原机同料及完整新模组证明的置换，以实际物料闭合前后身份。
+                plan.setBeforeMaterialCode(result.getMaterialCode());
+                plan.setBeforeMaterialDesc(result.getMaterialDesc());
+            }
             plan.setAfterMaterialCode(result.getMaterialCode());
             plan.setAfterMaterialDesc(result.getMaterialDesc());
             // 保存本条计划物料（换模后上机物料）对应的产品状态，与排程结果 PRODUCT_STATUS 同口径。
@@ -2304,14 +2310,24 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
              */
             appendSubstitutionRemark(
                     context, plan, result, plannedMouldChangeStartTime);
-            // 仅喷砂释放后的原机台交替承接清洗事实，但展示上不携带已经离机的原模具号。
-            this.applyOnlySandBlastSourcePlanPresentation(context, plan);
+            // 同料新模置换先收集，统一补齐基础备注后再追加置换说明。
+            if (StringUtils.equals(plan.getBeforeMaterialCode(), plan.getAfterMaterialCode())
+                    && cleaningScheduleService.isOnlySandBlastReplacement(context, result)) {
+                replacementPlans.add(plan);
+            } else {
+                this.applyOnlySandBlastSourcePlanPresentation(context, plan);
+            }
             plans.add(plan);
             planProductStatusMap.put(plan, result.getProductStatus());
 
             updateRollingState(state, result);
         }
 
+        if (!replacementPlans.isEmpty()) {
+            // 精确模具计划跳过模具重算入口，基础备注由独立入口补齐。
+            lhMouldChangePlanService.appendBaseRemarks(replacementPlans);
+            replacementPlans.forEach(plan -> this.applyOnlySandBlastSourcePlanPresentation(context, plan));
+        }
         planOrder = this.appendCleaningMouldChangePlans(
                 context, plans, planOrder, changeResults, planProductStatusMap);
         logOutOfWindowMouldChangePlans(context, plans);
@@ -2366,8 +2382,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     }
 
     /**
-     * 按成功承接来源填写交替前物料，实际在机为第三种物料时使用真实前料。
-     * MES已上历史后料时仍保留历史前料，避免生成后料到后料的计划。
+     * 按精确历史来源填写交替前物料，编码和描述原样继承，包含空值。
+     * 无历史来源时使用实际滚动前料，实际生产身份由运行态独立维护。
      *
      * @param context 含历史承接结果关联的上下文
      * @param result 本次换模结果
@@ -2380,15 +2396,6 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         if (Objects.nonNull(sourcePlan)) {
             plan.setBeforeMaterialCode(sourcePlan.getBeforeMaterialCode());
             plan.setBeforeMaterialDesc(sourcePlan.getBeforeMaterialDesc());
-            PreviousAlternatePlanReleaseEvent event = context.getPreviousAlternateReleaseEventMap()
-                    .get(result.getLhMachineCode());
-            if (Objects.nonNull(event) && event.getPlan() == sourcePlan
-                    && !StringUtils.equals(event.resolveBeforeMaterialCode(), sourcePlan.getBeforeMaterialCode())) {
-                // 冻结动作保留真实前料；不能将已变化的在机料重新显示为旧历史前料。
-                plan.setBeforeMaterialCode(event.resolveBeforeMaterialCode());
-                plan.setBeforeMaterialDesc(Optional.ofNullable(context.getMaterialInfoMap()
-                        .get(plan.getBeforeMaterialCode())).map(MdmMaterialInfo::getMaterialDesc).orElse(null));
-            }
             log.info("历史承接交替计划继承前物料, 工厂: {}, 批次: {}, 机台: {}, 历史计划ID: {}, "
                             + "在机前物料: {}, 历史前物料: {}, 本次前物料: {}, 后物料: {}, 产品状态: {}",
                     context.getFactoryCode(), context.getBatchNo(), result.getLhMachineCode(), sourcePlan.getId(),

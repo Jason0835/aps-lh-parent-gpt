@@ -3,6 +3,7 @@ package com.zlt.aps.lh.util;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.service.impl.ContinuationSandBlastRecoveryService;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -34,7 +35,7 @@ public final class TypeBlockRelationUtil {
      * 判断机台当前在机物料与候选SKU是否满足换活字块关系：只要同模具即可。
      *
      * <p>机台当前物料为空、与候选物料相同，或两侧模具关系集合无交集时返回 false。
-     * 喷砂转机候选还要求机台实际模具与来源事件的原模具整组一致。</p>
+     * 专用喷砂恢复候选执行正规换模，其他喷砂来源沿用原模整组核验。</p>
      *
      * @param context 排程上下文
      * @param machine 当前机台
@@ -45,6 +46,10 @@ public final class TypeBlockRelationUtil {
                                              MachineScheduleDTO machine,
                                              SkuScheduleDTO sku) {
         if (Objects.isNull(context) || Objects.isNull(machine) || Objects.isNull(sku)) {
+            return false;
+        }
+        // 下机恢复必须重新安装原模并完成首检，不能提前进入换活字块分支。
+        if (ContinuationSandBlastRecoveryService.isRecoveryCandidate(sku)) {
             return false;
         }
         String machineMaterialCode = machine.getCurrentMaterialCode();

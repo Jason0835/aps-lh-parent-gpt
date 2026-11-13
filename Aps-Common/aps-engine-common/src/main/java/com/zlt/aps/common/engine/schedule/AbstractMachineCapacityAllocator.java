@@ -1,5 +1,7 @@
 package com.zlt.aps.common.engine.schedule;
 
+import com.zlt.aps.common.engine.schedule.engine.ScheduleTaskDraftModel;
+
 import java.math.BigDecimal;
 
 /**
@@ -46,9 +48,14 @@ public abstract class AbstractMachineCapacityAllocator<T> {
      * 读取领域任务的请求计划量。
      *
      * @param task 领域任务
-     * @return 请求计划量
+     * @return 请求计划量，默认从公共任务草稿读取计划量
      */
-    protected abstract BigDecimal resolveRequestedPlanQty(T task);
+    protected BigDecimal resolveRequestedPlanQty(T task) {
+        if (task instanceof ScheduleTaskDraftModel) {
+            return ((ScheduleTaskDraftModel) task).getPlanQty();
+        }
+        return null;
+    }
 
     /**
      * 将空值或负值归一为零。

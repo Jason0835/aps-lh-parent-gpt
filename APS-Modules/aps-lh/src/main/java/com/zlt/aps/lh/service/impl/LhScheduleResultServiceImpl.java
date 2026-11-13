@@ -8,6 +8,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.zlt.aps.common.engine.domain.*;
+import com.zlt.aps.common.engine.utils.LhSkuSurplusCalculator;
 import com.zlt.aps.common.engine.utils.MonthPlanSurplusCalculator;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
@@ -21,6 +22,8 @@ import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.lh.api.enums.ReleaseStatusEnum;
 import com.zlt.aps.lh.component.LhBatchNoRedisGenerator;
 import com.zlt.aps.lh.handler.LhInsertOrderValidateHandler;
+import com.zlt.aps.lh.handler.LhSkuSurplusDataInfo;
+import com.zlt.aps.lh.handler.LhSkuSurplusDataLoadHandler;
 import com.zlt.aps.lh.handler.SkuMonthPlanCalculator;
 import com.zlt.aps.lh.mapper.*;
 import com.zlt.aps.lh.service.ILhDayPlanAdjustRequireService;
@@ -28,6 +31,7 @@ import com.zlt.aps.lh.service.ILhMonthStartService;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
 import com.zlt.aps.lh.util.LeftRightMouldUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
+import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.lh.util.SkuConstructionRefResolverUtil;
 import com.zlt.aps.mdm.api.domain.entity.*;
@@ -110,6 +114,8 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
 
     @Resource
     private ILhMonthStartService lhMonthStartService;
+    @Resource
+    private LhSkuSurplusDataLoadHandler skuSurplusDataLoadHandler;
 
     private static final AtomicInteger INSERT_ORDER_SEQ = new AtomicInteger(0);
 
@@ -239,7 +245,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             beforeMaterialDesc = prevResult.getMaterialDesc();
         }
 
-        String batchNo = generateNextBatchNo(dto.getScheduleDate(), dto.getFactoryCode());
+        String batchNo = resolveInsertOrderBatchNo(dto);
         String orderNo = generateInsertOrderNo(dto.getScheduleDate());
 
         LhScheduleResult result = buildInsertOrderResult(dto, batchNo, orderNo, validateResult);
@@ -558,8 +564,10 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         LhMouldChangePlan existingPlan = mouldChangePlanMapper.selectOne(new LambdaQueryWrapper<LhMouldChangePlan>().eq(LhMouldChangePlan::getFactoryCode, dto.getFactoryCode()).eq(LhMouldChangePlan::getScheduleDate, dto.getScheduleDate()).eq(LhMouldChangePlan::getLhMachineCode, dto.getLhMachineCode()).eq(LhMouldChangePlan::getAfterMaterialCode, afterMaterialCode).last("LIMIT 1"));
 
         if (existingPlan != null) {
-            // 覆盖更新已有记录，避免重复
-            existingPlan.setLhResultBatchNo(batchNo);
+            // 覆盖更新已有记录，避免重复；若已有批次号则沿用，无值时才回填
+            if (StringUtils.isBlank(existingPlan.getLhResultBatchNo())) {
+                existingPlan.setLhResultBatchNo(resolveInsertMouldChangePlanBatchNo(dto, batchNo));
+            }
             existingPlan.setBeforeMaterialCode(beforeMaterialCode);
             existingPlan.setBeforeMaterialDesc(beforeMaterialDesc);
             existingPlan.setMouldCode(mouldCode);
@@ -573,9 +581,10 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         }
 
         // 新增模具交替计划
+        String mouldPlanBatchNo = resolveInsertMouldChangePlanBatchNo(dto, batchNo);
         LhMouldChangePlan plan = new LhMouldChangePlan();
         plan.setFactoryCode(dto.getFactoryCode());
-        plan.setLhResultBatchNo(batchNo);
+        plan.setLhResultBatchNo(mouldPlanBatchNo);
         plan.setOrderNo(generateChangePlanOrderNo(dto.getScheduleDate()));
         plan.setScheduleDate(dto.getScheduleDate());
         plan.setPlanDate(dto.getScheduleDate());
@@ -596,6 +605,76 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
 
         mouldChangePlanMapper.insert(plan);
         log.info("插单生成模具交替计划, 工单号: {}, 机台: {}, 前规格: {}, 后规格: {}", plan.getOrderNo(), dto.getLhMachineCode(), beforeMaterialCode, afterMaterialCode);
+    }
+
+    /**
+     * 解析插单使用的硫化排程批次号
+     * <p>优先沿用同工厂+同排程日期下已存在的非空排程批次号，其次沿用请求入参中的批次号；均不存在时才生成新批次号。</p>
+     *
+     * @param dto 插单请求数据
+     * @return 硫化排程批次号
+     */
+    private String resolveInsertOrderBatchNo(LhOrderInsertDTO dto) {
+        if (StringUtils.isNotBlank(dto.getFactoryCode()) && dto.getScheduleDate() != null) {
+            List<LhScheduleResult> existingResults = this.selectByFactoryCodeAndScheduleDate(dto.getFactoryCode(), dto.getScheduleDate());
+            if (CollectionUtils.isNotEmpty(existingResults)) {
+                for (LhScheduleResult item : existingResults) {
+                    if (item != null && StringUtils.isNotBlank(item.getBatchNo())) {
+                        return item.getBatchNo().trim();
+                    }
+                }
+            }
+        }
+        if (StringUtils.isNotBlank(dto.getBatchNo())) {
+            return dto.getBatchNo().trim();
+        }
+        String existingMouldBatchNo = queryExistingMouldChangePlanBatchNo(dto);
+        if (StringUtils.isNotBlank(existingMouldBatchNo)) {
+            return existingMouldBatchNo;
+        }
+        return generateNextBatchNo(dto.getScheduleDate(), dto.getFactoryCode());
+    }
+
+    /**
+     * 解析插单同步生成模具交替计划的批次号
+     * <p>优先沿用同工厂+同排程日期下模具交替计划已有的非空批次号，其次沿用本次插单排程结果的批次号；均不存在时才生成新批次号。</p>
+     *
+     * @param dto             插单请求数据
+     * @param fallbackBatchNo 插单排程结果解析出的批次号
+     * @return 模具交替计划关联的硫化排程批次号
+     */
+    private String resolveInsertMouldChangePlanBatchNo(LhOrderInsertDTO dto, String fallbackBatchNo) {
+        String existingMouldBatchNo = queryExistingMouldChangePlanBatchNo(dto);
+        if (StringUtils.isNotBlank(existingMouldBatchNo)) {
+            return existingMouldBatchNo;
+        }
+        if (StringUtils.isNotBlank(fallbackBatchNo)) {
+            return fallbackBatchNo.trim();
+        }
+        return generateNextBatchNo(dto.getScheduleDate(), dto.getFactoryCode());
+    }
+
+    /**
+     * 查询同工厂+同排程日期下模具交替计划已存在的非空批次号
+     *
+     * @param dto 插单请求数据
+     * @return 已存在的模具交替计划批次号，不存在返回null
+     */
+    private String queryExistingMouldChangePlanBatchNo(LhOrderInsertDTO dto) {
+        if (StringUtils.isBlank(dto.getFactoryCode()) || dto.getScheduleDate() == null) {
+            return null;
+        }
+        LambdaQueryWrapper<LhMouldChangePlan> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(LhMouldChangePlan::getFactoryCode, dto.getFactoryCode())
+                .eq(LhMouldChangePlan::getScheduleDate, DateUtil.beginOfDay(dto.getScheduleDate()))
+                .isNotNull(LhMouldChangePlan::getLhResultBatchNo)
+                .ne(LhMouldChangePlan::getLhResultBatchNo, "")
+                .last("LIMIT 1");
+        LhMouldChangePlan existingBatchPlan = mouldChangePlanMapper.selectOne(wrapper);
+        if (existingBatchPlan != null && StringUtils.isNotBlank(existingBatchPlan.getLhResultBatchNo())) {
+            return existingBatchPlan.getLhResultBatchNo().trim();
+        }
+        return null;
     }
 
     /**
@@ -658,6 +737,8 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         }
         String factoryCode = lhScheduleResultList.get(BigDecimal.ZERO.intValue()).getFactoryCode();
         List<Date> realProductionDateList = getRealProductionDateInfo(scheduleDate);
+        LhSkuSurplusDataInfo dataInfo = skuSurplusDataLoadHandler.loadData(factoryCode, realProductionDateList);
+
         List<Date> allProductionDate = getAllProductionDateInfo(scheduleDate, factoryCode);
         YearMonth firstMonth = SkuMonthPlanCalculator.getFirstYearMonth(allProductionDate);
         YearMonth nextMonth = SkuMonthPlanCalculator.getNextMonth(allProductionDate);
@@ -719,18 +800,24 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             monthPlanMap = allMonthPlanList.stream().collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getFactoryMaterialStatusKey));
         }
         log.info("fillScheduleResultFields: 月计划定稿加载完成, 月计划匹配数={}", monthPlanMap.size());
-        // ======== 3. 加载机台信息（使用模数） ========
-        // key: machineCode, value: LhMachineInfo
-        Map<String, LhMachineInfo> machineInfoMap = new HashMap<>(machineCodes.size());
+        // ======== 3. 加载机台信息（使用模数，按工厂+机台编码隔离） ========
+        // key: factoryCode + "|" + machineCode（兼容无工厂编码时回退 machineCode）
+        Map<String, LhMachineInfo> machineInfoMap = new HashMap<>(machineCodes.size() * 2);
         if (!machineCodes.isEmpty()) {
-            LambdaQueryWrapper<LhMachineInfo> wrapper = new LambdaQueryWrapper<>();
-            wrapper.in(LhMachineInfo::getMachineCode, machineCodes);
-            List<LhMachineInfo> machineList = lhMachineInfoMapper.selectList(wrapper);
-            for (LhMachineInfo m : machineList) {
-                if (StringUtils.isNotEmpty(m.getMachineCode())) {
-                    machineInfoMap.put(m.getMachineCode(), m);
-                }
+            LambdaQueryWrapper<LhMachineInfo> machineWrapper = new LambdaQueryWrapper<>();
+            machineWrapper.in(LhMachineInfo::getMachineCode, machineCodes);
+            if (!factoryCodes.isEmpty()) {
+                machineWrapper.in(LhMachineInfo::getFactoryCode, factoryCodes);
             }
+            List<LhMachineInfo> machineList = lhMachineInfoMapper.selectList(machineWrapper);
+            machineList.stream()
+                    .filter(Objects::nonNull)
+                    .filter(machineItem -> StringUtils.isNotBlank(machineItem.getMachineCode()))
+                    .forEach(machineItem -> {
+                        machineInfoMap.put(this.buildFactoryScopedKey(
+                                machineItem.getFactoryCode(), machineItem.getMachineCode()), machineItem);
+                        machineInfoMap.putIfAbsent(machineItem.getMachineCode().trim(), machineItem);
+                    });
         }
         log.info("fillScheduleResultFields: 机台信息加载完成, 机台数={}, 匹配数={}", machineCodes.size(), machineInfoMap.size());
 
@@ -749,18 +836,26 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         }
         log.info("fillScheduleResultFields: 物料信息加载完成, 物料数={}, 匹配数={}", materialCodes.size(), materialInfoMap.size());
 
-        // ======== 5. 加载SKU硫化产能（硫化时间） ========
-        // key: materialCode, value: MdmSkuLhCapacity
-        Map<String, MdmSkuLhCapacity> skuLhCapacityMap = new HashMap<>(materialCodes.size());
+        // ======== 5. 加载SKU硫化产能（班产与硫化时间，按工厂+物料编码隔离） ========
+        // key: factoryCode + "|" + materialCode（兼容无工厂编码时回退 materialCode）
+        Map<String, MdmSkuLhCapacity> skuLhCapacityMap = new HashMap<>(materialCodes.size() * 2);
         if (!materialCodes.isEmpty()) {
-            LambdaQueryWrapper<MdmSkuLhCapacity> wrapper = new LambdaQueryWrapper<>();
-            wrapper.in(MdmSkuLhCapacity::getMaterialCode, materialCodes);
-            List<MdmSkuLhCapacity> capacityList = mdmSkuLhCapacityMapper.selectList(wrapper);
-            for (MdmSkuLhCapacity c : capacityList) {
-                if (StringUtils.isNotEmpty(c.getMaterialCode())) {
-                    skuLhCapacityMap.put(c.getMaterialCode(), c);
-                }
+            LambdaQueryWrapper<MdmSkuLhCapacity> capacityWrapper = new LambdaQueryWrapper<>();
+            capacityWrapper.in(MdmSkuLhCapacity::getMaterialCode, materialCodes);
+            if (!factoryCodes.isEmpty()) {
+                capacityWrapper.in(MdmSkuLhCapacity::getFactoryCode, factoryCodes);
             }
+            List<MdmSkuLhCapacity> capacityList = mdmSkuLhCapacityMapper.selectList(capacityWrapper);
+            capacityList.stream()
+                    .filter(Objects::nonNull)
+                    .filter(capacityItem -> StringUtils.isNotBlank(capacityItem.getMaterialCode()))
+                    .forEach(capacityItem -> {
+                        String scopedKey = this.buildFactoryScopedKey(
+                                capacityItem.getFactoryCode(), capacityItem.getMaterialCode());
+                        skuLhCapacityMap.merge(scopedKey, capacityItem, this::preferValidSkuCapacity);
+                        skuLhCapacityMap.merge(capacityItem.getMaterialCode().trim(), capacityItem,
+                                this::preferValidSkuCapacity);
+                    });
         }
         log.info("fillScheduleResultFields: SKU硫化产能加载完成, 物料数={}, 匹配数={}", materialCodes.size(), skuLhCapacityMap.size());
 
@@ -853,13 +948,18 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
                 finishedQty += nightFinish.intValue();
             }
             // 防御性非负保护，避免数据库异常负值导致余量计算错误
-            finishedQty = Math.max(finishedQty, 0);
-            result.setTotalFinishQty(finishedQty);
-            //20260830+ 余量计算
-            LhSurplusProductionDayInfo productionDayInfo = new LhSurplusProductionDayInfo(productionYearMonth, startDay, addLastMonthOverdueQty, realProductionDateList, extendDays, skuMaxDiscontinueDays);
-            LhSurplusSkuInfo lhSurplusSkuInfo = new LhSurplusSkuInfo(skuInfo, allMonthPlanList, monthOverdueQtyMap, finishedQty, allLhDayAdjustList);
-            LhSurplusResultVo lhSurplusResult = MonthPlanSurplusCalculator.getSurplusInfo(productionDayInfo, lhSurplusSkuInfo);
-
+//            finishedQty = Math.max(finishedQty, 0);
+//            result.setTotalFinishQty(finishedQty);
+//            //20260830+ 余量计算
+//            LhSurplusProductionDayInfo productionDayInfo = new LhSurplusProductionDayInfo(productionYearMonth, startDay, addLastMonthOverdueQty, realProductionDateList, extendDays, skuMaxDiscontinueDays);
+//            LhSurplusSkuInfo lhSurplusSkuInfo = new LhSurplusSkuInfo(skuInfo, allMonthPlanList, monthOverdueQtyMap, finishedQty, allLhDayAdjustList);
+//            LhSurplusResultVo lhSurplusResult = MonthPlanSurplusCalculator.getSurplusInfo(productionDayInfo, lhSurplusSkuInfo);
+            //20261105+ 余量计算(40天计划进行计算)
+            Integer actualFinishedQty = dataInfo.getFinishQty(skuInfo);
+            result.setTotalFinishQty(actualFinishedQty);
+            LhSkuSurplusControlParam productionDateInfo = new LhSkuSurplusControlParam(dataInfo.getPlanStartDate(), false, realProductionDateList, extendDays, skuMaxDiscontinueDays);
+            LhSurplusSkuInfo calculateSkuInfo = new LhSurplusSkuInfo(skuInfo, dataInfo.getAllMonthPlanList(), Collections.emptyMap(), actualFinishedQty, dataInfo.getAllLhDayPlanAdjustList());
+            LhSurplusResultVo lhSurplusResult = LhSkuSurplusCalculator.getSurplusInfo(productionDateInfo, calculateSkuInfo);
             // ---------- TOTAL_DAILY_PLAN_QTY：到断点月计划总量 ----------
             Integer planQty = lhSurplusResult.getAllPlanQty();
             if (Objects.nonNull(planQty)) {
@@ -891,27 +991,33 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             }
 
             // ---------- MOULD_QTY：使用模数 ----------
-            LhMachineInfo machineInfo = machineInfoMap.get(machineCode);
+            LhMachineInfo machineInfo = this.findFactoryScopedValue(machineInfoMap, fc, machineCode);
             if (Objects.nonNull(machineInfo) && Objects.nonNull(machineInfo.getMaxMoldNum())) {
                 result.setMouldQty(machineInfo.getMaxMoldNum());
             }
 
+            MdmSkuLhCapacity capacity = this.findFactoryScopedValue(skuLhCapacityMap, fc, matCode);
+
+            // ---------- SINGLE_MOULD_SHIFT_QTY：单班硫化量 ----------
+            // 模板导入阶段已将 Excel 传入的单班硫化量置空，此处统一按工厂+物料编码读取
+            // T_MDM_SKU_LH_CAPACITY.CLASS_CAPACITY，并与自动排程/插单口径对齐：
+            // 单模机台（L/R 结尾或 maxMoldNum=1）按整机班产折半（/2），双模机台直接取班产原值。
+            if (result.getSingleMouldShiftQty() == null || result.getSingleMouldShiftQty() <= 0) {
+                Integer resolvedShiftQty = this.resolveSystemSingleMouldShiftQty(capacity, machineInfo, machineCode);
+                if (resolvedShiftQty != null && resolvedShiftQty > 0) {
+                    result.setSingleMouldShiftQty(resolvedShiftQty);
+                }
+            }
+
             // ---------- LH_TIME：硫化时间 ----------
             Integer lhTime = null;
-            MdmSkuLhCapacity capacity = skuLhCapacityMap.get(matCode);
             if (Objects.nonNull(capacity) && Objects.nonNull(capacity.getVulcanizationTime()) && capacity.getVulcanizationTime() > 0) {
                 lhTime = capacity.getVulcanizationTime();
             }
-            // 兜底：根据单班硫化量和使用模数反推
+            // 兜底：根据系统回填后的单班硫化量和使用模数反推
             if (lhTime == null || lhTime <= 0) {
                 Integer singleMouldShiftQty = result.getSingleMouldShiftQty();
                 Integer mouldQty = result.getMouldQty();
-                // 如果result的singleMouldShiftQty为空，尝试从产能主数据取班产
-                if (singleMouldShiftQty == null || singleMouldShiftQty <= 0) {
-                    if (Objects.nonNull(capacity) && Objects.nonNull(capacity.getClassCapacity()) && capacity.getClassCapacity() > 0) {
-                        singleMouldShiftQty = capacity.getClassCapacity();
-                    }
-                }
                 if (singleMouldShiftQty != null && singleMouldShiftQty > 0 && mouldQty != null && mouldQty > 0) {
                     // 单班硫化量 = floor(28800 / 硫化时间) * 使用模数
                     // 反推：硫化时间 ≈ 28800 * 使用模数 / 单班硫化量
@@ -920,13 +1026,6 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             }
             if (lhTime != null && lhTime > 0) {
                 result.setLhTime(lhTime);
-            }
-
-            // ---------- SINGLE_MOULD_SHIFT_QTY：单班硫化量 ----------
-            // 模板导入未提供单班硫化量时，从 SKU 硫化产能主数据班产回填，与自动排程口径保持一致，
-            // 避免导入结果缺失该字段（自动排程由 SingleMouldShiftQtyUtil 优先取班产）。
-            if ((result.getSingleMouldShiftQty() == null || result.getSingleMouldShiftQty() <= 0) && Objects.nonNull(capacity) && Objects.nonNull(capacity.getClassCapacity()) && capacity.getClassCapacity() > 0) {
-                result.setSingleMouldShiftQty(capacity.getClassCapacity());
             }
 
             // ---------- DAILY_PLAN_QTY：日计划量 ----------
@@ -963,6 +1062,82 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         }
 
         log.info("fillScheduleResultFields: 排程结果字段填充完成, 共处理{}条记录", lhScheduleResultList.size());
+    }
+
+    /**
+     * 构建工厂隔离的组合缓存键。
+     *
+     * @param factoryCode 工厂编码
+     * @param bizCode     机台编码或物料编码
+     * @return factoryCode|bizCode 组合键
+     */
+    private String buildFactoryScopedKey(String factoryCode, String bizCode) {
+        return StringUtils.trimToEmpty(factoryCode) + "|" + StringUtils.trimToEmpty(bizCode);
+    }
+
+    /**
+     * 按工厂+业务编码优先从缓存中取值，工厂未命中时回退按业务编码匹配。
+     *
+     * @param cacheMap    缓存 Map
+     * @param factoryCode 工厂编码
+     * @param bizCode     机台编码或物料编码
+     * @param <T>         缓存值类型
+     * @return 命中的主数据对象，未命中返回 null
+     */
+    private <T> T findFactoryScopedValue(Map<String, T> cacheMap, String factoryCode, String bizCode) {
+        if (cacheMap == null || StringUtils.isBlank(bizCode)) {
+            return null;
+        }
+        if (StringUtils.isNotBlank(factoryCode)) {
+            T scopedValue = cacheMap.get(this.buildFactoryScopedKey(factoryCode, bizCode));
+            if (Objects.nonNull(scopedValue)) {
+                return scopedValue;
+            }
+        }
+        return cacheMap.get(bizCode.trim());
+    }
+
+    /**
+     * 合并同键 SKU 硫化产能记录时优先保留维护了有效班产（{@code classCapacity > 0}）的记录。
+     *
+     * @param existing  已缓存记录
+     * @param candidate 新候选记录
+     * @return 优选记录
+     */
+    private MdmSkuLhCapacity preferValidSkuCapacity(MdmSkuLhCapacity existing, MdmSkuLhCapacity candidate) {
+        boolean existingValid = Objects.nonNull(existing)
+                && Objects.nonNull(existing.getClassCapacity())
+                && existing.getClassCapacity() > 0;
+        if (existingValid) {
+            return existing;
+        }
+        return Objects.nonNull(candidate) ? candidate : existing;
+    }
+
+    /**
+     * 按系统主数据与单双模机台口径解析单班硫化量。
+     * <p>双模机台直接取 {@code T_MDM_SKU_LH_CAPACITY.CLASS_CAPACITY}；
+     * 单模机台（机台编码以 L/R 结尾或机台最大模台数为 1）按整机班产除以 2 向下取整，
+     * 与自动排程及手工插单口径保持一致。</p>
+     *
+     * @param capacity    SKU 硫化产能主数据
+     * @param machineInfo 硫化机台主数据
+     * @param machineCode 硫化机台编码
+     * @return 解析后的单班硫化量，无法解析时返回 null
+     */
+    private Integer resolveSystemSingleMouldShiftQty(MdmSkuLhCapacity capacity,
+                                                     LhMachineInfo machineInfo,
+                                                     String machineCode) {
+        if (Objects.isNull(capacity)
+                || Objects.isNull(capacity.getClassCapacity())
+                || capacity.getClassCapacity() <= 0) {
+            return null;
+        }
+        int classCapacity = capacity.getClassCapacity();
+        boolean singleMould = (Objects.nonNull(machineInfo) && Integer.valueOf(1).equals(machineInfo.getMaxMoldNum()))
+                || LhSingleControlMachineUtil.isSingleMouldMachine(machineCode);
+        int resolvedQty = singleMould ? classCapacity / 2 : classCapacity;
+        return resolvedQty > 0 ? resolvedQty : null;
     }
 
     /**

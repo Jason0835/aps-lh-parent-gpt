@@ -29,7 +29,7 @@ public enum ScheduleStepEnum {
     S4_4_8_STRUCTURE_ENDING_CONTINUATION("S4.4.8", "结构收尾续作增机回补"),
     S4_5_NEW_PRODUCTION("S4.5", "新增规格排产"),
     /**
-     * 新增完成后的专供机台转产下机与后料接续。
+     * 结构切换及回补之后、新增之前的专供机台转产下机与后料接续。
      */
     S4_5_4_DEDICATED_SUPPLY_TRANSFER("S4.5.4", "硫化机专供成型机转产处理"),
     /** S4.5.2 硫化日计划调整排产：新增排产全部完成后，基于剩余机台/产能处理月计划不存在的日计划调整物料 */

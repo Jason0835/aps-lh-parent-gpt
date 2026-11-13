@@ -35,6 +35,11 @@ public class LhScheduleResponseDTO {
     private List<String> warningMessages = new ArrayList<>();
 
     /**
+     * 排程耗时（单位：秒，四舍五入到整数），自排程服务接收请求起计时，成功与失败响应均会返回
+     */
+    private long costSeconds;
+
+    /**
      * 构建成功响应
      *
      * @param batchNo 批次号

@@ -64,8 +64,55 @@ public final class PendingSkuUnscheduledRule {
     }
 
     /**
+     * 判断收尾来源是否因无本轮可用胎胚而禁止实机生产。
+     * 胎胚库存收尾不依赖交班停产证据，原交班停产规则继续覆盖其余来源。
+     *
+     * @param context 本轮收尾标识及库存快照
+     * @param sku 当前物料及产品状态
+     * @return 任一零库存收尾规则命中时返回true
+     */
+    public static boolean isEndingWithoutStock(LhScheduleContext context, SkuScheduleDTO sku) {
+        return isHandoverStoppedWithoutStock(context, sku)
+                || EmbryoEndingStockAdmissionPolicy.isEmbryoEndingWithoutStock(context, sku);
+    }
+
+    /**
+     * 生成零库存收尾禁排说明，保留原硫化需求及历史在机事实。
+     * 交班停产沿用原原因，胎胚收尾零库存使用独立原因并保留零量记录。
+     *
+     * @param context 本轮收尾、库存及批次信息
+     * @param sku 当前物料及产品状态来源
+     * @return 命中时返回零量未排说明，否则返回null
+     */
+    public static LhUnscheduledResult evaluateEndingWithoutStock(LhScheduleContext context, SkuScheduleDTO sku) {
+        LhUnscheduledResult handoverStopped = evaluateHandoverStoppedWithoutStock(context, sku);
+        if (Objects.nonNull(handoverStopped)) {
+            return handoverStopped;
+        }
+        if (!EmbryoEndingStockAdmissionPolicy.isEmbryoEndingWithoutStock(context, sku)) {
+            return null;
+        }
+        UnscheduledReasonEnum reason = UnscheduledReasonEnum.EMBRYO_ENDING_NO_STOCK;
+        String detail = MessageFormat.format(
+                "工厂={0}，排程日期={1}，T日={2}，批次={3}，物料={4}，状态={5}，胎胚={6}，"
+                        + "存在本轮库存记录={7}，本轮库存原值={8}，硫化余量={9}，合法库存生产目标=0；"
+                        + "胎胚库存收尾无库存，历史交替身份不豁免",
+                context.getFactoryCode(), LhScheduleTimeUtil.formatDate(context.getScheduleTargetDate()),
+                LhScheduleTimeUtil.formatDate(context.getScheduleDate()), context.getBatchNo(),
+                sku.getMaterialCode(), sku.getProductStatus(), sku.getEmbryoCode(),
+                context.getEmbryoRealtimeStockMap().containsKey(sku.getEmbryoCode()),
+                context.getEmbryoRealtimeStockMap().get(sku.getEmbryoCode()), Math.max(0, sku.getSurplusQty()));
+        log.info("胎胚库存收尾无库存不排产, {}", detail);
+        PriorityTraceLogHelper.appendProcessLog(context, "胎胚库存收尾无库存不排产", detail);
+        LhUnscheduledResult result = buildUnscheduledResult(context, sku, 0, reason.getSummary(), reason, detail);
+        result.setMonthPlanVersion(sku.getMonthPlanVersion());
+        result.setProductionVersion(sku.getProductionVersion());
+        return result;
+    }
+
+    /**
      * 判断已确认交班停产收尾的胎胚是否没有本轮可用库存。
-     * 缺库存仅在已确认停产的范围内按无可用库存处理，不改变普通缺库存续作例外。
+     * 本方法保留交班停产判定；全部零库存收尾准入使用isEndingWithoutStock。
      *
      * @param context 本轮交班停产证据及T日库存快照
      * @param sku 待判断的物料及产品状态来源
@@ -83,9 +130,12 @@ public final class PendingSkuUnscheduledRule {
      * @return 已确认交班停产且本轮库存缺失或非正时返回true
      */
     public static boolean isHandoverStoppedWithoutStock(LhScheduleContext context, String embryoCode) {
-        return Objects.nonNull(context) && StringUtils.isNotEmpty(embryoCode)
-                && context.getCxHandoverStoppedEndingEmbryoSet().contains(embryoCode)
-                && context.getEmbryoRealtimeStockMap().getOrDefault(embryoCode, 0) <= 0;
+        if (Objects.isNull(context) || StringUtils.isEmpty(embryoCode)
+                || !context.getCxHandoverStoppedEndingEmbryoSet().contains(embryoCode)) {
+            return false;
+        }
+        Integer stockQty = context.getEmbryoRealtimeStockMap().get(embryoCode);
+        return Objects.isNull(stockQty) || stockQty <= 0;
     }
 
     /**
@@ -532,7 +582,7 @@ public final class PendingSkuUnscheduledRule {
 
     /**
      * 统一按小余量优先、历史欠产其次评估真实未排，支持出队入口显式提供历史证据。
-     * <p>只替换历史来源证据，不改写SKU或传导缓存；小余量的收尾、胎胚硬目标、比例和夜班条件完整保留。</p>
+     * <p>只替换历史来源证据，不改写SKU或传导缓存；小余量的收尾、胎胚硬目标、比例和前次累计计划覆盖历史余量条件完整保留。</p>
      *
      * @param context 排程上下文
      * @param sku 待评估SKU
@@ -551,9 +601,9 @@ public final class PendingSkuUnscheduledRule {
         if (Objects.isNull(context) || Objects.isNull(sku)) {
             return null;
         }
-        LhUnscheduledResult handoverStopped = evaluateHandoverStoppedWithoutStock(context, sku);
-        if (Objects.nonNull(handoverStopped)) {
-            return handoverStopped;
+        LhUnscheduledResult endingWithoutStock = evaluateEndingWithoutStock(context, sku);
+        if (Objects.nonNull(endingWithoutStock)) {
+            return endingWithoutStock;
         }
         int genericSurplusQty = Math.max(0, sku.getSurplusQty());
         int resolvedSmallEndingRuleQty = Math.max(0, smallEndingRuleQty);
@@ -572,24 +622,25 @@ public final class PendingSkuUnscheduledRule {
         if (!embryoStockEndingTargetApplied
                 && smallEndingRuleEnding
                 && resolvedSmallEndingRuleQty <= toleranceQty) {
-            int previousNightPlanQty = SmallEndingSurplusSkipRule.resolveTargetPreviousT1NightPlanQty(
-                    context, sku.getMaterialCode());
+            long previousPlannedQty = SmallEndingSurplusSkipRule.resolvePreviousPlannedQty(
+                    context, sku);
             boolean smallEndingSkipped = SmallEndingSurplusSkipRule.shouldSkip(
                     context, sku, smallEndingRuleEnding, resolvedSmallEndingRuleQty);
             log.info("待排SKU收尾小余量规则判断, materialCode: {}, genericSurplusQty: {}, "
                             + "smallEndingRuleQty: {}, quantitySource: {}, toleranceQty: {}, "
-                            + "previousT1NightPlanQty: {}, shiftCapacity: {}, skipped: {}",
+                            + "previousPlannedQty: {}, previousSurplusQty: {}, skipped: {}",
                     sku.getMaterialCode(), genericSurplusQty, resolvedSmallEndingRuleQty,
-                    quantitySource, toleranceQty, previousNightPlanQty,
-                    sku.getShiftCapacity(), smallEndingSkipped);
+                    quantitySource, toleranceQty, previousPlannedQty,
+                    SmallEndingSurplusSkipRule.resolvePreviousSurplusQty(context, sku), smallEndingSkipped);
             if (smallEndingSkipped) {
                 String detail = new StringBuilder(256)
                         .append("materialCode=").append(sku.getMaterialCode())
                         .append(", productStatus=").append(sku.getProductStatus())
                         .append(", actualQty=").append(resolvedSmallEndingRuleQty)
                         .append(", toleranceQty=").append(toleranceQty)
-                        .append(", previousT1NightPlanQty=").append(previousNightPlanQty)
-                        .append(", shiftCapacity=").append(sku.getShiftCapacity())
+                        .append(", previousPlannedQty=").append(previousPlannedQty)
+                        .append(", previousSurplusQty=")
+                        .append(SmallEndingSurplusSkipRule.resolvePreviousSurplusQty(context, sku))
                         .toString();
                 return buildUnscheduledResult(context, sku, resolvedSmallEndingRuleQty,
                         SmallEndingSurplusSkipRule.UNSCHEDULED_REASON,

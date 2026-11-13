@@ -29,6 +29,12 @@ public class ChangeQtyTaskVo implements Serializable {
     private BigDecimal newPlanQty;
 
     /**
+     * 目标顺序；已有节点表示移动到该位置，未传时保持原位置；空班次新增时为空表示追加到当前机台该班次末尾。
+     */
+    @ApiModelProperty(value = "调量目标顺序，已有节点移动或空班次新增时使用，TM和TC共用")
+    private Integer newSequence;
+
+    /**
      * 修改后的原因分析。
      */
     @ApiModelProperty(value = "修改后的原因分析")

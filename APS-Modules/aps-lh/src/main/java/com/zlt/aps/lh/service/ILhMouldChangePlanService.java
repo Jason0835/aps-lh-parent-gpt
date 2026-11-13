@@ -38,6 +38,13 @@ public interface ILhMouldChangePlanService extends IDocService<LhMouldChangePlan
     List<LhMouldChangePlan> resolveMouldCode(List<LhMouldChangePlan> planList);
 
     /**
+     * 按当前下机方式、实际模具和前日计划补齐基础备注，并保留已有业务说明。
+     *
+     * @param planList 已确定实际模具的交替计划列表，备注按分号完整项去重
+     */
+    void appendBaseRemarks(List<LhMouldChangePlan> planList);
+
+    /**
      * 刷新指定分厂、排程日期和硫化结果批次的模具号。
      *
      * @param factoryCode     工厂编码

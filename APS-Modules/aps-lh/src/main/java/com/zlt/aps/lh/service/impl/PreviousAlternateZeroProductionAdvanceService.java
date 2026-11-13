@@ -10,6 +10,8 @@ import com.zlt.aps.lh.component.StructureMinMachineRetentionService;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.DailySchedulePhase;
 import com.zlt.aps.lh.engine.strategy.support.DayScheduleContext;
+import com.zlt.aps.lh.engine.strategy.support.EquipmentPlanArrangement;
+import com.zlt.aps.lh.engine.strategy.support.FirstInspectionAllocationPlan;
 import com.zlt.aps.lh.engine.strategy.support.PreviousAlternatePlanReleaseEvent;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
@@ -58,7 +60,7 @@ public class PreviousAlternateZeroProductionAdvanceService {
      * @param preparationDay 当前准备业务日
      * @param event 本机精确历史交替事件
      * @param attempt 原指定机台跨生产日承接内核，不修改外层已完成集合
-     * @return 较早早班形成精确正量并通过原资源约束及结构上限时为真
+     * @return 较早早班或同日精度并行恢复班形成精确正量，并通过原资源约束及结构上限时为真
      */
     public boolean tryAdvance(LhScheduleContext context, DayScheduleContext preparationDay,
             PreviousAlternatePlanReleaseEvent event,
@@ -102,7 +104,7 @@ public class PreviousAlternateZeroProductionAdvanceService {
                 return false;
             }
             accepted = this.hasEarlierPositiveResult(context, event, shift, readyTime, originalRelease);
-            reason = accepted ? "较早早班正量及完整资源校验通过" : "较早早班无精确正量或结构机台上限复核未通过";
+            reason = accepted ? "较早承接正量及完整资源校验通过" : "较早早班或同日精度恢复班无精确正量或结构机台上限复核未通过";
             return accepted;
         } finally {
             if (!accepted) {
@@ -204,14 +206,14 @@ public class PreviousAlternateZeroProductionAdvanceService {
     }
 
     /**
-     * 精确历史来源、较早班次正量及结构上限同时成立才接受本次完整提交。
+     * 精确历史来源、较早班次或同日精度恢复班正量及结构上限同时成立才接受本次完整提交。
      *
      * @param context 原承接内核提交后的上下文
      * @param event 本次精确历史事件
      * @param shift 较早早班
      * @param readyTime 本次允许的最早释放
      * @param originalRelease 原历史释放边界
-     * @return 后料在较早早班有真实正量且结构未超限时为真
+     * @return 后料在较早早班或同日精度恢复班有真实正量且结构未超限时为真
      */
     private boolean hasEarlierPositiveResult(LhScheduleContext context, PreviousAlternatePlanReleaseEvent event,
             LhShiftConfigVO shift, Date readyTime, Date originalRelease) {
@@ -224,16 +226,54 @@ public class PreviousAlternateZeroProductionAdvanceService {
                 .filter(result -> Objects.nonNull(result.getMouldChangeStartTime())
                         && !result.getMouldChangeStartTime().before(readyTime)
                         && result.getMouldChangeStartTime().before(originalRelease))
-                .anyMatch(result -> this.hasPositiveQuantityWithinLimit(context, result, shift));
+                .anyMatch(result -> this.hasPositiveQuantityWithinLimit(context, result, shift)
+                        || this.hasSameDayPrecisionProduction(context, result, shift));
     }
 
     /**
-     * 复核实际早班量和时间，并按公共物理机台统计确认结构额度。
+     * 当天已接受精度占用早班时，以同一精度首检恢复后的同日正量核对提前承接。
+     * 必须绑定有效安排及唯一首检，普通中班生产或未来精度不能代替早班正量证据。
+     *
+     * @param context 当前完整承接提案的上下文
+     * @param result 精确绑定历史计划的后料结果
+     * @param preparationShift 本次尝试提前的早班
+     * @return 同日精度恢复后的首个生产班有正量且满足结构上限时为真
+     */
+    private boolean hasSameDayPrecisionProduction(LhScheduleContext context, LhScheduleResult result,
+            LhShiftConfigVO preparationShift) {
+        FirstInspectionAllocationPlan inspection = context.getFirstInspectionResultPlanMap().get(result);
+        if (Objects.isNull(inspection) || !inspection.isValid() || Objects.isNull(inspection.getEquipmentPlanId())) {
+            return false;
+        }
+        EquipmentPlanArrangement arrangement = context.getEquipmentPlanRuntimeState().getArrangementMap()
+                .get(inspection.getEquipmentPlanId());
+        if (Objects.isNull(arrangement) || !arrangement.isEffective()
+                || !StringUtils.equals(arrangement.getTimeline().getPhysicalMachineCode(),
+                        LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode()))
+                || arrangement.getTimeline().getMaintenanceStartTime().before(preparationShift.getShiftStartDateTime())
+                || !arrangement.getTimeline().getMaintenanceStartTime().before(preparationShift.getShiftEndDateTime())
+                || Objects.isNull(inspection.getInspectionStartTime())
+                || inspection.getInspectionStartTime().before(arrangement.getTimeline().getMaintenanceReadyTime())
+                || !result.getMouldChangeStartTime().before(arrangement.getTimeline().getMaintenanceEndTime())) {
+            return false;
+        }
+        // 首检是恢复后的第一段计量生产，按它实际所在班校验结构数量，避免借次日正量确认当天提前。
+        return context.getScheduleWindowShifts().stream()
+                .filter(shift -> LhScheduleTimeUtil.isSameDay(shift.getWorkDate(), preparationShift.getWorkDate()))
+                .filter(shift -> !inspection.getInspectionStartTime().before(shift.getShiftStartDateTime())
+                        && inspection.getInspectionStartTime().before(shift.getShiftEndDateTime()))
+                .anyMatch(shift -> this.hasPositiveQuantityWithinLimit(context, result, shift)
+                        && !ShiftFieldUtil.getShiftStartTime(result, shift.getShiftIndex())
+                                .before(inspection.getInspectionStartTime()));
+    }
+
+    /**
+     * 复核实际承接班次的计划量和时间，并按公共物理机台统计确认结构额度。
      *
      * @param context 已提交结果及结构在机索引
      * @param result 精确指定后料结果
-     * @param shift 较早早班
-     * @return 早班有正量且结构额度充足时为真
+     * @param shift 较早早班或同日精度恢复班
+     * @return 该班有正量且结构额度充足时为真
      */
     private boolean hasPositiveQuantityWithinLimit(LhScheduleContext context, LhScheduleResult result,
             LhShiftConfigVO shift) {

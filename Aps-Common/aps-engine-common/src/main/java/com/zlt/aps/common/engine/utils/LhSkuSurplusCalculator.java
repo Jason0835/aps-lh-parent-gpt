@@ -95,7 +95,9 @@ public class LhSkuSurplusCalculator {
             Integer beforePlanQty = sumPlanQty(dayPlanQtyMap, planStartDate, firstScheduleDate) + lhDayAdjustQty;
             if (beforePlanQty - finishedQty > BigDecimal.ZERO.intValue()) {
                 //6.1 前段有余量：返回结果并标记前段余量
-                LhSurplusResultVo beforeSurplusInfo = buildSurplusResult(skuInfo, beforePlanQty, allPlanQty, finishedQty);
+                //余量段 = 计划起始日 ~ 最早排产日：该账户的剩余需求落在窗口之前，不与窗口后的 SKU 合并
+                LhSurplusResultVo beforeSurplusInfo = buildSurplusResult(skuInfo, beforePlanQty, allPlanQty, finishedQty,
+                        planStartDate, firstScheduleDate);
                 beforeSurplusInfo.markBeforeSurplusQty();
                 return beforeSurplusInfo;
             }
@@ -110,7 +112,8 @@ public class LhSkuSurplusCalculator {
             }
             //6.1.4 后段余量：按planStartDate~终止日汇总计划量
             Integer forwardPlanQty = sumPlanQty(dayPlanQtyMap, planStartDate, forwardEndDate) + lhDayAdjustQty;
-            return buildSurplusResult(skuInfo, forwardPlanQty, allPlanQty, finishedQty);
+            return buildSurplusResult(skuInfo, forwardPlanQty, allPlanQty, finishedQty,
+                    forwardStartDate, forwardStartDate == null ? null : forwardEndDate);
         }
         //6.2 排产周期内有计划量：取排产周期内有计划量的最大日
         LocalDate maxCyclePlanDate = getMaxHasPlanQtyDate(cycleDateList, dayPlanQtyMap);
@@ -120,7 +123,7 @@ public class LhSkuSurplusCalculator {
         LocalDate forwardEndDate = findPlanEndDate(forwardStartDate, skuMaxDiscontinueDays, dayPlanQtyMap);
         //6.2.2 后段余量：按planStartDate~终止日汇总计划量
         Integer forwardPlanQty = sumPlanQty(dayPlanQtyMap, planStartDate, forwardEndDate) + lhDayAdjustQty;
-        return buildSurplusResult(skuInfo, forwardPlanQty, allPlanQty, finishedQty);
+        return buildSurplusResult(skuInfo, forwardPlanQty, allPlanQty, finishedQty, forwardStartDate, forwardEndDate);
     }
 
     /**
@@ -463,9 +466,32 @@ public class LhSkuSurplusCalculator {
                                                         Integer planQty,
                                                         Integer sumPlanQty,
                                                         Integer finishedQty) {
+        return buildSurplusResult(skuInfo, planQty, sumPlanQty, finishedQty, null, null);
+    }
+
+    /**
+     * 组装硫化余量结果（带余量段）。
+     *
+     * <p>余量段与余量数值同源：起点为窗口后需求的起点，断点为遇连续 N+1 天空档的截断日，
+     * 供成型按胎胚维度合并多个物料账户时判断「是否还连续在生产」。</p>
+     *
+     * @param skuInfo      Sku信息
+     * @param planQty      当前计划量（已含日硫化计划调整量）
+     * @param sumPlanQty   总计划量（已含日硫化计划调整量）
+     * @param finishedQty  已完成量
+     * @param segmentStart 余量段起始日，可空
+     * @param segmentEnd   余量段断点日，可空
+     * @return 硫化余量结果
+     */
+    private static LhSurplusResultVo buildSurplusResult(FactoryMonthPlanProductionFinalResult skuInfo,
+                                                        Integer planQty,
+                                                        Integer sumPlanQty,
+                                                        Integer finishedQty,
+                                                        LocalDate segmentStart,
+                                                        LocalDate segmentEnd) {
         //超欠产不生效，固定按0处理
         Integer monthOverdueQty = BigDecimal.ZERO.intValue();
-        return new LhSurplusResultVo(skuInfo, monthOverdueQty, planQty, sumPlanQty, finishedQty);
+        return new LhSurplusResultVo(skuInfo, monthOverdueQty, planQty, sumPlanQty, finishedQty, segmentStart, segmentEnd);
     }
 
     /**

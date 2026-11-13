@@ -1,6 +1,7 @@
 package com.zlt.aps.lh.engine.strategy.support;
 
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
+import com.zlt.aps.lh.util.DeviceStopMachineResolver;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
@@ -43,7 +44,7 @@ import java.util.stream.Stream;
 public final class ContinuationMachineReducer {
 
     /**
-     * 在既定减少台数内先选历史交替命中机台，再按原正常规则补足。
+     * 在既定减少台数内先选历史交替命中机台，再选普通候选；各范围内K21/K22同胎胚候选按编号降序。
      * 整机共用性只汇总本轮候选运行侧的实际模具，避免单控代表侧少计另一侧。
      *
      * @param context 已初始化的排程上下文
@@ -91,6 +92,8 @@ public final class ContinuationMachineReducer {
         List<LhScheduleResult> historicalCandidates = representatives.stream()
                 .filter(candidate -> history.containsKey(LhSingleControlMachineUtil.resolvePhysicalMachineCode(candidate.getLhMachineCode())))
                 .sorted(keepOrder.reversed()).collect(Collectors.toList());
+        K21K22EmbryoMatchPolicy.orderRemoval(historicalCandidates, LhScheduleResult::getLhMachineCode,
+                candidate -> sourceSku.getEmbryoCode(), candidate -> 0);
         List<MachineReductionDecision> decisions = new ArrayList<>(Math.min(reduceCount, groups.size()));
         Set<String> selected = new LinkedHashSet<>(groups.size());
         for (LhScheduleResult candidate : historicalCandidates) {
@@ -109,6 +112,8 @@ public final class ContinuationMachineReducer {
         List<LhScheduleResult> remaining = representatives.stream().filter(candidate -> !selected.contains(
                 LhSingleControlMachineUtil.resolvePhysicalMachineCode(candidate.getLhMachineCode())))
                 .sorted(keepOrder.reversed()).collect(Collectors.toList());
+        K21K22EmbryoMatchPolicy.orderRemoval(remaining, LhScheduleResult::getLhMachineCode,
+                candidate -> sourceSku.getEmbryoCode(), candidate -> 0);
         for (int index = 0; index < remaining.size() && decisions.size() < reduceCount; index++) {
             LhScheduleResult candidate = remaining.get(index);
             LhScheduleResult next = index + 1 < remaining.size() ? remaining.get(index + 1) : null;
@@ -122,6 +127,12 @@ public final class ContinuationMachineReducer {
                     mouldCommonality.applyAsInt(candidate), dimensionEnabled,
                     this.resolveMachineDimensionSize(context, candidate), this.hasValidCleaningPlanForMachine(context, candidate),
                     this.resolveCapsuleUsageCount(context, candidate), Objects.nonNull(next) ? next.getLhMachineCode() : "无剩余候选");
+            if (K21K22EmbryoMatchPolicy.isTargetMachine(machineCode)
+                    && StringUtils.isNotBlank(sourceSku.getEmbryoCode())) {
+                reason = ReductionReason.SAME_EMBRYO_MACHINE_CODE;
+                detail += ", K21/K22同胎胚编号降序, 在产物料=" + sourceSku.getMaterialCode()
+                        + ", 胎胚=" + sourceSku.getEmbryoCode();
+            }
             decisions.add(new MachineReductionDecision(machineCode, reason, detail,
                     decisions.size() + 1, groups.get(machineCode)));
         }
@@ -129,7 +140,8 @@ public final class ContinuationMachineReducer {
     }
 
     /**
-     * 先锁定已加载历史的最近有效批次，再筛选窗口T/T+1，不能从更旧批次补捞。
+     * 从已按工厂和前日日期加载的有效计划中筛选窗口T/T+1动作，批次号不参与选机。
+     *
      * @param context 已按业务目标日前一天加载的历史快照
      * @return 物理机台对应命中的一条交替计划，仅用于选机解释
      */
@@ -139,17 +151,9 @@ public final class ContinuationMachineReducer {
             return Collections.emptyMap();
         }
         List<LhMouldChangePlan> source = context.getHistoricalReverseMouldChangePlanList();
-        LhMouldChangePlan latest = source.stream().filter(Objects::nonNull)
-                .filter(plan -> StringUtils.isNotEmpty(plan.getLhResultBatchNo()))
-                .max(Comparator.comparing(LhMouldChangePlan::getCreateTime, Comparator.nullsFirst(Date::compareTo))
-                        .thenComparing(LhMouldChangePlan::getId, Comparator.nullsFirst(Long::compareTo))).orElse(null);
-        if (Objects.isNull(latest)) {
-            return Collections.emptyMap();
-        }
         LocalDate firstDate = context.getScheduleDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
         Map<String, LhMouldChangePlan> plans = new LinkedHashMap<>(source.size());
         source.stream().filter(Objects::nonNull)
-                .filter(plan -> StringUtils.equals(latest.getLhResultBatchNo(), plan.getLhResultBatchNo()))
                 .filter(plan -> StringUtils.isNotEmpty(plan.getLhMachineCode()) && Objects.nonNull(plan.getPlanDate()))
                 .filter(plan -> MouldChangeTypeEnum.containsAnyCode(plan.getChangeMouldType(),
                         MouldChangeTypeEnum.REGULAR.getCode(), MouldChangeTypeEnum.TYPE_BLOCK.getCode()))
@@ -519,7 +523,7 @@ public final class ContinuationMachineReducer {
     /**
      * 判断续作候选机台是否命中本次已加载的有效清洗计划。
      * <p>只读取初始化阶段保存的原始清洗候选快照，不重复查询数据库，也不依赖候选最终是否因每日上限、
-     * 班次或三天内收尾规则生成实际清洗窗口。单控机台复用物理机台编码匹配，保证 K1501 与
+     * 班次或三天内收尾规则生成实际清洗窗口。公共来源身份提供物理机台编码，保证 K1501 与
      * K1501L/K1501R 按既有左右侧联动口径一致命中。</p>
      *
      * @param context 排程上下文
@@ -543,8 +547,8 @@ public final class ContinuationMachineReducer {
                     || cleaningPlan.getBeginDate().before(scheduleStartTime)) {
                 continue;
             }
-            String planPhysicalMachineCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(
-                    cleaningPlan.getMachineCode());
+            String planPhysicalMachineCode = DeviceStopMachineResolver.resolve(context, cleaningPlan)
+                    .getPhysicalMachineCode();
             if (StringUtils.equals(resultPhysicalMachineCode, planPhysicalMachineCode)) {
                 return true;
             }

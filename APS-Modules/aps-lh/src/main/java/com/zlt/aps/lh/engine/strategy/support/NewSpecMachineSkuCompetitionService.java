@@ -926,20 +926,8 @@ public class NewSpecMachineSkuCompetitionService {
      */
     private int compareHistoricalSourceShift(NewSpecScheduleProposal left,
                                              NewSpecScheduleProposal right) {
-        HistoricalResidualCapacityInfo leftInfo = this.resolveHistoricalResidualCapacityInfo(left);
-        HistoricalResidualCapacityInfo rightInfo = this.resolveHistoricalResidualCapacityInfo(right);
-        if (Objects.nonNull(leftInfo) != Objects.nonNull(rightInfo)) {
-            return Objects.nonNull(leftInfo) ? -1 : 1;
-        }
-        if (Objects.isNull(leftInfo)) {
-            return 0;
-        }
-        Date leftSourceStartTime = Objects.isNull(leftInfo.getSourceShift())
-                ? null : leftInfo.getSourceShift().getShiftStartDateTime();
-        Date rightSourceStartTime = Objects.isNull(rightInfo.getSourceShift())
-                ? null : rightInfo.getSourceShift().getShiftStartDateTime();
-        return Comparator.nullsLast(Date::compareTo).compare(
-                leftSourceStartTime, rightSourceStartTime);
+        return HistoricalResidualCapacityInfo.compareSourcePriority(
+                this.resolveHistoricalResidualCapacityInfo(left), this.resolveHistoricalResidualCapacityInfo(right));
     }
 
     /**

@@ -15,13 +15,15 @@ import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.util.LeftRightMouldUtil;
 import com.zlt.aps.lh.util.CleaningScheduleRuleUtil;
 import com.zlt.aps.lh.util.LhMouldCodeUtil;
+import com.zlt.aps.lh.util.DeviceStopMachineResolver;
+import com.zlt.aps.lh.engine.strategy.support.DeviceStopMachineSource;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.MachineCleaningOverlapUtil;
+import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
-import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
@@ -103,11 +105,13 @@ public class LhCleaningPlanResolver {
         Map<String, Integer> dryIceAfternoonCountMap = new HashMap<>(16);
         Map<String, Integer> sandBlastDailyCountMap = new HashMap<>(16);
         for (MdmDevicePlanShut sourcePlan : cleaningPlanList) {
-            MdmDevicePlanShut cleaningPlan = this.resolveRuntimeCleaningPlan(context, sourcePlan);
+            DeviceStopMachineSource identity = DeviceStopMachineResolver.resolve(context, sourcePlan);
+            MdmDevicePlanShut cleaningPlan = this.resolveRuntimeCleaningPlan(context, sourcePlan, identity);
             if (cleaningPlan == null) {
                 continue;
             }
-            boolean followsOccupation = !StringUtils.equals(sourcePlan.getMachineCode(), cleaningPlan.getMachineCode())
+            boolean followsOccupation = identity.getSourceSide() == null
+                    && !StringUtils.equals(sourcePlan.getMachineCode(), cleaningPlan.getMachineCode())
                     && StringUtils.isBlank(sourcePlan.getInMachineMouldCode());
             // 调用设备停机清洗专用调度：沿用计划自然日和既有候选顺序，不提前分配未来候选。
             MachineCleaningWindowDTO cleaningWindow = this.scheduleDeviceStopCleaningWindow(context, cleaningPlan,
@@ -507,38 +511,48 @@ public class LhCleaningPlanResolver {
     }
 
     /**
-     * 将物理整机来源映射到已加载的主运行侧，来源主键与原始计划时刻保持不变。
-     * 配对侧由原共享事件入口派生，不能重复消耗清洗名额或回填同一来源。
+     * 按公共来源身份挂载清洗机台，保留来源侧别、原始模具和计划主键。
+     * 整机映射单控主侧时仍先校验整组原模，配对侧及名额沿用现有处理。
      *
      * @param context 已加载的机台主数据
      * @param source 原始设备清洗计划
-     * @return 运行侧副本；非拆分整机时复用原来源，整机模具校验失败时为空
+     * @param identity 已解析的来源与运行机台身份
+     * @return 运行机台副本；无需映射时复用原来源，整机模具校验失败时为空
      */
-    private MdmDevicePlanShut resolveRuntimeCleaningPlan(LhScheduleContext context, MdmDevicePlanShut source) {
-        String physical = source.getMachineCode();
-        if (StringUtils.isBlank(physical) || context.getMachineInfoMap().containsKey(physical)
-                || !context.getMachineInfoMap().containsKey(physical + "L")
-                || !context.getMachineInfoMap().containsKey(physical + "R")) {
+    private MdmDevicePlanShut resolveRuntimeCleaningPlan(LhScheduleContext context, MdmDevicePlanShut source,
+            DeviceStopMachineSource identity) {
+        if (source.getId() != null) {
+            context.getCleaningPlanRuntimeState().getMachineSourceMap().putIfAbsent(source.getId(), identity);
+        }
+        if (StringUtils.equals(source.getMachineCode(), identity.getRuntimeMachineCode())) {
             return source;
         }
         MdmDevicePlanShut runtime = com.zlt.aps.lh.engine.strategy.support.RepairPlanRuntimeState.copySource(source);
-        runtime.setMachineCode(physical + "L");
-        if (context.getScheduleConfig() != null && context.getScheduleConfig().isCleaningOnlineMouldCheckEnabled()
+        runtime.setMachineCode(identity.getRuntimeMachineCode());
+        if (identity.getSourceSide() == null && context.getScheduleConfig() != null
+                && context.getScheduleConfig().isCleaningOnlineMouldCheckEnabled()
                 && StringUtils.isNotBlank(source.getInMachineMouldCode())) {
-            String leftMoulds = LhMouldCodeUtil.resolveInMachineMouldCode(context, physical + "L");
-            String rightMoulds = LhMouldCodeUtil.resolveInMachineMouldCode(context, physical + "R");
+            String leftMoulds = LhMouldCodeUtil.resolveInMachineMouldCode(context,
+                    LhSingleControlMachineUtil.resolveLeftMachineCode(identity.getPhysicalMachineCode()));
+            String rightMoulds = LhMouldCodeUtil.resolveInMachineMouldCode(context,
+                    LhSingleControlMachineUtil.resolveRightMachineCode(identity.getPhysicalMachineCode()));
             String actualMoulds = StringUtils.join(new String[] {leftMoulds, rightMoulds}, ",");
             if (StringUtils.isBlank(leftMoulds) || StringUtils.isBlank(rightMoulds)
                     || !LhMouldCodeUtil.isSameMouldCodeSet(actualMoulds, source.getInMachineMouldCode())) {
                 this.recordSkip(context, source,
                         this.getDeviceStopPlanScheduleService().resolveCleaningType(source), "整机在机模具集合不匹配");
                 log.info("整机清洗模具校验未通过, 来源: {}, 物理机台: {}, 实际模具: {}, 计划模具: {}",
-                        source.getId(), physical, actualMoulds, source.getInMachineMouldCode());
+                        source.getId(), identity.getPhysicalMachineCode(), actualMoulds, source.getInMachineMouldCode());
                 return null;
             }
             // 整机集合已完整校验，运行侧继续使用本侧集合，不能让一侧匹配替代整机匹配。
             runtime.setInMachineMouldCode(leftMoulds);
         }
+        log.info("清洗来源机台识别, 工厂: {}, 批次: {}, 来源ID: {}, 来源机台: {}, 物理机台: {}, "
+                        + "运行机台: {}, 来源侧别: {}, 指定模具: {}",
+                context.getFactoryCode(), context.getBatchNo(), identity.getSourcePlanId(),
+                identity.getSourceMachineCode(), identity.getPhysicalMachineCode(), identity.getRuntimeMachineCode(),
+                identity.getSourceSide(), identity.getSourceMouldCodes());
         return runtime;
     }
     /**
@@ -616,7 +630,11 @@ public class LhCleaningPlanResolver {
         }
         String actualMouldCode = LhMouldCodeUtil.resolveInMachineMouldCode(
                 context, cleaningPlan.getMachineCode());
-        boolean matched = LhMouldCodeUtil.isSameMouldCodeSet(actualMouldCode, plannedMouldCode);
+        DeviceStopMachineSource identity = DeviceStopMachineResolver.resolve(context, cleaningPlan);
+        // 侧来源归属整机后仍校验指定的单副原模，不能与整机两副模具直接比较相等。
+        boolean matched = identity.isSideMappedToPhysical()
+                ? identity.matchesMoulds(LhMouldCodeUtil.splitMouldCode(actualMouldCode))
+                : LhMouldCodeUtil.isSameMouldCodeSet(actualMouldCode, plannedMouldCode);
         if (!matched) {
             String skipReason = this.resolveCleaningPlanMouldSkipReason(actualMouldCode);
             log.info("跳过清洗计划：当前在机模具与清洗计划维护的 IN_MACHINE_MOULD_CODE 不一致, "
@@ -878,7 +896,7 @@ public class LhCleaningPlanResolver {
     }
     /**
      * 因 SKU 收尾未安排清洗时，收集收尾日期回填项。
-     * <p>收尾日期 = 候选清洗开始时间所在自然日 + 剩余排产天数 N（N = 月计划余量 / 日硫化量 向上取整），
+     * <p>收尾日期 = 候选清洗开始时间所在自然日 + 剩余排产天数 N（N = 真实硫化余量 / SKU日标准产量向上取整），
      * 与 {@link #isMachineEndingWithinThreeDays} 的 3 天收尾判断同一口径。
      * isMachineEndingWithinThreeDays 命中时 N 必为 [0,3]，故无需额外兜底。</p>
      *
@@ -923,7 +941,18 @@ public class LhCleaningPlanResolver {
             return false;
         }
         int remainingDays = this.resolveEndingRemainingDays(context, machineMaterial, productStatus);
-        return remainingDays >= 0 && remainingDays <= CLEANING_SKIP_ENDING_DAYS;
+        boolean endingWithinThreeDays = remainingDays >= 0 && remainingDays <= CLEANING_SKIP_ENDING_DAYS;
+        String normalizedStatus = this.normalizeProductStatus(productStatus);
+        String materialStatusKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                machineMaterial, normalizedStatus);
+        log.info("清洗初始化收尾判断, 工厂: {}, 批次: {}, 机台: {}, 物料: {}, 状态: {}, 清洗开始: {}, "
+                        + "真实硫化余量: {}, 日标准产量: {}, 剩余天数: {}, 三天内收尾: {}",
+                context.getFactoryCode(), context.getBatchNo(), machineCode, machineMaterial,
+                normalizedStatus, LhScheduleTimeUtil.formatDateTime(cleanStartTime),
+                context.getCleaningInitialSurplusQtyMap().get(materialStatusKey),
+                ShiftCapacityResolverUtil.resolveDailyStandardQty(context, machineMaterial), remainingDays,
+                endingWithinThreeDays);
+        return endingWithinThreeDays;
     }
     /**
      * 取得设备停机计划服务。
@@ -1112,15 +1141,13 @@ public class LhCleaningPlanResolver {
     }
     /**
      * 计算机台当前在机物料的剩余排产天数。
-     * <p>按 月计划余量 / 日硫化量 向上取整，与收尾判定策略规则2口径一致。</p>
-     * <p>余量取值：优先使用 differenceQty（月计划定稿中"差异量/未排产数量"），
-     * 该字段由月计划流程写入，与 ScheduleAdjustHandler 中 surplusQty = monthPlanQty - finishedQty
-     * 语义等价；differenceQty 缺失时回退到 totalQty 作为保守估计。</p>
+     * <p>复用基础数据阶段冻结的公共硫化余量和SKU日标准产量，向上取整得到剩余天数。
+     * 正式窗口与延期窗口读取同一批输入，已确认非正余量为零天，缺少余量依据时返回无法判断。</p>
      *
      * @param context      排程上下文
      * @param materialCode 物料编码
      * @param productStatus 产品状态；空状态按正规 S 处理
-     * @return 剩余排产天数；-1 表示无法判定（无月计划/日产能为0等）
+     * @return 剩余排产天数；-1 表示缺少余量依据或正余量缺少日标准产量
      * @author APS
      * @since 2026-05-09
      */
@@ -1128,36 +1155,16 @@ public class LhCleaningPlanResolver {
         if (context == null || StringUtils.isEmpty(materialCode)) {
             return -1;
         }
-        List<FactoryMonthPlanProductionFinalResult> monthPlanList = context.getMonthPlanList();
-        if (CollectionUtils.isEmpty(monthPlanList)) {
-            return -1;
-        }
         String materialStatusKey = MonthPlanDateResolver.buildMaterialStatusKey(
                 materialCode, this.normalizeProductStatus(productStatus));
-        FactoryMonthPlanProductionFinalResult matchedPlan = null;
-        for (FactoryMonthPlanProductionFinalResult plan : monthPlanList) {
-            if (plan != null && StringUtils.equals(materialStatusKey,
-                    MonthPlanDateResolver.buildMaterialStatusKey(
-                            plan.getMaterialCode(), this.normalizeProductStatus(plan.getProductStatus())))) {
-                matchedPlan = plan;
-                break;
-            }
-        }
-        if (matchedPlan == null) {
+        Integer remainingQty = context.getCleaningInitialSurplusQtyMap().get(materialStatusKey);
+        if (remainingQty == null) {
             return -1;
-        }
-        // 余量优先使用 differenceQty（未排产数量），与 ScheduleAdjustHandler 中 surplusQty 语义等价；
-        // differenceQty 缺失时回退到 totalQty 作为保守估计
-        int remainingQty = matchedPlan.getDifferenceQty() != null
-                ? matchedPlan.getDifferenceQty() : 0;
-        if (remainingQty <= 0 && matchedPlan.getTotalQty() != null) {
-            remainingQty = Math.max(matchedPlan.getTotalQty(), 0);
         }
         if (remainingQty <= 0) {
             return 0;
         }
-        int dailyCapacity = matchedPlan.getDayVulcanizationQty() != null
-                ? matchedPlan.getDayVulcanizationQty() : 0;
+        int dailyCapacity = ShiftCapacityResolverUtil.resolveDailyStandardQty(context, materialCode);
         if (dailyCapacity <= 0) {
             return -1;
         }

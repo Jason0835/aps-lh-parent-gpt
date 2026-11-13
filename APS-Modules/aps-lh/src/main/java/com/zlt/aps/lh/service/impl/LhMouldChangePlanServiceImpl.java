@@ -31,6 +31,7 @@ import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.mapper.*;
 import com.zlt.aps.lh.service.ILhMouldChangePlanService;
 import com.zlt.aps.lh.service.ILhParamsService;
+import com.zlt.aps.lh.service.ILhScheduleResultService;
 import com.zlt.aps.lh.util.LhMouldCodeUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
@@ -56,6 +57,7 @@ import java.text.MessageFormat;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * 模具交替计划Service实现
@@ -172,6 +174,9 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
 
     @Autowired
     private ILhParamsService lhParamsService;
+
+    @Autowired
+    private ILhScheduleResultService lhScheduleResultService;
 
     @Autowired
     private LhMachineInfoEntityMapper lhMachineInfoEntityMapper;
@@ -940,6 +945,8 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
                         LinkedHashMap::new, Collectors.groupingBy(plan -> plan.getScheduleDate() == null
                                         ? "" : DateUtil.formatDate(plan.getScheduleDate()),
                                 LinkedHashMap::new, Collectors.toList())));
+        Map<LhMouldChangePlan, Map<String, List<LhMachineOnlineInfo>>> onlineMaps = new IdentityHashMap<>();
+        Map<LhMouldChangePlan, Map<String, List<LhSharedMouldPat>>> sharedMaps = new IdentityHashMap<>();
         for (Map.Entry<String, Map<String, List<LhMouldChangePlan>>> factoryEntry : factorySchedulePlanMap.entrySet()) {
             String currentFactoryCode = factoryEntry.getKey();
             for (List<LhMouldChangePlan> currentPlanList : factoryEntry.getValue().values()) {
@@ -949,44 +956,91 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
                         this.buildOnlineInfoMap(currentPlanList, currentFactoryCode, currentScheduleDate);
                 Map<String, List<LhSharedMouldPat>> sharedMouldPatMap =
                         this.buildSharedMouldPatMap(currentPlanList, currentFactoryCode);
-                for (LhMouldChangePlan plan : currentPlanList) {
-                    String changeMouldType = plan.getChangeMouldType();
-                    if (MouldChangeTypeEnum.containsCode(changeMouldType,
-                            MouldChangeTypeEnum.TYPE_BLOCK.getCode())) {
-                        // 命中在机同步时以同步模具号为准；单控机台仍只匹配本侧，不与配对侧拼接。
-                        String matchedMouldCode = this.resolveSingleSideOnlineMouldCode(plan, onlineInfoMap);
-                        String normalizedMatchedMouldCode = LhMouldCodeUtil.joinMouldCode(
-                                LhMouldCodeUtil.splitMouldCode(matchedMouldCode));
-                        if (StringUtils.isNotBlank(normalizedMatchedMouldCode)) {
-                            plan.setMouldCode(normalizedMatchedMouldCode);
-                        } else {
-                            // 无有效同步数据时保留原模具号兜底，并沿用原组套格式归一化规则。
-                            plan.setMouldCode(this.mergeMouldCode(plan.getMouldCode(), "", changeMouldType));
-                            log.warn("换活字块计划未匹配到有效在机模具号，保留原模具号兜底，工厂：{}，排程日期：{}，批次：{}，机台：{}",
-                                    plan.getFactoryCode(), plan.getScheduleDate(), plan.getLhResultBatchNo(),
-                                    plan.getLhMachineCode());
-                        }
-                    } else if (MouldChangeTypeEnum.containsCode(changeMouldType,
-                            MouldChangeTypeEnum.REGULAR.getCode())) {
-                        plan.setMouldCode(this.resolveRegularMouldCode(plan, onlineInfoMap, sharedMouldPatMap));
-                    } else if (MouldChangeTypeEnum.containsCode(changeMouldType,
-                            MouldChangeTypeEnum.SAND_BLAST.getCode())
-                            || MouldChangeTypeEnum.containsCode(changeMouldType,
-                            MouldChangeTypeEnum.DRY_ICE.getCode())) {
-                        // 喷砂、干冰属于清洗计划，按业务口径不保存模具号。
-                        plan.setMouldCode("");
-                    } else {
-                        String matchedMouldCode = this.resolveSharedMouldCode(plan, sharedMouldPatMap);
-                        plan.setMouldCode(this.mergeMouldCode(plan.getMouldCode(), matchedMouldCode,
-                                changeMouldType));
-                    }
-                    String scheduleGroupKey = this.buildScheduleGroupKey(plan.getFactoryCode(), plan.getScheduleDate());
-                    plan.setRemark(this.buildMouldChangeRemark(plan,
-                            previousPlanMap.getOrDefault(scheduleGroupKey, Collections.emptyMap())));
-                }
+                currentPlanList.forEach(plan -> {
+                    onlineMaps.put(plan, onlineInfoMap);
+                    sharedMaps.put(plan, sharedMouldPatMap);
+                });
             }
         }
+        // 不改变输入列表顺序，按计划时间确定各批次的模具分配优先级。
+        Comparator<String> textOrder = Comparator.nullsLast(Comparator.naturalOrder());
+        Comparator<LhMouldChangePlan> planOrder = Comparator
+                .comparing(LhMouldChangePlan::getPlanDate, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(LhMouldChangePlan::getLhMachineCode, textOrder)
+                .thenComparing(LhMouldChangePlan::getBeforeMaterialCode, textOrder)
+                .thenComparing(LhMouldChangePlan::getAfterMaterialCode, textOrder)
+                .thenComparing(LhMouldChangePlan::getLeftRightMould, textOrder)
+                .thenComparing(LhMouldChangePlan::getId, Comparator.nullsLast(Comparator.naturalOrder()));
+        Map<List<String>, Set<String>> selectedMoulds = new HashMap<>();
+        Map<List<String>, Set<String>> selectedPatterns = new HashMap<>();
+        for (LhMouldChangePlan plan : mouldResolutionPlanList.stream().sorted(planOrder).collect(Collectors.toList())) {
+            Map<String, List<LhMachineOnlineInfo>> onlineInfoMap = onlineMaps.get(plan);
+            Map<String, List<LhSharedMouldPat>> sharedMouldPatMap = sharedMaps.get(plan);
+            String changeMouldType = plan.getChangeMouldType();
+            if (MouldChangeTypeEnum.containsCode(changeMouldType,
+                    MouldChangeTypeEnum.TYPE_BLOCK.getCode())) {
+                // 命中在机同步时以同步模具号为准；单控机台仍只匹配本侧，不与配对侧拼接。
+                String matchedMouldCode = this.resolveSingleSideOnlineMouldCode(plan, onlineInfoMap);
+                String normalizedMatchedMouldCode = LhMouldCodeUtil.joinMouldCode(
+                        LhMouldCodeUtil.splitMouldCode(matchedMouldCode));
+                if (StringUtils.isNotBlank(normalizedMatchedMouldCode)) {
+                    plan.setMouldCode(normalizedMatchedMouldCode);
+                } else {
+                    // 无有效同步数据时保留原模具号兜底，并沿用原组套格式归一化规则。
+                    plan.setMouldCode(this.mergeMouldCode(plan.getMouldCode(), "", changeMouldType));
+                    log.warn("换活字块计划未匹配到有效在机模具号，保留原模具号兜底，工厂：{}，排程日期：{}，批次：{}，机台：{}",
+                            plan.getFactoryCode(), plan.getScheduleDate(), plan.getLhResultBatchNo(),
+                            plan.getLhMachineCode());
+                }
+            } else if (MouldChangeTypeEnum.containsCode(changeMouldType,
+                    MouldChangeTypeEnum.REGULAR.getCode())) {
+                List<String> batchKey = Arrays.asList(plan.getFactoryCode(), plan.getLhResultBatchNo());
+                Set<String> usedMoulds = selectedMoulds.computeIfAbsent(batchKey, key -> new HashSet<>());
+                Set<String> usedPatterns = selectedPatterns.computeIfAbsent(batchKey, key -> new HashSet<>());
+                plan.setMouldCode(this.resolveRegularMouldCode(plan, onlineInfoMap, sharedMouldPatMap,
+                        usedMoulds, usedPatterns));
+            } else if (MouldChangeTypeEnum.containsCode(changeMouldType,
+                    MouldChangeTypeEnum.SAND_BLAST.getCode())
+                    || MouldChangeTypeEnum.containsCode(changeMouldType,
+                    MouldChangeTypeEnum.DRY_ICE.getCode())) {
+                // 喷砂、干冰属于清洗计划，按业务口径不保存模具号。
+                plan.setMouldCode("");
+            } else {
+                String matchedMouldCode = this.resolveSharedMouldCode(plan, sharedMouldPatMap);
+                plan.setMouldCode(this.mergeMouldCode(plan.getMouldCode(), matchedMouldCode,
+                        changeMouldType));
+            }
+            String scheduleGroupKey = this.buildScheduleGroupKey(plan.getFactoryCode(), plan.getScheduleDate());
+            plan.setRemark(this.buildMouldChangeRemark(plan,
+                    previousPlanMap.getOrDefault(scheduleGroupKey, Collections.emptyMap())));
+        }
         return planList;
+    }
+
+    /**
+     * 补齐已有实际模具计划的基础备注，并按完整项保留原业务说明。
+     * 基础备注先于业务追加说明展示，重复收口时同一项只保留一次。
+     *
+     * @param planList 已确定实际模具的交替计划列表
+     */
+    @Override
+    public void appendBaseRemarks(List<LhMouldChangePlan> planList) {
+        if (CollectionUtils.isEmpty(planList)) {
+            return;
+        }
+        Map<String, Map<String, List<LhMouldChangePlan>>> previousPlanMap = this.buildPreviousPlanMap(planList);
+        planList.stream().filter(Objects::nonNull).forEach(plan -> {
+            String scheduleGroupKey = this.buildScheduleGroupKey(plan.getFactoryCode(), plan.getScheduleDate());
+            String baseRemark = this.buildMouldChangeRemark(plan,
+                    previousPlanMap.getOrDefault(scheduleGroupKey, Collections.emptyMap()));
+            // 仅合并备注项，实际模具由已提交结果提供，避免重新执行模具分配。
+            String mergedRemark = Stream.of(baseRemark, plan.getRemark())
+                    .filter(StringUtils::isNotBlank)
+                    .flatMap(remark -> Arrays.stream(remark.split("；")))
+                    .filter(StringUtils::isNotBlank)
+                    .distinct().collect(Collectors.joining("；"));
+            plan.setRemark(mergedRemark);
+        });
     }
 
     /**
@@ -1321,11 +1375,14 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
      * @param plan              模具交替计划
      * @param onlineInfoMap     机台前缀到在机信息的映射
      * @param sharedMouldPatMap 后物料描述到共享模具配置的映射
+     * @param usedMoulds 本批次已经选择的模具号
+     * @param usedPatterns 本批次已经选择的非空花纹块
      * @return 排除在机模具后的随机模具号和花纹块，多个配置以换行分隔
      */
     private String resolveRegularMouldCode(LhMouldChangePlan plan,
                                            Map<String, List<LhMachineOnlineInfo>> onlineInfoMap,
-                                           Map<String, List<LhSharedMouldPat>> sharedMouldPatMap) {
+                                           Map<String, List<LhSharedMouldPat>> sharedMouldPatMap,
+                                           Set<String> usedMoulds, Set<String> usedPatterns) {
         List<LhSharedMouldPat> sharedMouldPatList = sharedMouldPatMap.get(plan.getAfterMaterialDesc());
         if (CollectionUtils.isEmpty(sharedMouldPatList)) {
             return "";
@@ -1337,6 +1394,9 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
                 .filter(Objects::nonNull)
                 .filter(sharedMouldPat -> StringUtils.isNotBlank(sharedMouldPat.getMouldNo()))
                 .filter(sharedMouldPat -> !inMachineMouldCodeSet.contains(sharedMouldPat.getMouldNo().trim()))
+                .filter(sharedMouldPat -> !usedMoulds.contains(sharedMouldPat.getMouldNo().trim()))
+                .filter(sharedMouldPat -> StringUtils.isBlank(sharedMouldPat.getPatternBlock())
+                        || !usedPatterns.contains(sharedMouldPat.getPatternBlock().trim()))
                 .sorted(Comparator.comparing((LhSharedMouldPat sharedMouldPat) ->
                                 sharedMouldPat.getMouldNo().trim())
                         .thenComparing(sharedMouldPat -> StringUtils.defaultIfBlank(
@@ -1353,11 +1413,24 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
 
         List<LhSharedMouldPat> candidateList = new ArrayList<>(mouldCandidateMap.values());
         Collections.shuffle(candidateList, new Random(this.resolveRegularMouldRandomSeed(plan)));
-        return candidateList.stream()
-                .limit(2)
-                .map(sharedMouldPat -> sharedMouldPat.getMouldNo().trim() + "/"
-                        + StringUtils.defaultIfBlank(sharedMouldPat.getPatternBlock(), ""))
-                .collect(Collectors.joining(",\n"));
+        List<String> selectedCodes = new ArrayList<>();
+        for (LhSharedMouldPat candidate : candidateList) {
+            String patternBlock = StringUtils.defaultString(candidate.getPatternBlock()).trim();
+            // 同一计划内也不能重复选择同一个非空花纹块。
+            if (StringUtils.isNotBlank(patternBlock) && usedPatterns.contains(patternBlock)) {
+                continue;
+            }
+            String mouldNo = candidate.getMouldNo().trim();
+            usedMoulds.add(mouldNo);
+            if (StringUtils.isNotBlank(patternBlock)) {
+                usedPatterns.add(patternBlock);
+            }
+            selectedCodes.add(mouldNo + "/" + StringUtils.defaultIfBlank(candidate.getPatternBlock(), ""));
+            if (selectedCodes.size() == 2) {
+                break;
+            }
+        }
+        return String.join(",\n", selectedCodes);
     }
 
     /**
@@ -1405,7 +1478,8 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
             return;
         }
 
-        this.baseDao.updateBatch(this.resolveMouldCode(planList));
+        List<LhMouldChangePlan> list = this.resolveMouldCode(planList);
+        this.baseDao.updateBatch(list);
     }
 
     /**
@@ -1687,6 +1761,8 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
         int insertNum = 0;
         int updateNum = 0;
         List<LhMouldChangePlan> importList = new ArrayList<>();
+        List<LhMouldChangePlan> updatedList = new ArrayList<>();
+        Set<Long> matchedIds = new LinkedHashSet<>();
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
         String uniqueMsg = I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.unique");
 
@@ -1834,7 +1910,7 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
                 docEntity.setAfterMaterialDesc(material.getMaterialDesc());
             }
 
-            if (checkUnique(docEntity).equals(UserConstants.UNIQUE)) {
+            if (this.checkUnique(docEntity).equals(UserConstants.UNIQUE)) {
                 docEntity.setRowState(RowStateEnum.ADDED);
                 if (StringUtil.isBlank(docEntity.getFactoryCode())) {
                     docEntity.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
@@ -1845,13 +1921,14 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
                 docEntity.setMouldStatus(ApsConstant.FALSE);
                 importList.add(docEntity);
             } else if (updateSupport) {
-                LhMouldChangePlan exist = lhMouldChangePlanMapper.selectOne(this.buildUniqueQueryWrapper(docEntity));
-                if (exist == null) {
+                List<LhMouldChangePlan> existList = lhMouldChangePlanMapper.selectList(this.buildUniqueQueryWrapper(docEntity));
+                if (CollectionUtils.isEmpty(existList) || existList.size() > 1) {
                     failureNum++;
                     ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorNum,
                             MessageFormat.format(uniqueMsg, errorNum), importErrorLogs);
                     continue;
                 }
+                LhMouldChangePlan exist = existList.get(0);
                 docEntity.setId(exist.getId());
                 docEntity.setOrderNo(exist.getOrderNo());
                 docEntity.setIsRelease(exist.getIsRelease());
@@ -1860,7 +1937,8 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
                 if (docEntity.getEndType() == null) {
                     docEntity.setEndType(exist.getEndType());
                 }
-                this.updateImportedMouldChangePlan(docEntity);
+                updatedList.add(docEntity);
+                matchedIds.add(exist.getId());
                 updateNum++;
             } else {
                 failureNum++;
@@ -1870,24 +1948,76 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
             }
         }
 
-        if (CollectionUtils.isEmpty(importList) && updateNum == 0) {
-            String message = StringUtils.format(I18nUtil.getMessage("ui.message.import.fail"), successNum, failureNum);
+        // 存在任一校验失败行或本次无有效导入数据时，直接返回失败，避免部分写入或将失败行误判为缺失记录删除。
+        if (failureNum > 0 || (CollectionUtils.isEmpty(importList) && CollectionUtils.isEmpty(updatedList))) {
+            String message = StringUtils.format(I18nUtil.getMessage("ui.message.import.fail"), 0, failureNum);
             return AjaxResult.error(message, importErrorLogs);
+        }
+
+        // 按成功导入行的工厂和排程日期去重，统一缺失记录逻辑删除与批次号回填范围。
+        Map<String, Set<Date>> importedDatesByFactory = new LinkedHashMap<>();
+        for (LhMouldChangePlan plan : importList) {
+            if (plan.getScheduleDate() != null && StringUtil.isNotBlank(plan.getFactoryCode())) {
+                importedDatesByFactory.computeIfAbsent(plan.getFactoryCode(), factoryKey -> new LinkedHashSet<>())
+                        .add(DateUtil.beginOfDay(plan.getScheduleDate()));
+            }
+        }
+        for (LhMouldChangePlan plan : updatedList) {
+            if (plan.getScheduleDate() != null && StringUtil.isNotBlank(plan.getFactoryCode())) {
+                importedDatesByFactory.computeIfAbsent(plan.getFactoryCode(), factoryKey -> new LinkedHashSet<>())
+                        .add(DateUtil.beginOfDay(plan.getScheduleDate()));
+            }
+        }
+
+        // 有导入数据时，在批量新增落库前先逻辑删除同工厂同排程日期下未出现在本次导入数据中的既有记录。
+        this.deleteMissingImportedMouldChangePlans(importedDatesByFactory, matchedIds);
+
+        for (LhMouldChangePlan plan : updatedList) {
+            this.updateImportedMouldChangePlan(plan);
         }
 
         if (CollectionUtils.isNotEmpty(importList)) {
             insertNum = baseDao.saveBatch(importList);
         }
-        successNum = insertNum + updateNum;
 
-        // 返回提示信息及错误集合
-        if (failureNum > 0) {
-            String message = StringUtils.format(I18nUtil.getMessage("ui.message.import.fail"), successNum, failureNum);
-            return AjaxResult.error(message, importErrorLogs);
-        } else {
-            String message = StringUtils.format(I18nUtil.getMessage("ui.message.import.success"), successNum);
-            return AjaxResult.success(message);
+        importedDatesByFactory.forEach((factoryCode, scheduleDates) -> scheduleDates.forEach(
+                scheduleDate -> lhScheduleResultService.fillMouldChangePlanFieldsAfterImport(factoryCode, scheduleDate)));
+
+        successNum = insertNum + updateNum;
+        String message = StringUtils.format(I18nUtil.getMessage("ui.message.import.success"), successNum);
+        return AjaxResult.success(message);
+    }
+
+    /**
+     * 逻辑删除同工厂、同排程日期下未出现在本次导入数据中的既有模具交替计划记录。
+     *
+     * <p>仅在存在有效导入数据且全量校验通过后、新增记录落库前调用；查询只写业务条件，
+     * 逻辑删除过滤及更新均交由框架处理。</p>
+     *
+     * @param importedDatesByFactory 本次导入涉及的分厂与排程日期集合
+     * @param matchedIds             本次导入匹配命中的既有模具交替计划主键集合
+     */
+    private void deleteMissingImportedMouldChangePlans(Map<String, Set<Date>> importedDatesByFactory,
+                                                       Set<Long> matchedIds) {
+        if (importedDatesByFactory == null || importedDatesByFactory.isEmpty()) {
+            return;
         }
+        importedDatesByFactory.forEach((factoryCode, scheduleDates) -> scheduleDates.forEach(scheduleDate -> {
+            List<Long> missingIds = lhMouldChangePlanMapper.selectList(
+                            new LambdaQueryWrapper<LhMouldChangePlan>()
+                                    .eq(LhMouldChangePlan::getFactoryCode, factoryCode)
+                                    .eq(LhMouldChangePlan::getScheduleDate, scheduleDate))
+                    .stream()
+                    .map(LhMouldChangePlan::getId)
+                    .filter(Objects::nonNull)
+                    .filter(existingId -> !matchedIds.contains(existingId))
+                    .collect(Collectors.toList());
+            if (CollectionUtils.isNotEmpty(missingIds)) {
+                lhMouldChangePlanMapper.deleteBatchIds(missingIds);
+                log.info("模具交替计划导入逻辑删除缺失记录: factoryCode={}, scheduleDate={}, deletedCount={}",
+                        factoryCode, DateUtil.formatDate(scheduleDate), missingIds.size());
+            }
+        }));
     }
 
     /**

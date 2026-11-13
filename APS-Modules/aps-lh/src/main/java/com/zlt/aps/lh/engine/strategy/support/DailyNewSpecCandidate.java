@@ -27,6 +27,10 @@ public class DailyNewSpecCandidate {
     private EarlyProductionRuntimePlan earlyProductionPreview;
     /** 本次准入实际消费或提前拉取的计划日期 */
     private LocalDate targetPlanDate;
+    /**
+     * 本次准入使用的不可变延期来源；竞争清理延期队列后仍供固定动作重放核验。
+     */
+    private DeferredScheduleTask deferredTask;
     /** 构建候选时读取的当前日实时日计划余额 */
     private int realtimeDayPlanRemainingQty;
     /** 当前业务日原始日计划量，禁止使用临时前移后的额度替代 */
@@ -116,6 +120,24 @@ public class DailyNewSpecCandidate {
 
     public void setTargetPlanDate(LocalDate targetPlanDate) {
         this.targetPlanDate = targetPlanDate;
+    }
+
+    /**
+     * 返回构建候选时的延期来源，不包含旧目标量或资源快照。
+     *
+     * @return 原延期任务，无延期来源时为空
+     */
+    public DeferredScheduleTask getDeferredTask() {
+        return deferredTask;
+    }
+
+    /**
+     * 保存本次候选的延期来源，供隔离重放重新核对日期及阶段。
+     *
+     * @param deferredTask 原不可变延期任务
+     */
+    public void setDeferredTask(DeferredScheduleTask deferredTask) {
+        this.deferredTask = deferredTask;
     }
 
     public int getRealtimeDayPlanRemainingQty() {

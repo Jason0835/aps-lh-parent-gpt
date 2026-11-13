@@ -639,6 +639,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         //    故在屏障同步之后计算；以胎胚维度合并硫化余量并按主销参与情况判定收尾。
         this.loadEmbryoEndingFlagMap(context);
 
+        // 清洗初始化单独冻结物料状态余量，供正式窗口及延期副本读取。
+        this.loadCleaningInitialSurplusQtyMap(context);
+
         // 5. 目标机台数统一Map预计算：依赖工作日历和月计划均已就绪，覆盖停产保机前N日、
         //    实际排程窗口、T+3增机及特殊材料窗口后两日判断；以物料+产品状态+自然日为完整维度，
         //    供续作降模、续作加机台、新增排产和特殊材料置换统一查询目标总机台数。
@@ -1459,9 +1462,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                         .in(LhMouldChangePlan::getChangeMouldType,
                                 MouldChangeTypeEnum.REGULAR.getCode(),
                                 MouldChangeTypeEnum.TYPE_BLOCK.getCode()));
-        // 空前料侧必须先与同动作另一侧归并，再交给资格、排序和释放索引，不能先过滤掉来源。
+        // 历史动作按工厂和前日有效记录识别，批次号为空或不同也须先归并互补侧，再建立资格与释放索引。
         context.setHistoricalReverseMouldChangePlanList(
-                LhMouldChangePlanNormalizer.normalize(
+                LhMouldChangePlanNormalizer.normalizeHistorical(
                         Objects.nonNull(list) ? list : new ArrayList<LhMouldChangePlan>(0)));
         log.info("反选历史模具交替计划加载完成, factoryCode: {}, scheduleTargetDate: {}, "
                         + "historicalScheduleDate: {}, 数量: {}",
@@ -1854,7 +1857,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         List<Date> allProductionDate = Lists.newArrayList(context.getAllProductionDateInfo());
         LhSkuSurplusDataInfo surplusDataInfo = lhSkuSurplusDataLoadHandler.loadData(factoryCode, allProductionDate);
         context.setLhSkuSurplusDataInfo(surplusDataInfo);
-        log.info("硫化余量计算需要数据加载完成....");
+        log.info("40天月计划硫化余量计算需要数据加载完成....");
     }
 
     /**
@@ -2616,6 +2619,25 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     }
 
     /**
+     * 为清洗初始化单独冻结物料及产品状态对应的真实硫化余量。
+     * 复用公共计算入口，覆盖缺少胎胚号的月计划，空状态按正规S处理。
+     * 同一身份只计算一次，正式窗口和延期副本均读取该批只读输入。
+     *
+     * @param context 已加载月计划、完成量和日计划调整等余量计算数据的上下文
+     */
+    private void loadCleaningInitialSurplusQtyMap(LhScheduleContext context) {
+        Map<String, Integer> surplusQtyMap = new LinkedHashMap<>();
+        for (FactoryMonthPlanProductionFinalResult plan : context.getMonthPlanList()) {
+            String productStatus = StringUtils.defaultIfBlank(StringUtils.trimToEmpty(plan.getProductStatus()),
+                    TrialStatusEnum.FORMAL.getCode());
+            String materialStatusKey = MonthPlanDateResolver.buildMaterialStatusKey(plan.getMaterialCode(), productStatus);
+            surplusQtyMap.computeIfAbsent(materialStatusKey,
+                    key -> scheduleAdjustHandler.calculatePlanSurplusQty(context, plan));
+        }
+        context.setCleaningInitialSurplusQtyMap(Collections.unmodifiableMap(surplusQtyMap));
+    }
+
+    /**
      * 加载胎胚收尾标识Map。
      * <p>以胎胚维度合并硫化余量（口径与排程阶段 {@link ScheduleAdjustHandler#calculatePlanSurplusQty} 一致），
      * 结合胎胚实时库存计算胎胚余量，按主销产品参与情况判定收尾标识：
@@ -2673,7 +2695,14 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 continue;
             }
             // 复用排程阶段余量计算口径，保证基础数据与排程判定一致
-            int surplusQty = scheduleAdjustHandler.calculatePlanSurplusQty(context, plan);
+            int rawSurplusQty = scheduleAdjustHandler.calculatePlanSurplusQty(context, plan);
+            // 胎胚维度合并时，单个物料超产形成的负余量不能抵减同胎胚其它物料的欠产余量，
+            // 否则会出现“一个物料超产、一个物料还欠，胎胚却被判收尾”的假收尾。
+            int surplusQty = Math.max(0, rawSurplusQty);
+            if (rawSurplusQty < 0) {
+                log.info("胎胚收尾余量合并: 物料负数按0, 胎胚={}, 物料={}, 原始余量={}",
+                        embryoCode, plan.getMaterialCode(), rawSurplusQty);
+            }
             embryoSurplusMap.merge(embryoCode, surplusQty, Integer::sum);
             // 任一主销参与合并即标记为含主销，否则保持默认false
             if (mainProductCodes.contains(plan.getMaterialCode())) {

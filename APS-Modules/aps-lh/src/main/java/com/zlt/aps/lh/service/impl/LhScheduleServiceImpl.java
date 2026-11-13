@@ -26,7 +26,6 @@ import com.zlt.aps.lh.api.domain.vo.LhScheduleResultTemplateImportVO;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
-import com.zlt.aps.lh.api.enums.FactoryCodeEnum;
 import com.zlt.aps.lh.api.enums.ReleaseStatusEnum;
 import com.zlt.aps.lh.api.enums.TrialStatusEnum;
 import com.zlt.aps.lh.component.LhScheduleConfigResolver;
@@ -221,12 +220,17 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         log.info("接收排程请求, 工厂: {}, 日期: {}, 月计划版本: {}, 生产版本: {}",
                 request.getFactoryCode(), LhScheduleTimeUtil.formatDate(request.getScheduleDate()),
                 request.getMonthPlanVersion(), request.getProductionVersion());
+        // 排程耗时统计起点：自服务接收请求起计时，覆盖上下文构建与引擎执行，换算为整秒写入响应
+        long startTime = System.currentTimeMillis();
         LhScheduleContext context = buildContext(request);
         try {
             LhScheduleResponseDTO response = scheduleExecutor.execute(context);
-            log.info("排程服务执行完成, 工厂: {}, 批次号: {}, 成功: {}, 排程结果数: {}, 未排产数: {}, 模具计划数: {}",
+            // 引擎执行完成即写入耗时，后续校验触发属非阻断后置动作，不纳入接口耗时口径
+            response.setCostSeconds(this.calculateCostSeconds(startTime));
+            log.info("排程服务执行完成, 工厂: {}, 批次号: {}, 成功: {}, 排程结果数: {}, 未排产数: {}, 模具计划数: {}, 耗时: {}秒",
                     context.getFactoryCode(), response.getBatchNo(), response.isSuccess(),
-                    response.getScheduleResultCount(), response.getUnscheduledCount(), response.getMouldChangePlanCount());
+                    response.getScheduleResultCount(), response.getUnscheduledCount(), response.getMouldChangePlanCount(),
+                    response.getCostSeconds());
             // 排程成功后同步触发结果合理性校验（幂等替换，最后一次即终态），异常不阻断排程返回
             // 校验键必须与排程结果落库日期一致：结果行按 scheduleTargetDate 写入，页面也按该日期查询
             if (response.isSuccess()) {
@@ -237,13 +241,39 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         } catch (ScheduleException e) {
             log.warn("排程请求被拒绝, 工厂: {}, 日期: {}, 原因: {}",
                     context.getFactoryCode(), LhScheduleTimeUtil.formatDate(context.getScheduleTargetDate()), e.getMessage());
-            return LhScheduleResponseDTO.fail(context.getBatchNo(), e.getMessage());
+            return this.buildFailResponse(context.getBatchNo(), e.getMessage(), startTime);
         } catch (Exception e) {
             log.error("排程服务入口异常, 工厂: {}, 日期: {}",
                     context.getFactoryCode(), LhScheduleTimeUtil.formatDate(context.getScheduleTargetDate()), e);
-            return LhScheduleResponseDTO.fail(context.getBatchNo(),
-                    I18nUtil.getMessage("ui.data.column.lhScheduleResult.scheduleExecuteError") + e.getMessage());
+            return this.buildFailResponse(context.getBatchNo(),
+                    I18nUtil.getMessage("ui.data.column.lhScheduleResult.scheduleExecuteError") + e.getMessage(), startTime);
         }
+    }
+
+    /**
+     * 构建失败响应并写入排程耗时。
+     *
+     * @param batchNo 批次号
+     * @param message 失败原因
+     * @param startTime 排程耗时统计起点时间戳（毫秒）
+     * @return 已写入耗时（单位：秒）的失败响应
+     */
+    private LhScheduleResponseDTO buildFailResponse(String batchNo, String message, long startTime) {
+        LhScheduleResponseDTO response = LhScheduleResponseDTO.fail(batchNo, message);
+        response.setCostSeconds(this.calculateCostSeconds(startTime));
+        return response;
+    }
+
+    /**
+     * 计算排程耗时并四舍五入到整秒。
+     *
+     * <p>毫秒差加 500 后整除 1000，实现半舍入到整数秒，避免截断导致耗时系统性偏小。</p>
+     *
+     * @param startTime 排程耗时统计起点时间戳（毫秒）
+     * @return 排程耗时（单位：秒，四舍五入到整数）
+     */
+    private long calculateCostSeconds(long startTime) {
+        return (System.currentTimeMillis() - startTime + 500) / 1000;
     }
 
     /**
@@ -854,16 +884,18 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         QueryWrapper<LhMouldChangePlan> wrapper = new QueryWrapper<>();
         lhMouldChangePlanController.builderCondition(wrapper, mouldChangePlan);
         List<LhMouldChangePlan> mouldChangePlanList = lhMouldChangePlanMapper.selectList(wrapper);
-        // 硫化日计划导出的换模计划页同样需要对比前日计划；使用副本调整日期，避免影响当前计划的导出条件和标题。
+        // 硫化日计划导出的换模计划页同样需要对比前日计划。
         Set<String> previousDayPlanKeySet = null;
+        Map<String, List<Date>> previousPlanDateMap = Collections.emptyMap();
         Date scheduleDate = mouldChangePlan.getScheduleDate();
         if (scheduleDate != null) {
-            LhMouldChangePlan previousDayQuery = BeanCopyUtils.copyBean(mouldChangePlan, LhMouldChangePlan.class);
-            previousDayQuery.setScheduleDate(DateUtil.offsetDay(scheduleDate, -1));
-            QueryWrapper<LhMouldChangePlan> previousDayWrapper = new QueryWrapper<>();
-            lhMouldChangePlanController.builderCondition(previousDayWrapper, previousDayQuery);
+            // 前日比较仅使用分厂和排程日期，保留调整前的计划记录。
+            LambdaQueryWrapper<LhMouldChangePlan> previousDayWrapper = new LambdaQueryWrapper<>();
+            previousDayWrapper.eq(LhMouldChangePlan::getFactoryCode, mouldChangePlan.getFactoryCode())
+                    .eq(LhMouldChangePlan::getScheduleDate, DateUtil.offsetDay(scheduleDate, -1));
             List<LhMouldChangePlan> previousDayPlanList = lhMouldChangePlanMapper.selectList(previousDayWrapper);
             previousDayPlanKeySet = lhMouldChangePlanController.buildMouldChangePlanKeySet(previousDayPlanList);
+            previousPlanDateMap = lhMouldChangePlanController.buildPreviousPlanDateMap(previousDayPlanList);
         }
 
         // 节点4：模板第 7 行为 {.xxx} 明细模板行，writeMultiList 会从该行开始复制填充。
@@ -887,7 +919,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         lhMouldChangePlanController.setExportTitleFieldName(mouldChangePlanTableMap);
         List<List<Map<String, Object>>> mouldChangePlanExcelDataList = new ArrayList<>();
         mouldChangePlanExcelDataList.add(lhMouldChangePlanController.buildExportDataList(
-                mouldChangePlanExportList, mouldChangePlan, previousDayPlanKeySet));
+                mouldChangePlanExportList, mouldChangePlan, previousDayPlanKeySet, previousPlanDateMap));
 
         inputStream = new ByteArrayInputStream(exportBytes);
         exportBytes = ExcelUtils.writeMultiList(inputStream, 1, mouldChangePlanTableMap, mouldChangePlanExcelDataList);
@@ -1613,6 +1645,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             row.setFactoryCode(factoryCode);
             row.setScheduleDate(scheduleDate);
             row.setLeftRightMould(this.resolveImportLeftRightMould(row));
+            // 模板导入阶段先将 Excel 传入的单班硫化量置空，统一由系统按 SKU 硫化产能主数据及单双模机台口径回填
+            row.setSingleMouldShiftQty(null);
             List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(id, rowNum, row);
             if (PubUtil.isNotEmpty(validated)) {
                 failureNum++;
@@ -1758,24 +1792,64 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             });
         }
 
+        // 导入空班次视为 0：updateById 默认忽略 null，需先补 0 才能覆盖库中旧值
+        updateList.forEach(this::fillNullClassPlanQtyWithZero);
         updateList.forEach(scheduleResultMapper::updateById);
         if (CollUtil.isNotEmpty(newList)) {
             this.baseDao.saveBatch(newList);
         }
-        existingList.stream()
+        List<?> zeroPlanIds = existingList.stream()
                 .filter(item -> !matchedIds.contains(item.getId()))
                 .filter(this::hasPositiveStoredLhPlan)
-                .forEach(item -> {
-                    LhScheduleResult zeroPlan = new LhScheduleResult();
-                    zeroPlan.setId(item.getId());
-                    zeroPlan.setDailyPlanQty(0);
-                    zeroPlan.setIsRelease(ReleaseStatusEnum.NOT_RELEASED.getCode());
-                    IntStream.rangeClosed(1, LhScheduleConstant.MAX_SHIFT_SLOT_COUNT)
-                            .forEach(index -> zeroPlan.setFieldValueByFieldName(
-                                    String.format("class%dPlanQty", index), 0));
-                    scheduleResultMapper.updateById(zeroPlan);
-                });
+                .map(LhScheduleResult::getId)
+                .collect(Collectors.toList());
+        if (CollUtil.isNotEmpty(zeroPlanIds)) {
+            scheduleResultMapper.update(null, new LambdaUpdateWrapper<LhScheduleResult>()
+                    .in(LhScheduleResult::getId, zeroPlanIds)
+                    .set(LhScheduleResult::getDailyPlanQty, 0)
+                    .set(LhScheduleResult::getIsRelease, ReleaseStatusEnum.NOT_RELEASED.getCode())
+                    .set(LhScheduleResult::getClass1PlanQty, 0)
+                    .set(LhScheduleResult::getClass2PlanQty, 0)
+                    .set(LhScheduleResult::getClass3PlanQty, 0)
+                    .set(LhScheduleResult::getClass4PlanQty, 0)
+                    .set(LhScheduleResult::getClass5PlanQty, 0)
+                    .set(LhScheduleResult::getClass6PlanQty, 0)
+                    .set(LhScheduleResult::getClass7PlanQty, 0)
+                    .set(LhScheduleResult::getClass8PlanQty, 0));
+        }
         return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
+    }
+
+    /**
+     * 将导入行中为空的 1~8 班计划量补为 0，保证 updateById 能覆盖库中旧值。
+     *
+     * @param row 排程结果
+     */
+    private void fillNullClassPlanQtyWithZero(LhScheduleResult row) {
+        if (row.getClass1PlanQty() == null) {
+            row.setClass1PlanQty(0);
+        }
+        if (row.getClass2PlanQty() == null) {
+            row.setClass2PlanQty(0);
+        }
+        if (row.getClass3PlanQty() == null) {
+            row.setClass3PlanQty(0);
+        }
+        if (row.getClass4PlanQty() == null) {
+            row.setClass4PlanQty(0);
+        }
+        if (row.getClass5PlanQty() == null) {
+            row.setClass5PlanQty(0);
+        }
+        if (row.getClass6PlanQty() == null) {
+            row.setClass6PlanQty(0);
+        }
+        if (row.getClass7PlanQty() == null) {
+            row.setClass7PlanQty(0);
+        }
+        if (row.getClass8PlanQty() == null) {
+            row.setClass8PlanQty(0);
+        }
     }
 
     private boolean hasImportPlanValue(LhScheduleResultTemplateImportVO row) {
@@ -2587,7 +2661,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         target.setSpecDesc(source.getSpecDesc());
         target.setLhTime(source.getLhTime());
         target.setMouldSurplusQty(source.getMouldSurplusQty());
-        target.setSingleMouldShiftQty(source.getSingleMouldShiftQty());
+        // 忽略 Excel N 列静态硫化班产，显式置空后交由 fillScheduleResultFields 统一按系统主数据回填
+        target.setSingleMouldShiftQty(null);
         target.setDailyPlanQty(source.getDailyPlanQty());
         target.setTotalDailyPlanQty(source.getDailyPlanQty());
         target.setRemark(source.getRemark());
@@ -2709,11 +2784,23 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         if (StringUtils.isBlank(monthDay)) {
             return null;
         }
-        Date parsed = DateUtil.parse(DateUtil.year(scheduleDate) + "/" + monthDay.trim(), "yyyy/MM/dd");
-        while (parsed.after(DateUtil.beginOfDay(scheduleDate))) {
-            parsed = DateUtil.offsetYear(parsed, -1);
+        Date reference = DateUtil.beginOfDay(scheduleDate);
+        Date parsed = DateUtil.parse(DateUtil.year(reference) + "/" + monthDay.trim(), "yyyy/MM/dd");
+        // 班次标题只有“MM/dd”，年份需按排程窗口归属：窗口为排程日期前 1 天至后 1 天，
+        // 取与排程日期最接近的年份即可同时覆盖跨年（12/31、01/01）。
+        // 不能因为日期晚于排程日期就整体减一年，否则窗口内第三天（如排程日期次日）的
+        // 班次时间会被算到上一年，导入后 class6~class8 的时间出现去年的年份。
+        Date nearestDate = DateUtil.beginOfDay(parsed);
+        long nearestDiff = Math.abs(nearestDate.getTime() - reference.getTime());
+        for (int yearOffset : new int[]{-1, 1}) {
+            Date candidate = DateUtil.beginOfDay(DateUtil.offsetYear(parsed, yearOffset));
+            long diff = Math.abs(candidate.getTime() - reference.getTime());
+            if (diff < nearestDiff) {
+                nearestDate = candidate;
+                nearestDiff = diff;
+            }
         }
-        return DateUtil.beginOfDay(parsed);
+        return nearestDate;
     }
 
     private Date[] resolveShiftRange(int shift, Date shiftDate) {
@@ -2988,8 +3075,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
     /**
      * 按导出顺序排序排程结果。
-     * <p>先按硫化机台升序（忽略大小写），再按同机台物料首次有计划量的实际开始时间升序，
-     * 最后按首次计划班次和物料编码升序。导出明细顺序与班次顺序值保持一致。</p>
+     * <p>先按物理硫化机台升序（去除单控L/R后缀、忽略大小写），再按同物理机台下物料首次有计划量的实际开始时间升序，
+     * 接着按首次计划班次、原始硫化机台编码（保留L/R）和物料编码升序。导出明细仍展示带L/R的原始机台编码。</p>
      *
      * @param list 排程结果列表
      * @return 排序后的列表
@@ -2997,9 +3084,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     private List<LhScheduleResult> sortExportList(List<LhScheduleResult> list) {
         return list.stream()
                 .sorted(Comparator
-                        .comparing((LhScheduleResult r) -> StringUtils.defaultString(r.getLhMachineCode()), String.CASE_INSENSITIVE_ORDER)
+                        .comparing((LhScheduleResult r) -> StringUtils.defaultString(this.normalizePhysicalMachineCode(r.getLhMachineCode())), String.CASE_INSENSITIVE_ORDER)
                         .thenComparing(this::findFirstPlannedStartTime, Comparator.nullsLast(Date::compareTo))
                         .thenComparingInt(this::findFirstPlannedShift)
+                        .thenComparing(r -> StringUtils.defaultString(r.getLhMachineCode()), String.CASE_INSENSITIVE_ORDER)
                         .thenComparing(r -> StringUtils.defaultString(r.getMaterialCode())))
                 .collect(Collectors.toList());
     }

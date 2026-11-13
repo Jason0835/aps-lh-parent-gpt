@@ -381,8 +381,13 @@ public class NewSpecResultSubstitutionCoordinator {
 
     /**
      * 撤销被置换新增绑定的全部结果贡献并返回机台重新具备切换条件的时间。
+     *
+     * @param context 资源与数量上下文
+     * @param dayContext 当前业务日
+     * @param binding 可整体撤销的绑定
+     * @return 原换模开始时间，无法撤销时为空
      */
-    private Date removeVictimBindingResult(
+    Date removeVictimBindingResult(
             LhScheduleContext context,
             DayScheduleContext dayContext,
             ActiveMachineBinding binding) {
@@ -596,6 +601,12 @@ public class NewSpecResultSubstitutionCoordinator {
         }
     }
 
+    /**
+     * 清理被撤销结果的关联引用，包括逐班续排重复登记的机台占用。
+     *
+     * @param context 结果及资源上下文
+     * @param result 本次完整撤销的结果对象
+     */
     private void removeResultReferences(
             LhScheduleContext context,
             LhScheduleResult result) {
@@ -614,7 +625,8 @@ public class NewSpecResultSubstitutionCoordinator {
         List<LhScheduleResult> assignmentList = context.getMachineAssignmentMap()
                 .get(result.getLhMachineCode());
         if (Objects.nonNull(assignmentList)) {
-            assignmentList.remove(result);
+            // 同一绑定逐班续排会重复登记同一个结果，撤销时必须清除全部身份引用。
+            assignmentList.removeIf(assigned -> assigned == result);
             if (CollectionUtils.isEmpty(assignmentList)) {
                 context.getMachineAssignmentMap().remove(result.getLhMachineCode());
             }
@@ -762,14 +774,14 @@ public class NewSpecResultSubstitutionCoordinator {
     }
 
     /**
-     * 将机台运行态恢复到被置换新增结果接管之前，续作结果本身保持只读。
+     * 按已撤销结果之前的真实前料恢复机台选料状态。
      *
      * @param context 排程上下文
-     * @param victimBinding 被撤销新增绑定
-     * @param targetSku 当日未上机目标 SKU
-     * @param switchReadyTime 本次允许切换的开始时间
+     * @param victimBinding 已撤销的绑定
+     * @param targetSku 接管候选
+     * @param switchReadyTime 原准备开始时间
      */
-    private void restoreMachineStateBeforeVictim(
+    void restoreMachineStateBeforeVictim(
             LhScheduleContext context,
             ActiveMachineBinding victimBinding,
             SkuScheduleDTO targetSku,

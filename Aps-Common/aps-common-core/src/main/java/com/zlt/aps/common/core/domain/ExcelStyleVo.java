@@ -39,6 +39,11 @@ public class ExcelStyleVo {
 
     private Short color;
 
+    /**
+     * 字体颜色，使用Apache POI索引颜色值表示。
+     */
+    private Short fontColor;
+
     private RgbColor rgbColor;
 
 

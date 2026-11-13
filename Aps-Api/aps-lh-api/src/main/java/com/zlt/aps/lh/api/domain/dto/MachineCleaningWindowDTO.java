@@ -97,6 +97,16 @@ public class MachineCleaningWindowDTO implements Serializable {
     /** 已确认模具离机清洗，不再占用原机台或承接原机台喷砂首检。 */
     private boolean offMachineCleaning;
 
+    /**
+     * 旧装机独立喷砂开始时缺少足量空闲替换模具，需按现有需求登记原机原模恢复。
+     */
+    private boolean idleSandBlastRecoveryRequired;
+
+    /**
+     * 待次日原机同料置换的完整备用模具组，随来源快照保留，正式结果提交后解除预留。
+     */
+    private String deferredReplacementMouldCode;
+
     /** 清洗备注 */
     private String remark;
 }

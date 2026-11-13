@@ -23,12 +23,14 @@ import com.zlt.aps.lh.util.FirstInspectionQtyUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.MachineStatusUtil;
+import com.zlt.aps.lh.util.ResultDowntimeSummaryUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.maindata.mapper.FactoryParamMapper;
 import com.zlt.aps.maindata.mapper.LhMachineInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
 import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mdm.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.aps.mp.api.domain.entity.FactoryParam;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialConsumeDetail;
 import lombok.extern.slf4j.Slf4j;
@@ -71,7 +73,7 @@ import java.util.stream.Collectors;
  * <p>列表占位符清单：</p>
  * <ul>
  *   <li>{.rubberTypeName} - 胶种名称</li>
- *   <li>{.specPattern} - 主胎胚描述（按示方类型分组，每组前加标题前缀，如"正规 Chinh quy：胎胚描述"，多个用","隔开）</li>
+ *   <li>{.specPattern} - 主胎胚描述（按示方类型分组，每组前加标题前缀，如"正规 Chính quy：胎胚描述"，多个用","隔开）</li>
  * </ul>
  *
  * @author APS Team
@@ -93,18 +95,6 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     private static final int SMALL_RUBBER_START_COL_T2 = 6;
 
     private static final int SMALL_RUBBER_END_COL_T2 = 6;
-
-    /**
-     * 硫化精度固定原因项：硫化侧班次分析中真正表示精度保养的固定写法为独立原因项"精度计划"
-     * （来自 ResultDowntimeSummaryUtil 的固定常量）。
-     * 判定时先按分隔符拆分为独立原因项，再对每项做<b>精确等于</b>匹配：
-     * <ul>
-     *   <li>"喷砂清洗+精度"属于模具清洗与精度重叠的组合原因，应归入模具清洗栏位展示，精确不等于"精度计划"被排除</li>
-     *   <li>"换模+精度计划"属于换模组合原因（历史残留写法），应归入模具交替栏位展示，被排除</li>
-     *   <li>"成型精度影响: ..."拆分后无任何独立项等于"精度计划"，天然被排除</li>
-     * </ul>
-     */
-    private static final String LH_PRECISION_ANALYSIS = "精度计划";
 
     /**
      * 成型精度固定原因项：成型侧精度扣减班次由 buildTaskAnalysis 写入独立原因"精度"
@@ -140,6 +130,12 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
 
     @Resource
     private MdmMaterialInfoMapper mdmMaterialInfoMapper;
+
+    /**
+     * SKU与施工关系表Mapper（T_MDM_SKU_CONSTRUCTION_REF）：按物料+胎胚+示方类型取制造示方书号
+     */
+    @Resource
+    private MdmSkuConstructionRefMapper mdmSkuConstructionRefMapper;
 
     @Resource
     private LhMachineInfoEntityMapper lhMachineInfoEntityMapper;
@@ -978,11 +974,11 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
      * <p>取数逻辑：</p>
      * <ol>
      *   <li>从系统参数表读取TD胶种类型编码（PARAM_CODE=SYS04010002）</li>
-     *   <li>从原材料消耗明细表按胶种类型查对应的胎胚（CHILD_MATERIAL_NAME='AQ'+胶种类型）</li>
-     *   <li>匹配本次成型排程结果中的胎胚</li>
-     *   <li>通过胎胚编号关联物料主数据取主胎胚描述(embryoDesc)，仅保留本次实际排产的物料</li>
-     *   <li>按胶种分组，多个主胎胚描述用","隔开</li>
-     *   <li>按示方类型（正规/量试/试制）在物料级别分组，每组主胎胚描述前加标题前缀，不同组用换行隔开</li>
+     *   <li>按 物料+示方类型 从SKU施工关系表取制造示方书号（EMBRYO_NO）</li>
+     *   <li>按制造示方书号从原材料消耗明细表取用量最大的AQT胶种，作为该物料该示方类型的唯一TD胶种</li>
+     *   <li>仅保留配置内的胶种，未配置或未解析到的物料不展示并输出告警日志</li>
+     *   <li>按胶种分组，组内按示方类型（正规/量试/试制）展示规格+花纹，多个用"，"隔开</li>
+     *   <li>按示方类型（正规/量试/试制）在物料级别分组，每组规格花纹前加标题前缀，不同组用换行隔开</li>
      * </ol>
      *
      * <p>通过 keySuffix 区分 T+1/T+2 的班次过滤：
@@ -1004,32 +1000,14 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             return smallRubberList;
         }
 
-        // 根据 keySuffix 过滤有排计划量的胎胚
-        // keySuffix="" → class3/4/5（T+1），keySuffix="2" → class6/7/8（T+2）
-        log.info("构建小胶种列表[keySuffix={}], 排程日期: {}", keySuffix, scheduleDate);
-
-        Set<String> scheduleEmbryoCodes = cxResults.stream()
+        // 根据 keySuffix 过滤有排计划量的排程记录（keySuffix="" → class3/4/5，keySuffix="2" → class6/7/8）
+        List<CxScheduleResult> shiftResults = cxResults.stream()
                 .filter("".equals(keySuffix) ? this::hasAnyPlanQtyInShift345 : this::hasAnyPlanQtyInShift678)
-                .map(CxScheduleResult::getEmbryoCode)
-                .filter(StringUtils::isNotBlank)
-                .collect(Collectors.toSet());
-
-        // 收集已排产的物料编码集合，用于过滤物料主数据中未排产的SKU
-        // 注意：CxScheduleResult.materialCode 可能是逗号分隔的多个物料编码（排程生成时按胎胚+机台合并），
-        // 需拆分后放入Set，否则 scheduledMaterialCodes.contains(单个物料) 会匹配失败
-        Set<String> scheduledMaterialCodes = cxResults.stream()
-                .filter("".equals(keySuffix) ? this::hasAnyPlanQtyInShift345 : this::hasAnyPlanQtyInShift678)
-                .map(CxScheduleResult::getMaterialCode)
-                .filter(StringUtils::isNotBlank)
-                .flatMap(mc -> Arrays.stream(mc.split("[,，]")))
-                .map(String::trim)
-                .filter(StringUtils::isNotBlank)
-                .collect(Collectors.toSet());
-        log.info("小胶种[keySuffix={}]已排产胎胚代码数量: {}, 已排产物料编码数量: {}",
-                keySuffix, scheduleEmbryoCodes.size(), scheduledMaterialCodes.size());
-
-        if (scheduleEmbryoCodes.isEmpty()) {
-            log.warn("成型排程结果中无胎胚代码，小胶种列表为空[keySuffix={}]", keySuffix);
+                .collect(Collectors.toList());
+        log.info("构建小胶种列表[keySuffix={}], 排程日期: {}, 有排计划量记录数: {}",
+                keySuffix, scheduleDate, shiftResults.size());
+        if (shiftResults.isEmpty()) {
+            log.warn("成型排程结果中无排计划量记录，小胶种列表为空[keySuffix={}]", keySuffix);
             return smallRubberList;
         }
 
@@ -1037,126 +1015,65 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         Map<String, Set<String>> materialRecipeTypeMap = this.buildMaterialRecipeTypeMap(cxResults, keySuffix);
         log.info("物料示方类型映射构建完成[keySuffix={}], 映射数量: {}", keySuffix, materialRecipeTypeMap.size());
 
-        // 按胶种类型查询对应的胎胚，构建胶种→胎胚映射
-        Map<String, Set<String>> rubberTypeEmbryoMap = new LinkedHashMap<>();
-        for (String rubberType : rubberTypeCodes) {
-            String childMaterialName = "AQ" + rubberType;
-            List<MdmMaterialConsumeDetail> consumeDetails = mdmMaterialConsumeDetailMapper.selectList(
-                    new LambdaQueryWrapper<MdmMaterialConsumeDetail>()
-                            .eq(MdmMaterialConsumeDetail::getFactoryCode, factoryCode)
-                            .eq(MdmMaterialConsumeDetail::getChildMaterialName, childMaterialName)
-                            .and(w -> w.eq(MdmMaterialConsumeDetail::getIsDelete, 0)
-                                    .or().isNull(MdmMaterialConsumeDetail::getIsDelete)));
-            log.info("胶种类型[{}]消耗明细查询, CHILD_MATERIAL_NAME: {}, 数量: {}",
-                    rubberType, childMaterialName, consumeDetails.size());
-
-            Set<String> embryoCodes = consumeDetails.stream()
-                    .map(MdmMaterialConsumeDetail::getEmbryoCode)
-                    .filter(StringUtils::isNotBlank)
-                    .collect(Collectors.toCollection(LinkedHashSet::new));
-            rubberTypeEmbryoMap.put(rubberType, embryoCodes);
+        // 按 物料+示方类型 → 制造示方书号 → BOM主胶料 解析唯一TD胶种。
+        // 不再按"胎胚是否含AQT101"做存在性归类：同一胎胚的不同示方书版本可能使用不同TD胶种，
+        // 必须按排程记录的示方类型匹配对应版本，避免正规排产被量试版本的胶种误命中。
+        Map<String, Map<String, Set<String>>> rubberTypeMaterialMap = this.buildRubberTypeMaterialMap(
+                shiftResults, factoryCode, materialRecipeTypeMap, new HashSet<>(rubberTypeCodes));
+        if (rubberTypeMaterialMap.isEmpty()) {
+            log.info("小胶种[keySuffix={}]未解析到任何已配置的TD胶种数据", keySuffix);
+            return smallRubberList;
         }
 
-        // 查询物料主数据，构建胎胚→物料列表映射
-        Set<String> allRelevantEmbryoCodes = rubberTypeEmbryoMap.values().stream()
+        // 查询本次命中的物料主数据，规格/花纹优先取物料主数据字段，缺失时回退胎胚描述解析
+        Set<String> resultMaterialCodes = rubberTypeMaterialMap.values().stream()
+                .flatMap(typeMap -> typeMap.values().stream())
                 .flatMap(Set::stream)
-                .filter(scheduleEmbryoCodes::contains)
                 .collect(Collectors.toSet());
+        Map<String, MdmMaterialInfo> materialInfoMap = this.loadMaterialInfoByMaterialCode(resultMaterialCodes);
+        log.info("小胶种[keySuffix={}]命中胶种数: {}, 物料数: {}",
+                keySuffix, rubberTypeMaterialMap.size(), resultMaterialCodes.size());
 
-        log.info("需要查询物料主数据的胎胚代码数量: {}", allRelevantEmbryoCodes.size());
-
-        // 查询物料主数据，构建胎胚→物料列表映射（一个胎胚代码可能对应多条物料记录）
-        // 仅保留本次实际排产的物料（scheduledMaterialCodes过滤），避免展示未排产的SKU
-        Map<String, List<MdmMaterialInfo>> materialInfoMap = new HashMap<>();
-        if (!allRelevantEmbryoCodes.isEmpty()) {
-            List<MdmMaterialInfo> materialInfoList = mdmMaterialInfoMapper.selectList(
-                    new LambdaQueryWrapper<MdmMaterialInfo>()
-                            .in(MdmMaterialInfo::getEmbryoCode, allRelevantEmbryoCodes)
-                            .and(w -> w.eq(MdmMaterialInfo::getIsDelete, 0)
-                                    .or().isNull(MdmMaterialInfo::getIsDelete)));
-            materialInfoMap = materialInfoList.stream()
-                    .filter(m -> StringUtils.isNotBlank(m.getEmbryoCode()))
-                    .filter(m -> scheduledMaterialCodes.contains(m.getMaterialCode()))
-                    .collect(Collectors.groupingBy(MdmMaterialInfo::getEmbryoCode, HashMap::new, Collectors.toList()));
-            log.info("物料主数据查询完成(已过滤未排产SKU), 数量: {}, 胎胚分组数: {}",
-                    materialInfoMap.values().stream().mapToLong(List::size).sum(), materialInfoMap.size());
-        }
-
-        // 按胶种分组构建列表数据
+        // 按胶种分组构建列表数据：胶种 → 示方类型 → 规格/花纹
+        List<String> recipeTypeOrder = Arrays.asList("S", "T", "X");
         for (String rubberType : rubberTypeCodes) {
-            Set<String> embryoCodes = rubberTypeEmbryoMap.getOrDefault(rubberType, Collections.emptySet());
-
-            Set<String> scheduledEmbryos = embryoCodes.stream()
-                    .filter(scheduleEmbryoCodes::contains)
-                    .collect(Collectors.toCollection(LinkedHashSet::new));
-
-            if (scheduledEmbryos.isEmpty()) {
+            Map<String, Set<String>> recipeTypeMaterials = rubberTypeMaterialMap.get(rubberType);
+            if (recipeTypeMaterials == null || recipeTypeMaterials.isEmpty()) {
                 continue;
             }
 
-            // 收集该胶种下所有已排产物料，按物料级别确定示方类型
-            // 同一胎胚下不同物料可能有不同的示方类型（如正规和量试），需要分别展示
-            List<MdmMaterialInfo> rubberTypeMaterials = new ArrayList<>();
-            for (String embryoCode : scheduledEmbryos) {
-                List<MdmMaterialInfo> materials = materialInfoMap.get(embryoCode);
-                if (materials != null) {
-                    rubberTypeMaterials.addAll(materials);
-                }
-            }
-
-            if (rubberTypeMaterials.isEmpty()) {
-                continue;
-            }
-
-            // 按示方类型对物料进行分组（物料级别，而非胎胚级别）
-            // 同一物料可能同时属于多种示方类型，需要分别加入对应的分组
-            Map<String, List<MdmMaterialInfo>> recipeTypeMaterialGroupMap = new LinkedHashMap<>();
-            for (MdmMaterialInfo materialInfo : rubberTypeMaterials) {
-                Set<String> recipeTypes = materialRecipeTypeMap.getOrDefault(materialInfo.getMaterialCode(), Collections.singleton("S"));
-                for (String recipeType : recipeTypes) {
-                    recipeTypeMaterialGroupMap.computeIfAbsent(recipeType, k -> new ArrayList<>()).add(materialInfo);
-                }
-            }
-
-            // 按示方类型顺序构建主胎胚描述字符串：正规 → 量试 → 试制
-            // 取数口径：取物料主数据中的胎胚描述(embryoDesc)作为主胎胚描述，按胎胚描述去重
-            List<String> recipeTypeOrder = Arrays.asList("S", "T", "X");
             List<String> groupParts = new ArrayList<>();
-
             for (String recipeType : recipeTypeOrder) {
-                List<MdmMaterialInfo> materialsForType = recipeTypeMaterialGroupMap.get(recipeType);
-                if (materialsForType == null || materialsForType.isEmpty()) {
+                Set<String> materialCodes = recipeTypeMaterials.get(recipeType);
+                if (materialCodes == null || materialCodes.isEmpty()) {
                     continue;
                 }
 
-                // 从胎胚描述(embryoDesc)解析规格和花纹，按规格分组收集花纹列表
-                // 输出格式：规格1 花纹1/花纹2，规格2 花纹3（同规格多花纹用"/"隔开，不同规格用"，"隔开）
+                // 按规格分组收集花纹列表：规格1 花纹1/花纹2，规格2 花纹3（同规格多花纹用"/"隔开，不同规格用"，"隔开）
                 Map<String, LinkedHashSet<String>> specPatternsMap = new LinkedHashMap<>();
-                for (MdmMaterialInfo materialInfo : materialsForType) {
-                    String embryoDesc = StringUtils.defaultString(materialInfo.getEmbryoDesc()).trim();
-                    String[] specPattern = this.parseSpecAndPatternFromEmbryoDesc(embryoDesc);
+                for (String materialCode : materialCodes) {
+                    String[] specPattern = this.resolveSpecAndPattern(materialInfoMap.get(materialCode));
                     if (specPattern == null) {
                         continue;
                     }
-                    String specifications = specPattern[0];
-                    String pattern = specPattern[1];
-                    specPatternsMap.computeIfAbsent(specifications, k -> new LinkedHashSet<>()).add(pattern);
+                    specPatternsMap.computeIfAbsent(specPattern[0], k -> new LinkedHashSet<>()).add(specPattern[1]);
                 }
 
                 if (specPatternsMap.isEmpty()) {
                     continue;
                 }
 
-                // 格式化：规格 花纹1/花纹2，不同规格用"，"隔开
                 List<String> specPatternParts = new ArrayList<>();
                 for (Map.Entry<String, LinkedHashSet<String>> entry : specPatternsMap.entrySet()) {
-                    String spec = entry.getKey();
-                    String patterns = String.join("/", entry.getValue());
-                    specPatternParts.add(spec + " " + patterns);
+                    specPatternParts.add(entry.getKey() + " " + String.join("/", entry.getValue()));
                 }
 
                 String title = this.getRecipeTypeTitle(recipeType);
                 groupParts.add(title + String.join("，", specPatternParts));
+            }
+
+            if (groupParts.isEmpty()) {
+                continue;
             }
 
             Map<String, Object> item = new HashMap<>();
@@ -1170,22 +1087,303 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     }
 
     /**
+     * 按 物料+示方类型 → 制造示方书号 → BOM主胶料 解析TD胶种，并组装为
+     * 胶种 → 示方类型 → 物料编码集合。
+     *
+     * <p>解析链路：</p>
+     * <ol>
+     *   <li>按工厂+物料+胎胚批量查询SKU与施工关系表（T_MDM_SKU_CONSTRUCTION_REF），
+     *       按 物料|胎胚|示方类型 取更新时间最新的一条，得到制造示方书号(EMBRYO_NO)</li>
+     *   <li>按制造示方书号批量查询BOM消耗明细（EMBRYO_VERSION），只保留AQT开头的TD胶种</li>
+     *   <li>同一示方书版本内取用量(DOSAGE)最大的胶种作为该版本唯一主胶种</li>
+     *   <li>物料对应的示方书版本取不到AQT明细时，回退到同胎胚+同示方类型下最新且有AQT明细的版本
+     *       （应对部分正规示方书未同步TD胶种明细的数据情况）</li>
+     *   <li>最终胶种不在SYS04010002配置内时不展示，并输出告警日志便于业务定位</li>
+     * </ol>
+     *
+     * @param shiftResults          当前班次组有排计划量的排程记录
+     * @param factoryCode           分厂编码
+     * @param materialRecipeTypeMap 物料编码→示方类型集合
+     * @param rubberTypeCodes       配置的TD胶种类型编码集合
+     * @return 胶种→示方类型→物料编码集合
+     */
+    private Map<String, Map<String, Set<String>>> buildRubberTypeMaterialMap(
+            List<CxScheduleResult> shiftResults, String factoryCode,
+            Map<String, Set<String>> materialRecipeTypeMap, Set<String> rubberTypeCodes) {
+
+        Map<String, Map<String, Set<String>>> rubberTypeMaterialMap = new LinkedHashMap<>();
+
+        // 1. 收集 物料 → 胎胚代码集合（排程结果的物料编码可能是逗号分隔的多个物料）
+        Map<String, Set<String>> materialEmbryoMap = new LinkedHashMap<>();
+        for (CxScheduleResult result : shiftResults) {
+            String embryoCode = StringUtils.trimToNull(result.getEmbryoCode());
+            if (embryoCode == null) {
+                continue;
+            }
+            for (String materialCode : this.splitMaterialCodes(result.getMaterialCode())) {
+                materialEmbryoMap.computeIfAbsent(materialCode, k -> new LinkedHashSet<>()).add(embryoCode);
+            }
+        }
+        if (materialEmbryoMap.isEmpty()) {
+            log.warn("成型排程结果中无有效物料/胎胚编码，无法解析TD胶种");
+            return rubberTypeMaterialMap;
+        }
+
+        // 2. 批量查询SKU与施工关系表（按胎胚维度查询，确保同一胎胚下其它示方书版本可用于缺失兜底）
+        Set<String> embryoCodes = materialEmbryoMap.values().stream()
+                .flatMap(Set::stream)
+                .collect(Collectors.toSet());
+        List<MdmSkuConstructionRef> skuRefList = mdmSkuConstructionRefMapper.selectList(
+                new LambdaQueryWrapper<MdmSkuConstructionRef>()
+                        .eq(MdmSkuConstructionRef::getIsDelete, 0)
+                        .eq(StringUtils.isNotBlank(factoryCode), MdmSkuConstructionRef::getFactoryCode, factoryCode)
+                        .in(MdmSkuConstructionRef::getEmbryoCode, embryoCodes)
+                        .orderByDesc(MdmSkuConstructionRef::getUpdateTime));
+        if (skuRefList.isEmpty()) {
+            log.warn("SKU与施工关系表未命中数据, 物料数: {}, 胎胚数: {}",
+                    materialEmbryoMap.size(), embryoCodes.size());
+            return rubberTypeMaterialMap;
+        }
+
+        // 索引：物料|胎胚|示方类型 → 关系（按更新时间倒序，putIfAbsent保留最新一条）
+        Map<String, MdmSkuConstructionRef> materialEmbryoTypeRefMap = new LinkedHashMap<>();
+        // 索引：胎胚|示方类型 → 关系列表（最新在前，用于版本缺失兜底）
+        Map<String, List<MdmSkuConstructionRef>> embryoTypeRefMap = new LinkedHashMap<>();
+        for (MdmSkuConstructionRef ref : skuRefList) {
+            if (StringUtils.isBlank(ref.getEmbryoNo())) {
+                continue;
+            }
+            String materialCode = StringUtils.trimToEmpty(ref.getMaterialCode());
+            String embryoCode = StringUtils.trimToEmpty(ref.getEmbryoCode());
+            String embryoType = StringUtils.trimToEmpty(ref.getEmbryoType());
+            materialEmbryoTypeRefMap.putIfAbsent(this.buildSkuRefKey(materialCode, embryoCode, embryoType), ref);
+            embryoTypeRefMap.computeIfAbsent(embryoCode + "|" + embryoType, k -> new ArrayList<>()).add(ref);
+        }
+
+        // 3. 按制造示方书号查询BOM，得到每个版本的主胶种
+        Set<String> embryoVersions = skuRefList.stream()
+                .map(MdmSkuConstructionRef::getEmbryoNo)
+                .filter(StringUtils::isNotBlank)
+                .map(String::trim)
+                .collect(Collectors.toSet());
+        Map<String, String> versionRubberTypeMap = this.loadMainRubberTypeByVersion(factoryCode, embryoVersions);
+
+        // 4. 逐个 物料+胎胚+示方类型 解析唯一TD胶种并分组
+        for (Map.Entry<String, Set<String>> entry : materialEmbryoMap.entrySet()) {
+            String materialCode = entry.getKey();
+            Set<String> recipeTypes = materialRecipeTypeMap.get(materialCode);
+            if (recipeTypes == null || recipeTypes.isEmpty()) {
+                recipeTypes = Collections.singleton("S");
+            }
+            for (String embryoCode : entry.getValue()) {
+                for (String recipeType : recipeTypes) {
+                    String rubberType = this.resolveRubberType(materialCode, embryoCode, recipeType,
+                            materialEmbryoTypeRefMap, embryoTypeRefMap, versionRubberTypeMap);
+                    if (StringUtils.isBlank(rubberType)) {
+                        log.warn("排产小结TD胶种未解析: 物料={}, 胎胚={}, 示方类型={}",
+                                materialCode, embryoCode, recipeType);
+                        continue;
+                    }
+                    if (!rubberTypeCodes.contains(rubberType)) {
+                        log.warn("排产小结TD胶种未配置: 物料={}, 胎胚={}, 示方类型={}, 主胶种={}（SYS04010002未配置，报表不展示）",
+                                materialCode, embryoCode, recipeType, rubberType);
+                        continue;
+                    }
+                    rubberTypeMaterialMap.computeIfAbsent(rubberType, k -> new LinkedHashMap<>())
+                            .computeIfAbsent(recipeType, k -> new LinkedHashSet<>())
+                            .add(materialCode);
+                }
+            }
+        }
+        return rubberTypeMaterialMap;
+    }
+
+    /**
+     * 解析单个 物料+胎胚+示方类型 对应的唯一TD胶种。
+     *
+     * <p>先按物料+胎胚+示方类型精确匹配示方书号，取该版本的主胶种；
+     * 版本取不到AQT明细时，回退到同胎胚+同示方类型下最新且有AQT明细的版本。
+     * 不做跨示方类型回退——不同示方类型可能使用不同TD胶种，跨类型回退会把正规排产误归到量试胶种。</p>
+     *
+     * @return TD胶种类型编码（如T101），解析失败返回null
+     */
+    private String resolveRubberType(String materialCode, String embryoCode, String recipeType,
+                                     Map<String, MdmSkuConstructionRef> materialEmbryoTypeRefMap,
+                                     Map<String, List<MdmSkuConstructionRef>> embryoTypeRefMap,
+                                     Map<String, String> versionRubberTypeMap) {
+        String resolvedType = StringUtils.defaultIfBlank(recipeType, "S").trim();
+        // ① 物料+胎胚+示方类型 精确匹配最新示方书号
+        MdmSkuConstructionRef ref = materialEmbryoTypeRefMap.get(
+                this.buildSkuRefKey(materialCode, embryoCode, resolvedType));
+        String rubberType = this.getRubberTypeByRef(ref, versionRubberTypeMap);
+        if (StringUtils.isNotBlank(rubberType)) {
+            return rubberType;
+        }
+        // ② 兜底：同胎胚+同示方类型下最新且有AQT明细的示方书版本
+        List<MdmSkuConstructionRef> sameTypeRefs = embryoTypeRefMap.get(embryoCode + "|" + resolvedType);
+        if (sameTypeRefs != null) {
+            for (MdmSkuConstructionRef sameTypeRef : sameTypeRefs) {
+                rubberType = this.getRubberTypeByRef(sameTypeRef, versionRubberTypeMap);
+                if (StringUtils.isNotBlank(rubberType)) {
+                    return rubberType;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 从制造示方书号查询BOM消耗明细，按版本取用量最大的AQT胶种作为主胶种。
+     *
+     * @param factoryCode    分厂编码
+     * @param embryoVersions 制造示方书号集合
+     * @return 制造示方书号→主胶种类型编码（如T101）
+     */
+    private Map<String, String> loadMainRubberTypeByVersion(String factoryCode, Set<String> embryoVersions) {
+        Map<String, String> versionRubberTypeMap = new HashMap<>();
+        if (embryoVersions.isEmpty()) {
+            return versionRubberTypeMap;
+        }
+        List<MdmMaterialConsumeDetail> consumeDetails = mdmMaterialConsumeDetailMapper.selectList(
+                new LambdaQueryWrapper<MdmMaterialConsumeDetail>()
+                        .eq(MdmMaterialConsumeDetail::getIsDelete, 0)
+                        .eq(StringUtils.isNotBlank(factoryCode), MdmMaterialConsumeDetail::getFactoryCode, factoryCode)
+                        .in(MdmMaterialConsumeDetail::getEmbryoVersion, embryoVersions)
+                        .likeRight(MdmMaterialConsumeDetail::getChildMaterialName, "AQT")
+                        .orderByDesc(MdmMaterialConsumeDetail::getDosage));
+
+        Map<String, List<MdmMaterialConsumeDetail>> versionDetailsMap = consumeDetails.stream()
+                .filter(d -> StringUtils.isNotBlank(d.getEmbryoVersion()))
+                .filter(d -> StringUtils.startsWith(d.getChildMaterialName(), "AQT"))
+                .collect(Collectors.groupingBy(d -> d.getEmbryoVersion().trim()));
+
+        for (Map.Entry<String, List<MdmMaterialConsumeDetail>> entry : versionDetailsMap.entrySet()) {
+            MdmMaterialConsumeDetail mainDetail = entry.getValue().stream()
+                    .max(Comparator.comparing(
+                                    (MdmMaterialConsumeDetail d) -> d.getDosage() == null ? BigDecimal.ZERO : d.getDosage())
+                            .thenComparing(d -> StringUtils.defaultString(d.getChildMaterialName()),
+                                    Comparator.reverseOrder()))
+                    .orElse(null);
+            if (mainDetail == null) {
+                continue;
+            }
+            // 原材料描述形如AQT101，去掉AQ前缀即为胶种类型编码T101
+            String childMaterialName = StringUtils.defaultString(mainDetail.getChildMaterialName()).trim();
+            if (childMaterialName.length() <= 2) {
+                continue;
+            }
+            versionRubberTypeMap.put(entry.getKey(), childMaterialName.substring(2));
+        }
+        log.info("BOM主胶种解析完成, 示方书版本数: {}, 命中主胶种版本数: {}",
+                embryoVersions.size(), versionRubberTypeMap.size());
+        return versionRubberTypeMap;
+    }
+
+    /**
+     * 按物料编码批量查询物料主数据，构建 物料编码→物料主数据 映射（同一物料保留第一条）。
+     *
+     * @param materialCodes 物料编码集合
+     * @return 物料编码→物料主数据
+     */
+    private Map<String, MdmMaterialInfo> loadMaterialInfoByMaterialCode(Set<String> materialCodes) {
+        Map<String, MdmMaterialInfo> materialInfoMap = new HashMap<>();
+        if (materialCodes.isEmpty()) {
+            return materialInfoMap;
+        }
+        List<MdmMaterialInfo> materialInfoList = mdmMaterialInfoMapper.selectList(
+                new LambdaQueryWrapper<MdmMaterialInfo>()
+                        .in(MdmMaterialInfo::getMaterialCode, materialCodes)
+                        .and(w -> w.eq(MdmMaterialInfo::getIsDelete, 0)
+                                .or().isNull(MdmMaterialInfo::getIsDelete)));
+        for (MdmMaterialInfo materialInfo : materialInfoList) {
+            if (StringUtils.isNotBlank(materialInfo.getMaterialCode())) {
+                materialInfoMap.putIfAbsent(materialInfo.getMaterialCode().trim(), materialInfo);
+            }
+        }
+        return materialInfoMap;
+    }
+
+    /**
+     * 解析物料的规格与花纹：优先取物料主数据的规格(SPECIFICATIONS)和主花纹(MAIN_PATTERN)，
+     * 字段缺失时回退到胎胚描述解析。
+     *
+     * @param materialInfo 物料主数据（可能为null）
+     * @return [规格, 花纹]，解析失败返回null
+     */
+    private String[] resolveSpecAndPattern(MdmMaterialInfo materialInfo) {
+        if (materialInfo == null) {
+            return null;
+        }
+        String specifications = StringUtils.trimToNull(materialInfo.getSpecifications());
+        String pattern = StringUtils.trimToNull(materialInfo.getMainPattern());
+        if (StringUtils.isNotBlank(specifications) && StringUtils.isNotBlank(pattern)) {
+            return new String[]{specifications, pattern};
+        }
+        String[] parsed = this.parseSpecAndPatternFromEmbryoDesc(
+                StringUtils.defaultString(materialInfo.getEmbryoDesc()).trim());
+        if (parsed == null) {
+            return null;
+        }
+        return new String[]{
+                StringUtils.isNotBlank(specifications) ? specifications : parsed[0],
+                StringUtils.isNotBlank(pattern) ? pattern : parsed[1]};
+    }
+
+    /**
+     * 拆分排程结果的物料编码（可能为逗号分隔的多个物料编码）。
+     *
+     * @param materialCode 物料编码串
+     * @return 单个物料编码列表
+     */
+    private List<String> splitMaterialCodes(String materialCode) {
+        if (StringUtils.isBlank(materialCode)) {
+            return Collections.emptyList();
+        }
+        return Arrays.stream(materialCode.split("[,，]"))
+                .map(String::trim)
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 构建SKU施工关系匹配键：物料编码|胎胚代码|示方类型。
+     */
+    private String buildSkuRefKey(String materialCode, String embryoCode, String embryoType) {
+        return StringUtils.trimToEmpty(materialCode) + "|"
+                + StringUtils.trimToEmpty(embryoCode) + "|"
+                + StringUtils.trimToEmpty(embryoType);
+    }
+
+    /**
+     * 按SKU施工关系取对应制造示方书号的主胶种。
+     */
+    private String getRubberTypeByRef(MdmSkuConstructionRef ref, Map<String, String> versionRubberTypeMap) {
+        if (ref == null || StringUtils.isBlank(ref.getEmbryoNo())) {
+            return null;
+        }
+        return versionRubberTypeMap.get(ref.getEmbryoNo().trim());
+    }
+
+    /**
      * 从系统参数表（T_MP_FACTORY_PARAM）读取TD胶种类型编码
      *
      * <p>参数编码：SYS04010002，值为逗号分隔的胶种类型（如 T101,T133,T601）</p>
-     * <p>TD胶种数据取数逻辑：通过胎胚关联t_mdm_material_consume_detail，
-     * 如果CHILD_MATERIAL_NAME为AQ+参数配置里key为SYS04010002的任意一个值，
-     * 满足胎胚及CHILD_MATERIAL_NAME的数据即为本次要展示的TD胶种数据</p>
+     * <p>TD胶种数据取数逻辑：按 物料+示方类型 从SKU施工关系表取制造示方书号，
+     * 再按制造示方书号从BOM消耗明细（t_mdm_material_consume_detail）取用量最大的AQT胶种，
+     * 最终胶种在SYS04010002配置内的才展示</p>
      *
      * @param factoryCode 分厂编码
      * @return 胶种类型列表
      */
     private List<String> loadRubberTypeCodes(String factoryCode) {
-        CxParamConfig paramConfig = cxParamConfigMapper.selectOne(
+        // 参数表未按分厂区分，存在多条启用记录时取最新一条，避免selectOne抛TooManyResultsException
+        List<CxParamConfig> paramConfigs = cxParamConfigMapper.selectList(
                 new LambdaQueryWrapper<CxParamConfig>()
                         .eq(CxParamConfig::getParamCode, "SYS04010002")
                         .eq(CxParamConfig::getIsActive, 1)
+                        .orderByDesc(CxParamConfig::getId)
         );
+        CxParamConfig paramConfig = paramConfigs.isEmpty() ? null : paramConfigs.get(0);
         if (paramConfig == null || StringUtils.isBlank(paramConfig.getParamValue())) {
             log.warn("未找到TD胶种类型配置（成型参数配置表T_CX_PARAM_CONFIG，PARAM_CODE=SYS04010002）");
             return Collections.emptyList();
@@ -1364,7 +1562,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
      *
      * <p>示方类型与标题的对应关系：</p>
      * <ul>
-     *   <li>S（正规）→ "正规 Chinh quy："</li>
+     *   <li>S（正规）→ "正规 Chính quy："</li>
      *   <li>T（量试）→ "量试 Thi nghiem s5 luong："</li>
      *   <li>X（试制）→ "试制 Thử sản xuất："</li>
      * </ul>
@@ -1374,10 +1572,10 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
      */
     private String getRecipeTypeTitle(String recipeType) {
         switch (StringUtils.defaultString(recipeType)) {
-            case "S": return "正规 Chinh quy：";
+            case "S": return "正规 Chính quy：";
             case "T": return "量试 Thi nghiem s5 luong：";
             case "X": return "试制 Thử sản xuất：";
-            default: return "正规 Chinh quy：";
+            default: return "正规 Chính quy：";
         }
     }
 
@@ -1689,8 +1887,11 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
      *
      * <p>精度标记判定规则（硫化精度与成型精度互斥区分，均先按分隔符拆分为独立原因项再匹配）：</p>
      * <ul>
-     *   <li>硫化侧：精度保养结束班次由 {@code ResultDowntimeSummaryUtil} 写入固定原因"精度计划"，
-     *       独立项包含匹配"精度计划"/"喷砂清洗+精度"（"换模+精度计划"含"精度计划"自动覆盖）；
+     *   <li>硫化侧：精度保养结束班次由 {@code ResultDowntimeSummaryUtil} 写入固定原因，
+     *       独立项命中 {@link ResultDowntimeSummaryUtil#isPrecisionAnalysisItem(String)} 封闭集合才计入：
+     *       "精度计划"、"精度计划+换模"（正规换模与精度真实并行）、
+     *       "精度计划+换活字块"（换活字块与精度真实并行）、"换模+精度计划"（历史残留写法）；
+     *       "喷砂清洗+精度"等清洗组合原因不命中，归入模具清洗栏位；
      *       成型排程联动写入硫化结果的"成型精度影响: ..."拆分后无独立项命中白名单，天然被排除，
      *       避免仅受成型精度影响的硫化机台被误计入硫化备注</li>
      *   <li>成型侧：精度扣减班次由 {@code buildTaskAnalysis} 写入独立原因"精度"
@@ -1767,20 +1968,23 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
      * 判断硫化侧班次分析原因中是否包含硫化精度保养的固定写法。
      *
      * <p>硫化侧含"精度"的文本来自 {@code ResultDowntimeSummaryUtil} 的固定常量，属于封闭集合。
-     * 判定时先按分隔符（英文逗号/中文分号）拆分为独立原因项，再对每项与"精度计划"做
-     * <b>精确等于</b>匹配（仅真正做精度保养的机台计入硫化精度备注）：</p>
+     * 判定时先按分隔符（英文逗号/中文分号）拆分为独立原因项，再对每项调用
+     * {@link ResultDowntimeSummaryUtil#isPrecisionAnalysisItem(String)} 做<b>精确等于</b>匹配
+     * （仅真正做精度保养的机台计入硫化精度备注）：</p>
      * <ul>
-     *   <li>"精度计划" → 命中，计入硫化精度备注</li>
-     *   <li>"喷砂清洗+精度"（模具清洗与精度重叠的组合原因）→ 不等于独立项，归入模具清洗栏位展示</li>
-     *   <li>"换模+精度计划"（历史残留写法）→ 不等于独立项，归入模具交替栏位展示</li>
-     *   <li>"成型精度影响: 库存X+产量Y=Z&lt;硫化计划W, 缺口V条" → 拆分后无独立项等于"精度计划"，天然被排除</li>
+     *   <li>"精度计划"（单独精度保养）→ 命中，计入硫化精度备注</li>
+     *   <li>"精度计划+换模"（正规换模与精度真实并行）→ 命中，计入硫化精度备注</li>
+     *   <li>"精度计划+换活字块"（换活字块与精度真实并行）→ 命中，计入硫化精度备注</li>
+     *   <li>"换模+精度计划"（历史残留写法）→ 命中，兼容历史批次数据</li>
+     *   <li>"喷砂清洗+精度"（模具清洗与精度重叠的组合原因）→ 不命中，归入模具清洗栏位展示</li>
+     *   <li>"成型精度影响: 库存X+产量Y=Z&lt;硫化计划W, 缺口V条" → 拆分后无独立项命中，天然被排除</li>
      * </ul>
      *
      * <p>避免仅做模具清洗（如喷砂清洗叠加精度时段）的机台被误计入硫化精度维保备注；
      * 若同一班次同时含"精度计划"与"成型精度影响"，仍按"精度计划"正确计入。</p>
      *
-     * @param analyses 待检查的班次分析原因文本（可变参数，任一班次的独立原因项精确等于"精度计划"即返回true）
-     * @return true-任一班次分析含独立原因项"精度计划"；false-全部不含
+     * @param analyses 待检查的班次分析原因文本（可变参数，任一班次的独立原因项命中精度原因项封闭集合即返回true）
+     * @return true-任一班次分析含硫化精度原因项；false-全部不含
      */
     private boolean containsLhPrecisionKeyword(String... analyses) {
         if (analyses == null || analyses.length == 0) {
@@ -1790,10 +1994,10 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             if (StringUtils.isBlank(analysis)) {
                 continue;
             }
-            // 按分隔符拆分为独立原因项后，与"精度计划"做精确等于匹配，
-            // 排除"喷砂清洗+精度"/"换模+精度计划"等组合原因
+            // 按分隔符拆分为独立原因项后，交由算法侧统一维护的精度原因项集合做精确等于匹配，
+            // 覆盖单独精度及与换模/换活字块并行的组合写法，排除"喷砂清洗+精度"等清洗组合原因
             for (String item : this.splitAnalysisItems(analysis)) {
-                if (LH_PRECISION_ANALYSIS.equals(item)) {
+                if (ResultDowntimeSummaryUtil.isPrecisionAnalysisItem(item)) {
                     return true;
                 }
             }

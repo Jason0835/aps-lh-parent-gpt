@@ -14,6 +14,10 @@ public enum DailySchedulePhase {
 
     /** 延续前一业务日已经上机的新增 SKU */
     CARRY_OVER,
+    /**
+     * 仅喷砂且无空闲模具的原机原模恢复，先于普通资源竞争执行。
+     */
+    SAND_BLAST_RECOVERY,
     /** 当前日普通新增与当前日到期的续作加机台统一竞争资源 */
     NORMAL_RESOURCE_COMPETITION,
     /** 已下线：无未来计划的历史欠产或既有收尾遗留任务，暂留待后续关联代码清理 */

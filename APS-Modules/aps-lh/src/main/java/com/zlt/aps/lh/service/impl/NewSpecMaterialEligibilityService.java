@@ -19,6 +19,8 @@ import com.zlt.aps.lh.engine.strategy.IEndingJudgmentStrategy;
 import com.zlt.aps.lh.engine.strategy.support.DailyCandidateReason;
 import com.zlt.aps.lh.engine.strategy.support.DailyMachineExpansionPlanner;
 import com.zlt.aps.lh.engine.strategy.support.DailyNewSpecCandidate;
+import com.zlt.aps.lh.engine.strategy.support.DailySchedulePhase;
+import com.zlt.aps.lh.engine.strategy.support.DeferredScheduleTask;
 import com.zlt.aps.lh.engine.strategy.support.PreviousAlternateTrialQuotaPolicy;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionChecker;
 import com.zlt.aps.lh.engine.strategy.support.EarlyProductionRuntimePlan;
@@ -122,6 +124,7 @@ public class NewSpecMaterialEligibilityService {
 
     /**
      * 为已确定机台的排产构建物料资格；失败仅返回原因，不清理待排物料或写最终未排。
+     *
      * @param context 排程上下文
      * @param sku 原始物料对象，补偿副本保持各自身份
      * @param date 本次实际业务日期
@@ -130,11 +133,26 @@ public class NewSpecMaterialEligibilityService {
     public DailyNewSpecCandidate resolveCandidate(
             LhScheduleContext context, SkuScheduleDTO sku, LocalDate date) {
         // 普通新增始终使用原开关，不因SKU曾命中过历史关系而获得全局豁免。
-        return this.resolveCandidate(context, sku, date, false);
+        return this.resolveCandidate(context, sku, date, false, null);
+    }
+
+    /**
+     * 使用原正常延期来源重新核验固定组合，需求、减量及资源前置规则仍读取实时状态。
+     *
+     * @param context 隔离重放上下文
+     * @param sku 原来源对象
+     * @param date 本次尝试业务日
+     * @param deferredTask 原候选携带的延期来源，不恢复旧数量
+     * @return 重新准入的候选，拒绝时保留真实失败原因
+     */
+    public DailyNewSpecCandidate resolveDeferredCandidate(LhScheduleContext context,
+            SkuScheduleDTO sku, LocalDate date, DeferredScheduleTask deferredTask) {
+        return this.resolveCandidate(context, sku, date, false, deferredTask);
     }
 
     /**
      * 为前日指定组合构建资格，仅豁免试制量试开关，其他需求及资源规则继续共用。
+     *
      * @param context 排程上下文
      * @param sku 后物料及状态
      * @param date 实际业务日
@@ -161,7 +179,7 @@ public class NewSpecMaterialEligibilityService {
             log.info("前日指定交替试制量试开关豁免, {}", detail);
             PriorityTraceLogHelper.appendProcessLog(context, "前日指定交替试制量试开关豁免", detail);
         }
-        return this.resolveCandidate(context, sku, date, trial);
+        return this.resolveCandidate(context, sku, date, trial, null);
     }
 
     /**
@@ -180,19 +198,21 @@ public class NewSpecMaterialEligibilityService {
             return new DailyNewSpecCandidate(
                     MonthPlanDateResolver.buildMaterialStatusKey(sku.getMaterialCode(), sku.getProductStatus()), sku);
         }
-        return this.resolveCandidate(context, sku, date, PendingSkuUnscheduledRule.isTrialOrMassTrialSku(sku));
+        return this.resolveCandidate(context, sku, date, PendingSkuUnscheduledRule.isTrialOrMassTrialSku(sku), null);
     }
 
     /**
      * 共用日计划、减量清单、提前生产和真实余量判断，禁止指定关系绕过这些规则。
+     *
      * @param context 排程上下文
      * @param sku 当前候选
      * @param date 实际业务日
      * @param specifiedTrial 已精确校验的指定交替试制量试
+     * @param deferredTask 普通固定重放的原延期来源，其他入口为空
      * @return 普通或指定组合的物料资格
      */
     private DailyNewSpecCandidate resolveCandidate(LhScheduleContext context,
-            SkuScheduleDTO sku, LocalDate date, boolean specifiedTrial) {
+            SkuScheduleDTO sku, LocalDate date, boolean specifiedTrial, DeferredScheduleTask deferredTask) {
         DailyNewSpecCandidate candidate = new DailyNewSpecCandidate(
                 MonthPlanDateResolver.buildMaterialStatusKey(sku.getMaterialCode(), sku.getProductStatus()), sku);
         if (!SkuEndingDeferredExpansionPolicy.allowsExpansion(context, sku, date)) {
@@ -231,6 +251,13 @@ public class NewSpecMaterialEligibilityService {
                 && targetScheduleQtyResolver.previewProductionRemainingQty(context, sku) > 0;
         boolean normalDemand = continuation ? continuationDue : originalQty > 0 && (remainingQty > 0
             || switchExpansion);
+        // 延期只补充正常来源；首次增机日期、提前生产及全部硬性前置门禁不能被跳过。
+        boolean normalDeferred = Objects.nonNull(deferredTask) && deferredTask.getSku() == sku
+                && deferredTask.getSourcePhase() == DailySchedulePhase.NORMAL_RESOURCE_COMPETITION
+                && (Objects.isNull(deferredTask.getNextAttemptDate())
+                || !deferredTask.getNextAttemptDate().isAfter(date))
+                && continuationDue && !continuationEarly
+                && !context.isFutureOnlyEarlyProductionCandidate(sku, date);
         // 正库存收尾不借用未来计划日期，仍服从续作补机日期与前置独立准入规则。
         if (EmbryoEndingStockAdmissionPolicy.isEligible(context, sku) && continuationDue) {
             candidate.addReason(DailyCandidateReason.HISTORY_SHORTAGE_OR_ENDING);
@@ -239,7 +266,8 @@ public class NewSpecMaterialEligibilityService {
             candidate.addReason(continuation ? DailyCandidateReason.ADD_MACHINE_REQUIREMENT
                     : DailyCandidateReason.TODAY_PLAN);
             candidate.setTargetPlanDate(date);
-        } else if (originalQty <= 0 || continuationEarly || context.isFutureOnlyEarlyProductionCandidate(sku, date)) {
+        } else if (!normalDeferred
+                && (originalQty <= 0 || continuationEarly || context.isFutureOnlyEarlyProductionCandidate(sku, date))) {
             EarlyProductionRuntimePlan plan = this.previewEarlyProduction(context, sku, date);
             candidate.setEarlyProductionPreview(plan);
             if (Objects.nonNull(plan) && Objects.nonNull(plan.getDecision())
@@ -249,6 +277,11 @@ public class NewSpecMaterialEligibilityService {
                 candidate.addReason(DailyCandidateReason.EARLY_PRODUCTION);
                 candidate.setTargetPlanDate(plan.getDecision().getFuturePlanDate());
             }
+        }
+        if (normalDeferred) {
+            candidate.addReason(DailyCandidateReason.DEFERRED_FROM_PREVIOUS_DAY);
+            candidate.setTargetPlanDate(deferredTask.getDeferredFromDate());
+            candidate.setDeferredTask(deferredTask);
         }
         if (candidate.getReasons().isEmpty()) {
             candidate.setLastFailure("物料未进入当前业务日正常需求或获准的提前生产范围");

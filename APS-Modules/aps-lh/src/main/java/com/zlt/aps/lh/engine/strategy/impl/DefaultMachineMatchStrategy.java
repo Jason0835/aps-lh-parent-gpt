@@ -26,8 +26,10 @@ import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchCandidateScope;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.service.impl.ContinuationSandBlastRecoveryService;
 import com.zlt.aps.lh.engine.strategy.IMachineMatchStrategy;
 import com.zlt.aps.lh.engine.strategy.support.MachinePriorityMetricSnapshot;
+import com.zlt.aps.lh.engine.strategy.support.K21K22EmbryoMatchPolicy;
 import com.zlt.aps.lh.engine.strategy.support.MachinePriorityTraceSnapshot;
 import com.zlt.aps.lh.engine.strategy.support.MachineSkuMatchLevel;
 import com.zlt.aps.lh.engine.strategy.support.MachineSkuMatchResult;
@@ -258,7 +260,16 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                 trace.recordFilteredMachine(machine, "临时故障SKU禁止选回原机台");
                 continue;
             }
-            // 仅喷砂原机也参与竞争；来源原模可用时刻由完整时间轴和精确模具分配共同校验。
+            if (ContinuationSandBlastRecoveryService.isReplacementMachineReserved(context, sku, machine.getMachineCode())) {
+                trace.recordFilteredMachine(machine, "仅喷砂原机等待同料模具置换");
+                continue;
+            }
+            if (ContinuationSandBlastRecoveryService.isRecoveryCandidate(sku)
+                    && !ContinuationSandBlastRecoveryService.allowsMachine(context, sku, machine.getMachineCode())) {
+                trace.recordFilteredMachine(machine, "仅喷砂恢复只允许原机原模");
+                continue;
+            }
+            // 原机恢复仍须通过完整时间轴、原模清洗结束和资源约束。
             MachineAvailabilityReason availabilityReason = resolveMachineAvailabilityReason(
                     context, sku, mouldResourceContext, skuInch,
                     specialMaterialMatchResult, machine);
@@ -480,7 +491,14 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         if (context.isTemporaryFaultOriginalMachine(sku, machine.getMachineCode())) {
             return MachineSkuMatchResult.failed(machine, sku, "临时故障SKU禁止选回原故障机台");
         }
-        // 同料喷砂回装不再按原机身份拒绝，仍须等待来源原模清洗完成并通过全部资源约束。
+        if (ContinuationSandBlastRecoveryService.isReplacementMachineReserved(context, sku, machine.getMachineCode())) {
+            return MachineSkuMatchResult.failed(machine, sku, "仅喷砂原机等待同料模具置换");
+        }
+        if (ContinuationSandBlastRecoveryService.isRecoveryCandidate(sku)
+                && !ContinuationSandBlastRecoveryService.allowsMachine(context, sku, machine.getMachineCode())) {
+            return MachineSkuMatchResult.failed(machine, sku, "仅喷砂恢复只允许原机原模");
+        }
+        // 同料原机回装仍须等待来源原模清洗完成并通过全部资源约束。
         MouldResourceContext mouldResourceContext = resolveMouldResourceContext(context);
         BigDecimal skuInch = parseInch(sku.getProSize());
         SpecialMaterialMatchResult specialMaterialMatchResult =
@@ -4316,7 +4334,8 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
 
     /**
      * 解析同胎胚实际命中值。
-     * <p>优先按胎胚编码匹配；编码未命中时沿用现有胎胚描述兜底口径，并在日志中明确标识描述来源。</p>
+     * <p>K21/K22普通新增按初始化原胎胚编码生成软优先级；其它场景优先按运行态前料
+     * 胎胚编码匹配，编码未命中时沿用胎胚描述口径，并在日志中明确标识描述来源。</p>
      *
      * @param context 排程上下文
      * @param sku 待排SKU
@@ -4326,8 +4345,26 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     private String resolveEmbryoMatchedValue(LhScheduleContext context,
                                              SkuScheduleDTO sku,
                                              MachineScheduleDTO machine) {
-        if (Objects.isNull(context) || Objects.isNull(sku) || Objects.isNull(machine)
-                || StringUtils.isEmpty(machine.getPreviousMaterialCode())) {
+        if (Objects.isNull(context) || Objects.isNull(sku) || Objects.isNull(machine)) {
+            return null;
+        }
+        if (K21K22EmbryoMatchPolicy.isEnabled(context)
+                && K21K22EmbryoMatchPolicy.isTargetMachine(machine.getMachineCode())) {
+            K21K22EmbryoMatchPolicy policy = context.resolveK21K22EmbryoMatchPolicy();
+            String originalEmbryo = policy.getOriginalEmbryo(machine.getMachineCode());
+            String pairMachineCode = LhSingleControlMachineUtil.resolvePairMachineCode(machine.getMachineCode());
+            String pairOriginalEmbryo = this.isSingleControlMachine(context, machine.getMachineCode())
+                    && LhSingleControlMachineUtil.isWholeMachineGranularitySku(context, sku)
+                    ? policy.getOriginalEmbryo(pairMachineCode) : null;
+            if (originalEmbryo != null || pairOriginalEmbryo != null) {
+                // 整机只有全部已知原胎胚侧均命中才取得同胎胚优先，未命中继续比较其它软指标。
+                boolean matched = (originalEmbryo == null
+                        || policy.matchesOriginalEmbryo(machine.getMachineCode(), sku))
+                        && (pairOriginalEmbryo == null || policy.matchesOriginalEmbryo(pairMachineCode, sku));
+                return matched ? StringUtils.trimToNull(sku.getEmbryoCode()) : null;
+            }
+        }
+        if (StringUtils.isEmpty(machine.getPreviousMaterialCode())) {
             return null;
         }
         MdmMaterialInfo machineMaterialInfo = context.getMaterialInfoMap().get(machine.getPreviousMaterialCode());

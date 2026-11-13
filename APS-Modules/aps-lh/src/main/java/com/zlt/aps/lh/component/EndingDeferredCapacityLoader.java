@@ -21,6 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import javax.annotation.Resource;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.LinkedHashMap;
@@ -152,6 +153,9 @@ public class EndingDeferredCapacityLoader {
         projection.setSkuLhCapacityMap(new LinkedHashMap<>(source.getSkuLhCapacityMap()));
         projection.setMaterialInfoMap(new LinkedHashMap<>(source.getMaterialInfoMap()));
         projection.setMonthPlanList(new ArrayList<>(source.getMonthPlanList()));
+        // 延期清洗复用窗口起点的真实余量，副本只共享不可变标量，运行态分别初始化。
+        projection.setCleaningInitialSurplusQtyMap(Collections.unmodifiableMap(
+                new LinkedHashMap<>(source.getCleaningInitialSurplusQtyMap())));
         Map<String, MachineScheduleDTO> machines = new LinkedHashMap<>();
         source.getMachineScheduleMap().forEach((code, machine) -> {
             MachineScheduleDTO copied = BeanUtil.copyProperties(machine, MachineScheduleDTO.class);

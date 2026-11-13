@@ -22,6 +22,12 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.ruoyi.common.core.utils.DateUtils;
+import java.lang.reflect.Field;
+import java.math.BigDecimal;
+import java.text.DecimalFormat;
+import java.text.ParseException;
+
 public class ExcelUtils {
 
     /**
@@ -177,6 +183,49 @@ public class ExcelUtils {
         return placeholderMap;
     }
 
+    /**
+     * 扫描模板 Sheet 中所有包含列表占位符（形如 {.key}）的单元格，返回占位符名称 → 列索引（0起始）的有序映射。
+     * 与 scanTemplateRowPlaceholders 的区别：该方法遍历整个 Sheet 的所有占位行并汇总，
+     * 适用场景：模板包含多块列表区域（如表头统计区、数据区、特殊材料区），且各区域占位符 key 命名互不相同
+     * （如数据区使用 materialCode，表头统计区使用 materialCodeA）。
+     *
+     * @param is 模板输入流（调用方负责关闭）
+     * @param sheetIndex sheet 索引
+     * @return 占位符名称（不含 "{." 和 "}"）→ 列索引（0起始）的有序映射
+     */
+    public static Map<String, Integer> scanTemplateRowPlaceholdersAllRows(InputStream is, int sheetIndex) {
+        Map<String, Integer> placeholderMap = new LinkedHashMap<>();
+        try {
+            XSSFWorkbook workbook = new XSSFWorkbook(is);
+            Sheet sheet = workbook.getSheetAt(sheetIndex);
+            for (int i = sheet.getFirstRowNum(); i <= sheet.getLastRowNum(); i++) {
+                Row row = sheet.getRow(i);
+                if (row == null) {
+                    continue;
+                }
+                for (int j = 0; j < row.getLastCellNum(); j++) {
+                    Cell cell = row.getCell(j);
+                    if (cell != null && cell.getCellType() == CellType.STRING) {
+                        String cellValue = cell.getStringCellValue();
+                        if (cellValue != null && cellValue.contains("{.")) {
+                            Matcher matcher = PATTERN_LIST.matcher(cellValue);
+                            while (matcher.find()) {
+                                String key = matcher.group(1);
+                                if (!placeholderMap.containsKey(key)) {
+                                    placeholderMap.put(key, j);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            workbook.close();
+        } catch (Exception e) {
+            throw new RuntimeException("扫描模板全部占位行占位符失败", e);
+        }
+        return placeholderMap;
+    }
+
     //图片
     public static final String IMG = "IMG";
 
@@ -186,6 +235,14 @@ public class ExcelUtils {
     public static  final String RANGE_ADDRESS = "RANGE_ADDRESS";
 
     public static  final String CELL_STYLE = "CELL_STYLE";
+
+    /**
+     * 已写入公式的位置缓存，元素为 {行索引(0起始), 列索引(0起始), 公式}。
+     * 由 writeMultiList 在多列表块渲染前注入：先渲染的列表块中写入的公式，
+     * 会被后续列表块的 sheet.shiftRows 自动改写引用行号（如头部统计块引用主体表合计行），
+     * 因此记录公式的最终位置，在渲染结束时按原公式统一重写，保证引用正确。
+     */
+    private static final String WRITTEN_FORMULAS = "WRITTEN_FORMULAS";
 
     /**
      * 是否显示网格线，不传默认显示
@@ -200,6 +257,32 @@ public class ExcelUtils {
     public static final String HIDDEN_ROWS = "HIDDEN_ROWS";
 
     private ExcelUtils() {
+    }
+
+    /**
+     * 公式值标记：模板填充时若单元格值为 FormulaValue，则按 Excel 公式（setCellFormula）写入，
+     * 而不是当作普通文本/数值。适用场景：小计/合计行需以 =SUM(...) 公式方式合计。
+     * 用法：new FormulaValue("SUM(A1:A10)")，公式无需以 "=" 开头（构造时会自动去除）。
+     */
+    public static final class FormulaValue {
+
+        /** Excel 公式内容（不含前导 "="） */
+        private final String formula;
+
+        public FormulaValue(String formula) {
+            if (formula == null) {
+                throw new IllegalArgumentException("Excel 公式不能为空");
+            }
+            String formulaTemp = formula.trim();
+            if (formulaTemp.startsWith("=")) {
+                formulaTemp = formulaTemp.substring(1);
+            }
+            this.formula = formulaTemp;
+        }
+
+        public String getFormula() {
+            return formula;
+        }
     }
 
     /**
@@ -218,6 +301,8 @@ public class ExcelUtils {
                 Object displayGridlines = context.get(ExcelUtils.DISPLAY_GRIDLINES);
                 sheet.setDisplayGridlines(Boolean.parseBoolean(displayGridlines.toString()));
             }
+            // 公式位置缓存（由 writeMultiList 注入，单次 writeExcel 调用时为 null）
+            List<Object[]> writtenFormulas = (List<Object[]>) context.get(WRITTEN_FORMULAS);
             int listStartRowNum = -1;
             for (int i = sheet.getFirstRowNum(); i <= sheet.getLastRowNum(); i++) {
                 Row row = sheet.getRow(i);
@@ -265,6 +350,9 @@ public class ExcelUtils {
                     }
                 } else {
                     int lastCellNum = listStartRow.getLastCellNum();
+                    // 本列表块待写入的公式：{创建时的行号, 列号, 公式}。
+                    // 需延后到数据行上移压缩之后再写入，否则 sheet.shiftRows 会按行位移自动修正这些公式的引用行号，导致合计公式范围错位。
+                    List<Object[]> pendingFormulas = new ArrayList<>();
                     if (listStartRowNum + 1 <= sheet.getLastRowNum()) {
                         sheet.shiftRows(listStartRowNum + 1, sheet.getLastRowNum(), dataList.size(), true, false);// 列表数据行后面行下移，留出数据填充区域
                     }
@@ -293,7 +381,12 @@ public class ExcelUtils {
                                         newRow.setHeightInPoints(Float.parseFloat(map.get("height").toString())); // 设置行高为30个点
 
                                     }
-                                    setCellValue(newCell, newValue);
+                                    if (newValue instanceof FormulaValue) {
+                                        // 公式延后写入，避免行上移时被 shiftRows 自动修正引用行号
+                                        pendingFormulas.add(new Object[]{newRowNum, j, ((FormulaValue) newValue).getFormula()});
+                                    } else {
+                                        setCellValue(newCell, newValue);
+                                    }
                                     // 设置样式
 
                                     // 按列样式优先（style_{key}），其次整行样式（style）
@@ -335,6 +428,9 @@ public class ExcelUtils {
                                         font.setBold(excelStyleVo.getBold());
                                         if(excelStyleVo.getFontSize() != null){
                                             font.setFontHeightInPoints(excelStyleVo.getFontSize());
+                                        }
+                                        if (excelStyleVo.getFontColor() != null) {
+                                            font.setColor(excelStyleVo.getFontColor());
                                         }
                                         //将字体样式设置到单元格样式中
                                         style.setFont(font);
@@ -407,7 +503,8 @@ public class ExcelUtils {
                                         if (rowOffset != 0) {
                                             formula = formula.replaceAll("(?<=[A-Z])" + (listStartRowNum + 1) + "(?![0-9])", String.valueOf(newRowNum + 1));
                                         }
-                                        newCell.setCellFormula(formula);
+                                        // 公式延后写入，避免行上移时被 shiftRows 自动修正引用行号
+                                        pendingFormulas.add(new Object[]{newRowNum, j, formula});
                                     } else {
                                         newCell.setCellValue(cell.getStringCellValue());
                                     }
@@ -417,6 +514,23 @@ public class ExcelUtils {
                     }
                     sheet.removeRow(listStartRow);// 删除list表达式行
                     sheet.shiftRows(listStartRowNum + 1, sheet.getLastRowNum(), -1, true, false);// 数据区域上移一行，覆盖表达式行
+                    // 行上移压缩完成后统一写入公式：此时数据行已落到最终行号，公式引用即为最终行号，不会再被 shiftRows 二次调整
+                    for (Object[] pendingFormula : pendingFormulas) {
+                        int formulaRowNum = (Integer) pendingFormula[0] - 1;
+                        int formulaCellNum = (Integer) pendingFormula[1];
+                        String formula = (String) pendingFormula[2];
+                        Row formulaRow = sheet.getRow(formulaRowNum);
+                        if (formulaRow != null) {
+                            Cell formulaCell = formulaRow.getCell(formulaCellNum);
+                            if (formulaCell != null) {
+                                formulaCell.setCellFormula(formula);
+                                // 记录公式的最终位置，供多列表块渲染时统一重写（避免被后续列表块的 shiftRows 改写引用行号）
+                                if (writtenFormulas != null) {
+                                    writtenFormulas.add(new Object[]{formulaRowNum, formulaCellNum, formula});
+                                }
+                            }
+                        }
+                    }
 
                     // 合并单元格处理
                     for (int i = 0; i < lastCellNum; i++) {
@@ -502,6 +616,7 @@ public class ExcelUtils {
                         boolean bold = cs.getBold() != null ? cs.getBold() : false;
                         String fontName = cs.getFontName();
                         String fontColor = cs.getFontColor();
+                        String dataFormat = cs.getDataFormat();
                         for (int colIdx = cs.getStartCellNum(); colIdx <= cs.getEndCellNum(); colIdx++) {
                             CellStyle oldStyle = null;
                             if (cs.getStartRowNum() <= sheet.getLastRowNum()) {
@@ -515,12 +630,33 @@ public class ExcelUtils {
                             }
                             String cacheKey = cs.getColor() + "|" + cs.getWithBorder() + "|" + bold + "|" + fontName
                                     + "|" + fontColor
+                                    + "|" + (dataFormat != null ? dataFormat : "")
                                     + "|" + (oldStyle != null ? oldStyle.getAlignment().ordinal() : -1)
                                     + "|" + (oldStyle != null ? oldStyle.getVerticalAlignment().ordinal() : -1)
                                     + "|" + colIdx;
                             CellStyle finalOldStyle = oldStyle;
                             CellStyle style2 = styleMap.computeIfAbsent(cacheKey, k -> createColorCellStyle(workbook, cs.getColor(), cs.getWithBorder(), bold, fontName, fontColor, finalOldStyle));
+                            if (StringUtils.isNotEmpty(dataFormat)) {
+                                // 设置自定义单元格格式（如 0;-0;;@ 让0值显示为空白）；样式按 cacheKey 缓存，重复设置同一格式无副作用
+                                style2.setDataFormat(workbook.createDataFormat().getFormat(dataFormat));
+                            }
                             setCellRangeColor(sheet, cs.getStartRowNum(), colIdx, cs.getEndRowNum(), colIdx, style2);
+                        }
+                    }
+                }
+            }
+            // 公式重写：先渲染的列表块中写入的公式（如头部统计块引用主体表合计行），
+            // 可能已被后续列表块的 sheet.shiftRows 自动改写引用行号；此处按记录的最终公式统一重写
+            if (writtenFormulas != null) {
+                for (Object[] writtenFormula : writtenFormulas) {
+                    int writtenRowNum = (Integer) writtenFormula[0];
+                    int writtenCellNum = (Integer) writtenFormula[1];
+                    String writtenFormulaValue = (String) writtenFormula[2];
+                    Row writtenRow = sheet.getRow(writtenRowNum);
+                    if (writtenRow != null) {
+                        Cell writtenCell = writtenRow.getCell(writtenCellNum);
+                        if (writtenCell != null) {
+                            writtenCell.setCellFormula(writtenFormulaValue);
                         }
                     }
                 }
@@ -545,7 +681,9 @@ public class ExcelUtils {
         return this.getClass().getClassLoader();
     }
     private static void setCellValue(Cell cell, Object value) {
-        if (value instanceof Number) {// 如果是数字类型的设置为数值
+        if (value instanceof FormulaValue) {// 公式类型的值，按 Excel 公式写入
+            cell.setCellFormula(((FormulaValue) value).getFormula());
+        } else if (value instanceof Number) {// 如果是数字类型的设置为数值
             cell.setCellValue(Double.parseDouble(value.toString()));
         } else if (value instanceof Date) {// 如果为时间类型的设置为时间
             cell.setCellValue((Date) value);
@@ -668,6 +806,9 @@ public class ExcelUtils {
                                         List<List<Map<String, Object>>> dataLists) {
         try {
             File temp = convertInputStreamToFile(is);
+            // 注入公式位置缓存：多列表块渲染时，先渲染块中写入的公式会被后续块的 sheet.shiftRows 改写引用行号，
+            // 需要在每块渲染结束时按记录的最终公式统一重写，保证引用正确
+            context.put(WRITTEN_FORMULAS, new ArrayList<Object[]>());
             //先取出合并单元格，最后一步才进行合并
             List<ExcelCellRangeAddress> rangeAddressList = (List<ExcelCellRangeAddress>) context.get(RANGE_ADDRESS);
             List<ExcelCellRangeAddress> cellStyleList = (List<ExcelCellRangeAddress>) context.get(CELL_STYLE);
@@ -713,6 +854,8 @@ public class ExcelUtils {
                 boolean delete = temp.delete();
             }
             is.close();
+            // 移除本次渲染注入的公式位置缓存，避免调用方复用 context 时残留上一次的公式
+            context.remove(WRITTEN_FORMULAS);
             return output;
         } catch (ExcelException e) {
             throw e;
@@ -875,6 +1018,13 @@ public class ExcelUtils {
     }
 
     private static CellStyle createColorCellStyle(Workbook workbook, String colorCode, boolean withBorder, boolean bold, String fontName, String fontColor, CellStyle oldStyle) {
+        // 仅要求设置数字格式（未指定背景色、边框、字体）时，直接克隆原单元格样式，保留单元格原有外观
+        if (oldStyle != null && StringUtils.isEmpty(colorCode) && !withBorder && !bold
+                && StringUtils.isEmpty(fontName) && StringUtils.isEmpty(fontColor)) {
+            XSSFCellStyle cloneStyle = (XSSFCellStyle) workbook.createCellStyle();
+            cloneStyle.cloneStyleFrom(oldStyle);
+            return cloneStyle;
+        }
         XSSFCellStyle cellStyle = (XSSFCellStyle) workbook.createCellStyle();
         cellStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
 
@@ -1127,5 +1277,104 @@ public class ExcelUtils {
                 break;
             default:
         }
+    }
+
+    /* ==================== 以下方法合并自 mix-common-core ==================== */
+
+    public static boolean checkObjFieldIsNull(Object obj) throws IllegalAccessException {
+        boolean flag = true;
+
+        Class clazz = obj.getClass();
+        Field[] fields = clazz.getDeclaredFields();
+
+        for (Field field : fields) {
+            //设置属性是可以访问的(私有的也可以)
+            field.setAccessible(true);
+            Object value = null;
+            try {
+                value = field.get(obj);
+                // 只要有1个属性不为空,那么就不是所有的属性值都为空
+                if (value != null) {
+                    flag = false;
+                    break;
+                }
+            } catch (IllegalAccessException e) {
+                e.printStackTrace();
+            }
+        }
+
+        return flag;
+    }
+
+    public static String getCellValue(Cell cell) {
+        Object val = null;
+        if (cell == null) {
+            return null;
+        }
+        if (cell.getCellType() == CellType.NUMERIC || cell.getCellType() == CellType.FORMULA) {
+            val = cell.getNumericCellValue();
+            //当val值为大值时，很可能解析为科学计数法显示
+            String valStr = val + "";
+            if (valStr.contains("E")) {
+                BigDecimal realValue = new BigDecimal(valStr);
+                val = realValue.toPlainString();
+            }else {
+                if ((Double) val % 1 != 0) {
+                    val = new BigDecimal(val.toString());
+                } else {
+                    val = new DecimalFormat("0").format(val);
+                }
+            }
+        } else if (cell.getCellType() == CellType.STRING) {
+            val = cell.getStringCellValue();
+        } else if (cell.getCellType() == CellType.BOOLEAN) {
+            val = cell.getBooleanCellValue();
+        }
+        if (val == null) {
+            return null;
+        }
+        return val + "";
+    }
+
+    public static Date getDateValue(String val, String parsePatterns) throws ParseException {
+        Date db = null;
+        if (val == null) {
+            return DateUtils.parseDate("1970-01-01", parsePatterns);
+        }
+        try {
+            db = DateUtils.parseDate(val, parsePatterns);
+        } catch (Exception e) {
+            return DateUtils.parseDate("1970-01-01", parsePatterns);
+        }
+        return db;
+    }
+
+    public static Double getDoubleValue(String val) {
+        Double db = null;
+        if (val == null) {
+            return db;
+        }
+        try {
+            db = Double.valueOf(val);
+        } catch (Exception e) {
+            return null;
+        }
+        return db;
+    }
+
+    public static Integer getIntegerValue(String val) {
+        Integer integerVal = null;
+        if (val == null) {
+            return integerVal;
+        }
+        try {
+            if (val.endsWith(".0")) {
+                val = val.substring(0, val.indexOf(".0"));
+            }
+            integerVal = Integer.parseInt(val);
+        } catch (Exception e) {
+            return null;
+        }
+        return integerVal;
     }
 }

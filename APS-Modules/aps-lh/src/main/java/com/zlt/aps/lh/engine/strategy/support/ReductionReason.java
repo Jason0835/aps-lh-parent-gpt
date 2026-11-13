@@ -14,6 +14,10 @@ public enum ReductionReason {
     CLEANING_PLAN,
     /** 胶囊左右侧最大使用次数。 */
     CAPSULE_USAGE,
+    /**
+     * K21/K22同胎胚合法候选按物理机台编号降序。
+     */
+    SAME_EMBRYO_MACHINE_CODE,
     /** 业务因素相同时按编码确定顺序。 */
     MACHINE_CODE_FALLBACK
 }

@@ -35,6 +35,10 @@ public class DayScheduleContext {
     private final DailyNewSpecOrderLogCollector newSpecOrderLogCollector;
     /** 当前正在执行的日内阶段 */
     private DailySchedulePhase currentPhase;
+    /**
+     * 本次普通选料的首检及生产下限，按窗口首日边界一次初始化；独立入口为空。
+     */
+    private Date selectionProductionNotBeforeTime;
 
     /**
      * 创建业务日编排上下文。
@@ -129,5 +133,23 @@ public class DayScheduleContext {
 
     public void setCurrentPhase(DailySchedulePhase currentPhase) {
         this.currentPhase = currentPhase;
+    }
+
+    /**
+     * 返回普通选料的首检和生产下限，纯准备不受此边界限制。
+     *
+     * @return 普通选料的时间下限，独立入口和专用喷砂恢复阶段为空
+     */
+    public Date getSelectionProductionNotBeforeTime() {
+        return currentPhase == DailySchedulePhase.SAND_BLAST_RECOVERY ? null : selectionProductionNotBeforeTime;
+    }
+
+    /**
+     * 在日编排初始化时冻结普通选料的生产边界，避免每个机台提案重新扫描窗口。
+     *
+     * @param selectionProductionNotBeforeTime 允许首检及生产的最早时刻
+     */
+    public void setSelectionProductionNotBeforeTime(Date selectionProductionNotBeforeTime) {
+        this.selectionProductionNotBeforeTime = selectionProductionNotBeforeTime;
     }
 }

@@ -10,6 +10,7 @@ import com.zlt.aps.lh.engine.factory.ScheduleStrategyFactory;
 import com.zlt.aps.lh.engine.strategy.IProductionStrategy;
 import com.zlt.aps.lh.engine.strategy.ISkuPriorityStrategy;
 import com.zlt.aps.lh.engine.strategy.ITypeBlockProductionStrategy;
+import com.zlt.aps.lh.engine.strategy.impl.NewSpecProductionStrategy;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchCandidateScope;
 import com.zlt.aps.lh.service.impl.LhEquipmentPlanScheduleService;
 import com.zlt.aps.lh.service.impl.PreviousAlternatePlanReuseService;
@@ -77,6 +78,11 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
      */
     @Resource
     private TimedMachineOffCleaningHandoffService timedMachineOffCleaningHandoffService;
+    /**
+     * 历史承接确认后优先恢复喷砂原料，并发布后续阶段可见的完整窗口占用。
+     */
+    @Resource
+    private NewSpecProductionStrategy newSpecProductionStrategy;
     /** S4.4 续作排产前校验 MES 实际在机模具与续作 SKU 模具关系。 */
     @Resource
     private ContinuationOnlineMouldValidator continuationOnlineMouldValidator;
@@ -137,6 +143,11 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
 
         timedMachineOffCleaningHandoffService.execute(context,
                 () -> this.finalizeAndReuseContinuousProduction(context, strategy));
+
+        // 历史联合承接确认或回滚结束后再恢复，避免换活字块和结构切换先占用原机。
+        newSpecProductionStrategy.schedulePrioritySandBlastRecoveries(context,
+                strategyFactory.getMachineMatchStrategy(), strategyFactory.getMouldChangeBalanceStrategy(),
+                strategyFactory.getFirstInspectionBalanceStrategy(), strategyFactory.getCapacityCalculateStrategy());
 
         // S4.4.5 收尾后换活字块衔接排产：只读取均衡后的最终机台可用时间。
         typeBlockProductionStrategy.scheduleTypeBlockChange(context);

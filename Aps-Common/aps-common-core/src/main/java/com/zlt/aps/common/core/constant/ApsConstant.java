@@ -15,6 +15,16 @@ public class ApsConstant {
      */
     public static final String DEL_FLAG_DEL = "1";
 
+    /**
+     * 逻辑删除标识（IS_DELETE）：正常
+     */
+    public static final Integer IS_DELETE_NORMAL = 0;
+
+    /**
+     * 逻辑删除标识（IS_DELETE）：已删除
+     */
+    public static final Integer IS_DELETE_DELETED = 1;
+
 
     /**
      * 四个班次
@@ -299,24 +309,34 @@ public class ApsConstant {
     public static String DOCK_SYS_MES = "MES";
 
     /**
-     * 调度员操作类型：转机台
+     * 排程操作类型：转机台
      */
     public static String DISPATCHER_OPER_MACHINE = "0";
 
     /**
-     * 调度员操作类型：调量
+     * 排程操作类型：调量
      */
     public static String DISPATCHER_OPER_PLAN = "1";
 
     /**
-     * 调度员操作类型：插单
+     * 排程操作类型：插单
      */
     public static String DISPATCHER_OPER_INSERT_ORDER = "2";
 
     /**
-     * 调度员操作类型：删除
+     * 排程操作类型：删除
      */
     public static String DISPATCHER_OPER_DELETE = "3";
+
+    /**
+     * 排程操作类型：自动滚动
+     */
+    public static String DISPATCHER_OPER_AUTO_ROLLING = "4";
+
+    /**
+     * 排程操作类型：自动排程
+     */
+    public static String DISPATCHER_OPER_AUTO_SCHEDULE = "5";
 
     /**
      * 调度员角色编码

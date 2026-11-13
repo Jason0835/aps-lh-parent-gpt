@@ -18,7 +18,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Collectors;
 
 /**
- * 后半段窗口无计划时的胎胚库存收尾准入规则。
+ * 胎胚库存收尾的零库存禁排及后半段正库存准入规则。
  * 仅读取本轮原始标识、库存及共用关系，不冻结份额或修改需求、资源及消费账本。
  *
  * @author APS
@@ -64,6 +64,24 @@ public final class EmbryoEndingStockAdmissionPolicy {
         }
         Integer stockQty = context.getEmbryoRealtimeStockMap().get(sku.getEmbryoCode());
         return Objects.nonNull(stockQty) && stockQty > 0 && !isSharedOrUnusedEmbryoSource(context, sku);
+    }
+
+    /**
+     * 判断胎胚库存收尾来源是否已无本轮可用库存。
+     * 缺记录和非正库存均不得回退硫化余量或旧DTO库存，历史交替身份不豁免。
+     * 单胎胚、共用胎胚及同物料多机台统一禁排，不依赖候选或份额冻结状态。
+     *
+     * @param context 本轮胎胚收尾标识和T日库存
+     * @param sku 当前物料及产品状态来源
+     * @return 胎胚收尾且本轮库存缺失或非正时返回true
+     */
+    public static boolean isEmbryoEndingWithoutStock(LhScheduleContext context, SkuScheduleDTO sku) {
+        if (Objects.isNull(context) || Objects.isNull(sku) || StringUtils.isBlank(sku.getEmbryoCode())
+                || !EMBRYO_ENDING_FLAG.equals(context.getEmbryoEndingFlagMap().get(sku.getEmbryoCode()))) {
+            return false;
+        }
+        Integer stockQty = context.getEmbryoRealtimeStockMap().get(sku.getEmbryoCode());
+        return Objects.isNull(stockQty) || stockQty <= 0;
     }
 
     /**

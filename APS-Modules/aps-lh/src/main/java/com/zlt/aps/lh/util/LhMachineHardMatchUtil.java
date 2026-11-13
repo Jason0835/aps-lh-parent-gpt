@@ -5,6 +5,7 @@ import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.SpecialMaterialMatchResult;
 import com.zlt.aps.lh.api.enums.LhSpecialMaterialCategoryEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.service.impl.ContinuationSandBlastRecoveryService;
 import com.zlt.aps.mdm.api.domain.entity.MdmModelInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import org.apache.commons.lang3.StringUtils;
@@ -57,7 +58,15 @@ public final class LhMachineHardMatchUtil {
             // 达到两班阈值的故障SKU必须迁移到其他物理机台，禁止本轮重新选回故障原机。
             return false;
         }
-        // 喷砂原机不属于永久禁用资源，原模清洗结束与换模时间仍由排产链路判断。
+        if (Objects.nonNull(context)
+                && ContinuationSandBlastRecoveryService.isReplacementMachineReserved(context, sku, machine.getMachineCode())) {
+            return false;
+        }
+        if (ContinuationSandBlastRecoveryService.isRecoveryCandidate(sku)
+                && !ContinuationSandBlastRecoveryService.allowsMachine(context, sku, machine.getMachineCode())) {
+            return false;
+        }
+        // 原机原模身份通过后，清洗结束与换模时间仍由排产链路判断。
         BigDecimal skuInch = parseInch(Objects.isNull(sku) ? null : sku.getProSize());
         if (!isInchInRange(skuInch, machine.getDimensionMinimum(), machine.getDimensionMaximum())) {
             return false;

@@ -19,11 +19,13 @@ import com.zlt.aps.lh.engine.strategy.support.PreviousAlternatePlanReleaseEvent;
 import com.zlt.aps.lh.engine.strategy.support.EquipmentPlanOverlapResult;
 import com.zlt.aps.lh.engine.strategy.support.FirstInspectionAllocationPlan;
 import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
+import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.util.LhInventoryPlanMatcher;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.PriorityTraceLogHelper;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
+import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.aps.lh.api.enums.MachineStopTypeEnum;
 import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
@@ -315,16 +317,49 @@ public class LhMaintenanceScheduleService {
     }
 
     /**
-     * 以候选冻结的公共首检计划复核精度并行，禁止仅凭切换区间重叠跳过首检或放宽生产截止。
-     * @param context 上下文 @param machine 候选机台 @param sku SKU @param pendingQty 待排量 @param plannedQty 实排量
-     * @param preparationStartTime 切换开始 @param productionStartTime 正式生产开始 @param completionTime 生产结束
-     * @param parallelMouldChangeEndTime 切换含首检总时长结束 @param inspectionPlan 已冻结公共首检
+     * 兼容既有正规换模调用，以冻结首检计划复核精度并行。
+     *
+     * @param context 排程上下文
+     * @param machine 候选机台
+     * @param sku 待排物料
+     * @param pendingQty 待排数量
+     * @param plannedQty 实际计划数量
+     * @param preparationStartTime 切换开始时间
+     * @param productionStartTime 正式生产开始时间
+     * @param completionTime 生产结束时间
+     * @param parallelMouldChangeEndTime 切换含首检总时长结束时间
+     * @param inspectionPlan 已冻结公共首检
      * @return 拒绝原因，空表示允许
      */
     public String resolvePrecisionCandidateRejectReason(LhScheduleContext context,
             MachineScheduleDTO machine, SkuScheduleDTO sku, int pendingQty, int plannedQty,
             Date preparationStartTime, Date productionStartTime, Date completionTime,
             Date parallelMouldChangeEndTime, FirstInspectionAllocationPlan inspectionPlan) {
+        return this.resolvePrecisionCandidateRejectReason(context, machine, sku, pendingQty, plannedQty,
+                preparationStartTime, productionStartTime, completionTime, parallelMouldChangeEndTime,
+                inspectionPlan, ScheduleTypeEnum.NEW_SPEC.getCode());
+    }
+
+    /**
+     * 按真实切换类型校验冻结首检，换活字块复用包含首检的切换时长。
+     *
+     * @param context 排程上下文
+     * @param machine 候选机台
+     * @param sku 待排物料
+     * @param pendingQty 待排数量
+     * @param plannedQty 实际计划数量
+     * @param preparationStartTime 切换开始时间
+     * @param productionStartTime 正式生产开始时间
+     * @param completionTime 生产结束时间
+     * @param parallelMouldChangeEndTime 切换含首检总时长结束时间
+     * @param inspectionPlan 已冻结公共首检
+     * @param scheduleType 实际切换类型
+     * @return 拒绝原因，空表示允许
+     */
+    public String resolvePrecisionCandidateRejectReason(LhScheduleContext context,
+            MachineScheduleDTO machine, SkuScheduleDTO sku, int pendingQty, int plannedQty,
+            Date preparationStartTime, Date productionStartTime, Date completionTime,
+            Date parallelMouldChangeEndTime, FirstInspectionAllocationPlan inspectionPlan, String scheduleType) {
         MachineMaintenanceWindowDTO window = resolveFirstMaintenanceWindow(machine);
         if (Objects.isNull(window) || Objects.isNull(window.getProductionCutoffTime())
                 || Objects.isNull(window.getProductionResumeTime())) {
@@ -333,6 +368,7 @@ public class LhMaintenanceScheduleService {
         if (window.isEquipmentPlanManaged()) {
             if (Objects.nonNull(inspectionPlan) && Objects.equals(window.getPrecisionPlanId(), inspectionPlan.getEquipmentPlanId())) {
                 if (!inspectionPlan.isValid() || Objects.isNull(inspectionPlan.getInspectionStartTime())
+                        || Objects.isNull(inspectionPlan.getCountingShift())
                         || Objects.isNull(window.getMaintenanceReadyTime())
                         || inspectionPlan.getInspectionStartTime().before(window.getMaintenanceReadyTime())) {
                     return "精度并行缺少有效的计件首检计划";
@@ -343,12 +379,20 @@ public class LhMaintenanceScheduleService {
                     changeoverEndTime = parallelMouldChangeEndTime;
                 }
                 long expectedStart = equipmentPlanTimelineResolver.resolvePrecisionInspectionStartTime(
-                        window.getMaintenanceReadyTime(), changeoverEndTime).getTime();
+                        context, window, preparationStartTime, changeoverEndTime,
+                        inspectionPlan, scheduleType).getTime();
                 if (Objects.isNull(inspectionPlan.getInspectionEndTime())
                         || inspectionPlan.getInspectionStartTime().getTime() != expectedStart
                         || inspectionPlan.getInspectionEndTime().getTime() != expectedStart
                                 + inspectionPlan.getInspectionDurationSeconds() * 1000L) {
-                    return "精度并行首检未按准备完成点及参数条数正向执行";
+                    return "精度并行首检与切换时长及准备下限不一致";
+                }
+                if (ScheduleTypeEnum.TYPE_BLOCK.getCode().equals(scheduleType)) {
+                    String conflict = this.resolvePrecisionInspectionOverlapReason(
+                            context, inspectionPlan, preparationStartTime);
+                    if (StringUtils.isNotBlank(conflict)) {
+                        return conflict;
+                    }
                 }
                 return Objects.isNull(productionStartTime) || productionStartTime.before(inspectionPlan.getInspectionEndTime())
                         ? "精度与切换公共首检尚未结束，禁止正式生产" : StringUtils.EMPTY;
@@ -623,7 +667,7 @@ public class LhMaintenanceScheduleService {
 
     /**
      * 读取单侧机台已知收尾时间，普通余量组未完成时旧节点不能证明自然收尾。
-     * 空闲机台以当前排程日零点表示已经就绪。
+     * 已收口的历史零产量前料使用实际可用起点，无历史占用的空闲机台使用排程日零点。
      *
      * @param context 排程上下文
      * @param machine 运行态机台
@@ -635,6 +679,10 @@ public class LhMaintenanceScheduleService {
         }
         if (ContinuationSurplusCompletionSupport.hasUnfinishedContinuation(context, machine)) {
             return null;
+        }
+        Date zeroProductionReadyTime = this.resolveZeroProductionPrecisionReadyTime(context, machine);
+        if (Objects.nonNull(zeroProductionReadyTime)) {
+            return zeroProductionReadyTime;
         }
         // 空闲机台没有预计收尾时间并不代表时间未知，应视为排程日开始时已经就绪。
         // 该区分可避免3天内精准计划把空闲机台误判为“必须强制下机”。
@@ -649,6 +697,69 @@ public class LhMaintenanceScheduleService {
             return null;
         }
         return machine.getEstimatedEndTime();
+    }
+
+    /**
+     * 续作最终零产量的历史前料按真实空闲时间竞争精度，避免历史中班承接起点推迟精度。
+     * 仅解析精度输入，历史交替事件、生产和模具释放仍由原承接流程提交或恢复。
+     *
+     * @param context 已完成续作收口的上下文
+     * @param machine 当前运行侧，物理配对侧由调用方取最晚就绪时间
+     * @return 可提前的精度就绪时间；没有独立零产量证明时返回空
+     */
+    private Date resolveZeroProductionPrecisionReadyTime(LhScheduleContext context, MachineScheduleDTO machine) {
+        PreviousAlternatePlanReleaseEvent event = context.getPreviousAlternateReleaseEventMap()
+                .get(machine.getMachineCode());
+        if (!context.isContinuousDailyQuotaSynced() || Objects.isNull(event)
+                || !event.isBeforeMaterialNotScheduled() || StringUtils.isNotBlank(machine.getCurrentMaterialCode())
+                || event.resolveProductionRole()
+                != PreviousAlternatePlanReleaseEvent.ProductionRole.BEFORE_MATERIAL_PRODUCTION
+                || Objects.isNull(event.getNoProductionStartTime())
+                || !event.getNoProductionStartTime().equals(event.getOfflineTime())
+                || !event.getNoProductionStartTime().equals(machine.getEstimatedEndTime())) {
+            return null;
+        }
+        // 独立收尾、时间下机和故障释放已有自己的事实，不能被默认零量历史班初覆盖。
+        if (event.isSupplementalReleasePending() || event.isSharedEmbryoEndingPending()
+                || event.isRemainderFinishDeferred() || Objects.nonNull(event.getCompletedStrictEndingReleaseTime())
+                || Objects.nonNull(event.getCompletedEmbryoEndingWindowEndTime())
+                || Objects.nonNull(event.getForcedHandoffReleaseTime())
+                || Objects.nonNull(event.getConfirmedTimedHandoffWindowEndTime())
+                || context.isContinuousStopHoldMachine(machine.getMachineCode())
+                || Objects.nonNull(context.getTimedMachineOffBoundary(machine.getMachineCode()))) {
+            return null;
+        }
+        String physicalMachine = LhSingleControlMachineUtil.resolvePhysicalMachineCode(machine.getMachineCode());
+        boolean occupied = context.getScheduleResultList().stream().anyMatch(result ->
+                StringUtils.equals(physicalMachine, LhSingleControlMachineUtil.resolvePhysicalMachineCode(
+                        result.getLhMachineCode())) && ShiftFieldUtil.resolveScheduledQty(result) > 0);
+        boolean timedReleasePending = context.getTimedMachineOffRequests().stream().anyMatch(request ->
+                request.getProfile().getOriginals().stream().anyMatch(result -> StringUtils.equals(physicalMachine,
+                        LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode()))));
+        boolean faultControlled = context.getTemporaryFaultWindowMap().values().stream().anyMatch(window ->
+                StringUtils.equals(physicalMachine,
+                        LhSingleControlMachineUtil.resolvePhysicalMachineCode(window.getMachineCode())))
+                || context.getContinuationTemporaryFaultTransferEventMap().values().stream().anyMatch(transfer ->
+                        StringUtils.equals(physicalMachine, transfer.getOriginalPhysicalMachineCode())
+                                || StringUtils.equals(physicalMachine, LhSingleControlMachineUtil.resolvePhysicalMachineCode(
+                                        transfer.getTargetMachineCode())));
+        if (occupied || timedReleasePending || faultControlled) {
+            return null;
+        }
+        // 保留默认零量释放所在业务日，仅消除当天历史班次对精度的限制。设备冲突继续由公共时间轴校验。
+        Date readyTime = LhScheduleTimeUtil.resolveDayResourceReferenceTime(context,
+                LhScheduleTimeUtil.clearTime(event.getNoProductionStartTime()), null);
+        readyTime = ShiftCapacityResolverUtil.resolveCapsuleReplacementReadyTime(
+                context, machine.getMachineCode(), readyTime);
+        if (!readyTime.before(event.getOfflineTime())) {
+            return null;
+        }
+        log.info("零产量历史前料精度就绪, 工厂={}, 批次={}, 机台={}, 前料={}, 状态={}, 历史计划ID={}, "
+                        + "历史承接起点={}, 精度可用时间={}",
+                context.getFactoryCode(), context.getBatchNo(), machine.getMachineCode(), event.getMaterialCode(),
+                event.getProductStatus(), event.getPlan().getId(),
+                LhScheduleTimeUtil.formatDateTime(event.getOfflineTime()), LhScheduleTimeUtil.formatDateTime(readyTime));
+        return readyTime;
     }
 
     /**

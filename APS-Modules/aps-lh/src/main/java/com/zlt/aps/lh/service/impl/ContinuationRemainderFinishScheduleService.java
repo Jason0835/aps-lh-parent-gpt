@@ -618,7 +618,7 @@ public class ContinuationRemainderFinishScheduleService {
      * 后续日期命中两机大余量时共用3.2公式，历史顺序仅绑定实际释放角色；其他场景沿原节点。
      * 真实强制退出场景保留原机能力算法，不覆盖设备专属硬边界。
      *
-     * @param context 包含最新有效历史关系的上下文
+     * @param context 包含前日有效历史关系的上下文
      * @param sku 同物料同状态的共享需求
      * @param machines 已应用真实硬截止的原物理机台画像
      * @param shifts 本次真实班次

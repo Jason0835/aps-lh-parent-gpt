@@ -243,6 +243,8 @@ public final class ScheduleExtraCreateDomainPolicy<C extends ScheduleContextMode
     }
 
     /**
+     * 分配阶段核对备库行结构、数量和来源；延迟模式的时间完整性由统一终算后检查。
+     *
      * @param workspace 工作区 @throws IllegalStateException 新行节点、来源或分量不守恒时阻止发布
      */
     @Override
@@ -258,7 +260,8 @@ public final class ScheduleExtraCreateDomainPolicy<C extends ScheduleContextMode
                     if (node == null || node.getOwnerList() == null || node.getTask() != task
                             || !Objects.equals(task.getShiftOrder(), node.getShiftOrder())
                             || node.getPlanQty().compareTo(task.getPlanQty()) != 0
-                            || node.getStartTime() == null || node.getEndTime() == null
+                            || (!workspace.isChainTimeDeferred()
+                            && (node.getStartTime() == null || node.getEndTime() == null))
                             || group == null || group.getSourceTaskList().isEmpty()
                             || group.getSourceWeightMap().isEmpty()
                             || group.getSourceWeightMap().values().stream().filter(Objects::nonNull)

@@ -6,7 +6,9 @@ import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 import java.io.Serializable;
-import java.util.Date;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 人工操作异步任务响应。
@@ -66,6 +68,18 @@ public class OperationTaskVo implements Serializable {
     private Integer affectedCount;
 
     /**
+     * 问题明细数量，WARN 不代表任务失败。
+     */
+    @ApiModelProperty("问题明细数量")
+    private Integer issueCount = 0;
+
+    /**
+     * 人工操作产生的问题明细。
+     */
+    @ApiModelProperty("问题明细")
+    private List<AutoScheduleIssueVo> issues = new ArrayList<>();
+
+    /**
      * 工厂编码。
      */
     @ApiModelProperty("工厂编码")
@@ -74,7 +88,17 @@ public class OperationTaskVo implements Serializable {
     /**
      * 排程日期。
      */
-    @JsonFormat(pattern = "yyyy-MM-dd", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd")
     @ApiModelProperty("排程日期")
-    private Date scheduleDate;
+    private LocalDate scheduleDate;
+
+    /**
+     * 设置问题明细并同步维护问题数量。
+     *
+     * @param issues 问题明细
+     */
+    public void setIssues(List<AutoScheduleIssueVo> issues) {
+        this.issues = issues == null ? new ArrayList<>() : issues;
+        this.issueCount = this.issues.size();
+    }
 }

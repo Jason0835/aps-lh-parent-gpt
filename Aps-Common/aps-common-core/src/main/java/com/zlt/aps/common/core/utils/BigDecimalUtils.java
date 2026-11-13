@@ -16,6 +16,7 @@ public class BigDecimalUtils {
      * 数值BigDecimal 100
      */
     public static final BigDecimal HUNDRED = new BigDecimal("100");
+    public static final BigDecimal THOUSAND = new BigDecimal("1000"); // 千
     public static final BigDecimal TWO = new BigDecimal("2"); // 用于计算平分
     public static final BigDecimal HOUR24 = new BigDecimal("24"); // 一天24小时
 

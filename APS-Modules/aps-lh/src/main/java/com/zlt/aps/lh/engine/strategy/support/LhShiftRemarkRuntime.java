@@ -327,10 +327,13 @@ public final class LhShiftRemarkRuntime {
 
         /**
          * 将已确定历史组合的真实拒绝交回外层任务，普通淘汰候选不得调用。
+         * 供胚等待属于成功时间轴附件，提交失败时随候选丢弃，避免污染后续历史尝试。
          */
         public void retainInParent() {
             if (parent != null) {
-                parent.include(this.freeze());
+                this.freeze().stream()
+                        .filter(evidence -> evidence.getReason() != LhShiftDelayReason.STRUCTURE_SWITCH_SUPPLY_TIME)
+                        .forEach(parent::add);
             }
         }
 

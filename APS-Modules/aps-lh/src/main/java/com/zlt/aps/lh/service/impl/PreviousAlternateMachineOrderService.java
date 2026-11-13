@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
 
 /**
  * 在续作收尾与时间下机之前统一初始化前日交替计划机台列表。
- * 最新批次和过期过滤复用已准备的历史资格，列表只发布排序事实。
+ * 前日有效计划和过期过滤复用已准备的历史资格，列表只发布排序事实。
  *
  * @author Codex
  * @date 2026/10/09
@@ -34,6 +34,7 @@ public class PreviousAlternateMachineOrderService {
     /**
      * 从本批已冻结资格按业务日期、班次稳定排序，再归并物理机台。
      * 同日期同班次保留资格列表原顺序，历史多条关系仅决定最早排名。
+     * 空历史前料与承接资格共用实际前料匹配键。
      *
      * @param context 已完成前日交替资格准备的批次上下文
      */
@@ -55,7 +56,8 @@ public class PreviousAlternateMachineOrderService {
                 .map(LhSingleControlMachineUtil::resolvePhysicalMachineCode).distinct().collect(Collectors.toList());
         // 歧义判断沿用完整有效关系集合，不能先过滤掉其他动作后把多条关系误认成唯一。
         Map<String, List<LhMouldChangePlan>> relations = context.getEligiblePreviousAlternatePlans().stream()
-                .collect(Collectors.groupingBy(plan -> plan.getLhMachineCode() + "|" + plan.getBeforeMaterialCode(),
+                .collect(Collectors.groupingBy(plan -> plan.getLhMachineCode() + "|"
+                                + PreviousAlternatePlanEligibilityService.resolveMatchBeforeMaterial(context, plan),
                         LinkedHashMap::new, Collectors.toList()));
         Map<String, LhMouldChangePlan> uniquePlans = new LinkedHashMap<>();
         relations.forEach((key, matches) -> {

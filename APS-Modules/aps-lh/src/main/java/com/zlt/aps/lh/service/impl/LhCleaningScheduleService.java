@@ -157,6 +157,8 @@ public class LhCleaningScheduleService {
             precisionOverlapPolicy.prepareForMachine(context, machine);
             repairPrecisionOverlapPolicy.prepareForMachine(context, machine);
         }
+        // 精度组合先确定唯一首检时间，纯置换再领取公共班次首检序号。
+        ContinuationReplacementInspectionSupport.prepare(context);
         this.publishCurrentEvents(context);
     }
     /**
@@ -249,6 +251,16 @@ public class LhCleaningScheduleService {
     public boolean isSandBlastExactMouldPlan(
             LhScheduleContext context, LhMouldChangePlan plan, String productStatus) {
         return finalizer.isSandBlastExactMouldPlan(context, plan, productStatus);
+    }
+    /**
+     * 判断仅喷砂释放后是否已在原机同料换入完整新模具组。
+     *
+     * @param context 本批离机来源及最终结果
+     * @param result 待输出实际换模结果
+     * @return 已落实同料整组置换时返回 true
+     */
+    public boolean isOnlySandBlastReplacement(LhScheduleContext context, LhScheduleResult result) {
+        return finalizer.isOnlySandBlastReplacement(context, result);
     }
     /**
      * 解析喷砂交接计划类型，置换为换模，原模具离机清洗为喷砂。

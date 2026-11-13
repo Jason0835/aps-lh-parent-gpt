@@ -113,6 +113,22 @@ public class DayDrivenScheduleState {
     }
 
     /**
+     * 已提交占用被撤销后重开物料待排生命周期，保留原顺序和其他在机绑定。
+     *
+     * @param sku 恢复真实剩余需求的物料
+     */
+    public void reopenPendingSku(SkuScheduleDTO sku) {
+        if (Objects.isNull(sku)) {
+            return;
+        }
+        completedSkuSet.remove(sku);
+        finalUnscheduledSkuSet.remove(sku);
+        deferredTaskMap.remove(sku);
+        this.registerPendingSku(sku);
+        this.markNoProgressToday(sku);
+    }
+
+    /**
      * 将运行中生成的补偿 SKU 按 S4.5 全局顺序稳定合并到当前剩余工作队列。
      *
      * <p>该方法只处理“下一轮尚未执行”的队列：有名次补偿按 sortRank 与剩余候选竞争，

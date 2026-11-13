@@ -6,6 +6,14 @@ import lombok.EqualsAndHashCode;
 @Data
 public class CellStyle {
 
+    /**
+     * 无参构造方法：ExcelUtils 中 cellStyleList 是用 fastjson 从 JSON 反序列化得到的，
+     * fastjson 要求有无参构造，否则会改用"参数最多的构造方法"作为 creator（只回填构造参数），
+     * 导致非构造参数（如 dataFormat）无法回填而变成 null
+     */
+    public CellStyle() {
+    }
+
     public CellStyle(int startRowNum, int endRowNum, int startCellNum, int endCellNum, String color, boolean withBorder) {
         this.startRowNum = startRowNum;
         this.endRowNum = endRowNum;
@@ -82,5 +90,10 @@ public class CellStyle {
      * 字体颜色，设置后字体将以该颜色显示
      */
     private String fontColor;
+
+    /**
+     * 自定义单元格数字格式，例如 0;-0;;@（正数正常显示、负数带负号、0值显示空白、文本原样显示）
+     */
+    private String dataFormat;
 
 }

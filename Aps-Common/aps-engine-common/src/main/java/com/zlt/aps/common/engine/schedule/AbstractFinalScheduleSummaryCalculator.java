@@ -1,11 +1,9 @@
 package com.zlt.aps.common.engine.schedule;
 
+import com.zlt.aps.common.engine.schedule.engine.ScheduleTaskDraftModel;
+
 import java.math.BigDecimal;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -53,41 +51,51 @@ public abstract class AbstractFinalScheduleSummaryCalculator<T> {
      * 读取机台编码。
      *
      * @param task 领域任务
-     * @return 机台编码
+     * @return 机台编码，默认从公共任务草稿获取
      */
-    protected abstract String getMachineCode(T task);
+    protected String getMachineCode(T task) {
+        return task instanceof ScheduleTaskDraftModel ? ((ScheduleTaskDraftModel) task).getMachineCode() : null;
+    }
 
     /**
      * 读取产品编码。
      *
      * @param task 领域任务
-     * @return 产品编码
+     * @return 产品编码，默认从公共任务草稿获取工序产品编码
      */
-    protected abstract String getProductCode(T task);
+    protected String getProductCode(T task) {
+        return task instanceof ScheduleTaskDraftModel ? ((ScheduleTaskDraftModel) task).getProcessCode() : null;
+    }
 
     /**
      * 读取胎胚编码。
      *
      * @param task 领域任务
-     * @return 胎胚编码
+     * @return 胎胚编码，默认从公共任务草稿获取
      */
-    protected abstract String getEmbryoCode(T task);
+    protected String getEmbryoCode(T task) {
+        return task instanceof ScheduleTaskDraftModel ? ((ScheduleTaskDraftModel) task).getEmbryoCode() : null;
+    }
 
     /**
      * 读取班次顺序。
      *
      * @param task 领域任务
-     * @return 班次顺序
+     * @return 班次顺序，默认从公共任务草稿获取
      */
-    protected abstract Integer getShiftOrder(T task);
+    protected Integer getShiftOrder(T task) {
+        return task instanceof ScheduleTaskDraftModel ? ((ScheduleTaskDraftModel) task).getShiftOrder() : null;
+    }
 
     /**
      * 读取计划量。
      *
      * @param task 领域任务
-     * @return 计划量
+     * @return 计划量，默认从公共任务草稿获取
      */
-    protected abstract BigDecimal getPlanQty(T task);
+    protected BigDecimal getPlanQty(T task) {
+        return task instanceof ScheduleTaskDraftModel ? ((ScheduleTaskDraftModel) task).getPlanQty() : null;
+    }
 
     /**
      * 归一化普通编码。

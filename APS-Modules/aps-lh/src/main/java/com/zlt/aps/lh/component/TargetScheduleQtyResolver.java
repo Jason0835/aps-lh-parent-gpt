@@ -153,7 +153,7 @@ public class TargetScheduleQtyResolver {
      * <p>非满排模式（按需求排产）：目标量 = 待排量；窗口总量封顶交由日计划账本消费链路约束。</p>
      * <p>满排模式（按产能满排）：目标量 = min(待排量, 理论窗口产能上限)。</p>
      * <p>后半段无计划的单胎胚或非共用胎胚正库存收尾先保留库存需求，实际份额延后统一冻结。
-     * 交班已停产且无本轮可用胎胚时，所有来源均无生产目标。</p>
+     * 胎胚收尾或交班已停产且无本轮可用胎胚时，所有实机来源均无生产目标。</p>
      *
      * @param context 排程上下文
      * @param sku SKU
@@ -161,7 +161,7 @@ public class TargetScheduleQtyResolver {
      */
     public int resolveInitialTargetQty(LhScheduleContext context, SkuScheduleDTO sku) {
         if (Objects.isNull(sku)
-                || PendingSkuUnscheduledRule.isHandoverStoppedWithoutStock(context, sku)) {
+                || PendingSkuUnscheduledRule.isEndingWithoutStock(context, sku)) {
             return 0;
         }
         // 此时份额尚未冻结，仅保留库存需求；实机准入后仍按同胎胚份额统一覆盖。
@@ -199,7 +199,7 @@ public class TargetScheduleQtyResolver {
     /**
      * 初始化 SKU 实际排产剩余账本。
      * <p>dayN 只用于节奏判断，非收尾 SKU 的实际消费账本优先取硫化余量；严格目标量场景取业务目标量。
-     * 交班已停产且无本轮可用胎胚时初始化为0，不使用原始硫化余量。</p>
+     * 胎胚收尾或交班已停产且无本轮可用胎胚时初始化为0，不使用原始硫化余量。</p>
      *
      * @param context 排程上下文
      * @param sku SKU
@@ -211,10 +211,14 @@ public class TargetScheduleQtyResolver {
                                                 SkuScheduleDTO sku,
                                                 int targetQty,
                                                 String reason) {
-        int initialQty = PendingSkuUnscheduledRule.isHandoverStoppedWithoutStock(context, sku)
+        int initialQty = PendingSkuUnscheduledRule.isEndingWithoutStock(context, sku)
                 ? 0 : this.resolveInitialProductionRemainingQty(sku, targetQty);
         if (Objects.isNull(context) || Objects.isNull(sku) || StringUtils.isEmpty(sku.getMaterialCode())) {
             return initialQty;
+        }
+        if (EmbryoEndingStockAdmissionPolicy.isEmbryoEndingWithoutStock(context, sku)) {
+            // 重复初始化时也清理旧正余额，副本不得绕过零库存禁排。
+            return this.syncProductionRemainingQtyToTarget(context, sku, 0, reason);
         }
         Map<String, Integer> ledgerMap = context.getSkuProductionRemainingQtyMap();
         String skuKey = buildSkuKey(sku);
@@ -234,7 +238,7 @@ public class TargetScheduleQtyResolver {
     }
 
     /**
-     * 解析SKU实际排产剩余量，交班已停产且无可用胎胚时不授予生产余额。
+     * 解析SKU实际排产剩余量，零库存收尾不授予生产余额。
      *
      * @param context 排程上下文
      * @param sku SKU
@@ -242,7 +246,7 @@ public class TargetScheduleQtyResolver {
      */
     public int resolveProductionRemainingQty(LhScheduleContext context, SkuScheduleDTO sku) {
         if (Objects.isNull(sku)
-                || PendingSkuUnscheduledRule.isHandoverStoppedWithoutStock(context, sku)) {
+                || PendingSkuUnscheduledRule.isEndingWithoutStock(context, sku)) {
             return 0;
         }
         if (Objects.isNull(context) || StringUtils.isEmpty(sku.getMaterialCode())) {
@@ -257,7 +261,7 @@ public class TargetScheduleQtyResolver {
     }
 
     /**
-     * 只读预演实际消费余量，交班停产无胎胚时返回0，不懒加载写入中心账本。
+     * 只读预演实际消费余量，零库存收尾返回0，不懒加载写入中心账本。
      *
      * @param context 排程上下文
      * @param sku 来源SKU
@@ -265,7 +269,7 @@ public class TargetScheduleQtyResolver {
      */
     public int previewProductionRemainingQty(LhScheduleContext context, SkuScheduleDTO sku) {
         if (Objects.isNull(sku)
-                || PendingSkuUnscheduledRule.isHandoverStoppedWithoutStock(context, sku)) {
+                || PendingSkuUnscheduledRule.isEndingWithoutStock(context, sku)) {
             return 0;
         }
         Integer remaining = Objects.nonNull(context) && StringUtils.isNotEmpty(sku.getMaterialCode())
@@ -314,7 +318,7 @@ public class TargetScheduleQtyResolver {
      * 将 SKU 实际消费账本同步到指定目标量。
      * <p>目标量调整只改变账本总目标，必须保留同一“物料+产品状态”已经消费的数量。
      * 续作、新增、换活字块会在不同阶段重复进入收尾目标量解析，禁止后进入阶段把
-     * 前一阶段已扣减的数量重新加回。</p>
+     * 前一阶段已扣减的数量重新加回；胎胚收尾零库存时禁止任何正目标恢复。</p>
      *
      * @param context 排程上下文
      * @param sku SKU
@@ -326,6 +330,16 @@ public class TargetScheduleQtyResolver {
                                                   SkuScheduleDTO sku,
                                                   int targetQty,
                                                   String reason) {
+        if (EmbryoEndingStockAdmissionPolicy.isEmbryoEndingWithoutStock(context, sku)) {
+            // 历史前料、普通余量归整和副本恢复都不能重新授予零库存生产余额。
+            String skuKey = this.buildSkuKey(sku);
+            context.getSkuProductionTargetQtyMap().put(skuKey, 0);
+            context.getSkuProductionRemainingQtyMap().put(skuKey, 0);
+            sku.setStrictTargetQty(true);
+            sku.setTargetScheduleQty(0);
+            sku.setRemainingScheduleQty(0);
+            return 0;
+        }
         StructureEndingContinuationState structureEnding = StructureEndingContinuationPolicy.state(context, sku);
         int resolvedTargetQty = structureEnding != null && structureEnding.getLegalTargetQty() != null
                 ? structureEnding.getLegalTargetQty() : Math.max(0, targetQty);
@@ -431,6 +445,9 @@ public class TargetScheduleQtyResolver {
                                                      SkuScheduleDTO sku,
                                                      int remainingQty,
                                                      String reason) {
+        if (EmbryoEndingStockAdmissionPolicy.isEmbryoEndingWithoutStock(context, sku)) {
+            return this.syncProductionRemainingQtyToTarget(context, sku, 0, reason);
+        }
         StructureEndingContinuationState structureEnding = StructureEndingContinuationPolicy.state(context, sku);
         if (structureEnding != null && structureEnding.getLegalTargetQty() != null) {
             // 派生候选只同步同一余额，禁止把已消费前缀再次当作新的待排需求。
@@ -776,13 +793,17 @@ public class TargetScheduleQtyResolver {
      * <p>单胎胚（非共用胎胚）：胎胚收尾标记为1且SKU为收尾SKU，不强制要求T日收尾；
      * 后半段无计划的正库存例外不再额外要求SKU收尾标签。</p>
      * <p>共用胎胚只要求胎胚收尾标识为1，独立分摊不再依赖SKU标签及T日同日收尾。</p>
-     * <p>交班已停产收尾只消耗本轮库存，缺失库存不回退硫化余量；其他缺库存来源沿用普通余量。</p>
+     * <p>胎胚收尾缺失或非正库存时统一禁排，不因SKU标签、共用关系或分摊暂缓回退硫化余量。</p>
      *
      * @param context 排程上下文
      * @param sku SKU
      * @return true-按胎胚库存严格排产；false-沿用现有目标量逻辑
      */
     public boolean isEmbryoStockEnding(LhScheduleContext context, SkuScheduleDTO sku) {
+        // 零库存胎胚收尾优先于暂缓分摊及实机成员资格，避免缺记录回退普通余量。
+        if (EmbryoEndingStockAdmissionPolicy.isEmbryoEndingWithoutStock(context, sku)) {
+            return true;
+        }
         if (Objects.nonNull(context) && context.isEmbryoStockAllocationDeferred()) {
             return false;
         }
@@ -793,11 +814,6 @@ public class TargetScheduleQtyResolver {
             return false;
         }
         if (!this.isEmbryoStockEndingFlagYes(context, sku.getEmbryoCode())) {
-            return false;
-        }
-        // 交班已停产的来源具有库存约束依据；其他缺库存来源仍沿用普通硫化余量。
-        if (Objects.nonNull(context.getEmbryoStockRealMachineSkuKeys())
-                && !this.hasEmbryoStockAllocationBasis(context, sku)) {
             return false;
         }
         if (this.isExcludedFromRealMachineEmbryoAllocation(context, sku)) {
@@ -899,7 +915,8 @@ public class TargetScheduleQtyResolver {
     private int syncEmbryoStockEndingProductionRemainingQty(LhScheduleContext context,
                                                             SkuScheduleDTO sku,
                                                             int quotaQty) {
-        int targetQty = Math.max(0, quotaQty);
+        int targetQty = EmbryoEndingStockAdmissionPolicy.isEmbryoEndingWithoutStock(context, sku)
+                ? 0 : Math.max(0, quotaQty);
         if (Objects.isNull(context) || Objects.isNull(sku) || StringUtils.isEmpty(sku.getMaterialCode())) {
             return targetQty;
         }
@@ -989,14 +1006,15 @@ public class TargetScheduleQtyResolver {
 
     /**
      * 解析原始胎胚库存。
-     * <p>优先取上下文实时库存；交班已停产且本轮无记录时返回0，禁止从旧DTO库存补足。</p>
+     * <p>优先取上下文实时库存；胎胚收尾或交班已停产且无本轮可用库存时返回0，禁止旧DTO补足。</p>
      *
      * @param context 排程上下文
      * @param sku SKU
      * @return 原始胎胚库存
      */
     private int resolveOriginalEmbryoStock(LhScheduleContext context, SkuScheduleDTO sku) {
-        if (Objects.isNull(sku)) {
+        if (Objects.isNull(sku)
+                || EmbryoEndingStockAdmissionPolicy.isEmbryoEndingWithoutStock(context, sku)) {
             return 0;
         }
         if (Objects.nonNull(context) && StringUtils.isNotEmpty(sku.getEmbryoCode())
@@ -1086,6 +1104,9 @@ public class TargetScheduleQtyResolver {
                                            SkuScheduleDTO sku,
                                            int originalEmbryoStock,
                                            String scene) {
+        if (EmbryoEndingStockAdmissionPolicy.isEmbryoEndingWithoutStock(context, sku)) {
+            return 0;
+        }
         if (Objects.isNull(context) || Objects.isNull(sku) || StringUtils.isEmpty(sku.getMaterialCode())) {
             return Math.max(0, originalEmbryoStock);
         }
@@ -1127,7 +1148,8 @@ public class TargetScheduleQtyResolver {
             return;
         }
         int resolvedOriginalStock = Math.max(0, originalEmbryoStock);
-        int resolvedQuotaQty = Math.max(0, quotaQty);
+        int resolvedQuotaQty = EmbryoEndingStockAdmissionPolicy.isEmbryoEndingWithoutStock(context, sku)
+                ? 0 : Math.max(0, quotaQty);
         getOrCreateEmbryoStockLedger(context, sku.getEmbryoCode(), resolvedOriginalStock);
         sku.setEmbryoStock(resolvedOriginalStock);
         sku.setStrictTargetQty(true);
@@ -1233,7 +1255,7 @@ public class TargetScheduleQtyResolver {
 
     /**
      * 判断参与本轮库存分配的收尾胎胚SKU是否已被有效实机成员确认排除。
-     * 缺少库存记录的普通余量来源不参与成员排除；交班已停产及明确零库存仍受库存硬控。
+     * 收尾胎胚均受库存硬控，缺记录也不能凭余量恢复实机资格。
      *
      * @param context 本轮已确认的库存实机成员
      * @param sku 待消费来源
@@ -1248,17 +1270,15 @@ public class TargetScheduleQtyResolver {
 
     /**
      * 统一库存成员确认、库存收尾身份及实际消费的适用范围。
-     * 普通来源区分缺记录与明确零库存；交班已停产时缺记录也按无可用库存约束，不读取其他日期补足。
+     * 胎胚收尾即具有库存约束依据，缺记录不再放行，不读取其他日期补足。
      *
      * @param context 本轮胎胚收尾及原始库存快照
      * @param sku 待判断的物料状态来源
-     * @return 胎胚标记收尾，且存在本轮库存记录或已确认交班停产时返回true
+     * @return 胎胚标记收尾时返回true
      */
     private boolean hasEmbryoStockAllocationBasis(LhScheduleContext context, SkuScheduleDTO sku) {
         return Objects.nonNull(context) && Objects.nonNull(sku)
-                && this.isEmbryoStockEndingFlagYes(context, sku.getEmbryoCode())
-                && (context.getEmbryoRealtimeStockMap().containsKey(sku.getEmbryoCode())
-                || context.getCxHandoverStoppedEndingEmbryoSet().contains(sku.getEmbryoCode()));
+                && this.isEmbryoStockEndingFlagYes(context, sku.getEmbryoCode());
     }
 
     /**
@@ -2407,8 +2427,15 @@ public class TargetScheduleQtyResolver {
                 shiftCapacity,
                 lhTimeSeconds,
                 mouldQty);
-        if (firstProductionStartTime == null) {
+        boolean precisionTypeBlockInspectionOnly = Objects.isNull(firstProductionStartTime)
+                && precisionOverlap.isSupported() && ScheduleTypeEnum.TYPE_BLOCK.getCode().equals(scheduleType)
+                && Objects.equals(productionStartTime, shifts.get(shifts.size() - 1).getShiftEndDateTime());
+        if (firstProductionStartTime == null && !precisionTypeBlockInspectionOnly) {
             return 0;
+        }
+        if (precisionTypeBlockInspectionOnly) {
+            // 正常生产恰在窗口末端时，继续核对切换内首检能否完整落在可写班次。
+            firstProductionStartTime = productionStartTime;
         }
         // 收尾SKU若3天内可完成，不再把清洗作为产能约束参与目标量估算。
         List<MachineCleaningWindowDTO> cleaningWindowList = resolveEffectiveCleaningWindowList(
@@ -2437,7 +2464,7 @@ public class TargetScheduleQtyResolver {
         EquipmentPlanTimeline parallelTimeline = precisionOverlap.getTimeline();
         FirstInspectionAllocationPlan firstInspectionAllocationPlan = precisionOverlap.isSupported()
                 ? FirstInspectionAllocationUtil.buildPrecisionQuantityPlan(context, sku, inspectionShifts,
-                        parallelTimeline.getInspectionStartTime(),
+                        parallelTimeline.getInspectionStartTime(), mouldChangeCompleteTime,
                         shiftCapacity, Math.max(sku.resolveTargetScheduleQty(), shiftCapacity), scheduleType, machine.getMachineCode(), null, parallelTimeline.getPrecisionPlanId())
                 : FirstInspectionAllocationUtil.buildPlan(
                         context, sku, inspectionShifts, mouldChangeCompleteTime,
@@ -2458,6 +2485,9 @@ public class TargetScheduleQtyResolver {
         }
         if ((precisionOverlap.isSupported() || combinedInspectionReady != null)
                 && !firstInspectionAllocationPlan.isValid()) {
+            return 0;
+        }
+        if (precisionTypeBlockInspectionOnly && !firstInspectionAllocationPlan.hasPositiveQuantityInShifts(shifts)) {
             return 0;
         }
         if (precisionOverlap.isSupported() && StringUtils.isNotBlank(equipmentPlanTimelineResolver.resolveInspectionOverlapReason(
@@ -3407,11 +3437,11 @@ public class TargetScheduleQtyResolver {
         if (Objects.isNull(sku)) {
             return 0;
         }
-        if (this.isExcludedFromRealMachineEmbryoAllocation(context, sku)) {
-            // 原硫化需求用于未排及虚拟兜底，不借普通收尾的MAX口径重新取得实机库存目标。
+        if (applyEmbryoStockEndingTargetQtyIfNecessary(context, sku, "收尾目标量")) {
             return sku.resolveTargetScheduleQty();
         }
-        if (applyEmbryoStockEndingTargetQtyIfNecessary(context, sku, "收尾目标量")) {
+        if (this.isExcludedFromRealMachineEmbryoAllocation(context, sku)) {
+            // 原硫化需求用于未排及虚拟兜底，不借普通收尾的MAX口径重新取得实机库存目标。
             return sku.resolveTargetScheduleQty();
         }
         /*
@@ -3944,7 +3974,7 @@ public class TargetScheduleQtyResolver {
     }
 
     /**
-     * 按当前活跃SKU集合刷新单个胎胚库存内部分摊，交班已停产的缺库存来源按零额度处理。
+     * 按当前活跃SKU集合刷新单个胎胚库存内部分摊，收尾胎胚缺库存按零额度处理。
      *
      * @param context 排程上下文
      * @param embryoCode 胎胚编码
@@ -3953,11 +3983,14 @@ public class TargetScheduleQtyResolver {
     private void refreshSharedEmbryoStockAllocation(LhScheduleContext context, String embryoCode, String reason) {
         if (Objects.isNull(context) || context.isEmbryoStockAllocationDeferred() || StringUtils.isEmpty(embryoCode)
                 || (!context.getEmbryoRealtimeStockMap().containsKey(embryoCode)
+                && !this.isEmbryoStockEndingFlagYes(context, embryoCode)
                 && !context.getCxHandoverStoppedEndingEmbryoSet().contains(embryoCode))) {
             return;
         }
         Integer rawEmbryoStock = context.getEmbryoRealtimeStockMap().getOrDefault(embryoCode, 0);
-        if (Objects.isNull(rawEmbryoStock)) {
+        if (this.isEmbryoStockEndingFlagYes(context, embryoCode)) {
+            rawEmbryoStock = Objects.isNull(rawEmbryoStock) ? 0 : Math.max(0, rawEmbryoStock);
+        } else if (Objects.isNull(rawEmbryoStock)) {
             return;
         }
         if (sharedEmbryoEndingQuotaPolicy.hasFrozenGroup(context, embryoCode)) {

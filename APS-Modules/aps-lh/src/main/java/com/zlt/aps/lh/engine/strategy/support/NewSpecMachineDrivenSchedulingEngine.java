@@ -184,9 +184,8 @@ public class NewSpecMachineDrivenSchedulingEngine {
                     continue;
                 }
                 // 类型层在尺寸和其它作用域之外，后续分组不得把单控资源重新提前。
-                List<List<MachineResource>> dimensionMachineGroups = dynamicBestMatchCompetitionEnabled
-                        ? this.groupMachineResourcesByDimension(context, controlModeResources)
-                        : Collections.singletonList(controlModeResources);
+                List<List<MachineResource>> dimensionMachineGroups = this.buildCompetitionGroups(
+                        context, controlModeResources, dynamicBestMatchCompetitionEnabled);
                 // 匹配专供结构已在上方完整试排；其余候选不新增硬限制，仍保护固定指令。
                 NewSpecScheduleProposal dedicatedMachineWinner = this.selectFirstDimensionGroupWinner(
                         context, dayContext, shift,
@@ -347,8 +346,8 @@ public class NewSpecMachineDrivenSchedulingEngine {
         if (CollectionUtils.isEmpty(context.getFormingMachineSupplyLhMachineMap())) {
             return null;
         }
-        List<List<MachineResource>> groups = dynamicCompetition
-                ? this.groupMachineResourcesByDimension(context, resources) : Collections.singletonList(resources);
+        List<List<MachineResource>> groups = this.buildCompetitionGroups(
+                context, resources, dynamicCompetition);
         Set<String> fixedMachines = this.resolveFixedPhysicalMachineCodes(context, dayContext, pools);
         // 强专供先完成本业务日合法机会扫描，再尝试弱专供；层内沿用完整最优匹配。
         for (DedicatedType dedicatedType : java.util.Arrays.asList(DedicatedType.EXCLUSIVE, DedicatedType.PREFERRED)) {
@@ -1055,6 +1054,25 @@ public class NewSpecMachineDrivenSchedulingEngine {
                 .map(groups::get)
                 .filter(resources -> !CollectionUtils.isEmpty(resources))
                 .collect(Collectors.toCollection(() -> new ArrayList<List<MachineResource>>(groups.size())));
+    }
+
+    /**
+     * 在原分组基础上组织K21/K22同胎胚局部队列，直接交给最终提案决胜循环消费。
+     *
+     * @param context 当前排程上下文
+     * @param resources 当前机台类型组资源
+     * @param dynamicCompetition 是否沿用标准尺寸分组
+     * @return 保留高优先级作用域的有序竞争组
+     */
+    private List<List<MachineResource>> buildCompetitionGroups(LhScheduleContext context,
+            List<MachineResource> resources, boolean dynamicCompetition) {
+        List<List<MachineResource>> groups = dynamicCompetition
+                ? this.groupMachineResourcesByDimension(context, resources) : Collections.singletonList(resources);
+        if (!K21K22EmbryoMatchPolicy.isEnabled(context)) {
+            return groups;
+        }
+        return context.resolveK21K22EmbryoMatchPolicy().orderGroups(groups,
+                resource -> machineSupplyStructureRule.getMachinePriority(context, resource.getPhysicalMachineCode()));
     }
 
     /**

@@ -18,14 +18,6 @@ public class ScheduleExtraCreateDemandSlice {
      */
     private BigDecimal demandQty;
     /**
-     * 工厂时区解析后的真实消费开始时间，epoch毫秒。
-     */
-    private Long consumptionStartTime;
-    /**
-     * 该段最晚消费时点；最大保管开启时必须提供，不能将班初当整段消费结束。
-     */
-    private Long consumptionEndTime;
-    /**
      * 是否来自真实成型需求；CLASS8之外的外推不得标成真实记录。
      */
     private Boolean realDemand;

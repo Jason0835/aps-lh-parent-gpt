@@ -16,6 +16,7 @@ import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.chain.validators.ContinuationOnlineMouldValidator;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationSkuMatcher;
+import com.zlt.aps.lh.engine.strategy.support.PendingSkuUnscheduledRule;
 import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
 import com.zlt.aps.lh.util.LhMouldCodeUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
@@ -50,7 +51,7 @@ import javax.annotation.Resource;
 public class HistoricalBeforeMaterialContinuationService {
 
     /**
-     * 沿用最新有效历史批次及动作日期资格。
+     * 沿用前日有效计划及动作日期资格，来源批次号不参与识别。
      */
     @Resource
     private PreviousAlternatePlanEligibilityService previousAlternatePlanEligibilityService;
@@ -278,15 +279,16 @@ public class HistoricalBeforeMaterialContinuationService {
     }
 
     /**
-     * 判断前料是否有本次续作需求；共用胎胚资格和额度仍由原续作准入及分摊流程裁定。
+     * 判断前料是否有本次续作需求，零库存胎胚收尾优先于历史硫化余量。
      *
      * @param context 胎胚收尾标识上下文
      * @param sku 前料原始需求
-     * @return 原始硫化余量为正，或胎胚已收尾且库存为正时返回true
+     * @return 未命中零库存禁排且有硫化余量或胎胚收尾库存时返回true
      */
     private boolean hasContinuationDemand(LhScheduleContext context, SkuScheduleDTO sku) {
-        return sku.getSurplusQty() > 0 || (sku.getEmbryoStock() > 0
-                && targetScheduleQtyResolver.isEmbryoStockEndingFlagYes(context, sku.getEmbryoCode()));
+        return !PendingSkuUnscheduledRule.isEndingWithoutStock(context, sku)
+                && (sku.getSurplusQty() > 0 || (sku.getEmbryoStock() > 0
+                && targetScheduleQtyResolver.isEmbryoStockEndingFlagYes(context, sku.getEmbryoCode())));
     }
 
     /**

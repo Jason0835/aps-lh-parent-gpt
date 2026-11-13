@@ -2,6 +2,7 @@ package com.zlt.aps.lh.engine.strategy.support;
 
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.component.StructureEarlyProductionAdmission;
+import com.zlt.aps.lh.context.LhScheduleContext;
 import org.apache.commons.lang3.StringUtils;
 
 import java.time.LocalDate;
@@ -12,7 +13,7 @@ import java.util.Map;
 /**
  * 新增排产同一运行态版本内的提案只读缓存。
  *
- * <p>缓存只保存 SKU 级收尾判断、结构×班次有效机台统计、日志指纹和扫描统计，不保存
+ * <p>缓存保存阶段内固定的原在机胎胚、SKU级收尾判断、结构×班次有效机台统计、日志指纹和扫描统计，不保存
  * Machine×SKU反向匹配或真实时间轴计划，只读准入失败最多保存512条轻量原因。
  * 正式结果、终局未排、候选池或业务日阶段变化时
  * 清空快照；失败组合由主循环保存轻量AssignmentKey，避免构造完整匹配矩阵。</p>
@@ -84,7 +85,7 @@ public final class NewSpecProposalRoundCache {
     }
 
     /**
-     * 正式运行态发生变化后清空全部只读快照。
+     * 正式运行态变化后清空本轮动态只读快照。
      */
     public void clearAfterStateChanged() {
         endingFlagMap.clear();

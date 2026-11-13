@@ -274,17 +274,17 @@ public final class LhSingleControlMachineUtil {
     /**
      * 查找同一历史动作中唯一的配对侧指定关系，供整机声明和两侧正式来源登记共用。
      *
-     * @param context 已按历史批次和日期过滤的有效关系
+     * @param context 已按工厂、前日日期和动作有效期过滤的关系
      * @param sku 后物料及产品状态
      * @param plan 当前侧历史指定关系
-     * @return 同批次、同计划日、同班次且后料状态一致的唯一配对侧关系；缺失或歧义时返回null
+     * @return 同计划日、同班次且后料状态一致的唯一配对侧关系；缺失或歧义时返回null
      */
     public static LhMouldChangePlan resolvePairedPreviousAlternatePlan(LhScheduleContext context,
             SkuScheduleDTO sku, LhMouldChangePlan plan) {
         if (Objects.isNull(context) || Objects.isNull(plan)
                 || !context.isEligiblePreviousAlternateCombination(sku, plan, plan.getLhMachineCode())
                 || !isConfiguredSingleControlMachine(context, plan.getLhMachineCode())
-                || StringUtils.isBlank(plan.getLhResultBatchNo()) || Objects.isNull(plan.getPlanDate())
+                || Objects.isNull(plan.getPlanDate())
                 || StringUtils.isBlank(plan.getBeforeMaterialCode())
                 || StringUtils.isBlank(plan.getClassIndex())
                 || !MouldChangeTypeEnum.containsAnyCode(plan.getChangeMouldType(),
@@ -294,7 +294,6 @@ public final class LhSingleControlMachineUtil {
         String pairMachineCode = resolvePairMachineCode(plan.getLhMachineCode());
         List<LhMouldChangePlan> pairPlans = context.getEligiblePreviousAlternatePlans().stream()
                 .filter(candidate -> context.isEligiblePreviousAlternateCombination(sku, candidate, pairMachineCode))
-                .filter(candidate -> StringUtils.equals(plan.getLhResultBatchNo(), candidate.getLhResultBatchNo()))
                 .filter(candidate -> Objects.nonNull(candidate.getPlanDate())
                         && LhScheduleTimeUtil.isSameDay(plan.getPlanDate(), candidate.getPlanDate()))
                 .filter(candidate -> StringUtils.equals(plan.getClassIndex(), candidate.getClassIndex()))

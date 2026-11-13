@@ -262,6 +262,40 @@ public final class StructureSwitchSchedulingPolicy {
     }
 
     /**
+     * 复用候选的真实机台就绪时间形成供胚等待附件，正式接纳和回滚沿用备注生命周期。
+     * 供胚与准备等约束可同时作用于空班，跨日尝试不以当前日首检探针截断前日等待。
+     * 只读取已计算时间，不增加试排、结果遍历或资源查询。
+     *
+     * @param context 当前候选上下文
+     * @param sku 当前物料状态
+     * @param source 本轮有效结构切换来源
+     * @param availability 含真实机台就绪及正式占用时刻的有效候选计划
+     * @return 携带实际供胚等待证据的计划，无有效等待时复用原计划
+     */
+    public static NewSpecMachineAvailabilityPlan attachSupplyDelayEvidence(LhScheduleContext context,
+            SkuScheduleDTO sku, CxEmbryoLhTime source, NewSpecMachineAvailabilityPlan availability) {
+        if (source == null || source.getEarliestLhTime() == null || availability == null
+                || !availability.isAvailable() || context.isStructureSwitchSelectionProbe()) {
+            return availability;
+        }
+        Date machineReadyTime = availability.getMachineReadyTime();
+        Date supplyTime = source.getEarliestLhTime();
+        Date actualStart = availability.getProductionOccupationStartTime();
+        if (machineReadyTime == null || !machineReadyTime.before(supplyTime)
+                || actualStart == null || actualStart.before(supplyTime)) {
+            return availability;
+        }
+        String machineCode = availability.getMachine().getMachineCode();
+        // 局部域只附着到本候选；未选中、提交失败或快照回滚均不会发布到最终结果。
+        try (LhShiftRemarkRuntime.Scope scope = context.getShiftRemarkRuntime().openScope(sku, machineCode)) {
+            context.getShiftRemarkRuntime().record(LhShiftDelayReason.STRUCTURE_SWITCH_SUPPLY_TIME,
+                    "STRUCTURE_SWITCH_SUPPLY_TIME", machineCode, sku, machineReadyTime, supplyTime,
+                    "sourceId=" + source.getId() + ",structure=" + source.getNextStructureName());
+            return availability.withDelayEvidence(scope.freeze());
+        }
+    }
+
+    /**
      * 构建冻结提案，普通结构切换不修改原首检和生产时刻。
      * @param context 排程上下文
      * @param source 已匹配记录
@@ -1455,13 +1489,13 @@ public final class StructureSwitchSchedulingPolicy {
     }
 
     /**
-     * 比较候选与已提交参照的SKU及胎胚关系，供原扩机和非等结果首班共用。
+     * 比较候选与已提交参照的SKU及胎胚关系，供扩机、等结果第二班及非等结果首班共用。
      *
      * @param state 已提交的首台参照
      * @param sku 当前候选
      * @return 同SKU为0、同胎胚为1、其他为2
      */
-    private static int skuRelationRank(StructureSwitchRuntimeState state, SkuScheduleDTO sku) {
+    static int skuRelationRank(StructureSwitchRuntimeState state, SkuScheduleDTO sku) {
         if (StringUtils.equals(state.getMaterialCode(), sku.getMaterialCode())
                 && StringUtils.equals(state.getProductStatus(), sku.getProductStatus())) {
             return 0;

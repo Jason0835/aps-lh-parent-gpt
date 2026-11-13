@@ -138,24 +138,25 @@ public class LhSkuSurplusDataLoadHandler {
         YearMonth nextMonth = firstMonth.plusMonths(BigDecimal.ONE.intValue());
         YearMonth previousFirstMonth = firstMonth.minusMonths(BigDecimal.ONE.intValue());
         List<FactoryMonthPlanProductionFinalResult> lastMonthList = getMonthPlanList(nextMonth, factoryList, Lists.newArrayList());
-        if (!CollectionUtils.isEmpty(lastMonthList)) {
-            Date stockCaptureDate = lastMonthList.get(BigDecimal.ZERO.intValue()).getStockCaptureDate();
-            //排产日在前，则加载前一个月
-            if (first.before(stockCaptureDate)) {
-                List<FactoryMonthPlanProductionFinalResult> previousFirstMonthList = getMonthPlanList(previousFirstMonth, factoryList, Lists.newArrayList());
-                if (!CollectionUtils.isEmpty(previousFirstMonthList)) {
-                    allMonthPlanList.addAll(previousFirstMonthList);
-                }
-                return allMonthPlanList;
+        if (CollectionUtils.isEmpty(lastMonthList)) {
+            //后一个月还没有定稿，则加载前一个月
+            List<FactoryMonthPlanProductionFinalResult> previousFirstMonthList = getMonthPlanList(previousFirstMonth, factoryList, Lists.newArrayList());
+            if (!CollectionUtils.isEmpty(previousFirstMonthList)) {
+                allMonthPlanList.addAll(previousFirstMonthList);
             }
-            //加载后一个月
-            allMonthPlanList.addAll(lastMonthList);
+            return allMonthPlanList;
         }
-        //后一个月还没有定稿，则加载前一个月
-        List<FactoryMonthPlanProductionFinalResult> previousFirstMonthList = getMonthPlanList(previousFirstMonth, factoryList, Lists.newArrayList());
-        if (!CollectionUtils.isEmpty(previousFirstMonthList)) {
-            allMonthPlanList.addAll(previousFirstMonthList);
+        Date stockCaptureDate = lastMonthList.get(BigDecimal.ZERO.intValue()).getStockCaptureDate();
+        //排产日在前，则加载前一个月
+        if (first.before(stockCaptureDate)) {
+            List<FactoryMonthPlanProductionFinalResult> previousFirstMonthList = getMonthPlanList(previousFirstMonth, factoryList, Lists.newArrayList());
+            if (!CollectionUtils.isEmpty(previousFirstMonthList)) {
+                allMonthPlanList.addAll(previousFirstMonthList);
+            }
+            return allMonthPlanList;
         }
+        //加载后一个月
+        allMonthPlanList.addAll(lastMonthList);
         return allMonthPlanList;
     }
 

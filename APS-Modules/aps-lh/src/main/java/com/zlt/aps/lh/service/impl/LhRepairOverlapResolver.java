@@ -1,22 +1,26 @@
 package com.zlt.aps.lh.service.impl;
 
 import com.zlt.aps.lh.api.domain.dto.MachineMaintenanceWindowDTO;
+import com.zlt.aps.lh.api.enums.MachineStopTypeEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.RepairPlanResult;
 import com.zlt.aps.lh.engine.strategy.support.RepairPlanRuntimeState;
 import com.zlt.aps.lh.util.LhInventoryPlanMatcher;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
+import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
- * 计划性维修组合解析，统一真实切换重叠的容量投影和正式精度拒绝边界。
+ * 计划性维修组合解析，统一真实切换容量投影、普通精度准备边界及其他组合拒绝范围。
  * 故障不进入组合编排，清洗及未定义多事项仍沿用原占用并集和调用顺序。
  *
  * @author APS
@@ -147,6 +151,51 @@ public final class LhRepairOverlapResolver {
                 return result;
             }
         }
+        return result;
+    }
+
+    /**
+     * 合并普通精度与05维修的准备完成边界，保持其他停机的原拒绝范围。
+     * 维修按实际开始排序，新增相交维修可延长准备区间；各段预热并行取晚，不累加时长。
+     *
+     * @param context 当前参数上下文
+     * @param physicalMachineCode 物理机台或运行侧编码
+     * @param start 精度与切换组合的最早开始时间
+     * @param readyTime 已知准备完成时间，复核时可传入首检结束时间
+     * @return 独立结果，productionNotBefore为各项准备的最晚完成时刻
+     */
+    public static RepairPlanResult resolvePrecisionPreparation(LhScheduleContext context,
+            String physicalMachineCode, Date start, Date readyTime) {
+        RepairPlanResult result = new RepairPlanResult();
+        result.setPhysicalMachineCode(LhSingleControlMachineUtil.resolvePhysicalMachineCode(physicalMachineCode));
+        result.setProductionNotBefore(RepairPlanRuntimeState.copyDate(readyTime));
+        if (Objects.isNull(context) || Objects.isNull(start) || Objects.isNull(readyTime)) {
+            return result;
+        }
+        List<MdmDevicePlanShut> plans = LhInventoryPlanMatcher.matchPhysicalStopPlans(
+                context.getDevicePlanShutList(), physicalMachineCode).stream()
+                .filter(plan -> Objects.nonNull(plan.getBeginDate()) && Objects.nonNull(plan.getEndDate()))
+                .sorted(Comparator.comparing(MdmDevicePlanShut::getBeginDate)).collect(Collectors.toList());
+        Date combinedReady = readyTime;
+        for (MdmDevicePlanShut plan : plans) {
+            if (!overlaps(start, combinedReady, plan.getBeginDate(), plan.getEndDate())) {
+                continue;
+            }
+            if (!MachineStopTypeEnum.PLANNED_REPAIR.getCode().equals(plan.getMachineStopType())) {
+                result.setOverlapStatus(RepairPlanResult.OverlapStatus.UNSUPPORTED);
+                result.setReason("精度与其他设备停机重叠尚未接入，停机类型=" + plan.getMachineStopType());
+                return result;
+            }
+            Date repairReady = LhScheduleTimeUtil.addMinutes(plan.getEndDate(),
+                    LhScheduleTimeUtil.getCapsulePreheatMinutes(context));
+            if (repairReady.after(combinedReady)) {
+                combinedReady = repairReady;
+            }
+            result.getSourcePlans().add(RepairPlanRuntimeState.copySource(plan));
+            result.setOverlapStatus(RepairPlanResult.OverlapStatus.SUPPORTED);
+        }
+        result.setProductionNotBefore(RepairPlanRuntimeState.copyDate(combinedReady));
+        result.setReason("维修及精度、切换按实际准备完成时刻取最晚值，公共首检仅执行一次");
         return result;
     }
 

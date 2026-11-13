@@ -4,6 +4,7 @@ import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.service.impl.ContinuationSandBlastRecoveryService;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import org.apache.commons.lang3.StringUtils;
@@ -66,6 +67,22 @@ public final class DailyUnscheduledSkuSubstitutionPolicy {
     }
 
     /**
+     * 检查本批有效历史指定、释放事件和已承接结果的物理机台保护。
+     *
+     * @param context 本批历史关系与结果
+     * @param machineCode 运行态机台编码，单控两侧按整机判断
+     * @return 命中历史保护时返回 true
+     */
+    public static boolean isHistoricalMachineProtected(LhScheduleContext context, String machineCode) {
+        String physical = LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode);
+        return context.getEligiblePreviousAlternatePlans().stream().filter(Objects::nonNull)
+                .anyMatch(plan -> samePhysicalMachine(physical, plan.getLhMachineCode()))
+                || context.getPreviousAlternateReleaseEventMap().keySet().stream()
+                .anyMatch(code -> samePhysicalMachine(physical, code))
+                || hasProtectedResult(context, context.getPreviousAlternateResultPlanMap().keySet(), physical);
+    }
+
+    /**
      * 检查一条结果在当前业务日是否有任意班次正计划量。
      *
      * @param dayContext 当前业务日班次切片
@@ -85,7 +102,8 @@ public final class DailyUnscheduledSkuSubstitutionPolicy {
      * 解析当前绑定所在整台物理机台不得置换的原因。
      *
      * <p>前日指定关系即使尚未成功承接也保护；结构切换和历史承接以活跃绑定及当前结果关联
-     * 共同判定，不依赖通用新增类型或主侧标识。收集、选机及正式撤销前均使用同一判断。</p>
+     * 共同判定，不依赖通用新增类型或主侧标识。喷砂恢复按来源绑定保护同一物理机台。
+     * 收集、选机及正式撤销前均使用同一判断。</p>
      *
      * @param context 历史资格与已提交结果
      * @param state 当前业务日绑定状态
@@ -100,6 +118,14 @@ public final class DailyUnscheduledSkuSubstitutionPolicy {
         String physicalMachineCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(binding.getMachineCode());
         if (StringUtils.isEmpty(physicalMachineCode)) {
             return "置换绑定缺少物理机台编码";
+        }
+        boolean recoveryBinding = Stream.concat(state.getActiveBindings().stream(),
+                        context.getPreScheduledMachineBindingList().stream())
+                .filter(active -> ContinuationSandBlastRecoveryService.isRecoveryCandidate(active.getSku()))
+                .anyMatch(active -> samePhysicalMachine(physicalMachineCode, active.getMachineCode())
+                        || samePhysicalMachine(physicalMachineCode, active.getPairMachineCode()));
+        if (recoveryBinding) {
+            return "仅喷砂原机原模恢复结果机台";
         }
         boolean previousAlternateSpecified = context.getEligiblePreviousAlternatePlans().stream()
                 .filter(Objects::nonNull)

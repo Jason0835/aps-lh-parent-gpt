@@ -92,7 +92,7 @@ public final class TaskChainScheduleEngine<C extends TaskChainContextAccess<T>,
         ScheduleChainChangeResult<T> result = chain.remove(node,
                 this.operationContext(context, settings.getManualDeleteOperation()));
         context.removeTaskNode(taskId);
-        policy.recalculateChainTimes(context, chain, machineCode, shiftOrder);
+        this.refreshChainAfterChange(context, chain, machineCode, shiftOrder, policy);
         return result;
     }
 
@@ -123,8 +123,8 @@ public final class TaskChainScheduleEngine<C extends TaskChainContextAccess<T>,
         ScheduleChainChangeResult<T> result = sourceChain.transferTo(sourceNode, targetChain, anchor,
                 this.operationContext(context, settings.getManualTransferOperation()));
         context.registerTaskNode(taskId, sourceNode);
-        policy.recalculateChainTimes(context, sourceChain, sourceMachineCode, sourceShiftOrder);
-        policy.recalculateChainTimes(context, targetChain, targetMachineCode, position.getShiftOrder());
+        this.refreshChainAfterChange(context, sourceChain, sourceMachineCode, sourceShiftOrder, policy);
+        this.refreshChainAfterChange(context, targetChain, targetMachineCode, position.getShiftOrder(), policy);
         return result;
     }
 
@@ -149,7 +149,7 @@ public final class TaskChainScheduleEngine<C extends TaskChainContextAccess<T>,
         }
         ScheduleChainChangeResult<T> result = chain.resequence(
                 this.operationContext(context, settings.getChangeQtyOperation()));
-        policy.recalculateChainTimes(context, chain, node.getMachineCode(), shiftOrder);
+        this.refreshChainAfterChange(context, chain, node.getMachineCode(), shiftOrder, policy);
         policy.traceChainState(context, chain, settings.getChangeQtyOperation(),
                 node.getMachineCode(), shiftOrder, taskId);
         return result;
@@ -158,9 +158,31 @@ public final class TaskChainScheduleEngine<C extends TaskChainContextAccess<T>,
     private void finishChange(C context, ScheduleTaskLinkedList<T> chain, ScheduleTaskNode<T> node,
                               String operation, TaskChainPolicy<C, T> policy) {
         context.registerTaskNode(node.getTaskId(), node);
-        policy.recalculateChainTimes(context, chain, node.getMachineCode(), node.getShiftOrder());
+        this.refreshChainAfterChange(context, chain, node.getMachineCode(), node.getShiftOrder(), policy);
         policy.traceChainState(context, chain, operation, node.getMachineCode(),
                 node.getShiftOrder(), node.getTaskId());
+    }
+
+    /**
+     * 链变更后的统一刷新入口。
+     *
+     * <p>延迟时间终算模式（仅自动排程上下文显式启用）下只维护换型资源字段，产能扣减
+     * 不依赖被延迟的时间重算副作用，起止时间由分配结束后的统一终算写入；手工上下文
+     * 及其他实现按模式缺省值关闭，保持既有整链时间即时重算。</p>
+     *
+     * @param context     排程上下文
+     * @param chain       受影响任务链
+     * @param machineCode 机台编码
+     * @param shiftOrder  班次顺序
+     * @param policy      领域策略
+     */
+    private void refreshChainAfterChange(C context, ScheduleTaskLinkedList<T> chain, String machineCode,
+                                         Integer shiftOrder, TaskChainPolicy<C, T> policy) {
+        if (context.isChainTimeDeferred()) {
+            policy.maintainChainSwitchResources(context, chain, machineCode, shiftOrder);
+            return;
+        }
+        policy.recalculateChainTimes(context, chain, machineCode, shiftOrder);
     }
 
     private ScheduleTaskNode<T> toNode(T task, String machineCode, Integer shiftOrder, C context,

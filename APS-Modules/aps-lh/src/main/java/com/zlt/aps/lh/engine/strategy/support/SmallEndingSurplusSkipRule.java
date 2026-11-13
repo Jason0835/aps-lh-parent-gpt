@@ -11,27 +11,37 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * 收尾小余量不排产规则。
  *
  * <p>规则口径：收尾 SKU 的有效硫化余量小于等于允许欠产偏差值时，先判断余量占本轮目标月
- * 原始TOTAL_QTY的比例；达到不忽略阈值时继续排产，未达到且业务目标日前一日排程结果中
- * T+1日夜班未排满时，本次不排产并进入未排结果。</p>
+ * 原始TOTAL_QTY的比例；达到不忽略阈值时继续排产。未达到且前次同物料、同产品状态的
+ * 全机台首班至T+1夜班累计计划已覆盖前次硫化余量时，本次不排产并进入未排结果。</p>
  *
  * @author APS
  */
 @Slf4j
 public final class SmallEndingSurplusSkipRule {
 
-    /** 收尾小余量且前日 T+1 夜班未排满的统一未排原因 */
+    /**
+     * 收尾小余量且前次已计划收完的统一未排原因。
+     */
     public static final String UNSCHEDULED_REASON =
-            "收尾余量小于等于允许欠产偏差值，且前日 T+1 夜班未排满，本次不排产";
+            "收尾余量小于等于允许欠产偏差值，且前次首班至T+1夜班累计计划已覆盖前次硫化余量，本次不排产";
 
+    /**
+     * 前次完成判断的截止夜班日期偏移。
+     */
     private static final int T1_DATE_OFFSET = 1;
 
+    /**
+     * 禁止实例化无状态规则。
+     */
     private SmallEndingSurplusSkipRule() {
     }
 
@@ -77,19 +87,21 @@ public final class SmallEndingSurplusSkipRule {
         int keepRatioPercent = resolveKeepRatioPercent(context);
         boolean keepScheduleByRatio = isKeepScheduleBySurplusRatio(
                 surplusQty, originalMonthPlanTotalQty, keepRatioPercent);
-        int previousT1NightPlanQty = resolveTargetPreviousT1NightPlanQty(context, sku.getMaterialCode());
-        boolean previousT1NightFull = isTargetPreviousT1NightFull(context, sku);
-        boolean skipSchedule = !keepScheduleByRatio && !previousT1NightFull;
+        long previousPlannedQty = resolvePreviousPlannedQty(context, sku);
+        Integer previousSurplusQty = resolvePreviousSurplusQty(context, sku);
+        boolean previousPlanCompleted = Objects.nonNull(previousSurplusQty)
+                && previousPlannedQty >= previousSurplusQty;
+        boolean skipSchedule = !keepScheduleByRatio && previousPlanCompleted;
         log.info("收尾小余量统一判断, factoryCode: {}, batchNo: {}, materialCode: {}, productStatus: {}, "
                         + "surplusQty: {}, toleranceQty: {}, originalMonthPlanTotalQty: {}, "
-                        + "keepRatioPercent: {}, keepScheduleByRatio: {}, previousT1NightPlanQty: {}, "
-                        + "shiftCapacity: {}, previousT1NightFull: {}, skipSchedule: {}",
+                        + "keepRatioPercent: {}, keepScheduleByRatio: {}, previousPlannedQty: {}, "
+                        + "previousSurplusQty: {}, previousPlanCompleted: {}, skipSchedule: {}",
                 Objects.isNull(context) ? null : context.getFactoryCode(),
                 Objects.isNull(context) ? null : context.getBatchNo(),
                 sku.getMaterialCode(), sku.getProductStatus(), surplusQty, toleranceQty,
                 originalMonthPlanTotalQty, keepRatioPercent, keepScheduleByRatio,
-                previousT1NightPlanQty, sku.getShiftCapacity(), previousT1NightFull, skipSchedule);
-        // 前日 T+1 夜班未排满是本规则的必要条件，已排满时仍按原收尾排产规则继续。
+                previousPlannedQty, previousSurplusQty, previousPlanCompleted, skipSchedule);
+        // 比较的是前次余量；本轮余量只决定阈值与未排数量，不能替代历史完成依据。
         return skipSchedule;
     }
 
@@ -141,44 +153,85 @@ public final class SmallEndingSurplusSkipRule {
     }
 
     /**
-     * 判断业务目标日前一日排程结果中该 SKU 的 T+1 日夜班是否已排满。
+     * 判断前次同物料、同产品状态的累计计划是否已覆盖前次余量。
      *
      * @param context 排程上下文
-     * @param sku SKU
-     * @return true-业务目标日前一日 T+1 夜班排产量大于等于班产；false-无业务目标日前一日数据或未排满
+     * @param sku 当前物料及产品状态
+     * @return 历史余量有效一致且累计计划已覆盖时返回true
      */
-    public static boolean isTargetPreviousT1NightFull(LhScheduleContext context, SkuScheduleDTO sku) {
-        if (Objects.isNull(sku) || sku.getShiftCapacity() <= 0) {
-            return false;
-        }
-        return resolveTargetPreviousT1NightPlanQty(context, sku.getMaterialCode()) >= sku.getShiftCapacity();
+    public static boolean isPreviousPlanCompleted(LhScheduleContext context, SkuScheduleDTO sku) {
+        Integer previousSurplusQty = resolvePreviousSurplusQty(context, sku);
+        return Objects.nonNull(previousSurplusQty)
+                && resolvePreviousPlannedQty(context, sku) >= previousSurplusQty;
     }
 
     /**
-     * 汇总业务目标日前一日排程结果中指定物料的 T+1 日夜班排产量。
+     * 汇总前次同SKU全部机台从首班至T+1夜班（含）的有效计划量。
      *
-     * @param context 排程上下文
-     * @param materialCode 物料编码
-     * @return 业务目标日前一日 T+1 夜班排产量，无数据时返回0
+     * @param context 已加载前次有效排程快照的上下文
+     * @param sku 当前物料及产品状态
+     * @return 指定班次前缀累计量；无快照或无截止班次时返回0
      */
-    public static int resolveTargetPreviousT1NightPlanQty(LhScheduleContext context, String materialCode) {
-        if (Objects.isNull(context) || StringUtils.isEmpty(materialCode)
-                || CollectionUtils.isEmpty(context.getTargetPreviousScheduleResultList())) {
-            return 0;
+    public static long resolvePreviousPlannedQty(LhScheduleContext context, SkuScheduleDTO sku) {
+        List<LhScheduleResult> results = resolvePreviousResults(context, sku);
+        if (results.isEmpty()) {
+            return 0L;
         }
         Integer nightShiftIndex = resolveT1NightShiftIndex(context);
         if (Objects.isNull(nightShiftIndex)) {
-            return 0;
+            return 0L;
         }
-        int totalQty = 0;
-        for (LhScheduleResult result : context.getTargetPreviousScheduleResultList()) {
-            if (Objects.isNull(result) || !StringUtils.equals(materialCode, result.getMaterialCode())) {
-                continue;
+        long totalQty = 0L;
+        for (LhScheduleResult result : results) {
+            for (int shiftIndex = 1; shiftIndex <= nightShiftIndex; shiftIndex++) {
+                Integer quantity = ShiftFieldUtil.getShiftPlanQty(result, shiftIndex);
+                totalQty += Objects.isNull(quantity) ? 0 : Math.max(0, quantity);
             }
-            Integer shiftPlanQty = ShiftFieldUtil.getShiftPlanQty(result, nightShiftIndex);
-            totalQty += Objects.isNull(shiftPlanQty) ? 0 : Math.max(0, shiftPlanQty);
         }
         return totalQty;
+    }
+
+    /**
+     * 读取前次SKU余量；各机台重复保存的SKU余量只取一次，缺失或不一致不推定已收完。
+     *
+     * @param context 已加载前次有效排程快照的上下文
+     * @param sku 当前物料及产品状态
+     * @return 一致的非负历史余量；缺少证据时返回null
+     */
+    public static Integer resolvePreviousSurplusQty(LhScheduleContext context, SkuScheduleDTO sku) {
+        List<LhScheduleResult> results = resolvePreviousResults(context, sku);
+        if (results.isEmpty() || Objects.isNull(resolveT1NightShiftIndex(context))) {
+            return null;
+        }
+        Integer previousSurplusQty = results.get(0).getMouldSurplusQty();
+        if (Objects.isNull(previousSurplusQty) || previousSurplusQty < 0
+                || results.stream().anyMatch(result -> !Objects.equals(previousSurplusQty, result.getMouldSurplusQty()))) {
+            log.info("小余量前次完成依据不足, factoryCode: {}, batchNo: {}, materialCode: {}, productStatus: {}, "
+                            + "reason: 前次硫化余量缺失、负数或跨机台不一致",
+                    context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(), sku.getProductStatus());
+            return null;
+        }
+        return previousSurplusQty;
+    }
+
+    /**
+     * 从已加载的前次快照筛选同物料、同产品状态的有效结果，保留所有机台与分段行。
+     *
+     * @param context 排程上下文
+     * @param sku 当前物料及产品状态
+     * @return 同SKU有效结果，无证据时返回空集合
+     */
+    private static List<LhScheduleResult> resolvePreviousResults(LhScheduleContext context, SkuScheduleDTO sku) {
+        if (Objects.isNull(context) || Objects.isNull(sku) || StringUtils.isBlank(sku.getMaterialCode())
+                || StringUtils.isBlank(sku.getProductStatus())
+                || CollectionUtils.isEmpty(context.getTargetPreviousScheduleResultList())) {
+            return Collections.emptyList();
+        }
+        return context.getTargetPreviousScheduleResultList().stream().filter(Objects::nonNull)
+                .filter(result -> !Objects.equals(1, result.getIsDelete()))
+                .filter(result -> StringUtils.equals(sku.getMaterialCode(), result.getMaterialCode())
+                        && StringUtils.equals(sku.getProductStatus(), result.getProductStatus()))
+                .collect(Collectors.toList());
     }
 
     /**

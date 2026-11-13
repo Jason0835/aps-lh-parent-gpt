@@ -3,6 +3,8 @@ package com.zlt.aps.lh.engine.strategy.support;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 
 import java.util.Date;
+import java.util.Comparator;
+import java.util.Objects;
 
 /**
  * 新增 SKU 候选机台的历史班次剩余产能画像。
@@ -56,6 +58,33 @@ public class HistoricalResidualCapacityInfo {
         this.netProductiveSeconds = netProductiveSeconds;
         this.residualCapacityQty = residualCapacityQty;
         this.priorityLevel = priorityLevel;
+    }
+
+    /**
+     * 共用历史剩余资源来源比较，历史来源优先，同为历史来源时按绝对班次开始时间升序。
+     *
+     * @param left 左侧冻结的来源，空表示当前资源
+     * @param right 右侧冻结的来源，空表示当前资源
+     * @return 负数表示左侧优先，零表示继续比较后续规则
+     */
+    public static int compareSourcePriority(HistoricalResidualCapacityInfo left,
+            HistoricalResidualCapacityInfo right) {
+        if (Objects.nonNull(left) != Objects.nonNull(right)) {
+            return Objects.nonNull(left) ? -1 : 1;
+        }
+        if (Objects.isNull(left)) {
+            return 0;
+        }
+        return Comparator.nullsLast(Date::compareTo).compare(left.getSourceStartTime(), right.getSourceStartTime());
+    }
+
+    /**
+     * 读取冻结来源班次的绝对开始时间，供排序与审计共用。
+     *
+     * @return 来源开始时间，来源班次缺失时为空
+     */
+    public Date getSourceStartTime() {
+        return Objects.isNull(sourceShift) ? null : sourceShift.getShiftStartDateTime();
     }
 
     public LhShiftConfigVO getSourceShift() {

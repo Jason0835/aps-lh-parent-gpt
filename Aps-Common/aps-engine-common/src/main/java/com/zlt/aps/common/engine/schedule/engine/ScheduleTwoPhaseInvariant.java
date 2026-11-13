@@ -1,6 +1,7 @@
 package com.zlt.aps.common.engine.schedule.engine;
 
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
+import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
 
 import java.math.BigDecimal;
 import java.util.HashMap;
@@ -12,6 +13,28 @@ import java.util.Objects;
  * 两阶段输入证明及物理结果守恒检查，不读库、不改变事实或资源。
  */
 public final class ScheduleTwoPhaseInvariant {
+
+    /**
+     * 统一终算后核对数量守恒及已分配备库新行的时间完整性。
+     *
+     * <p>延迟模式在分配阶段允许备库节点时间为空，但完成分配后必须具有起止时间。
+     * 只对原提交校验涉及的已分配备库新行检查时间，不扩大普通任务和保留事实的校验范围。</p>
+     *
+     * @param context 已完成任务链时间终算的排程上下文
+     * @return 数量守恒且全部已分配备库新行的节点起止时间完整时返回 true
+     */
+    public boolean validFinalAssignments(ScheduleContextModel<?, ?, ?, ?, ?> context) {
+        if (!this.validAssignments(context.getTaskDraftList())) {
+            return false;
+        }
+        return context.getTaskDraftList().stream().filter(Objects::nonNull)
+                .filter(task -> Boolean.TRUE.equals(task.getExtraCreateTask()))
+                .filter(task -> task.getQuantityStage() == ScheduleQuantityStage.ASSIGNED)
+                .allMatch(task -> {
+                    ScheduleTaskNode<?> node = context.getTaskNode(task.getBusinessKey());
+                    return node != null && node.getStartTime() != null && node.getEndTime() != null;
+                });
+    }
 
     /**
      * 检查已结算输入证明，保证顺延与显式预置不会重新损耗或换机套用旧候选。

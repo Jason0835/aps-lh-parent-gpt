@@ -10,6 +10,7 @@ import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.LhShiftDelayEvidence;
+import com.zlt.aps.lh.engine.strategy.support.LhShiftDelayReason;
 import com.zlt.aps.lh.engine.strategy.support.LhShiftRemarkRuntime;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchPlan;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchRuntimeState;
@@ -53,7 +54,7 @@ public class LhShiftAnalysisRemarkService {
      */
     private static final String SPECIFIED_MACHINE_ANALYSIS = "指定上机";
     /**
-     * 等结果结构指定机台等待供胚及首班受限时的实际空班说明。
+     * 等结果结构指定机台首班名额受限时的实际空班说明。
      */
     private static final String STRUCTURE_SWITCH_WAIT_AVAILABLE_ANALYSIS = "结构切换等结果最早可供硫化时间受限";
     /**
@@ -124,9 +125,13 @@ public class LhShiftAnalysisRemarkService {
                 if (!this.matches(result, evidence)) {
                     continue;
                 }
-                BitSet machineOccupied = occupied.get(evidence.getMachineCode());
+                String occupiedMachine = evidence.getReason() == LhShiftDelayReason.STRUCTURE_SWITCH_SUPPLY_TIME
+                        ? LhSingleControlMachineUtil.resolvePhysicalMachineCode(evidence.getMachineCode())
+                        : evidence.getMachineCode();
+                BitSet machineOccupied = occupied.get(occupiedMachine);
                 for (LhShiftConfigVO shift : shifts) {
                     int shiftIndex = shift.getShiftIndex();
+                    // 供胚落在班次内部时仍会造成等待；有量班由下方整机占用索引统一排除。
                     if (shift.getShiftStartDateTime().getTime() >= evidence.getBlockedUntil()
                             || shift.getShiftEndDateTime().getTime() <= evidence.getBlockedFrom()
                             || !shift.getShiftStartDateTime().before(firstPositive.getShiftStartDateTime())
@@ -346,8 +351,8 @@ public class LhShiftAnalysisRemarkService {
     }
 
     /**
-     * 为等结果结构指定上机补充供胚前及规则首班的实际空班说明，不推断候选曾被拒绝。
-     * 供胚前等待从实际换模准备起点计算；同物理机已有其他生产时不展示空班说明。
+     * 为等结果结构指定上机补充规则首班名额的实际空班说明，供胚等待由候选证据投影。
+     * 同物理机已有其他生产时不展示空班说明。
      *
      * @param context 最终结构切换来源和共享规则首班
      * @param result 已核对正式历史来源和侧位的首个有效结果
@@ -379,18 +384,6 @@ public class LhShiftAnalysisRemarkService {
         }
         String physicalMachine = LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode());
         BitSet machineOccupied = occupied.get(physicalMachine);
-        // 实际准备之前的空班没有本次等待依据；供胚所在班若能开产，不按整班等待处理。
-        Date preparationStart = result.getMouldChangeStartTime();
-        if (preparationStart != null && preparationStart.before(source.getEarliestLhTime())) {
-            for (LhShiftConfigVO shift : shifts) {
-                if (shift.getShiftEndDateTime().after(preparationStart)
-                        && !shift.getShiftEndDateTime().after(source.getEarliestLhTime())
-                        && shift.getShiftStartDateTime().before(firstPositive.getShiftStartDateTime())
-                        && (machineOccupied == null || !machineOccupied.get(shift.getShiftIndex()))) {
-                    this.appendItem(result, shift.getShiftIndex(), STRUCTURE_SWITCH_WAIT_AVAILABLE_ANALYSIS);
-                }
-            }
-        }
         // 供胚所在规则首班仍沿用原第二班指定开机条件，不能把全部延后原因归为供胚。
         if (state.getSecondShift() == null
                 || !Objects.equals(firstPositive.getShiftStartDateTime(),

@@ -250,6 +250,79 @@ public final class FirstInspectionAllocationUtil {
     }
 
     /**
+     * 构建精度与切换共用的计件首检，换活字块沿用总时长包含首检的口径。
+     * 按真实开始班次解析参数后倒推首检，精度及维修准备下限较晚时完整后移。
+     *
+     * @param context 排程上下文
+     * @param sku 首检所属物料
+     * @param shifts 完整排程窗口班次
+     * @param inspectionNotBeforeTime 精度及维修预热完成下限
+     * @param changeoverEndTime 包含原首检的切换结束时间，独立精度为空
+     * @param shiftCapacity 运行态完整班产
+     * @param remainingQty 当前可消费数量
+     * @param scheduleType 实际切换类型
+     * @param machineCode 运行态机台编码
+     * @param availableCapacityMap 真实首检区间容量
+     * @param precisionPlanId 有效精度计划主键
+     * @return 保留精度归属、计数及真实时间分摊的首检计划
+     */
+    public static FirstInspectionAllocationPlan buildPrecisionQuantityPlan(
+            LhScheduleContext context, SkuScheduleDTO sku, List<LhShiftConfigVO> shifts,
+            Date inspectionNotBeforeTime, Date changeoverEndTime, int shiftCapacity, int remainingQty,
+            String scheduleType, String machineCode, Map<Integer, Integer> availableCapacityMap,
+            Long precisionPlanId) {
+        if (!ScheduleTypeEnum.TYPE_BLOCK.getCode().equals(scheduleType)
+                || Objects.isNull(changeoverEndTime) || Objects.isNull(inspectionNotBeforeTime)
+                || CollectionUtils.isEmpty(shifts) || shiftCapacity <= 0) {
+            return buildPrecisionQuantityPlan(context, sku, shifts, inspectionNotBeforeTime,
+                    shiftCapacity, remainingQty, scheduleType, machineCode, availableCapacityMap, precisionPlanId);
+        }
+        List<LhShiftConfigVO> orderedShifts = shifts.stream()
+                .filter(Objects::nonNull)
+                .filter(shift -> Objects.nonNull(shift.getShiftIndex())
+                        && Objects.nonNull(shift.getShiftStartDateTime())
+                        && Objects.nonNull(shift.getShiftEndDateTime()))
+                .sorted(Comparator.comparing(LhShiftConfigVO::getShiftStartDateTime))
+                .collect(Collectors.toList());
+        for (LhShiftConfigVO shift : orderedShifts) {
+            if (!inspectionNotBeforeTime.before(shift.getShiftEndDateTime())) {
+                continue;
+            }
+            int sequence = FirstInspectionQtyUtil.resolveNextFirstInspectionSequence(context, shift);
+            int configuredQty = FirstInspectionQtyUtil.resolveAdjustedFirstInspectionQty(
+                    context, sequence, machineCode, false);
+            int inspectionQty = Math.min(Math.max(0, configuredQty), Math.max(0, remainingQty));
+            long durationSeconds = resolveInspectionDurationSeconds(inspectionQty,
+                    ShiftCapacityResolverUtil.resolveShiftDurationSeconds(shift), shiftCapacity);
+            Date inspectionStart = resolvePrecisionTypeBlockInspectionStartTime(
+                    inspectionNotBeforeTime, changeoverEndTime, durationSeconds, shift);
+            if (inspectionStart.before(shift.getShiftEndDateTime())) {
+                // 容量失败交回原候选重试流程，不能为了换参数或取得容量而跳到另一个班次。
+                return buildPrecisionQuantityPlan(context, sku, shifts, inspectionStart,
+                        shiftCapacity, remainingQty, scheduleType, machineCode, availableCapacityMap, precisionPlanId);
+            }
+        }
+        return FirstInspectionAllocationPlan.invalid("精度换活字块首检未命中排程班次", null, changeoverEndTime);
+    }
+
+    /**
+     * 用实际首检时长扣除换活字块总时长中已包含的首检，并遵守准备及计数班次下限。
+     *
+     * @param inspectionNotBeforeTime 精度及维修预热完成下限
+     * @param changeoverEndTime 包含首检的换活字块结束时间
+     * @param durationSeconds 当前计数班次及目标量确定的首检秒数
+     * @param countingShift 首检真实开始班次
+     * @return 倒推时间与各项下限取晚后的首检开始时间
+     */
+    public static Date resolvePrecisionTypeBlockInspectionStartTime(Date inspectionNotBeforeTime,
+            Date changeoverEndTime, long durationSeconds, LhShiftConfigVO countingShift) {
+        long includedStart = changeoverEndTime.getTime() - durationSeconds * MILLIS_PER_SECOND;
+        long allowedStart = Math.max(inspectionNotBeforeTime.getTime(),
+                countingShift.getShiftStartDateTime().getTime());
+        return new Date(Math.max(includedStart, allowedStart));
+    }
+
+    /**
      * 按固定时长或计件时长分摊首检，历史指定试制量试共用正规数量和时间轴。
      *
      * @param context 当前历史规则和首检计数

@@ -285,7 +285,8 @@ public class LhEquipmentPlanScheduleService {
                 this.replaceInspectionTimeline(context, arrangement, timeline.withInspection(inspectionStart, inspectionStart),
                         "切换承接结果已撤销，恢复精度准备边界，首检待明确SKU后按参数分配");
                 PriorityTraceLogHelper.appendProcessLog(context, "精度并行安排恢复",
-                        "批次=" + context.getBatchNo() + "，物理机台=" + timeline.getPhysicalMachineCode()
+                        "批次=" + context.getBatchNo() + "，工厂=" + context.getFactoryCode()
+                            + "，物理机台=" + timeline.getPhysicalMachineCode()
                                 + "，计划主键=" + timeline.getPrecisionPlanId() + "，原因=有效承接结果已撤销"
                                 + "，首检准备完成=" + LhScheduleTimeUtil.formatDateTime(inspectionStart));
             }
@@ -372,7 +373,7 @@ public class LhEquipmentPlanScheduleService {
                 this.recordUnsupported(context, entry.getKey(), "有效精度判定未返回计划主键，不能登记安排");
                 continue;
             }
-            EquipmentPlanTimeline timeline = timelineResolver.resolvePrecision(context, decision,
+            EquipmentPlanTimeline timeline = timelineResolver.resolvePrecisionWithRepair(context, decision,
                     versions.get(decision.getMachineCode()));
             state.getCandidateTimelineMap().put(entry.getKey(), timeline);
             state.getPendingPhysicalMachines().add(entry.getKey());
@@ -418,7 +419,7 @@ public class LhEquipmentPlanScheduleService {
                 }
                 String reason = "有效精度判定未返回计划主键，不能登记安排";
                 if (Objects.nonNull(decision.getPrecisionPlanId())) {
-                    EquipmentPlanTimeline timeline = timelineResolver.resolvePrecision(context, decision,
+                    EquipmentPlanTimeline timeline = timelineResolver.resolvePrecisionWithRepair(context, decision,
                             versions.get(decision.getMachineCode()));
                     state.getCandidateTimelineMap().put(entry.getKey(), timeline);
                     reason = this.resolveAcceptanceRejectReason(context, timeline);
@@ -545,7 +546,8 @@ public class LhEquipmentPlanScheduleService {
     }
 
     /**
-     * 正式接受单场景时间计划，同时发布L/R实际窗口与物理额度；未覆盖组合明确拒绝。
+     * 正式接受精度及维修并行准备时间计划，同时发布L/R实际窗口与物理额度。
+     *
      * @param context 排程上下文
      * @param timeline 已适配的候选时间计划
      */
@@ -559,6 +561,17 @@ public class LhEquipmentPlanScheduleService {
             return;
         }
         this.registerAcceptedTimeline(context, timeline);
+        RepairPlanResult repair = LhRepairOverlapResolver.resolvePrecisionPreparation(context,
+                timeline.getPhysicalMachineCode(), timeline.getMaintenanceStartTime(), timeline.getMaintenanceReadyTime());
+        if (repair.getOverlapStatus() == RepairPlanResult.OverlapStatus.SUPPORTED) {
+            PriorityTraceLogHelper.appendProcessLog(context, "维修精度并行准备时间轴",
+                    "批次=" + context.getBatchNo() + "，物理机台=" + timeline.getPhysicalMachineCode()
+                            + "，精度计划主键=" + timeline.getPrecisionPlanId()
+                            + "，维修来源=" + repair.getSourcePlans().stream().map(plan -> String.valueOf(plan.getId()))
+                                    .collect(Collectors.joining(","))
+                            + "，共同准备完成=" + LhScheduleTimeUtil.formatDateTime(timeline.getMaintenanceReadyTime())
+                            + "，规则=各事项实际准备完成时刻取晚，首检由后续SKU唯一承接");
+        }
     }
 
     /**
@@ -838,13 +851,18 @@ public class LhEquipmentPlanScheduleService {
                 .collect(Collectors.toList());
     }
 
-    /** @param context 上下文 @param timeline 单场景候选 @return 尚未覆盖的组合原因，空表示未发现重叠 */
+    /**
+     * 检查维修并行之外的设备、清洗及已提交切换冲突。
+     *
+     * @param context 上下文
+     * @param timeline 已合并准备边界的精度候选
+     * @return 未覆盖的组合原因，无冲突时返回null
+     */
     private String resolveUnsupportedCombination(LhScheduleContext context, EquipmentPlanTimeline timeline) {
         Date start = timeline.getMaintenanceStartTime();
         Date end = timeline.getProductionResumeTime();
-        RepairPlanResult repairOverlap = LhRepairOverlapResolver.resolveWithPrecision(
-                context.getDevicePlanShutList(), timeline.getPhysicalMachineCode(), start, end,
-                "精度与设备停机/维修重叠尚未接入，停机类型=");
+        RepairPlanResult repairOverlap = LhRepairOverlapResolver.resolvePrecisionPreparation(
+                context, timeline.getPhysicalMachineCode(), start, end);
         if (repairOverlap.getOverlapStatus() == RepairPlanResult.OverlapStatus.UNSUPPORTED) {
             return repairOverlap.getReason();
         }

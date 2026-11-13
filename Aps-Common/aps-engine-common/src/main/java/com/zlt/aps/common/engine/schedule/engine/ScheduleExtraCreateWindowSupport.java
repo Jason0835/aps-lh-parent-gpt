@@ -1,20 +1,17 @@
 package com.zlt.aps.common.engine.schedule.engine;
 
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
-import com.zlt.aps.common.core.utils.SixShiftWorkCalendarUtil;
-import com.zlt.aps.common.engine.schedule.ScheduleTaskNode;
-import com.zlt.aps.common.engine.schedule.ScheduleTaskTimingCalculator;
-import com.zlt.aps.common.engine.schedule.constraint.ScheduleConstraintCalculator;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 新行试排后从真实来源、已偏移窗口和成型日历构建公共窗口证明。
+ * 从真实来源、已偏移窗口和成型日历构建公共窗口证明。
+ *
+ * <p>停放上下限、生产起止时点与期限净请求裁量已按业务确认下线：本支撑类只负责
+ * 需求归集（参数化覆盖窗口、真实保证需求兼容路径）、需求侧窗口证明与来源权重；
+ * 备库数量上限由目标、产能、工装与成型余量额度在数量计算器中约束。</p>
  */
 public final class ScheduleExtraCreateWindowSupport {
     /**
@@ -118,31 +115,6 @@ public final class ScheduleExtraCreateWindowSupport {
                 .filter(offset -> offset >= startOffset && offset < endOffset).count();
         return explicitDemand.add(BigDecimalUtils.valueOf(window.getExtrapolatedDemandQtyPerShift())
                 .max(BigDecimal.ZERO).multiply(BigDecimalUtils.valueOf(endOffset - startOffset - overriddenOffsets)));
-    }
-
-    /**
-     * 按真实消费先后分配班初库存，再计算合格段的净请求。
-     * 被时间窗口排除的前置消费仍先占用库存；后置排除段不得倒过来占用前面合格段的库存。
-     *
-     * @param context 同一来源和库存快照的工作区 @param task 试排候选 @param proof 已通过的实际时效证明
-     * @param <T>     任务类型
-     * @return 合格消费段尚缺的米数，不重复扣除已被前置消费占用的库存
-     */
-    public static <T extends ScheduleTaskDraftModel> BigDecimal resolveEligibleNetRequest(
-            ScheduleContextModel<T, ?, ?, ?, ?> context, T task, ScheduleExtraCreateWindowProof proof) {
-        if (proof == null || !proof.isReady()) {
-            return BigDecimal.ZERO;
-        }
-        BigDecimal remainingStock = BigDecimalUtils.valueOf(task.getRollingStockQty()).max(BigDecimal.ZERO);
-        BigDecimal net = BigDecimal.ZERO;
-        for (Map.Entry<Integer, BigDecimal> entry : candidateDemandByShift(context, task).entrySet()) {
-            BigDecimal allocatedStock = remainingStock.min(entry.getValue());
-            remainingStock = remainingStock.subtract(allocatedStock);
-            if (proof.getEligibleFormingShiftOrders().contains(entry.getKey())) {
-                net = net.add(entry.getValue().subtract(allocatedStock));
-            }
-        }
-        return net.min(BigDecimalUtils.valueOf(proof.getEligibleDemandQty())).max(BigDecimal.ZERO);
     }
 
     /**
@@ -268,7 +240,7 @@ public final class ScheduleExtraCreateWindowSupport {
     /**
      * 将新行来源权重限定为本次合格的真实消费班；同一来源的派生快照只向稳定锚点归属一次。
      *
-     * @param group 当前计划组 @param task 已确认工艺 @param proof 实际窗口证明
+     * @param group 当前计划组 @param task 已确认工艺 @param proof 窗口证明
      * @param <T>   来源任务类型
      * @return 含所有来源键的独立权重表；不符合窗口的来源权重为0
      */
@@ -282,7 +254,6 @@ public final class ScheduleExtraCreateWindowSupport {
 
     /**
      * 普通覆盖分配权重可能全为0，独立新行必须按批准窗口内真实消费重建来源权重。
-     * 机台试算后仍须按实际合格消费段再次收紧，不能将此窗口权重当作时效证明。
      *
      * @param context 工作区 @param task 当前候选 @param <T> 任务类型
      * @return 本次独立备库请求的来源权重，不修改原始需求量
@@ -361,135 +332,24 @@ public final class ScheduleExtraCreateWindowSupport {
     }
 
     /**
-     * 按本模块现有物理日期轴解析生产窗口。
+     * 从来源及已批准窗口构建需求侧窗口证明（窗口范围、成型日历与口型白名单）。
      *
-     * @param context 领域上下文 @param shift 班次 @param dateOffset 本模块日期偏移 @param zone 工厂时区
-     * @return 生产班起止；缺配置返回null
-     */
-    public static Date[] productionWindow(ScheduleContextModel<?, ?, ?, ?, ?> context, int shift,
-                                          int dateOffset, ZoneId zone) {
-        ScheduleShiftTimeWindowModel window = context.getShiftTimeWindowMap().get(shift);
-        return window == null ? null : SchedulePhysicalShiftTimeUtils.resolveShiftWindow(context.getScheduleDate(),
-                dateOffset, shift, window.getPlanStartTime(), window.getPlanEndTime(), window.getCrossDayFlag(), zone);
-    }
-
-    /**
-     * 以实际挂链后的节点计算窗口，使用参数化覆盖窗口中已批准的真实或外推需求。
-     * 消费日期由逻辑班映射，日历、最小停放和最大保管门禁仍逐段核验。
-     *
-     * @param context      工作区 @param task 已试排任务 @param node 实际节点 @param machine 已通过过滤的机台
-     * @param minimumHours 最小停放 @param maximumHours 最大保管 @param zone 工厂时区
-     * @param <T>          任务类型
-     * @return 静态白名单及已批准消费窗口证明
+     * @param context 工作区 @param task 已试排候选 @param machine 目标机台 @param <T> 任务类型
+     * @return 需求侧窗口证明，不修改上下文
      */
     public static <T extends ScheduleTaskDraftModel> ScheduleExtraCreateWindowProof evaluate(
-            ScheduleContextModel<T, ?, ?, ?, ?> context, T task, ScheduleTaskNode<T> node,
-            ScheduleMachineCandidateModel machine, BigDecimal minimumHours, BigDecimal maximumHours, ZoneId zone) {
-        return new ScheduleExtraCreateWindowGuard().evaluate(
-                windowRequest(context, task, node, machine, minimumHours, maximumHours, zone));
+            ScheduleContextModel<T, ?, ?, ?, ?> context, T task, ScheduleMachineCandidateModel machine) {
+        return new ScheduleExtraCreateWindowGuard().evaluate(windowRequest(context, task, machine));
     }
 
     /**
-     * 将各真实消费期限的时间上限、合格净需求的损耗后目标及资源量共同裁量，再比较最大可行整卷量。
-     * 节点开始已包含换产时间；按整秒向下取可生产时长，与任务链向上取生产秒数相匹配。
-     * 此方法只试算数量，不修改节点、需求、库存或资源账本；调用方须重新挂链和证明。
+     * 从来源及已批准窗口组装窗口输入，供需求侧证明使用。
      *
-     * @param context          最新试排工作区
-     * @param task             已按选中机台结算的候选
-     * @param node             全量试排节点
-     * @param machine          目标机台及小时速度
-     * @param curlLength       本模块已解析的有效卷长
-     * @param calculationScale 本模块损耗结算精度
-     * @param minimumHours     最小停放小时
-     * @param maximumHours     最大保管小时
-     * @param zone             工厂时区
-     * @param <T>              领域任务类型
-     * @return 不超过当前节点数量的最大窗口可行量；资料不足或不足起排返回0
-     */
-    public static <T extends ScheduleTaskDraftModel> BigDecimal resolveStandingAllowedQty(
-            ScheduleContextModel<T, ?, ?, ?, ?> context, T task, ScheduleTaskNode<T> node,
-            ScheduleMachineCandidateModel machine, BigDecimal curlLength, int calculationScale,
-            BigDecimal minimumHours, BigDecimal maximumHours, ZoneId zone) {
-        if (node == null || node.getStartTime() == null || minimumHours == null || minimumHours.signum() < 0
-                || BigDecimalUtils.valueOf(task.getMachineSpeed()).signum() <= 0) {
-            return BigDecimal.ZERO;
-        }
-        ScheduleExtraCreateWindowRequest request = windowRequest(
-                context, task, node, machine, minimumHours, maximumHours, zone);
-        BigDecimal best = BigDecimal.ZERO;
-        ScheduleTwoPhaseQuantityCalculator quantities = new ScheduleTwoPhaseQuantityCalculator();
-        for (ScheduleExtraCreateDemandSlice slice : request.getDemandSlices()) {
-            if (slice.getConsumptionStartTime() == null) {
-                continue;
-            }
-            BigDecimal seconds = BigDecimalUtils.valueOf(slice.getConsumptionStartTime())
-                    .subtract(BigDecimalUtils.valueOf(node.getStartTime().getTime()))
-                    .subtract(minimumHours.multiply(BigDecimalUtils.valueOf(3600000)))
-                    .divide(BigDecimalUtils.valueOf(1000), 0, RoundingMode.FLOOR);
-            if (seconds.signum() <= 0) {
-                continue;
-            }
-            BigDecimal limit = seconds.multiply(task.getMachineSpeed())
-                    .divide(BigDecimalUtils.valueOf(3600), 12, RoundingMode.FLOOR);
-            BigDecimal allowed = quantities.calculateExtraCreateAllowedQty(task, node.getPlanQty(), curlLength,
-                    task.getMinStartQty(), limit);
-            if (allowed.compareTo(best) <= 0) {
-                continue;
-            }
-            request.setProductionEndTime(ScheduleTaskTimingCalculator.calculate(
-                    node.getStartTime(), allowed, task.getMachineSpeed(), BigDecimal.ZERO).getEndTime().getTime());
-            ScheduleExtraCreateWindowProof proof = new ScheduleExtraCreateWindowGuard().evaluate(request);
-            if (!proof.isReady()) {
-                continue;
-            }
-            BigDecimal eligibleRequest = resolveEligibleNetRequest(context, task, proof);
-            // 不能仅凭“存在正需求”保留整份目标：逐期限按所选机台损耗、起排及补卷结算需求上限。
-            BigDecimal demandTarget = committedDemandQty(task, eligibleRequest, curlLength, calculationScale);
-            BigDecimal candidate = quantities.calculateExtraCreateAllowedQty(task, demandTarget, curlLength,
-                    task.getMinStartQty(), allowed);
-            if (candidate.compareTo(best) <= 0) {
-                continue;
-            }
-            // 裁量后消费段资格可能扩大，重算证明及库存归属；比较前必须证实候选量有足够目标支撑。
-            request.setProductionEndTime(ScheduleTaskTimingCalculator.calculate(
-                    node.getStartTime(), candidate, task.getMachineSpeed(), BigDecimal.ZERO).getEndTime().getTime());
-            ScheduleExtraCreateWindowProof candidateProof = new ScheduleExtraCreateWindowGuard().evaluate(request);
-            if (candidateProof.isReady() && candidate.compareTo(committedDemandQty(task,
-                    resolveEligibleNetRequest(context, task, candidateProof), curlLength, calculationScale)) <= 0) {
-                best = candidate;
-            }
-        }
-        return best;
-    }
-
-    /**
-     * 沿用正常选机的损耗、起排及补卷公式，将窗口净需求换成物理目标；不修改候选的数量证据。
-     *
-     * @param task             已解析损耗率的候选 @param request 合格损耗前净需求 @param curlLength 有效卷长
-     * @param calculationScale 领域精度
-     * @return 损耗后整数米目标；无净需求返回0，不能凭最低起排量制造需求
-     */
-    private static BigDecimal committedDemandQty(ScheduleTaskDraftModel task, BigDecimal request,
-                                                 BigDecimal curlLength, int calculationScale) {
-        if (ScheduleDemandOnlyQuantityPolicy.enabled(task)) {
-            return ScheduleDemandOnlyQuantityPolicy.settle(task, request, task.getResolvedLossRate(), calculationScale)
-                    .getFinalPlanQty();
-        }
-        return new ScheduleConstraintCalculator().calculatePlanQtyAfterLoss(request, task.getResolvedLossRate(),
-                        task.getMinStartQty(), curlLength, request.signum() <= 0, calculationScale)
-                .getFinalPlanQty().setScale(0, RoundingMode.CEILING);
-    }
-
-    /**
-     * 从实际节点及来源组装窗口输入，供正式证明与限量试算共用。
-     *
-     * @param context      工作区 @param task 候选 @param node 实际试排节点 @param machine 目标机台
-     * @param minimumHours 最小停放 @param maximumHours 最大保管 @param zone 时区 @param <T> 任务类型
+     * @param context 工作区 @param task 候选 @param machine 目标机台 @param <T> 任务类型
      * @return 独立的窗口输入，不修改上下文
      */
     private static <T extends ScheduleTaskDraftModel> ScheduleExtraCreateWindowRequest windowRequest(
-            ScheduleContextModel<T, ?, ?, ?, ?> context, T task, ScheduleTaskNode<T> node,
-            ScheduleMachineCandidateModel machine, BigDecimal minimumHours, BigDecimal maximumHours, ZoneId zone) {
+            ScheduleContextModel<T, ?, ?, ?, ?> context, T task, ScheduleMachineCandidateModel machine) {
         ScheduleExtraCreateWindowRequest request = new ScheduleExtraCreateWindowRequest();
         request.setCurrentFormingLogicalShiftOrder(task.getFormingLogicalShiftOrder());
         ScheduleStockCoverageWindowModel stockCoverageWindow = task.getStockCoverageWindow();
@@ -497,10 +357,6 @@ public final class ScheduleExtraCreateWindowSupport {
                 ? BigDecimalUtils.valueOf(task.getGuardShiftCount()).intValue()
                 : BigDecimalUtils.valueOf(stockCoverageWindow.getShiftCount()).intValue() - 1;
         request.setGuardShiftCount(guardShiftCount);
-        request.setProductionStartTime(node.getStartTime() == null ? null : node.getStartTime().getTime());
-        request.setProductionEndTime(node.getEndTime() == null ? null : node.getEndTime().getTime());
-        request.setMinimumStandingHours(minimumHours);
-        request.setMaximumStandingHours(maximumHours);
         request.setMouthPlateCode(task.getMouthPlateCode());
         request.setAllowedMouthPlateCodes(machine.getMouthPlateCodes());
         // 压出CLASS1为中班，对应成型CLASS2；这里按同时段检查，不能再次应用供料偏移。
@@ -516,14 +372,6 @@ public final class ScheduleExtraCreateWindowSupport {
             slice.setApprovedDemand(stockCoverageWindow != null);
             slice.setExtrapolatedDemand(logical > 8);
             slice.setCalendarOpen(context.getExtraCreateFormingCalendarOpenMap().get(logical));
-            LocalDate date = SixShiftWorkCalendarUtil.resolveFormingProductionDate(context.getScheduleDate(), logical);
-            int calendarShift = SixShiftWorkCalendarUtil.resolveFormingCalendarShiftOrder(logical);
-            int mappedShift = calendarShift == 3 ? 1 : calendarShift + 1;
-            ScheduleShiftTimeWindowModel clock = context.getShiftTimeWindowMap().get(mappedShift);
-            Date[] time = clock == null ? null : SchedulePhysicalShiftTimeUtils.resolveShiftWindow(
-                    date, 0, 1, clock.getPlanStartTime(), clock.getPlanEndTime(), clock.getCrossDayFlag(), zone);
-            slice.setConsumptionStartTime(time == null ? null : time[0].getTime());
-            slice.setConsumptionEndTime(time == null ? null : time[1].getTime());
             slices.add(slice);
         });
         request.setDemandSlices(slices);

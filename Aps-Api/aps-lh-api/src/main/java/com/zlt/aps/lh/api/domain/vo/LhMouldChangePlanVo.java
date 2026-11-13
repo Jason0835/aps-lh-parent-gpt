@@ -112,6 +112,13 @@ public class LhMouldChangePlanVo extends BaseEntity implements Serializable {
     @TableField(value = "LEFT_RIGHT_MOULD")
     private String leftRightMould;
 
+    /**
+     * 导出日期比较使用的原始前物料编码，纯清洗计划的展示值可能被清空。
+     */
+    @JsonIgnore
+    @TableField(exist = false)
+    private String comparisonBeforeMaterialCode;
+
     @ApiModelProperty(value = "前规格物料编码")
     @Excel(name = "ui.data.column.lhMouldChangePlan.beforeMaterialCode")
     @TableField(value = "BEFORE_MATERIAL_CODE")

@@ -1,5 +1,6 @@
 package com.zlt.aps.lh.context;
 
+import com.zlt.aps.lh.component.NewProductionDateAdmissionPolicy;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.zlt.aps.common.engine.domain.LhDayPlanAdjustVo;
@@ -661,6 +662,13 @@ public class LhScheduleContext {
     private CleaningPlanRuntimeState cleaningPlanRuntimeState = new CleaningPlanRuntimeState();
 
     /**
+     * 基础数据阶段按物料及产品状态冻结的真实硫化余量，供清洗初始化和延期产能判断收尾。
+     * 键沿用月计划物料状态标识，空状态按正规S处理。缺少键表示尚无余量依据。
+     * 该快照仅在基础数据加载时赋值，生产扣账与候选回滚使用各自运行态。
+     */
+    private Map<String, Integer> cleaningInitialSurplusQtyMap = Collections.emptyMap();
+
+    /**
      * 每条续作实际消费记录，仅用于精度晚阶段受控撤销与重算，按结果身份关联。
      */
     private Map<LhScheduleResult, ContinuousProductionConsumption> continuousProductionConsumptionMap = new IdentityHashMap<>();
@@ -879,7 +887,7 @@ public class LhScheduleContext {
      * 校验调用携带的计划确属本批有效历史关系，且精确指向当前机台和后料状态。
      *
      * @param sku         待排物料
-     * @param plan        已经最新批次和日期过滤的源计划
+     * @param plan        已经工厂、前日日期和动作有效期过滤的源计划
      * @param machineCode 本次指定运行态机台，不能把单侧关系扩散到另一侧
      * @return 是否为有效指定组合
      */
@@ -1094,9 +1102,62 @@ public class LhScheduleContext {
      */
     private List<SkuScheduleDTO> trialVirtualMachineCandidateList = new ArrayList<>();
     /**
-     * 本批最新有效历史关系，只提供指定组合资格，不授予普通新增开关豁免。
+     * 本批前日有效历史关系，只提供指定组合资格，不授予普通新增开关豁免。
      */
     private List<LhMouldChangePlan> eligiblePreviousAlternatePlans = new ArrayList<>(16);
+
+    /**
+     * 初始化原胎胚与有效历史排除范围的只读快照，供匹配指标和机台组织共用。
+     */
+    @lombok.Getter(lombok.AccessLevel.NONE)
+    @lombok.Setter(lombok.AccessLevel.NONE)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private transient K21K22EmbryoMatchPolicy k21K22EmbryoMatchPolicy;
+
+    /**
+     * 延迟构建批次原胎胚快照，避免逐SKU扫描全部历史关系和初始化机台。
+     *
+     * @return 当前基础快照对应的原胎胚优先策略
+     */
+    public K21K22EmbryoMatchPolicy resolveK21K22EmbryoMatchPolicy() {
+        if (k21K22EmbryoMatchPolicy == null) {
+            k21K22EmbryoMatchPolicy = new K21K22EmbryoMatchPolicy(this);
+        }
+        return k21K22EmbryoMatchPolicy;
+    }
+
+    /**
+     * 更新有效历史关系并使原胎胚优先快照失效，下次匹配重新解析排除范围。
+     *
+     * @param plans 本批有效历史关系
+     */
+    public void setEligiblePreviousAlternatePlans(List<LhMouldChangePlan> plans) {
+        this.eligiblePreviousAlternatePlans = plans;
+        this.k21K22EmbryoMatchPolicy = null;
+    }
+
+    /**
+     * 更新初始化机台快照并使原胎胚优先快照失效。
+     *
+     * @param machines 初始化机台快照
+     */
+    public void setInitialMachineScheduleMap(Map<String, MachineScheduleDTO> machines) {
+        this.initialMachineScheduleMap = machines;
+        this.k21K22EmbryoMatchPolicy = null;
+    }
+
+    /**
+     * 登记新增运行机台的初始状态，并刷新原胎胚优先快照的覆盖范围。
+     *
+     * @param machineCode 运行态机台编码
+     * @param snapshot 首次更新前的初始状态
+     */
+    public void registerInitialMachineSnapshot(String machineCode, MachineScheduleDTO snapshot) {
+        if (initialMachineScheduleMap.putIfAbsent(machineCode, snapshot) == null) {
+            this.k21K22EmbryoMatchPolicy = null;
+        }
+    }
 
     /**
      * 续作决策前冻结的前日交替物理机台顺序，预演和正式计算共同只读消费。
@@ -2833,14 +2894,28 @@ public class LhScheduleContext {
      * 解析仅喷砂剩余需求重新进入后续排产的最早时刻。
      *
      * @param sku 当前来源续作对象或明确绑定来源机台的转机候选
-     * @return 该来源事件的清洗结束时间；普通候选、历史承接或事件已取消时返回null
+     * @return 清洗结束与T+1首班开始的较晚时刻；普通候选、历史承接或事件已取消时返回null
      */
     public Date resolveOnlySandBlastRequeueNotBeforeTime(SkuScheduleDTO sku) {
         return this.resolveOnlySandBlastRequeueEvents(sku).stream()
-                .map(MachineCleaningWindowDTO::getCleanEndTime)
-                .filter(Objects::nonNull)
+                .filter(event -> Objects.nonNull(event.getCleanEndTime()))
+                .map(this::resolveOnlySandBlastRecoveryNotBeforeTime)
                 .findFirst()
                 .orElse(null);
+    }
+
+    /**
+     * 计算仅喷砂原机同料任务的准备下限，备用模具置换使用来源触发时刻，原模恢复等待清洗结束。
+     * T+1按班次业务日取首班起点，窗口未包含该日时保留次日日期供窗口外收口。
+     *
+     * @param event 已确认离机喷砂的来源事件
+     * @return 对应资源就绪与T+1首班起点中的较晚时刻
+     */
+    public Date resolveOnlySandBlastRecoveryNotBeforeTime(MachineCleaningWindowDTO event) {
+        Date nextDayStart = NewProductionDateAdmissionPolicy.resolveNotBeforeTime(this);
+        Date resourceReady = StringUtils.isNotBlank(event.getDeferredReplacementMouldCode())
+                ? event.getCleanStartTime() : event.getCleanEndTime();
+        return resourceReady.after(nextDayStart) ? resourceReady : nextDayStart;
     }
 
     /**

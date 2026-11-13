@@ -38,6 +38,12 @@ public abstract class ScheduleContextModel<T extends ScheduleTaskDraftModel,
      */
     protected boolean twoPhaseEnabled;
     /**
+     * 任务链起止时间延迟终算模式；仅自动排程入口与两阶段开关同点显式启用。
+     * 启用后链变更只维护换型资源字段，起止时间由分配结束后的统一终算写入；
+     * 人工和滚动上下文保持缺省关闭，链变更即时重算时间。
+     */
+    protected boolean chainTimeDeferred;
+    /**
      * 基础轮独立供应时长排序模式，不更改全局策略。
      */
     protected String twoPhaseBaseSortMode;

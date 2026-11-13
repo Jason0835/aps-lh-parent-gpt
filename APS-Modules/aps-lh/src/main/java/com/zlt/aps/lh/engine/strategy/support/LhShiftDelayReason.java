@@ -29,7 +29,11 @@ public enum LhShiftDelayReason {
     /**
      * 已确认可用模具数量不足。
      */
-    MOULD_SHORTAGE("模具不足");
+    MOULD_SHORTAGE("模具不足"),
+    /**
+     * 结构切换供胚时间晚于候选机台真实就绪时间。
+     */
+    STRUCTURE_SWITCH_SUPPLY_TIME("受限于结构切换最早可供硫化时间");
 
     /**
      * 成型供胚来源明确要求等待结果的标识。

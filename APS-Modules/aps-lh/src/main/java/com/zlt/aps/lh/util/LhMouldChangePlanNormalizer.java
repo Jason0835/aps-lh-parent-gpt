@@ -33,10 +33,31 @@ public final class LhMouldChangePlanNormalizer {
     /**
      * 将同动作唯一L/R配对复制为LR并继承非空前料；同侧重复、前料冲突及独立单控侧保持原记录。
      *
-     * @param plans 历史来源或本次待保存计划，不修改其中原对象
+     * @param plans 本次待保存计划，不修改其中原对象，按输出批次隔离动作
      * @return 保持原顺序的规范化计划，非合并记录继续保留原对象身份
      */
     public static List<LhMouldChangePlan> normalize(List<LhMouldChangePlan> plans) {
+        return normalize(plans, true);
+    }
+
+    /**
+     * 按历史动作归并互补左右模，来源批次号不参与匹配。
+     *
+     * @param plans 已按工厂和前日排程日期加载的有效历史计划
+     * @return 保留来源对象的历史规范化计划
+     */
+    public static List<LhMouldChangePlan> normalizeHistorical(List<LhMouldChangePlan> plans) {
+        return normalize(plans, false);
+    }
+
+    /**
+     * 共用互补左右模的唯一配对规则，按调用场景决定是否隔离输出批次。
+     *
+     * @param plans 待规范化的计划集合，原对象保持只读
+     * @param matchBatchNo 是否将批次号作为动作分组条件
+     * @return 保持原顺序及未归并对象身份的计划集合
+     */
+    private static List<LhMouldChangePlan> normalize(List<LhMouldChangePlan> plans, boolean matchBatchNo) {
         Map<List<Object>, List<LhMouldChangePlan>> groups = plans.stream()
                 .filter(Objects::nonNull)
                 .filter(plan -> StringUtils.isNotBlank(plan.getLhMachineCode())
@@ -47,7 +68,7 @@ public final class LhMouldChangePlanNormalizer {
                 .filter(plan -> StringUtils.isNotBlank(plan.getAfterMaterialCode())
                         && Objects.nonNull(plan.getPlanDate()) && StringUtils.isNotBlank(plan.getClassIndex()))
                 .collect(Collectors.groupingBy(plan -> Arrays.asList(plan.getFactoryCode(),
-                        plan.getLhResultBatchNo(), plan.getScheduleDate(), plan.getLhMachineCode(),
+                        matchBatchNo ? plan.getLhResultBatchNo() : null, plan.getScheduleDate(), plan.getLhMachineCode(),
                         plan.getPlanDate(), plan.getClassIndex(), plan.getChangeTime(),
                         plan.getChangeMouldType(), plan.getCleanType(), plan.getAfterMaterialCode(),
                         plan.getProductStatus(), plan.getEndType()), LinkedHashMap::new, Collectors.toList()));

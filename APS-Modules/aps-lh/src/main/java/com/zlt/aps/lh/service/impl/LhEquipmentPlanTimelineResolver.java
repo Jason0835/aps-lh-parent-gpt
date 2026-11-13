@@ -17,6 +17,7 @@ import com.zlt.aps.lh.engine.strategy.support.EquipmentPlanTimeline;
 import com.zlt.aps.lh.engine.strategy.support.FirstInspectionAllocationPlan;
 import com.zlt.aps.lh.engine.strategy.support.StructureSwitchSchedulingPolicy;
 import com.zlt.aps.lh.util.FirstInspectionQtyUtil;
+import com.zlt.aps.lh.util.FirstInspectionAllocationUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
@@ -29,7 +30,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-/** 设备计划时间适配；保留原始精度区间，按既有参数衔接上胶囊、预热及公共首检。 */
+/**
+ * 设备计划时间适配，保留原始精度区间并衔接维修、上胶囊预热及公共首检。
+ */
 @Component
 public class LhEquipmentPlanTimelineResolver {
 
@@ -47,8 +50,26 @@ public class LhEquipmentPlanTimelineResolver {
     }
 
     /**
+     * 为普通精度冻结维修与精度并行后的准备边界，保留精度原始本体起止。
+     * 资格及每日额度仍由原精度判定负责，未支持的停机由正式接受门禁拒绝。
+     *
+     * @param context 已归一实际维修时间的上下文
+     * @param decision 有效精度判定
+     * @param inputVersion 输入指纹
+     * @return 合并准备时间后的只读时间约束
+     */
+    public EquipmentPlanTimeline resolvePrecisionWithRepair(LhScheduleContext context,
+            PrecisionMaintenanceJudgeDTO decision, String inputVersion) {
+        EquipmentPlanTimeline precision = this.resolvePrecision(context, decision, inputVersion);
+        RepairPlanResult repair = LhRepairOverlapResolver.resolvePrecisionPreparation(context,
+                precision.getPhysicalMachineCode(), precision.getMaintenanceStartTime(), precision.getMaintenanceReadyTime());
+        return new EquipmentPlanTimeline(decision, repair.getProductionNotBefore(), inputVersion);
+    }
+
+    /**
      * 重叠场景统一分派入口。先读取已生效单场景结果，再解析组合，最后由原策略分配公共首检数量。
-     * 仅接入精度与普通换模、换活字块；新增组合必须显式实现，不能默认放行。
+     * 接入精度、05维修与普通换模、换活字块；其他组合仍须显式校验。
+     *
      * @param context 排程上下文
      * @param machine 候选机台
      * @param sku 候选SKU，试制、量试等复合场景留待后续接入
@@ -85,8 +106,17 @@ public class LhEquipmentPlanTimelineResolver {
     }
 
     /**
-     * 保养后上胶囊及预热完成与切换结束取最大边界，再正向执行一次公共首检。
-     * 原始保养开始/结束始终保留；不同开始时刻比较绝对完成点，不向前移动已合法的切换窗口。
+     * 合并精度与切换的准备约束，换活字块单独保留可倒推首检的准备下限。
+     * 换活字块总时长已包含首检，数量确定前同时返回准备下限和完整切换结束边界。
+     * 正规换模继续从全部准备结束后执行公共首检。
+     *
+     * @param context 排程上下文
+     * @param machine 候选机台
+     * @param sku 待承接首检的SKU
+     * @param start 切换实际开始时间
+     * @param end 切换实际完成时间
+     * @param scheduleType 切换类型
+     * @return 组合准备边界或明确拒绝原因
      */
     private EquipmentPlanOverlapResult resolvePrecisionChangeover(LhScheduleContext context, MachineScheduleDTO machine,
             SkuScheduleDTO sku, Date start, Date end, String scheduleType) {
@@ -123,11 +153,74 @@ public class LhEquipmentPlanTimelineResolver {
             return EquipmentPlanOverlapResult.unsupported("精度公共首检已被有效结果承接，不得再次分配或移动");
         }
         Date inspectionStart = this.resolvePrecisionInspectionStartTime(original.getMaintenanceReadyTime(), end);
-        // 此时尚未选定首检参数及条数，仅返回准备边界；实际首检区间由原数量分摊工具生成。
-        EquipmentPlanTimeline parallel = original.withInspection(inspectionStart, inspectionStart);
-        String conflict = this.resolveAdditionalOverlapReason(context, parallel, start);
+        Date preparationStart = start.before(original.getMaintenanceStartTime())
+                ? start : original.getMaintenanceStartTime();
+        RepairPlanResult repair = LhRepairOverlapResolver.resolvePrecisionPreparation(context,
+                original.getPhysicalMachineCode(), preparationStart, inspectionStart);
+        if (repair.getOverlapStatus() == RepairPlanResult.OverlapStatus.UNSUPPORTED) {
+            return EquipmentPlanOverlapResult.unsupported(repair.getReason());
+        }
+        inspectionStart = this.resolveInspectionPreparationTime(
+                context, original.getMaintenanceReadyTime(), repair, scheduleType);
+        // 数量尚未确定时，换活字块返回首检下限及完整切换边界，实际区间由数量分摊工具冻结。
+        EquipmentPlanTimeline parallel = original.withInspection(inspectionStart, repair.getProductionNotBefore());
+        String conflict = this.resolveAdditionalOverlapReason(context, parallel, start, true);
         return StringUtils.isNotBlank(conflict)
                 ? EquipmentPlanOverlapResult.unsupported(conflict) : EquipmentPlanOverlapResult.supported(parallel);
+    }
+
+    /**
+     * 合并真实精度及维修预热下限，换活字块的含首检结束时间单独保留。
+     *
+     * @param context 排程参数上下文
+     * @param maintenanceReadyTime 精度及预热完成时间
+     * @param repair 覆盖完整切换区间的维修解析结果
+     * @param scheduleType 实际切换类型
+     * @return 公共首检允许开始的准备下限
+     */
+    private Date resolveInspectionPreparationTime(LhScheduleContext context, Date maintenanceReadyTime,
+            RepairPlanResult repair, String scheduleType) {
+        if (!ScheduleTypeEnum.TYPE_BLOCK.getCode().equals(scheduleType)) {
+            return repair.getProductionNotBefore();
+        }
+        Date inspectionNotBefore = maintenanceReadyTime;
+        for (MdmDevicePlanShut source : repair.getSourcePlans()) {
+            Date repairReady = LhScheduleTimeUtil.addMinutes(source.getEndDate(),
+                    LhScheduleTimeUtil.getCapsulePreheatMinutes(context));
+            if (repairReady.after(inspectionNotBefore)) {
+                inspectionNotBefore = repairReady;
+            }
+        }
+        return inspectionNotBefore;
+    }
+
+    /**
+     * 按候选冻结的首检时长复核实际开始边界，换活字块共用倒推计算。
+     *
+     * @param context 排程上下文
+     * @param window 当前有效精度窗口
+     * @param changeoverStartTime 真实切换开始时间
+     * @param changeoverEndTime 包含首检的切换结束时间，独立精度为空
+     * @param inspection 冻结的计件首检计划
+     * @param scheduleType 实际切换类型
+     * @return 当前组合应采用的首检开始时间
+     */
+    public Date resolvePrecisionInspectionStartTime(LhScheduleContext context, MachineMaintenanceWindowDTO window,
+            Date changeoverStartTime, Date changeoverEndTime, FirstInspectionAllocationPlan inspection,
+            String scheduleType) {
+        Date readyTime = this.resolvePrecisionInspectionStartTime(window.getMaintenanceReadyTime(), changeoverEndTime);
+        if (!ScheduleTypeEnum.TYPE_BLOCK.getCode().equals(scheduleType) || Objects.isNull(changeoverEndTime)) {
+            return readyTime;
+        }
+        Date preparationStart = changeoverStartTime.before(window.getMaintenanceStartTime())
+                ? changeoverStartTime : window.getMaintenanceStartTime();
+        RepairPlanResult repair = LhRepairOverlapResolver.resolvePrecisionPreparation(
+                context, window.getMachineCode(), preparationStart, readyTime);
+        Date inspectionNotBefore = this.resolveInspectionPreparationTime(
+                context, window.getMaintenanceReadyTime(), repair, scheduleType);
+        return FirstInspectionAllocationUtil.resolvePrecisionTypeBlockInspectionStartTime(
+                inspectionNotBefore, changeoverEndTime, inspection.getInspectionDurationSeconds(),
+                inspection.getCountingShift());
     }
 
     /**
@@ -144,7 +237,10 @@ public class LhEquipmentPlanTimelineResolver {
 
     /**
      * 首检数量确定后复核真实首检结束前的组合占用，不能只检查尚未分配数量时的准备边界。
-     * @param context 上下文 @param inspection 参数计件首检 @param changeStart 切换开始，无切换时为空
+     *
+     * @param context 上下文
+     * @param inspection 参数计件首检
+     * @param changeStart 切换开始，无切换时为空
      * @return 尚未覆盖组合原因，无冲突为空
      */
     public String resolveInspectionOverlapReason(LhScheduleContext context, FirstInspectionAllocationPlan inspection,
@@ -159,17 +255,34 @@ public class LhEquipmentPlanTimelineResolver {
         EquipmentPlanTimeline actual = arrangement.getTimeline().withInspection(
                 inspection.getInspectionStartTime(), inspection.getInspectionEndTime());
         return this.resolveAdditionalOverlapReason(context, actual,
-                Objects.nonNull(changeStart) ? changeStart : actual.getMaintenanceStartTime());
+                Objects.nonNull(changeStart) ? changeStart : actual.getMaintenanceStartTime(), true);
     }
 
     /**
-     * 其他场景的扩展入口。当前只报告未覆盖组合，后续接入维修、清洗等时在此明确分派。
-     * 使用组合后的完整区间，防止切换较晚完成时把新增的等待和首检时间静默压到其他占用上。
-     * @param context 上下文 @param timeline 组合时间轴 @param changeStart 切换开始
+     * 专用清洗组合沿用严格重叠校验，使用完整区间复核新增等待和首检占用。
+     * 普通维修精度链路由内部带场景参数的入口处理。
+     *
+     * @param context 上下文
+     * @param timeline 组合时间轴
+     * @param changeStart 切换开始
      * @return 未覆盖组合原因，无其他占用时为空
      */
     public String resolveAdditionalOverlapReason(LhScheduleContext context, EquipmentPlanTimeline timeline,
             Date changeStart) {
+        return this.resolveAdditionalOverlapReason(context, timeline, changeStart, false);
+    }
+
+    /**
+     * 复核组合实际区间，仅普通精度链路允许已完成准备的05维修并行。
+     *
+     * @param context 排程上下文
+     * @param timeline 已冻结准备和首检的时间轴
+     * @param changeStart 切换或精度开始
+     * @param allowPlannedRepair 是否属于本次已接入的普通维修精度组合
+     * @return 未覆盖或准备未完成的原因，无冲突时为空
+     */
+    private String resolveAdditionalOverlapReason(LhScheduleContext context, EquipmentPlanTimeline timeline,
+            Date changeStart, boolean allowPlannedRepair) {
         Date start = changeStart.before(timeline.getMaintenanceStartTime()) ? changeStart : timeline.getMaintenanceStartTime();
         Date end = timeline.getProductionResumeTime();
         String physical = timeline.getPhysicalMachineCode();
@@ -179,11 +292,17 @@ public class LhEquipmentPlanTimelineResolver {
         if (capsuleOverlap) {
             return "精度并行与换胶囊组合尚未接入";
         }
-        RepairPlanResult repairOverlap = LhRepairOverlapResolver.resolveWithPrecision(
-                context.getDevicePlanShutList(), physical, start, end,
-                "精度并行与停机/维修组合尚未接入，停机类型=");
+        RepairPlanResult repairOverlap = allowPlannedRepair
+                ? LhRepairOverlapResolver.resolvePrecisionPreparation(context, physical, start, end)
+                : LhRepairOverlapResolver.resolveWithPrecision(context.getDevicePlanShutList(), physical, start, end,
+                        "精度并行与停机/维修组合尚未接入，停机类型=");
         if (repairOverlap.getOverlapStatus() == RepairPlanResult.OverlapStatus.UNSUPPORTED) {
             return repairOverlap.getReason();
+        }
+        if (allowPlannedRepair && repairOverlap.getSourcePlans().stream().anyMatch(plan ->
+                LhScheduleTimeUtil.addMinutes(plan.getEndDate(), LhScheduleTimeUtil.getCapsulePreheatMinutes(context))
+                        .after(timeline.getInspectionStartTime()))) {
+            return "计划性维修及预热尚未完成，不能在公共首检期间开始或继续维修";
         }
         for (MachineScheduleDTO side : context.getMachineScheduleMap().values()) {
             if (Objects.isNull(side) || !this.samePhysicalMachine(physical, side.getMachineCode())) {

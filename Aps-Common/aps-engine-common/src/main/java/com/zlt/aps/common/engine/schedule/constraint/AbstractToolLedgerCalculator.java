@@ -1,5 +1,7 @@
 package com.zlt.aps.common.engine.schedule.constraint;
 
+import com.zlt.aps.common.engine.schedule.engine.ScheduleTaskDraftModel;
+
 import java.math.BigDecimal;
 
 /**
@@ -96,15 +98,30 @@ public abstract class AbstractToolLedgerCalculator<T> {
      * 读取任务总工装数量。
      *
      * @param task 当前领域任务
-     * @return 总工装数量
+     * @return 总工装数量，默认从公共任务草稿获取
      */
-    protected abstract BigDecimal getTotalToolQty(T task);
+    protected BigDecimal getTotalToolQty(T task) {
+        if (task instanceof ScheduleTaskDraftModel) {
+            BigDecimal qty = ((ScheduleTaskDraftModel) task).getTotalToolQty();
+            return qty == null ? BigDecimal.ZERO : qty;
+        }
+        return BigDecimal.ZERO;
+    }
 
     /**
      * 读取任务有效卷曲长度。
      *
      * @param task 当前领域任务
-     * @return 有效卷曲长度
+     * @return 有效卷曲长度，默认从公共任务草稿获取并兜底默认卷曲长度
      */
-    protected abstract BigDecimal getCurlRollLength(T task);
+    protected BigDecimal getCurlRollLength(T task) {
+        if (task instanceof ScheduleTaskDraftModel) {
+            ScheduleTaskDraftModel draft = (ScheduleTaskDraftModel) task;
+            if (draft.getCurlRollLength() != null && draft.getCurlRollLength().compareTo(BigDecimal.ZERO) > 0) {
+                return draft.getCurlRollLength();
+            }
+            return draft.getDefaultCurlRollLength() == null ? BigDecimal.ZERO : draft.getDefaultCurlRollLength();
+        }
+        return BigDecimal.ZERO;
+    }
 }

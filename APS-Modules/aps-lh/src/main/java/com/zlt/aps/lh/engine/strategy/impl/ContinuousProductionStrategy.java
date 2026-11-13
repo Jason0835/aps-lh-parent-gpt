@@ -55,6 +55,7 @@ import com.zlt.aps.lh.engine.strategy.support.ContinuationSurplusCompletionSuppo
 import com.zlt.aps.lh.service.impl.LhCleaningScheduleService;
 import com.zlt.aps.lh.component.LhMachineSupplyStructureRule;
 import com.zlt.aps.lh.service.impl.ContinuationSandBlastDispositionService;
+import com.zlt.aps.lh.service.impl.ContinuationSandBlastRecoveryService;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
 import com.zlt.aps.lh.engine.strategy.IEmbryoEndingBalanceStrategy;
 import com.zlt.aps.lh.engine.strategy.IEndingJudgmentStrategy;
@@ -64,6 +65,7 @@ import com.zlt.aps.lh.engine.strategy.IMachineMatchStrategy;
 import com.zlt.aps.lh.engine.strategy.IMouldChangeBalanceStrategy;
 import com.zlt.aps.lh.engine.strategy.IProductionStrategy;
 import com.zlt.aps.lh.engine.strategy.support.DailyMachineExpansionPlanner;
+import com.zlt.aps.lh.engine.strategy.support.ActiveMachineBinding;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationRemainderFinishGroup;
 import com.zlt.aps.lh.engine.strategy.support.TimedMachineOffRequest;
 import com.zlt.aps.lh.engine.strategy.support.ContinuationFinishScheduleResult;
@@ -431,12 +433,12 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 isEnding = false;
             }
             if (shouldSkipSmallEndingSurplusContinuousConsideringEmbryoEnding(context, sku, isEnding)) {
-                // 收尾小余量未命中比例豁免且前日T+1夜班未排满：释放原续作机台给换活字块/新增链路。
+                // 收尾小余量未命中比例豁免且前次首班至T+1夜班累计计划已覆盖前次余量：释放原续作机台给换活字块/新增链路。
                 appendSmallEndingSurplusUnscheduledResult(context, sku);
                 registerReleasedContinuousMachine(context, machineCode, sku.getMaterialCode(),
-                        "收尾小余量且前日T+1夜班未排满不排产");
+                        "收尾小余量且前次首班至T+1夜班累计计划已覆盖前次余量不排产");
                 registerTypeBlockReleasedContinuousMachine(context, machineCode, sku.getMaterialCode(),
-                        "收尾小余量且前日T+1夜班未排满不排产");
+                        "收尾小余量且前次首班至T+1夜班累计计划已覆盖前次余量不排产");
                 context.removePendingSkuFromStructureMap(sku);
                 getTargetScheduleQtyResolver().removeActiveEmbryoSku(
                         context, sku, SMALL_ENDING_SURPLUS_UNSCHEDULED_REASON);
@@ -4444,6 +4446,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
 
     /**
      * 在余量收尾准入前按真实逐日降模节奏试算容量，无法清量时冻结普通时间下机身份。
+     * 生产段结束后的尾部零目标由余量节点处理，真实减机仍进入完整逐日试算。
      * 选机及容量试算不提交生产或资源；分流成立后仅校正来源身份及原余量账本。
      *
      * @param context 当前批次上下文
@@ -4461,13 +4464,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             return Collections.emptyMap();
         }
         Map<LocalDate, List<LhShiftConfigVO>> days = this.groupShiftsByWorkDate(shifts);
-        boolean hasLowerTarget = days.keySet().stream().anyMatch(productionDate ->
-                this.lhDailyMouldCalcService.hasRequiredMachineCount(context,
-                        sourceSku.getMaterialCode(), sourceSku.getProductStatus(), productionDate)
-                        && this.lhDailyMouldCalcService.getRequiredMachineCount(context,
-                        sourceSku.getMaterialCode(), sourceSku.getProductStatus(), productionDate)
-                        < physicalMachineCount);
-        if (!hasLowerTarget) {
+        if (!this.hasContinuationReductionBeforePlanEnd(context, sourceSku, days.keySet(), physicalMachineCount)) {
             return Collections.emptyMap();
         }
         Map<LocalDate, ContinuationDayReduction> plan = new LinkedHashMap<>(days.size());
@@ -4559,6 +4556,54 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         }
         results.forEach(result -> result.setIsEnd("0"));
         return plan;
+    }
+
+    /**
+     * 判断窗口内是否存在需先试算的真实减机目标，识别生产段结束后的尾部零目标。
+     * 只读取原始日计划，独立后续生产段不改变本窗口余量收尾身份；窗口内低谷继续原保机判断。
+     *
+     * @param context 已加载原始月计划及逐日目标的上下文
+     * @param sourceSku 已具备余量收尾资格的续作来源
+     * @param productionDates 按实际班次归组的窗口业务日
+     * @param physicalMachineCount 当前参与的物理机台数
+     * @return 存在正目标减机、窗口内低谷或缺少生产段结束证据的较低目标时返回true
+     */
+    private boolean hasContinuationReductionBeforePlanEnd(LhScheduleContext context, SkuScheduleDTO sourceSku,
+            Set<LocalDate> productionDates, int physicalMachineCount) {
+        LocalDate lastPlannedDate = productionDates.stream()
+                .filter(productionDate -> MonthPlanDateResolver.resolveDayQty(context,
+                        sourceSku.getMaterialCode(), sourceSku.getProductStatus(), productionDate) > 0)
+                .max(LocalDate::compareTo).orElse(null);
+        List<LocalDate> planEndingDates = new ArrayList<>();
+        for (LocalDate productionDate : productionDates) {
+            if (!this.lhDailyMouldCalcService.hasRequiredMachineCount(context,
+                    sourceSku.getMaterialCode(), sourceSku.getProductStatus(), productionDate)) {
+                continue;
+            }
+            int targetMachineCount = this.lhDailyMouldCalcService.getRequiredMachineCount(context,
+                    sourceSku.getMaterialCode(), sourceSku.getProductStatus(), productionDate);
+            if (targetMachineCount >= physicalMachineCount) {
+                continue;
+            }
+            // 零目标落在最后正计划日之后时，原机承担已准入的余量；其他下降仍按原降模节奏评估。
+            if (targetMachineCount == 0 && lastPlannedDate != null && productionDate.isAfter(lastPlannedDate)) {
+                planEndingDates.add(productionDate);
+                continue;
+            }
+            return true;
+        }
+        if (!planEndingDates.isEmpty()) {
+            String detail = String.format("工厂=%s, 批次=%s, 物料=%s, 状态=%s, 窗口最后正计划日=%s, "
+                            + "尾部零目标日期=%s, 原物理机台数=%s, 硫化余量=%s, 决策=保留原机进入余量错班分配",
+                    context.getFactoryCode(), context.getBatchNo(), sourceSku.getMaterialCode(),
+                    sourceSku.getProductStatus(), lastPlannedDate, planEndingDates,
+                    physicalMachineCount, sourceSku.getSurplusQty());
+            PriorityTraceLogHelper.appendProcessLog(context, "续作生产段结束保留余量收尾", detail);
+            if (log.isInfoEnabled()) {
+                log.info("续作生产段结束保留余量收尾, {}", detail);
+            }
+        }
+        return false;
     }
 
     /**
@@ -5741,9 +5786,9 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     /**
      * 判断续作收尾小余量是否允许本次不排产。
      *
-     * <p>这是“收尾小余量 + 比例未豁免 + 前日 T+1 夜班未排满”的特殊不排产规则；
+     * <p>这是“收尾小余量 + 比例未豁免 + 前次同物料同状态累计计划已覆盖前次余量”的特殊不排产规则；
      * 仍有硫化余量的试制、量试续作必须排产，不适用本规则。非收尾SKU、余量大于参数值、
-     * 余量占原始TOTAL_QTY达到比例阈值或前日T+1夜班已排满时，
+     * 余量占原始TOTAL_QTY达到比例阈值或前次累计计划尚未覆盖历史余量时，
      * 继续沿用原收尾排产规则。</p>
      *
      * @param context 排程上下文
@@ -5766,15 +5811,16 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             return false;
         }
         int toleranceQty = SmallEndingSurplusSkipRule.resolveToleranceQty(context);
-        int previousNightPlanQty = SmallEndingSurplusSkipRule.resolveTargetPreviousT1NightPlanQty(
-                context, sku.getMaterialCode());
-        boolean previousNightFull = SmallEndingSurplusSkipRule.isTargetPreviousT1NightFull(context, sku);
+        long previousPlannedQty = SmallEndingSurplusSkipRule.resolvePreviousPlannedQty(
+                context, sku);
+        boolean previousPlanCompleted = SmallEndingSurplusSkipRule.isPreviousPlanCompleted(context, sku);
         boolean skip = SmallEndingSurplusSkipRule.shouldSkip(context, sku, isEnding);
-        log.info("续作收尾小余量业务目标日前一日夜班判断, materialCode: {}, machineCode: {}, isEnding: {}, surplusQty: {}, "
-                        + "toleranceQty: {}, targetPreviousT1NightPlanQty: {}, shiftCapacity: {}, targetPreviousT1NightFull: {}, "
+        log.info("续作收尾小余量前次累计计划覆盖余量判断, materialCode: {}, machineCode: {}, isEnding: {}, surplusQty: {}, "
+                        + "toleranceQty: {}, previousPlannedQty: {}, previousSurplusQty: {}, previousPlanCompleted: {}, "
                         + "skipSchedule: {}",
                 sku.getMaterialCode(), sku.getContinuousMachineCode(), isEnding, surplusQty, toleranceQty,
-                previousNightPlanQty, sku.getShiftCapacity(), previousNightFull, skip);
+                previousPlannedQty, SmallEndingSurplusSkipRule.resolvePreviousSurplusQty(context, sku),
+                previousPlanCompleted, skip);
         return skip;
     }
 
@@ -5942,7 +5988,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             return;
         }
         StringBuilder detail = new StringBuilder(160);
-        detail.append("续作收尾小余量且前日T+1夜班未排满不排产, materialCode: ")
+        detail.append("续作收尾小余量且前次首班至T+1夜班累计计划已覆盖前次余量不排产, materialCode: ")
                 .append(sku.getMaterialCode())
                 .append(", machineCode: ")
                 .append(machineCode)
@@ -5950,10 +5996,10 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 .append(Math.max(0, sku.getSurplusQty()))
                 .append(", toleranceQty: ")
                 .append(toleranceQty)
-                .append(", targetPreviousT1NightPlanQty: ")
-                .append(SmallEndingSurplusSkipRule.resolveTargetPreviousT1NightPlanQty(context, sku.getMaterialCode()))
-                .append(", shiftCapacity: ")
-                .append(sku.getShiftCapacity())
+                .append(", previousPlannedQty: ")
+                .append(SmallEndingSurplusSkipRule.resolvePreviousPlannedQty(context, sku))
+                .append(", previousSurplusQty: ")
+                .append(SmallEndingSurplusSkipRule.resolvePreviousSurplusQty(context, sku))
                 .append(", unscheduledReason: ")
                 .append(SMALL_ENDING_SURPLUS_UNSCHEDULED_REASON)
                 .append(", flow: 释放机台优先进入换活字块，不满足后进入S4.5换模新增");
@@ -11440,14 +11486,26 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
      */
     private void appendContinuousCompensationSkuList(LhScheduleContext context,
                                                       Set<String> lockedFormalSkuKeySet) {
-        if (context == null || CollectionUtils.isEmpty(context.getContinuousSkuList())) {
+        if (context == null) {
             return;
         }
+        // 旧装机可能没有普通续作身份，先从明确喷砂来源关联已有需求，覆盖续作列表为空的场景。
+        this.appendIdleSandBlastRecoveryCandidates(context);
         Set<SkuScheduleDTO> processedSkuSet = Collections.newSetFromMap(
                 new IdentityHashMap<SkuScheduleDTO, Boolean>(8));
         Set<String> processedLockedFormalSkuKeySet = new HashSet<String>(4);
         for (SkuScheduleDTO sourceSku : context.getContinuousSkuList()) {
             if (sourceSku == null || !processedSkuSet.add(sourceSku)) {
+                continue;
+            }
+            LhUnscheduledResult skipped = unscheduledResultCollector.find(context, sourceSku);
+            if (Objects.nonNull(skipped) && StringUtils.equals(
+                    UnscheduledReasonEnum.SMALL_ENDING_SURPLUS.getCode(), skipped.getUnscheduledReasonCode())) {
+                // 小余量已作出本轮不排决定，历史释放及普通增机均不能再次按归整目标生成补偿。
+                log.info("续作小余量已列未排，跳过新增补偿, factoryCode: {}, batchNo: {}, materialCode: {}, "
+                                + "productStatus: {}, unscheduledQty: {}",
+                        context.getFactoryCode(), context.getBatchNo(), sourceSku.getMaterialCode(),
+                        sourceSku.getProductStatus(), skipped.getUnscheduledQty());
                 continue;
             }
             if (StructureEndingContinuationPolicy.state(context, sourceSku) != null) {
@@ -12641,9 +12699,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 将仅喷砂下机后仍有真实余量的续作SKU强制转入后续换活字块/新增排产池。
-     * <p>该入口不使用普通dayN增机门槛：原续作机台已经由明确业务事件强制退出，剩余生产账本
-     * 必须继续参与资源竞争。补偿SKU仍复用原日计划账本、生产账本和新增主链。</p>
+     * 登记仅喷砂且无空闲模具下机后的专用恢复候选。
+     * 原机已因喷砂事件退出，恢复候选复用原数量账本，仅由新增恢复阶段消费原机原模机会。
      *
      * @param context 排程上下文
      * @param sourceSku 来源续作SKU
@@ -12653,11 +12710,52 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             LhScheduleContext context,
             SkuScheduleDTO sourceSku) {
         if (Objects.isNull(context) || Objects.isNull(sourceSku)
-                || StringUtils.isEmpty(sourceSku.getContinuousMachineCode())
-                || CollectionUtils.isEmpty(context.getOnlySandBlastContinuationReleaseWindowMap())) {
+                || StringUtils.isEmpty(sourceSku.getContinuousMachineCode())) {
             return false;
         }
-        String releasedMachineCode = sourceSku.getContinuousMachineCode();
+        return this.appendOnlySandBlastRecoveryCandidate(context, sourceSku, sourceSku.getContinuousMachineCode());
+    }
+
+    /**
+     * 为旧装机原模恢复或备用模具置换关联已有物料状态需求。
+     * 来源事件独立保存原机身份，派生候选继续共享实际余量和日计划账本。
+     *
+     * @param context 已完成续作扣账的排程上下文
+     */
+    private void appendIdleSandBlastRecoveryCandidates(LhScheduleContext context) {
+        for (Map.Entry<String, MachineCleaningWindowDTO> entry
+                : context.getOnlySandBlastContinuationReleaseWindowMap().entrySet()) {
+            MachineCleaningWindowDTO event = entry.getValue();
+            if (Objects.isNull(event) || (!event.isIdleSandBlastRecoveryRequired()
+                    && StringUtils.isBlank(event.getDeferredReplacementMouldCode()))) {
+                continue;
+            }
+            SkuScheduleDTO source = Stream.concat(context.getContinuousSkuList().stream(),
+                            context.getNewSpecSkuList().stream())
+                    .filter(Objects::nonNull)
+                    .filter(sku -> !ContinuationSandBlastRecoveryService.isRecoveryCandidate(sku))
+                    .filter(sku -> StringUtils.equals(sku.getMaterialCode(), event.getContinuationMaterialCode())
+                            && StringUtils.equals(this.normalizeProductStatus(sku.getProductStatus()),
+                            this.normalizeProductStatus(event.getContinuationProductStatus())))
+                    .findFirst().orElse(null);
+            if (Objects.nonNull(source)) {
+                this.appendOnlySandBlastRecoveryCandidate(context, source, entry.getKey());
+            } else {
+                context.getCleaningPlanRuntimeState().getPendingRecoveryMachineCodes().remove(entry.getKey());
+            }
+        }
+    }
+
+    /**
+     * 按实际喷砂来源幂等生成原机原模恢复候选，复用来源需求的共享账本。
+     *
+     * @param context 喷砂释放事件及数量账本
+     * @param sourceSku 已存在的同物料状态需求
+     * @param releasedMachineCode 喷砂来源运行侧机台
+     * @return 存在有效喷砂来源且已处理时返回true
+     */
+    private boolean appendOnlySandBlastRecoveryCandidate(LhScheduleContext context,
+            SkuScheduleDTO sourceSku, String releasedMachineCode) {
         MachineCleaningWindowDTO releaseWindow = context
                 .getOnlySandBlastContinuationReleaseWindowMap()
                 .get(releasedMachineCode);
@@ -12671,13 +12769,15 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         List<String> releasedMouldCodeList = new ArrayList<String>(
                 LhMouldCodeUtil.resolveInMachineMouldCodeSet(context, releasedMachineCode));
         if (productionRemainingQty <= 0) {
+            context.getCleaningPlanRuntimeState().getPendingRecoveryMachineCodes().remove(releasedMachineCode);
             this.logOnlySandBlastContinuationRelease(
                     releasedMachineCode, sourceSku, releaseWindow,
                     releasedMouldCodeList, 0, false);
             return true;
         }
-        // 只合并同一来源事件的回流副本，普通补机候选继续保留自己的资源身份和共享账本。
-        boolean existingRequeueCandidate = context.getNewSpecSkuList().stream()
+        // 待排副本和已提交绑定共同去重，晚阶段重算不能再次登记已恢复来源。
+        boolean existingRequeueCandidate = Stream.concat(context.getNewSpecSkuList().stream(),
+                        context.getPreScheduledMachineBindingList().stream().map(ActiveMachineBinding::getSku))
                 .filter(Objects::nonNull)
                 .anyMatch(candidate -> StringUtils.equals(releasedMachineCode,
                         candidate.getOnlySandBlastRequeueSourceMachineCode())
@@ -12691,8 +12791,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                     releasedMouldCodeList, productionRemainingQty, true);
             return true;
         }
-        LocalDate firstAddMachineProductionDate = releaseWindow.getCleanStartTime().toInstant()
-                .atZone(ZoneId.systemDefault()).toLocalDate();
+        ContinuationSandBlastRecoveryService recoveryService = new ContinuationSandBlastRecoveryService();
+        LocalDate firstAddMachineProductionDate = recoveryService.resolveEarliestDate(context, releaseWindow);
         int activeMachineCount = this.resolveContinuousMachineCount(context, sourceSku);
         List<LhScheduleResult> continuousMachineResults = this.resolveContinuousMachineResults(context, sourceSku);
         int requiredMachineCount = Math.max(activeMachineCount + 1,
@@ -12706,6 +12806,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 firstAddMachineProductionDate, activeMachineCount, requiredMachineCount,
                 shortageMachineCount, addMachineDayPlanQty, null);
         compensationSku.setOnlySandBlastRequeueSourceMachineCode(releasedMachineCode);
+        recoveryService.register(context, compensationSku);
         context.getNewSpecSkuList().add(compensationSku);
         log.info("仅喷砂转机候选来源绑定, factoryCode: {}, batchNo: {}, materialCode: {}, productStatus: {}, "
                         + "sourceMachineCode: {}, sourcePlanId: {}, cleanEndTime: {}, mouldCodes: {}",
@@ -13640,7 +13741,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 判断是否已存在当前续作SKU的补偿SKU。
+     * 判断是否已存在当前续作SKU的普通补偿副本，原机喷砂恢复保留独立机会。
      *
      * @param context 排程上下文
      * @param sourceSku 来源SKU
@@ -13651,7 +13752,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             return false;
         }
         for (SkuScheduleDTO newSpecSku : context.getNewSpecSkuList()) {
-            if (newSpecSku == null) {
+            if (newSpecSku == null || ContinuationSandBlastRecoveryService.isRecoveryCandidate(newSpecSku)) {
                 continue;
             }
             if (StringUtils.equals(newSpecSku.getMaterialCode(), sourceSku.getMaterialCode())

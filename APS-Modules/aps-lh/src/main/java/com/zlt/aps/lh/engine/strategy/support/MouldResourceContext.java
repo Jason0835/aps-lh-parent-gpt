@@ -6,6 +6,7 @@ import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.service.impl.ContinuationSandBlastRecoveryService;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.util.LhMouldCodeUtil;
 import com.zlt.aps.lh.util.CleaningDispositionResolver;
@@ -242,7 +243,7 @@ public class MouldResourceContext {
         List<String> resultList = new ArrayList<String>(availableMouldCodeList.size());
         for (String mouldCode : availableMouldCodeList) {
             if (occupiedMouldCodeSet.contains(mouldCode)
-                    || this.isBeforeCommittedRelease(mouldCode, resourceReferenceTime)
+                    || this.isUnavailableAtResourceTime(mouldCode, resourceReferenceTime)
                     || (!CollectionUtils.isEmpty(excludedMouldCodeSet)
                     && excludedMouldCodeSet.contains(mouldCode))) {
                 continue;
@@ -340,7 +341,7 @@ public class MouldResourceContext {
             for (String mouldCode : allowedMouldCodeList) {
                 if (!availableMouldCodeList.contains(mouldCode)
                         || occupiedMouldCodeSet.contains(mouldCode)
-                        || this.isBeforeCommittedRelease(mouldCode, resourceReferenceTime)
+                        || this.isUnavailableAtResourceTime(mouldCode, resourceReferenceTime)
                         || allocatedMouldCodeList.contains(mouldCode)) {
                     continue;
                 }
@@ -522,16 +523,23 @@ public class MouldResourceContext {
     }
 
     /**
-     * 按当前模具运行态计算候选机台的分配结果。
+     * 按当前来源作用域只读计算候选机台的模具分配结果。
+     * 喷砂来源精确领取冻结原模或备用组，其他来源沿用各自资源规则。
      *
-     * @param materialCode SKU 编码
-     * @param machineCode 候选机台编码
-     * @param resourceReferenceTime 明确的资源查询或正式切换时刻
-     * @return 模具资源分配结果，本方法不修改运行态
+     * @param materialCode 待排物料编码
+     * @param machineCode 目标运行侧
+     * @param resourceReferenceTime 本次明确的资源时刻
+     * @return 当前资源时刻的完整模具分配决定
      */
     private MouldResourceAllocationResult resolveAllocation(String materialCode, String machineCode, Date resourceReferenceTime) {
         Objects.requireNonNull(resourceReferenceTime, "模具分配必须提供明确的资源时刻");
         int requiredMouldQty = resolveRequiredMouldQty(machineCode);
+        String recoverySource = scheduleContext.getCleaningPlanRuntimeState().getActiveRecoverySourceMachineCode();
+        if (StringUtils.isNotBlank(recoverySource)) {
+            return this.resolveExactAllocation(materialCode, machineCode,
+                    ContinuationSandBlastRecoveryService.resolveRecoveryMouldCodes(
+                            scheduleContext, recoverySource, machineCode), resourceReferenceTime);
+        }
         PreviousAlternatePlanReleaseEvent event = scheduleContext.getActivePreviousAlternateEvent();
         if (Objects.nonNull(event) && StringUtils.equals(machineCode, event.getMachineCode())
                 && StringUtils.equals(materialCode, event.getPlan().getAfterMaterialCode())) {
@@ -587,7 +595,7 @@ public class MouldResourceContext {
         }
         List<String> allocatedMouldCodeList = new ArrayList<String>(requiredMouldQty);
         for (String mouldCode : availableMouldCodeList) {
-            if (this.isBeforeCommittedRelease(mouldCode, resourceReferenceTime)
+            if (this.isUnavailableAtResourceTime(mouldCode, resourceReferenceTime)
                     || (occupiedMouldCodeSet.contains(mouldCode)
                     && (CollectionUtils.isEmpty(releasableMouldCodeSet) || !releasableMouldCodeSet.contains(mouldCode)))) {
                 continue;
@@ -737,7 +745,10 @@ public class MouldResourceContext {
             causes.add(MouldResourceDiagnosticCause.RELATION_MISMATCH);
         }
         for (String mouldCode : result.getOccupiedMouldCodeList()) {
-            causes.add(this.isBeforeCommittedRelease(mouldCode, referenceTime)
+            Date releaseTime = scheduleContext.getPreScheduledMouldReleaseTimeMap().get(mouldCode);
+            // 已清洗完成但保留给待恢复来源的原模属于预占，不能解释为仍未到释放时刻。
+            boolean releaseNotReached = Objects.nonNull(releaseTime) && referenceTime.before(releaseTime);
+            causes.add(releaseNotReached
                     ? MouldResourceDiagnosticCause.RELEASE_NOT_REACHED : MouldResourceDiagnosticCause.OCCUPIED);
         }
         causes.addAll(skuDiagnosticCauseMap.computeIfAbsent(materialCode, this::resolveUnavailableDiagnosticCauses));
@@ -820,6 +831,14 @@ public class MouldResourceContext {
                 : MouldResourceSkipReason.MOULD_QTY_NOT_ENOUGH;
     }
 
+    /**
+     * 归集当前不可领取的模具，统一包含实际占用、释放时间和待恢复来源预留。
+     *
+     * @param availableMouldCodeList 物料有效关系模具
+     * @param releasableMouldCodeSet 当前机台可交接的模具
+     * @param resourceReferenceTime 本次资源时刻
+     * @return 本次不可分配的模具编码列表
+     */
     private List<String> resolveOccupiedSkuMouldCodeList(List<String> availableMouldCodeList,
                                                          Set<String> releasableMouldCodeSet, Date resourceReferenceTime) {
         if (CollectionUtils.isEmpty(availableMouldCodeList)) {
@@ -827,7 +846,7 @@ public class MouldResourceContext {
         }
         List<String> resultList = new ArrayList<String>(availableMouldCodeList.size());
         for (String mouldCode : availableMouldCodeList) {
-            if (this.isBeforeCommittedRelease(mouldCode, resourceReferenceTime)
+            if (this.isUnavailableAtResourceTime(mouldCode, resourceReferenceTime)
                     || (occupiedMouldCodeSet.contains(mouldCode)
                     && (CollectionUtils.isEmpty(releasableMouldCodeSet) || !releasableMouldCodeSet.contains(mouldCode)))) {
                 resultList.add(mouldCode);
@@ -837,15 +856,17 @@ public class MouldResourceContext {
     }
 
     /**
-     * 只比较调用方给定的资源时刻与已提交的模具释放时刻。
+     * 校验已提交释放时刻及待恢复原模归属，预演与正式分配使用同一边界。
      * <p>不读取currentScheduleDate，不推导机台日期，窗口预检和实际排产共用同一释放边界。</p>
+     *
      * @param mouldCode 模具编码
      * @param resourceReferenceTime 调用方明确的资源可用时刻
-     * @return 是否尚未到达模具释放时刻
+     * @return 模具尚未释放或归属于其他待恢复来源时返回true
      */
-    private boolean isBeforeCommittedRelease(String mouldCode, Date resourceReferenceTime) {
+    private boolean isUnavailableAtResourceTime(String mouldCode, Date resourceReferenceTime) {
         Date releaseTime = scheduleContext.getPreScheduledMouldReleaseTimeMap().get(mouldCode);
-        return Objects.nonNull(releaseTime) && resourceReferenceTime.before(releaseTime);
+        return ContinuationSandBlastRecoveryService.isReservedMould(scheduleContext, mouldCode)
+                || (Objects.nonNull(releaseTime) && resourceReferenceTime.before(releaseTime));
     }
 
     private static Map<String, List<String>> buildSkuAvailableMouldCodeMap(LhScheduleContext context,

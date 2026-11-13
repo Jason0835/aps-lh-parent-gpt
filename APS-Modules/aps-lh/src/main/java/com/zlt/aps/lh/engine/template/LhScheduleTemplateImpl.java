@@ -56,7 +56,7 @@ public class LhScheduleTemplateImpl extends AbsLhScheduleTemplate {
     private NewProductionHandler newProductionHandler;
 
     /**
-     * 新增完成后的专供转产处理器。
+     * 新增之前的专供转产处理器。
      */
     @Resource
     private DedicatedSupplyTransferHandler dedicatedSupplyTransferHandler;

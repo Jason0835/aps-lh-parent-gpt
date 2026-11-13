@@ -310,6 +310,7 @@ public class SharedEmbryoEndingScheduleService {
     /**
      * 最终扣账及零量清理后，为有精确历史异料动作的零份额生产单元确认物理退出。
      * 仅冻结总份额为零时适用；剩余预算为零、单台零量及固定状态链均不能取得该资格。
+     * 从窗口首班和真实占用计算释放，历史指定班次仅保留来源，不作为后料最早承接下限。
      *
      * @param context 数量已稳定、零量结果已清理的续作上下文
      */
@@ -333,16 +334,9 @@ public class SharedEmbryoEndingScheduleService {
                 if (!this.canReleaseZeroQuotaHistoricalUnit(context, group, profile)) {
                     continue;
                 }
-                // 不能读取已被零份额规则延长的estimatedEndTime；从历史零产量起点校验真实物理占用。
-                Date start = profile.getOriginals().stream()
-                        .map(result -> context.getPreviousAlternateReleaseEventMap().get(result.getLhMachineCode()))
-                        .map(PreviousAlternatePlanReleaseEvent::getNoProductionStartTime)
-                        .max(Date::compareTo).get();
-                Date unitReady = profile.switchReadyTime(0);
-                if (unitReady.after(start)) {
-                    start = unitReady;
-                }
-                Date release = profile.physicalReadyTime(start);
+                // 前料最终无需生产，历史中班不能锁空早班；复用画像校验整机真实占用，避免旧逻辑占用推迟释放。
+                // 这里只发布资源可用事实，后料仍由原指定承接内核逐班校验换模、首检和生产约束。
+                Date release = profile.physicalReadyTime(profile.switchReadyTime(0));
                 if (!release.before(windowEnd)) {
                     continue;
                 }
@@ -358,7 +352,7 @@ public class SharedEmbryoEndingScheduleService {
                             .get(result.getLhMachineCode());
                     event.setBeforeMaterialNotScheduled(true);
                     resultSupport.logPreviousAlternateReleaseDecision(context, event,
-                            "冻结胎胚份额为0且最终无生产，按历史异料动作确认物理退出；释放="
+                            "冻结胎胚份额为0且最终无生产，按窗口内真实就绪确认物理退出，不受历史班次下限限制；释放="
                                     + LhScheduleTimeUtil.formatDateTime(release));
                 }
                 ContinuationMachineFinishPlan plan = BeanUtil.copyProperties(

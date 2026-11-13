@@ -2,6 +2,7 @@ package com.zlt.aps.lh.handler;
 
 import com.google.common.collect.Lists;
 import com.zlt.aps.common.engine.domain.*;
+import com.zlt.aps.common.engine.utils.LhSkuSurplusCalculator;
 import com.zlt.aps.common.engine.utils.MonthPlanSurplusCalculator;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
@@ -287,7 +288,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
 
         for (FactoryMonthPlanProductionFinalResult plan : monthPlanList) {
             // 计算硫化余量：统一使用月计划、已完成量与有效上月超欠产量（含超产负值），不读取月余量表作为兜底。
-            SurplusCalculation surplus = calculateSurplusQty(context, plan);
+            SurplusCalculation surplus = calculateLhSurplusQty(context, plan);
             SkuScheduleDTO dto = buildSkuScheduleDTO(context, plan, surplus);
 
             // 产品结构为空，跳过
@@ -298,10 +299,12 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
             }
 
             // 在续作及历史前料分类前拦截，保留MES与装机模具事实供后料执行真实准备动作。
-            LhUnscheduledResult handoverStopped =
-                    PendingSkuUnscheduledRule.evaluateHandoverStoppedWithoutStock(context, dto);
-            if (Objects.nonNull(handoverStopped)) {
-                unscheduledResultCollector.add(context, dto, handoverStopped);
+            LhUnscheduledResult endingWithoutStock =
+                    PendingSkuUnscheduledRule.evaluateEndingWithoutStock(context, dto);
+            if (Objects.nonNull(endingWithoutStock)) {
+                // 实机零库存目标不限制试制量试虚拟需求，退出结构池前保留独立候选和硫化目标。
+                this.preserveNoStockTrialVirtualCandidate(context, dto);
+                unscheduledResultCollector.add(context, dto, endingWithoutStock);
                 continue;
             }
             int targetScheduleQty = dto.resolveTargetScheduleQty();
@@ -1217,14 +1220,14 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
 
     /**
      * 计算指定月计划记录的硫化余量（只读计算，不修改上下文）。
-     * <p>供基础数据初始化阶段以胎胚维度合并余量使用，口径与排程阶段 {@link #calculateSurplusQty} 完全一致。</p>
+     * <p>供基础数据初始化阶段以胎胚维度合并余量使用，口径与排程阶段 {@link #calculateLhSurplusQty} 完全一致。</p>
      *
      * @param context 排程上下文
      * @param plan    月生产计划记录
      * @return 硫化余量（Max(月度计划总量 - 已完成量 + 有效上月超欠产量, 0)）
      */
     public int calculatePlanSurplusQty(LhScheduleContext context, FactoryMonthPlanProductionFinalResult plan) {
-        SurplusCalculation surplusCalculation = calculateSurplusQty(context, plan);
+        SurplusCalculation surplusCalculation = calculateLhSurplusQty(context, plan);
         if (null == surplusCalculation) {
             return BigDecimal.ZERO.intValue();
         }
@@ -1233,7 +1236,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
 
     /**
      * 计算指定月计划记录的硫化余量与合格产量（只读计算，不修改上下文）。
-     * <p>与排程阶段 {@link #calculateSurplusQty} 完全同一口径，供日排产进度报表等只读场景复用：
+     * <p>与排程阶段 {@link #calculateLhSurplusQty} 完全同一口径，供日排产进度报表等只读场景复用：
      * 余量=Max(月度计划总量-已完成量±有效上月超欠产,0)，合格产量=硫化余量计算使用的已完成量。</p>
      *
      * @param context 排程上下文（需已加载月计划、完成量、日计划调整等余量相关基础数据）
@@ -1242,7 +1245,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      */
     public LhSkuSurplusVO resolveSurplusAndFinishedQty(LhScheduleContext context,
                                                        FactoryMonthPlanProductionFinalResult plan) {
-        SurplusCalculation surplusCalculation = calculateSurplusQty(context, plan);
+        SurplusCalculation surplusCalculation = calculateLhSurplusQty(context, plan);
         if (null == surplusCalculation) {
             return null;
         }
@@ -1254,6 +1257,42 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         return surplusVO;
     }
 
+    /**
+     * 新的余量计算方式处理
+     * 40天计划余量
+     *
+     * @param context
+     * @param plan
+     * @return
+     */
+    private SurplusCalculation calculateLhSurplusQty(LhScheduleContext context, FactoryMonthPlanProductionFinalResult plan) {
+        List<Date> allProductionDate = Lists.newArrayList(context.getAllProductionDateInfo());
+        LhSkuSurplusDataInfo lhSkuSurplusDataInfo = context.getLhSkuSurplusDataInfo();
+        //20260829+ 排产周期中间间断间隔限制
+        Integer extendDays = null;
+        Integer skuMaxDiscontinueDays = null;
+        LhScheduleConfig scheduleConfig = context.getScheduleConfig();
+        if (null != scheduleConfig) {
+            extendDays = scheduleConfig.getEarlyProductionDaysThreshold();
+            skuMaxDiscontinueDays = scheduleConfig.getSkuMaxDiscontinueDays();
+        }
+        Integer actualFinishedQty = lhSkuSurplusDataInfo.getFinishQty(plan);
+        Integer nightFinishQty = lhSkuSurplusDataInfo.getNightFinishQty(plan);
+        LhSkuSurplusControlParam productionDateInfo = new LhSkuSurplusControlParam(lhSkuSurplusDataInfo.getPlanStartDate(), false, allProductionDate, extendDays, skuMaxDiscontinueDays);
+        LhSurplusSkuInfo calculateSkuInfo = new LhSurplusSkuInfo(plan, lhSkuSurplusDataInfo.getAllMonthPlanList(), Collections.emptyMap(), actualFinishedQty, lhSkuSurplusDataInfo.getAllLhDayPlanAdjustList());
+        LhSurplusResultVo lhSurplusResult = LhSkuSurplusCalculator.getSurplusInfo(productionDateInfo, calculateSkuInfo);
+        //月计划量 当前计划量 总计划量 余量
+        int totalPlanQty = lhSurplusResult.getPlanQty();
+        int monthPlanTotalQty = lhSurplusResult.getSumPlanQty();
+        int remainingDemandQty = lhSurplusResult.getSurplusQty();
+        log.info("40天月计划硫化余量计算完成, materialCode: {}, monthPlanQty: {}, monthFinishedAndScheDayQty: {}, "
+                        + "scheDayFinishQty: {}, surplusQty: {}, "
+                        + "monthPlanTotalQty: {}, 欠产余量标识: {}",
+                plan.getMaterialCode(), totalPlanQty, actualFinishedQty, nightFinishQty,
+                remainingDemandQty, monthPlanTotalQty, lhSurplusResult.isOverdueSurplusFlag());
+        return new SurplusCalculation(remainingDemandQty, actualFinishedQty, BigDecimal.ZERO.intValue(),
+                BigDecimal.ZERO.intValue(), totalPlanQty, monthPlanTotalQty, Collections.emptyMap(), lhSurplusResult.isOverdueSurplusFlag());
+    }
     /**
      * 计算SKU的硫化余量
      * <p>
@@ -2599,6 +2638,26 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         // SKU减量清单统一前置过滤：命中减量清单的SKU不进入任何排产入口，写未排并从排产集合移除
         skuDecrementChecker.filterDecrementSkus(context);
         log.info("续作/新增SKU区分完成, 续作: {}个, 新增: {}个", continuousSkuList.size(), newSpecSkuList.size());
+    }
+
+    /**
+     * 实机因零库存禁排时保留试制量试虚拟候选及独立硫化需求。
+     * 虚拟目标在实机零目标之外保存，历史指定来源后续冻结不得将其覆盖为0。
+     *
+     * @param context 本轮实机及虚拟需求上下文
+     * @param sku 因无库存退出实机的来源
+     */
+    private void preserveNoStockTrialVirtualCandidate(LhScheduleContext context, SkuScheduleDTO sku) {
+        if (!PendingSkuUnscheduledRule.isTrialOrMassTrialSku(sku) || sku.getSurplusQty() <= 0) {
+            return;
+        }
+        context.registerTrialVirtualMachineCandidate(sku);
+        String skuKey = MonthPlanDateResolver.buildMaterialStatusKey(sku.getMaterialCode(), sku.getProductStatus());
+        context.getVirtualMachineCuringTargetQtyMap().putIfAbsent(skuKey, Math.max(0, sku.getSurplusQty()));
+        log.info("零库存实机禁排保留试制量试虚拟需求, factoryCode: {}, batchNo: {}, materialCode: {}, "
+                        + "productStatus: {}, surplusQty: {}, virtualTargetQty: {}",
+                context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(), sku.getProductStatus(),
+                sku.getSurplusQty(), context.getVirtualMachineCuringTargetQtyMap().get(skuKey));
     }
 
     /**

@@ -12,6 +12,7 @@ import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.context.LhScheduleConfig;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.engine.strategy.support.ContinuationReplacementInspectionSupport;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
@@ -43,6 +44,7 @@ import java.util.Set;
  *   <li>本批初始次数取左右模次数最大值，普通双模按单侧生产循环数累计，其他机台沿用现有累计口径；</li>
  *   <li>只有当前次数加扣减前胶囊次数增量严格大于上限时才首次换胶囊，刚好达到上限不触发；</li>
  *   <li>本批首次跨限时，满产班次固定扣减配置量；未满产班次登记换胶囊时间窗口，二者互斥；</li>
+ *   <li>同机同料纯喷砂置换的已登记首检班次，换胶囊保留实际事件和备注，免扣条数且不追加延时；</li>
  *   <li>L/R整机结果按左右实际量合计一次，结果复制和同班多个结果不得重复累计；</li>
  *   <li>候选预演只能调用无副作用 {@link #previewActualPlanQty}；正式登记统一调用
  *       {@link #applyPreviewedPlanQty} 并校验预演与提交结果一致。</li>
@@ -152,14 +154,19 @@ public class CapsuleReplacementRuleService {
                 normalizedCandidateQty, wholeSingleControlPair, result.getLhMachineCode());
         boolean shiftFullBeforeReplacement = existingPhysicalShiftQty + candidatePhysicalShiftQty
                 >= physicalShiftCapacity;
-        int actualPlanQty = firstThresholdCrossing && shiftFullBeforeReplacement
+        boolean replacementInspection = ContinuationReplacementInspectionSupport
+                .isReplacementInspectionShift(context, result, shift);
+        int actualPlanQty = firstThresholdCrossing && shiftFullBeforeReplacement && !replacementInspection
                 ? Math.max(0, normalizedCandidateQty - effectiveLossQty) : normalizedCandidateQty;
 
         if (firstThresholdCrossing) {
             // 首次严格跨限后登记物理机台，本批后续班次只累计次数，不再重复触发换胶囊。
             context.getCapsuleThresholdHandledMachineSet().add(physicalMachineCode);
             context.getCapsuleReplacementShiftKeySet().add(shiftKey);
-            if (shiftFullBeforeReplacement) {
+            if (replacementInspection) {
+                // 此场景实际换胶囊但不损失首检产量，后处理也不能沿普通数量模式补扣。
+                context.getCapsuleReplacementShiftCapacityLimitMap().remove(capacityLimitKey);
+            } else if (shiftFullBeforeReplacement) {
                 // 满产班次只保留既有固定扣量上限，禁止同时追加换胶囊时间窗口。
                 context.getCapsuleReplacementShiftCapacityLimitMap().put(
                         capacityLimitKey, existingPlanQty + actualPlanQty);
@@ -177,6 +184,10 @@ public class CapsuleReplacementRuleService {
         applyActualUsageIncrement(context, physicalMachineCode, actualUsageIncrement);
 
         if (firstThresholdCrossing) {
+            String adjustmentMode = shiftFullBeforeReplacement ? "扣量" : "延时";
+            if (replacementInspection) {
+                adjustmentMode = "置换首检免扣";
+            }
             log.info("换胶囊产能调整, batchNo: {}, scheduleDate: {}, scene: {}, materialCode: {}, "
                             + "machineCode: {}, physicalMachineCode: {}, shiftIndex: {}, 当前机台胶囊次数: {}, "
                             + "胶囊上限: {}, 扣减前结果可排量: {}, 候选胶囊次数增量: {}, 换胶囊前实际班产: {}, "
@@ -187,8 +198,8 @@ public class CapsuleReplacementRuleService {
                     result.getMaterialCode(), result.getLhMachineCode(), physicalMachineCode,
                     shift.getShiftIndex(), beforeUsage,
                     usageUpperLimit, normalizedCandidateQty, candidateUsageIncrement, normalizedShiftCapacity,
-                    shiftFullBeforeReplacement, shiftFullBeforeReplacement ? "扣量" : "延时",
-                    configuredLossQty, shiftFullBeforeReplacement
+                    shiftFullBeforeReplacement, adjustmentMode,
+                    configuredLossQty, replacementInspection || shiftFullBeforeReplacement
                             ? 0 : resolveReplacementDurationHours(context),
                     normalizedCandidateQty, actualPlanQty,
                     resolveReplacementWindowStartTime(context, shiftKey),
@@ -371,6 +382,9 @@ public class CapsuleReplacementRuleService {
             // 时间模式的容量损失已由 ShiftCapacityResolverUtil 合并不可生产区间计算，禁止二次扣量。
             return normalizedCapacity;
         }
+        if (ContinuationReplacementInspectionSupport.isReplacementInspectionShift(context, result, shift)) {
+            return normalizedCapacity;
+        }
 
         int effectiveLossQty = resolveEffectiveLossQty(
                 resolveChangeLossQty(context), isWholeSingleControlPairResult(context, result),
@@ -417,6 +431,9 @@ public class CapsuleReplacementRuleService {
         }
         if (containsReplacementTimeWindow(context, shiftKey)) {
             // 时间模式没有固定数量上限，后续容量由换胶囊窗口重新折算。
+            return normalizedPlanQty;
+        }
+        if (ContinuationReplacementInspectionSupport.isReplacementInspectionShift(context, result, shift)) {
             return normalizedPlanQty;
         }
         Integer recordedCapacityLimit = context.getCapsuleReplacementShiftCapacityLimitMap().get(

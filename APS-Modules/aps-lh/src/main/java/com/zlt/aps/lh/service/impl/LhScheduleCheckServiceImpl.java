@@ -165,8 +165,15 @@ public class LhScheduleCheckServiceImpl
                         ? LhScheduleCheckResult.CHECK_LEVEL_HARD : LhScheduleCheckResult.CHECK_LEVEL_TIP);
                 record.setTriggerType(triggerType);
                 record.setBatchNo(batchNo);
-                record.setAcknowledged(LhScheduleCheckResult.ACKNOWLEDGED_NO);
+                // 检查项可对「可解释异常」预置已了解（如成型已收尾），未预置的默认未确认
+                if (StringUtils.isBlank(record.getAcknowledged())) {
+                    record.setAcknowledged(LhScheduleCheckResult.ACKNOWLEDGED_NO);
+                }
                 record.setCheckTime(checkTime);
+                if (LhScheduleCheckResult.ACKNOWLEDGED_YES.equals(record.getAcknowledged())) {
+                    record.setAcknowledgeBy(SYSTEM_USER);
+                    record.setAcknowledgeTime(checkTime);
+                }
             }
             allRecords.addAll(records);
         }

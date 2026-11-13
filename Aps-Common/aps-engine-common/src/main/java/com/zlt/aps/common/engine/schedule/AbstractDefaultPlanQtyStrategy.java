@@ -156,57 +156,80 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T extends ScheduleTaskDr
      * 获取当班需求量。
      *
      * @param task 待排任务
-     * @return 当班需求量
+     * @return 当班需求量，默认从待排任务草稿获取
      */
-    protected abstract BigDecimal getCurrentShiftDemand(T task);
+    protected BigDecimal getCurrentShiftDemand(T task) {
+        return task != null ? task.getCurrentShiftDemandQty() : null;
+    }
 
     /**
      * 获取下一班需求量。
      *
      * @param task 待排任务
-     * @return 下一班需求量
+     * @return 下一班需求量，默认从待排任务草稿获取
      */
-    protected abstract BigDecimal getNextShiftDemand(T task);
+    protected BigDecimal getNextShiftDemand(T task) {
+        return task != null ? task.getNextShiftDemandQty() : null;
+    }
 
     /**
      * 获取库存保证需求量。
      *
      * @param task 待排任务
-     * @return 库存保证需求量
+     * @return 库存保证需求量，默认从待排任务草稿获取
      */
-    protected abstract BigDecimal getGuardDemand(T task);
+    protected BigDecimal getGuardDemand(T task) {
+        return task != null ? task.getGuardDemandQty() : null;
+    }
 
     /**
      * 获取班初滚动库存。
      *
      * @param task 待排任务
-     * @return 班初滚动库存
+     * @return 班初滚动库存，默认从待排任务草稿获取
      */
-    protected abstract BigDecimal getRollingStockQty(T task);
+    protected BigDecimal getRollingStockQty(T task) {
+        return task != null ? task.getRollingStockQty() : null;
+    }
 
     /**
      * 判断是否为成型连续停产收尾任务。
      *
      * @param task 待排任务
-     * @return 是否为停产收尾任务
+     * @return 是否为停产收尾任务，默认读取待排任务草稿成型连续停产收尾标记
      */
-    protected abstract boolean isFormingShutdownCloseOut(T task);
+    protected boolean isFormingShutdownCloseOut(T task) {
+        return task != null && Boolean.TRUE.equals(task.getFormingShutdownCloseOutFlag());
+    }
 
     /**
      * 判断是否应用库存覆盖门槛。
      *
+     * <p>默认排除新规格提前排产与实验规格任务；领域子类可根据特殊需求重写。</p>
+     *
      * @param task 待排任务
      * @return 是否应用库存覆盖
      */
-    protected abstract boolean isTwoShiftStockCoverageApplicable(T task);
+    protected boolean isTwoShiftStockCoverageApplicable(T task) {
+        if (task == null) {
+            return false;
+        }
+        boolean newSpecAdvanceTask = task.getNewSpecInfo() != null
+                && task.getNewSpecInfo().isNewSpecHit();
+        boolean experimentSpecTask = task.getExperimentSpecInfo() != null
+                && task.getExperimentSpecInfo().isExperimentSpecHit();
+        return !newSpecAdvanceTask && !experimentSpecTask;
+    }
 
     /**
      * 获取收尾余量。
      *
      * @param task 待排任务
-     * @return 收尾余量
+     * @return 收尾余量，默认从待排任务草稿获取
      */
-    protected abstract BigDecimal getTailBalanceQty(T task);
+    protected BigDecimal getTailBalanceQty(T task) {
+        return task != null ? task.getTailBalanceQty() : null;
+    }
 
     /**
      * 获取胎面或胎侧标准长度。
@@ -223,15 +246,22 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T extends ScheduleTaskDr
      * @param baseDemandQty 库存抵扣后的基础需求量
      * @return 是否执行收尾计划量口径
      */
-    protected abstract boolean isTailTask(T task, BigDecimal baseDemandQty);
+    protected boolean isTailTask(T task, BigDecimal baseDemandQty) {
+        return task != null
+                && "1".equals(task.getTailFlag())
+                && this.nvl(this.getTailBalanceQty(task)).compareTo(BigDecimal.ZERO) > 0
+                && this.nvl(this.getProductLength(task)).compareTo(BigDecimal.ZERO) > 0;
+    }
 
     /**
      * 获取最小起排量。
      *
      * @param task 待排任务
-     * @return 最小起排量
+     * @return 最小起排量，默认从待排任务草稿获取
      */
-    protected abstract BigDecimal getMinStartQty(T task);
+    protected BigDecimal getMinStartQty(T task) {
+        return task != null ? task.getMinStartQty() : null;
+    }
 
     /**
      * 获取收尾规格最小计划量。
@@ -247,17 +277,21 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T extends ScheduleTaskDr
      * 获取任务卷曲长度。
      *
      * @param task 待排任务
-     * @return 任务卷曲长度
+     * @return 任务卷曲长度，默认从待排任务草稿获取
      */
-    protected abstract BigDecimal getCurlRollLength(T task);
+    protected BigDecimal getCurlRollLength(T task) {
+        return task != null ? task.getCurlRollLength() : null;
+    }
 
     /**
      * 获取默认卷曲长度。
      *
      * @param task 待排任务
-     * @return 默认卷曲长度
+     * @return 默认卷曲长度，默认从待排任务草稿获取
      */
-    protected abstract BigDecimal getDefaultCurlRollLength(T task);
+    protected BigDecimal getDefaultCurlRollLength(T task) {
+        return task != null ? task.getDefaultCurlRollLength() : null;
+    }
 
     /**
      * 写入历史两班需求合计。
@@ -265,7 +299,11 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T extends ScheduleTaskDr
      * @param task 任务
      * @param value 历史两班需求合计
      */
-    protected abstract void setTwoShiftDemandQty(T task, BigDecimal value);
+    protected void setTwoShiftDemandQty(T task, BigDecimal value) {
+        if (task != null) {
+            task.setTwoShiftDemandQty(value);
+        }
+    }
 
     /**
      * 写入历史两班库存缺口。
@@ -273,7 +311,11 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T extends ScheduleTaskDr
      * @param task 任务
      * @param value 历史两班库存缺口
      */
-    protected abstract void setTwoShiftStockGapQty(T task, BigDecimal value);
+    protected void setTwoShiftStockGapQty(T task, BigDecimal value) {
+        if (task != null) {
+            task.setTwoShiftStockGapQty(value);
+        }
+    }
 
     /**
      * 写入历史两班库存覆盖标识。
@@ -281,7 +323,11 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T extends ScheduleTaskDr
      * @param task 任务
      * @param value 是否覆盖
      */
-    protected abstract void setTwoShiftStockCovered(T task, Boolean value);
+    protected void setTwoShiftStockCovered(T task, Boolean value) {
+        if (task != null) {
+            task.setTwoShiftStockCovered(value);
+        }
+    }
 
     /**
      * 写入库存抵扣量。
@@ -289,7 +335,11 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T extends ScheduleTaskDr
      * @param task 任务
      * @param value 库存抵扣量
      */
-    protected abstract void setStockDeductQty(T task, BigDecimal value);
+    protected void setStockDeductQty(T task, BigDecimal value) {
+        if (task != null) {
+            task.setStockDeductQty(value);
+        }
+    }
 
     /**
      * 写入交接库存。
@@ -297,7 +347,11 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T extends ScheduleTaskDr
      * @param task 任务
      * @param value 交接库存
      */
-    protected abstract void setPlanStockQty(T task, BigDecimal value);
+    protected void setPlanStockQty(T task, BigDecimal value) {
+        if (task != null) {
+            task.setPlanStockQty(value);
+        }
+    }
 
     /**
      * 写入最终计划量。
@@ -305,7 +359,11 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T extends ScheduleTaskDr
      * @param task 任务
      * @param value 最终计划量
      */
-    protected abstract void setPlanQty(T task, BigDecimal value);
+    protected void setPlanQty(T task, BigDecimal value) {
+        if (task != null) {
+            task.setPlanQty(value);
+        }
+    }
 
     /**
      * 设置结果基础需求量。
@@ -313,7 +371,11 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T extends ScheduleTaskDr
      * @param result 计划量结果
      * @param value 基础需求量
      */
-    protected abstract void setResultBaseDemandQty(R result, BigDecimal value);
+    protected void setResultBaseDemandQty(R result, BigDecimal value) {
+        if (result != null) {
+            result.setBaseDemandQty(value);
+        }
+    }
 
     /**
      * 设置结果损耗补偿量。
@@ -321,7 +383,11 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T extends ScheduleTaskDr
      * @param result 计划量结果
      * @param value 损耗补偿量
      */
-    protected abstract void setResultLossAddQty(R result, BigDecimal value);
+    protected void setResultLossAddQty(R result, BigDecimal value) {
+        if (result != null) {
+            result.setLossAddQty(value);
+        }
+    }
 
     /**
      * 设置结果最小起排调整量。
@@ -329,7 +395,11 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T extends ScheduleTaskDr
      * @param result 计划量结果
      * @param value 最小起排调整量
      */
-    protected abstract void setResultMinStartAdjustQty(R result, BigDecimal value);
+    protected void setResultMinStartAdjustQty(R result, BigDecimal value) {
+        if (result != null) {
+            result.setMinStartAdjustQty(value);
+        }
+    }
 
     /**
      * 设置结果卷数取整调整量。
@@ -337,7 +407,11 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T extends ScheduleTaskDr
      * @param result 计划量结果
      * @param value 卷数取整调整量
      */
-    protected abstract void setResultTailRoundAdjustQty(R result, BigDecimal value);
+    protected void setResultTailRoundAdjustQty(R result, BigDecimal value) {
+        if (result != null) {
+            result.setTailRoundAdjustQty(value);
+        }
+    }
 
     /**
      * 设置结果工装限制调整量。
@@ -345,7 +419,11 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T extends ScheduleTaskDr
      * @param result 计划量结果
      * @param value 工装限制调整量
      */
-    protected abstract void setResultToolLimitAdjustQty(R result, BigDecimal value);
+    protected void setResultToolLimitAdjustQty(R result, BigDecimal value) {
+        if (result != null) {
+            result.setToolLimitAdjustQty(value);
+        }
+    }
 
     /**
      * 设置结果工装溢出量。
@@ -353,7 +431,11 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T extends ScheduleTaskDr
      * @param result 计划量结果
      * @param value 工装溢出量
      */
-    protected abstract void setResultToolOverflowQty(R result, BigDecimal value);
+    protected void setResultToolOverflowQty(R result, BigDecimal value) {
+        if (result != null) {
+            result.setToolOverflowQty(value);
+        }
+    }
 
     /**
      * 设置结果产能调整量。
@@ -361,7 +443,11 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T extends ScheduleTaskDr
      * @param result 计划量结果
      * @param value 产能调整量
      */
-    protected abstract void setResultCapacityAdjustQty(R result, BigDecimal value);
+    protected void setResultCapacityAdjustQty(R result, BigDecimal value) {
+        if (result != null) {
+            result.setCapacityAdjustQty(value);
+        }
+    }
 
     /**
      * 设置结果损耗前计划量。
@@ -369,7 +455,11 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T extends ScheduleTaskDr
      * @param result 计划量结果
      * @param value 损耗前计划量
      */
-    protected abstract void setResultPreLossPlanQty(R result, BigDecimal value);
+    protected void setResultPreLossPlanQty(R result, BigDecimal value) {
+        if (result != null) {
+            result.setPreLossPlanQty(value);
+        }
+    }
 
     /**
      * 设置结果工装限制前计划量。
@@ -377,7 +467,11 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T extends ScheduleTaskDr
      * @param result 计划量结果
      * @param value 工装限制前计划量
      */
-    protected abstract void setResultPlanQtyBeforeToolLimit(R result, BigDecimal value);
+    protected void setResultPlanQtyBeforeToolLimit(R result, BigDecimal value) {
+        if (result != null) {
+            result.setPlanQtyBeforeToolLimit(value);
+        }
+    }
 
     /**
      * 设置结果最终计划量。
@@ -385,7 +479,11 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T extends ScheduleTaskDr
      * @param result 计划量结果
      * @param value 最终计划量
      */
-    protected abstract void setResultFinalPlanQty(R result, BigDecimal value);
+    protected void setResultFinalPlanQty(R result, BigDecimal value) {
+        if (result != null) {
+            result.setFinalPlanQty(value);
+        }
+    }
 
     /**
      * 设置结果计算说明。
@@ -393,7 +491,11 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T extends ScheduleTaskDr
      * @param result 计划量结果
      * @param value 计算说明
      */
-    protected abstract void setResultCalcFormulaDesc(R result, String value);
+    protected void setResultCalcFormulaDesc(R result, String value) {
+        if (result != null) {
+            result.setCalcFormulaDesc(value);
+        }
+    }
 
     /**
      * 计算停产收尾任务计划量。
@@ -447,19 +549,38 @@ public abstract class AbstractDefaultPlanQtyStrategy<C, T extends ScheduleTaskDr
      * 获取停产收尾需求量。
      *
      * @param task 任务
-     * @return 停产收尾需求量
+     * @return 停产收尾需求量，默认从待排任务草稿获取
      */
-    protected abstract BigDecimal getFormingShutdownCloseOutDemandQty(T task);
+    protected BigDecimal getFormingShutdownCloseOutDemandQty(T task) {
+        return task != null ? task.getFormingShutdownCloseOutDemandQty() : null;
+    }
 
     /**
-     * 获取成型连续停产收尾的收尾上限。
+     * 获取成型连续停产收尾的收尾上限；成型余量无效时回退到停产前原始计划汇总。
      *
      * @param task 任务
      * @return 收尾上限，无法取得时返回空值
      */
     protected BigDecimal getFormingShutdownCloseOutTailLimitQty(T task) {
-        return this.nvl(this.getTailBalanceQty(task))
+        if (task == null) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal configuredTailLimitQty = this.nvl(this.getTailBalanceQty(task))
                 .multiply(this.nvl(this.getProductLength(task)));
+        if (configuredTailLimitQty.compareTo(BigDecimal.ZERO) > 0) {
+            return configuredTailLimitQty;
+        }
+        int lastOpenFormingShiftOrder = task.getFormingLogicalShiftOrder() == null
+                ? 0 : task.getFormingLogicalShiftOrder();
+        if (task.getFormingClassQtyMap() == null || task.getFormingClassQtyMap().isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal formingPlanQty = task.getFormingClassQtyMap().entrySet().stream()
+                .filter(entry -> entry.getKey() != null && entry.getKey() <= lastOpenFormingShiftOrder)
+                .map(entry -> this.nvl(entry.getValue()))
+                .filter(value -> value.compareTo(BigDecimal.ZERO) > 0)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return formingPlanQty.multiply(this.nvl(this.getProductLength(task)));
     }
 
     /**

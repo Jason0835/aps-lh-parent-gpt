@@ -43,7 +43,6 @@ import com.zlt.aps.lh.component.OrderNoGenerator;
 import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
 import com.zlt.aps.lh.mapper.LhSharedMouldPatEntityMapper;
 import com.zlt.aps.lh.service.ILhMouldChangePlanService;
-import com.zlt.aps.lh.service.ILhScheduleResultService;
 import com.zlt.aps.lh.util.LhMouldChangePlanImportReader;
 import com.zlt.aps.utils.AppUtils;
 import com.zlt.bill.common.controller.AbstractDocBizController;
@@ -67,6 +66,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Field;
+import java.text.MessageFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -112,9 +112,6 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
 
     @Autowired
     private LhSharedMouldPatEntityMapper lhSharedMouldPatEntityMapper;
-
-    @Autowired
-    private ILhScheduleResultService lhScheduleResultService;
 
     /**
      * 中心计划日期使用的Excel字体颜色。
@@ -283,21 +280,32 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         if (scheduleResult == null) {
             scheduleResult = new LhScheduleResult();
         }
+        // 导入请求携带的排程日期（前端所选）优先，与硫化日计划导入保持同一日期口径；
+        // 只有请求未携带日期（如独立换模页面上传）时才回退解析模板标题日期。
+        Date requestScheduleDate = scheduleResult.getScheduleDate();
 
         try (Workbook wb = WorkbookFactory.create(new ByteArrayInputStream(fileBytes))) {
             Sheet sheet = wb.getSheet(sheetName);
             if (sheet == null || sheet.getRow(0) == null) {
                 return AjaxResult.error(templateErrorStr);
             }
-            Cell titleCell = sheet.getRow(1).getCell(6);
-            if (titleCell == null) {
-                return AjaxResult.error(templateErrorStr);
+            if (Objects.nonNull(requestScheduleDate)) {
+                scheduleDate = DateUtil.beginOfDay(requestScheduleDate);
+                log.info("模具交替计划导入使用请求排程日期: factoryCode={}, scheduleDate={}",
+                        scheduleResult.getFactoryCode(), DateUtil.formatDate(scheduleDate));
+            } else {
+                Cell titleCell = sheet.getRow(1).getCell(6);
+                if (titleCell == null) {
+                    return AjaxResult.error(templateErrorStr);
+                }
+                params = ApsCommonUtil.parseFormat(titleFormat, titleCell.getStringCellValue());
+                if (params == null || params.length < 3) {
+                    return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mpStructureAllocation.import.templateTitleError"));
+                }
+                scheduleDate = DateUtil.parse(params[0], "yyyy年MM月dd日");
+                log.info("模具交替计划导入回退使用模板标题日期: factoryCode={}, scheduleDate={}",
+                        scheduleResult.getFactoryCode(), DateUtil.formatDate(scheduleDate));
             }
-            params = ApsCommonUtil.parseFormat(titleFormat, titleCell.getStringCellValue());
-            if (params == null || params.length < 3) {
-                return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mpStructureAllocation.import.templateTitleError"));
-            }
-            scheduleDate = DateUtil.parse(params[0], "yyyy年MM月dd日");
             scheduleResult.setScheduleDate(scheduleDate);
             if (StringUtils.isBlank(scheduleResult.getFactoryCode())) {
                 scheduleResult.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
@@ -308,15 +316,14 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         }
         lhImportContext.setScheduleResult(scheduleResult);
         List<LhMouldChangePlanVo> list = LhMouldChangePlanImportReader.readRows(fileBytes, sheetName);
-        List<LhMouldChangePlan> mouldChangePlanList = buildLhMouldChangePlanList(list, scheduleDate);
+        String requestFactoryCode = StringUtils.defaultIfBlank(
+                scheduleResult.getFactoryCode(), FactoryConstant.DEFAULT_FACTORY_CODE);
+        list.stream()
+                .filter(Objects::nonNull)
+                .filter(planVo -> StringUtils.isBlank(planVo.getFactoryCode()))
+                .forEach(planVo -> planVo.setFactoryCode(requestFactoryCode));
+        List<LhMouldChangePlan> mouldChangePlanList = this.buildLhMouldChangePlanList(list, scheduleDate);
         AjaxResult ajaxResult = this.doImportData(mouldChangePlanList, updateSupport, importLog.getId());
-        // 导入成功后，补全模具交替计划的批次号
-//        if (!ajaxResult.get(AjaxResult.CODE_TAG).equals(AjaxResult.Type.ERROR.value())) {
-            if (CollectionUtils.isNotEmpty(list)) {
-                String factoryCode = scheduleResult.getFactoryCode().trim();
-                lhScheduleResultService.fillMouldChangePlanFieldsAfterImport(factoryCode, scheduleDate);
-            }
-//        }
         Date endTime = DateUtils.getNowDate();
         importLog.setRowCount(list.size());
         importLog.setBeginTime(beginTime);
@@ -411,12 +418,14 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         //1.获取导出数据
         List<LhMouldChangePlan> list = this.listExportData(queryVO);
         Set<String> previousDayPlanKeySet = null;
+        Map<String, List<Date>> previousPlanDateMap = Collections.emptyMap();
         Date originalScheduleDate = queryVO.getScheduleDate();
         if (originalScheduleDate != null) {
             try {
                 queryVO.setScheduleDate(DateUtil.offsetDay(originalScheduleDate, -1));
                 List<LhMouldChangePlan> previousDayPlanList = this.listExportData(queryVO);
                 previousDayPlanKeySet = this.buildMouldChangePlanKeySet(previousDayPlanList);
+                previousPlanDateMap = this.buildPreviousPlanDateMap(previousDayPlanList);
             } finally {
                 queryVO.setScheduleDate(originalScheduleDate);
             }
@@ -429,7 +438,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             List<LhMouldChangePlanVo> exportList = this.buildLhMouldChangePlanVoList(list, queryVO);
             lhMouldChangePlanService.prepareExportDisplayFields(list, exportList);
             // listExportData 已完成默认全量排序，模板组装阶段直接复用该顺序，避免重复查询计划量。
-            excelDataList.add(buildExportDataList(exportList, queryVO, previousDayPlanKeySet, true));
+            excelDataList.add(this.buildExportDataList(exportList, queryVO, previousDayPlanKeySet, previousPlanDateMap, true));
         }
         tableMap = buildExportTableMap(queryVO.getScheduleDate());
         // 赋值表头字段名称
@@ -531,16 +540,6 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             return new HashMap<>();
         }
         return sharedMouldPatList.stream().collect(Collectors.groupingBy(LhSharedMouldPat::getMaterialDesc));
-    }
-
-    /**
-     * 解析模具交替计划最终展示的模具号。
-     *
-     * @param item 模具交替计划导出视图
-     * @return 最终展示模具号
-     */
-    private String resolveDisplayMouldCode(LhMouldChangePlanVo item) {
-        return StringUtils.defaultIfBlank(item.getMouldCode(), "");
     }
 
     /**
@@ -649,7 +648,23 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
     public List<Map<String, Object>> buildExportDataList(List<LhMouldChangePlanVo> list,
                                                          LhMouldChangePlan queryVO,
                                                          Set<String> previousDayPlanKeySet) {
-        return this.buildExportDataList(list, queryVO, previousDayPlanKeySet, false);
+        return this.buildExportDataList(list, queryVO, previousDayPlanKeySet, Collections.emptyMap());
+    }
+
+    /**
+     * 构建导出行并对比前日计划日期。
+     *
+     * @param list                  模具交替计划导出视图列表
+     * @param queryVO               查询条件
+     * @param previousDayPlanKeySet 前日交替计划标识集合
+     * @param previousPlanDateMap   前日计划标识及日期
+     * @return 导出行数据
+     */
+    public List<Map<String, Object>> buildExportDataList(List<LhMouldChangePlanVo> list,
+                                                         LhMouldChangePlan queryVO,
+                                                         Set<String> previousDayPlanKeySet,
+                                                         Map<String, List<Date>> previousPlanDateMap) {
+        return this.buildExportDataList(list, queryVO, previousDayPlanKeySet, previousPlanDateMap, false);
     }
 
     /**
@@ -658,12 +673,14 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
      * @param list                  模具交替计划导出视图列表
      * @param queryVO               查询条件
      * @param previousDayPlanKeySet 前日交替计划唯一标识集合
+     * @param previousPlanDateMap   前日计划标识及日期
      * @param alreadySorted         列表是否已由统一排序服务完成排序
      * @return 导出行数据
      */
     private List<Map<String, Object>> buildExportDataList(List<LhMouldChangePlanVo> list,
                                                           LhMouldChangePlan queryVO,
                                                           Set<String> previousDayPlanKeySet,
+                                                          Map<String, List<Date>> previousPlanDateMap,
                                                           boolean alreadySorted) {
         if (!alreadySorted && !this.hasExplicitSort(queryVO)) {
             if (lhMouldChangePlanService != null) {
@@ -734,13 +751,43 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
                 }
             }
 
-            row.put("mouldCode", this.resolveDisplayMouldCode(item));
+            // 按自然日比较前日计划，保留模具号并逐条展示不同的原计划日期。
+            String mouldCode = StringUtils.defaultString(item.getMouldCode());
+            String comparisonBeforeMaterialCode = item.getComparisonBeforeMaterialCode() == null
+                    ? item.getBeforeMaterialCode() : item.getComparisonBeforeMaterialCode();
+            List<Date> previousPlanDates = previousPlanDateMap.get(this.buildMouldChangePlanKey(
+                    item.getLhMachineCode(), comparisonBeforeMaterialCode, item.getAfterMaterialCode()));
+            if (previousPlanDates != null && item.getPlanDate() != null) {
+                String currentPlanDate = DateUtil.format(item.getPlanDate(), "yyyy-MM-dd");
+                String currentPlanDateText = DateUtil.format(item.getPlanDate(), "M.d");
+                String adjustmentTemplate = I18nUtil.getMessage("ui.data.column.lhMouldChangePlan.planDateAdjusted");
+                List<String> adjustmentDescriptions = previousPlanDates.stream()
+                        .map(planDate -> DateUtil.format(planDate, "yyyy-MM-dd"))
+                        .filter(planDate -> !planDate.equals(currentPlanDate))
+                        .distinct()
+                        .sorted()
+                        .map(planDate -> MessageFormat.format(adjustmentTemplate,
+                                DateUtil.format(DateUtil.parse(planDate, "yyyy-MM-dd"), "M.d"),
+                                currentPlanDateText))
+                        .collect(Collectors.toList());
+                if (!adjustmentDescriptions.isEmpty()) {
+                    String adjustmentText = String.join("\n", adjustmentDescriptions);
+                    mouldCode = StringUtils.isBlank(mouldCode) ? adjustmentText : mouldCode + "\n" + adjustmentText;
+                }
+            }
+            row.put("mouldCode", mouldCode);
 
             String remark = StringUtils.defaultString(item.getRemark(), "");
             row.put("remark", remark);
             if (StringUtils.isNotBlank(remark)) {
                 int remarkLineCount = remark.split("\\R", -1).length;
                 row.put("height", Math.max(30, remarkLineCount * 15));
+            }
+            // 模具说明和备注共用行高，按两者中的最大行数设置。
+            if (mouldCode.contains("\n")) {
+                int mouldLineCount = mouldCode.split("\\R", -1).length;
+                int existingHeight = row.containsKey("height") ? (Integer) row.get("height") : 30;
+                row.put("height", Math.max(existingHeight, mouldLineCount * 15));
             }
 
             // 当前交替计划在前日不存在且计划日期处于排程日-1日时，仅将后物料描述字体标红。
@@ -801,6 +848,19 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         return mouldChangePlanList.stream()
                 .map(this::buildMouldChangePlanKey)
                 .collect(Collectors.toSet());
+    }
+
+    /**
+     * 按机台及前后物料汇总前日计划日期。
+     *
+     * @param previousDayPlanList 前日模具交替计划
+     * @return 计划标识对应的前日计划日期列表
+     */
+    public Map<String, List<Date>> buildPreviousPlanDateMap(List<LhMouldChangePlan> previousDayPlanList) {
+        return previousDayPlanList.stream()
+                .filter(plan -> plan.getPlanDate() != null)
+                .collect(Collectors.groupingBy(this::buildMouldChangePlanKey,
+                        Collectors.mapping(LhMouldChangePlan::getPlanDate, Collectors.toList())));
     }
 
     /**
@@ -877,6 +937,8 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         for (LhMouldChangePlan lhMouldChangePlan : list) {
             LhMouldChangePlanVo lhMouldChangePlanVo = new LhMouldChangePlanVo();
             BeanUtil.copyProperties(lhMouldChangePlan, lhMouldChangePlanVo);
+            // 纯清洗计划可能清空展示值，比较日期时仍使用原始前物料编码。
+            lhMouldChangePlanVo.setComparisonBeforeMaterialCode(lhMouldChangePlan.getBeforeMaterialCode());
             lhMouldChangePlanVo.setMouldCode(StringUtils.defaultIfBlank(lhMouldChangePlan.getMouldCode(), ""));
 
             lhMouldChangePlanVo.setSeq(seq++);

@@ -9,6 +9,7 @@ import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.ShiftEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.engine.strategy.support.K21K22EmbryoMatchPolicy;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.engine.strategy.support.OffMachineDecision;
@@ -452,8 +453,8 @@ public class TimedMachineOffShiftService {
     }
 
     /**
-     * 在同物料同状态的可调整请求位置内稳定排序，预演和正式两轮共用同一入口。
-     * 未命中机台保持相对顺序，固定边界机台以及其他SKU的位置不移动。
+     * 在同物料同状态的可调整请求位置内，先按历史排名，再将K21/K22同胎胚机台按编号降序排列。
+     * 预演和正式两轮共用同一入口，固定边界机台与其他SKU保留原位置。
      *
      * @param context 本批已选请求及固定历史顺序
      * @return 独立有序列表，不修改上下文请求集合
@@ -472,6 +473,9 @@ public class TimedMachineOffShiftService {
         positions.forEach((skuKey, slots) -> {
             List<TimedMachineOffRequest> candidates = slots.stream().map(ordered::get).collect(Collectors.toList());
             candidates.sort(Comparator.comparingInt(request -> this.requestRank(context, request)));
+            K21K22EmbryoMatchPolicy.orderRemoval(candidates,
+                    request -> request.getProfile().getOriginals().get(0).getLhMachineCode(),
+                    request -> request.getSourceSku().getEmbryoCode(), request -> this.requestRank(context, request));
             for (int position = 0; position < slots.size(); position++) {
                 ordered.set(slots.get(position), candidates.get(position));
             }

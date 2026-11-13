@@ -1,9 +1,11 @@
 package com.zlt.aps.lh.service.impl;
 
+import com.zlt.aps.lh.component.NewProductionDateAdmissionPolicy;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.api.enums.UnscheduledReasonEnum;
+import com.zlt.aps.lh.api.enums.ShiftEnum;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.component.CapsuleReplacementRuleService;
@@ -29,7 +31,7 @@ import java.util.stream.Collectors;
 import java.util.function.Supplier;
 
 /**
- * 专供机台转产后处理，复用候选原有准入、结构切换约束、单组合预演和完整回滚。
+ * 专供机台分结构四班转产，复用候选原有准入、结构切换约束、单组合预演和完整回滚。
  * 原料截断与后料跨日生产属于同一次提交，失败不会留下空机或资源扣账。
  */
 @Slf4j
@@ -93,7 +95,7 @@ public class DedicatedSupplyTransferService {
     /**
      * 按收尾、胎胚机台数及编码顺序处理全部已排产专供机台。
      *
-     * @param context 新增排产完成后的实时上下文
+     * @param context 结构切换及回补完成后的实时上下文
      */
     public void process(LhScheduleContext context) {
         if (context.getSupplyFormingMachinesByLhMachineMap().isEmpty()) {
@@ -110,8 +112,6 @@ public class DedicatedSupplyTransferService {
         }
         long started = System.nanoTime();
         Date originalDate = context.getCurrentScheduleDate();
-        Map<SkuScheduleDTO, EarlyProductionRuntimePlan> originalEarlyPlans =
-                new IdentityHashMap<>(context.getEarlyProductionRuntimePlanMap());
         List<DayScheduleContext> days = new ArrayList<>();
         Map<LocalDate, List<LhShiftConfigVO>> grouped = LhScheduleTimeUtil.groupByWorkDate(
                 StructureSwitchSchedulingPolicy.orderedShifts(context));
@@ -120,32 +120,120 @@ public class DedicatedSupplyTransferService {
         Map<String, Set<String>> embryoMachines = this.embryoMachineIndex(context);
         int succeeded = 0;
         try {
-            // 新增窗口已经清理主队列，独立单机提交需要自己的工作视图；只复用原SKU和共享账本。
             context.setNewSpecSkuList(new ArrayList<>(pool));
-            while (!tails.isEmpty()) {
-                String machineCode = this.selectNextMachine(context, tails, embryoMachines);
-                List<LhScheduleResult> results = tails.remove(machineCode);
-                if (this.tryMachine(context, results, pool, days)) {
-                    succeeded++;
-                    this.refreshEmbryoMachines(context, embryoMachines, machineCode);
-                } else if (results.size() > 1) {
-                    // 整组没有合法后料时再尝试单侧；匹配声明必须严格落在本侧，不能截断另一侧。
-                    for (LhScheduleResult result : results) {
-                        if (this.tryMachine(context, Collections.singletonList(result), pool, days)) {
+            // 入口末段只收集一次，成功后的新料不能再次入选；四班分别只扫描该固定集合。
+            Set<String> transferred = new HashSet<>();
+            Map<String, Integer> actualByStructure = new HashMap<>();
+            LocalDate firstDate = days.get(0).getScheduleDate();
+            for (int dayIndex = 0; dayIndex < Math.min(2, days.size()); dayIndex++) {
+                DayScheduleContext day = days.get(dayIndex);
+                // 保留原四班和T日统计基数，首日不截断原料、不扣资源，也不计成功数。
+                if (!NewProductionDateAdmissionPolicy.isAllowed(context, day.getScheduleDate())) {
+                    log.info("专供转产按日期准入跳过, factoryCode={}, batchNo={}, date={}",
+                            context.getFactoryCode(), context.getBatchNo(), day.getScheduleDate());
+                    continue;
+                }
+                for (LhShiftConfigVO shift : day.getDayShifts()) {
+                    if (shift.resolveShiftTypeEnum() == ShiftEnum.NIGHT_SHIFT) {
+                        continue;
+                    }
+                    Map<String, Integer> targets = new HashMap<>();
+                    Map<String, Integer> shiftActual = new HashMap<>();
+                    Map<String, List<LhScheduleResult>> candidates = new LinkedHashMap<>();
+                    tails.forEach((code, rows) -> {
+                        String physical = LhSingleControlMachineUtil.resolvePhysicalMachineCode(code);
+                        if (!transferred.contains(physical) && this.endsInShift(context, rows, shift)) {
+                            candidates.put(code, rows);
+                        }
+                    });
+                    while (!candidates.isEmpty()) {
+                        String code = this.selectNextMachine(context, candidates, embryoMachines);
+                        List<LhScheduleResult> rows = candidates.remove(code);
+                        String physical = LhSingleControlMachineUtil.resolvePhysicalMachineCode(code);
+                        String structure = this.source(context, rows).getStructureName();
+                        int currentDay = dayIndex;
+                        int target = targets.computeIfAbsent(structure, key -> this.shiftTarget(
+                                context.getStructurePlanMachineCount(firstDate, key), currentDay,
+                                shift.resolveShiftTypeEnum(), actualByStructure.getOrDefault(key, 0)));
+                        if (transferred.contains(physical) || shiftActual.getOrDefault(structure, 0) >= target) {
+                            continue;
+                        }
+                        boolean success = this.tryMachine(context, rows, pool, days, dayIndex, shift);
+                        if (!success && rows.size() > 1) {
+                            for (LhScheduleResult row : rows) {
+                                if (this.tryMachine(context, Collections.singletonList(row), pool, days, dayIndex, shift)) {
+                                    success = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (success) {
+                            transferred.add(physical);
+                            actualByStructure.merge(structure, 1, Integer::sum);
+                            shiftActual.merge(structure, 1, Integer::sum);
                             succeeded++;
-                            this.refreshEmbryoMachines(context, embryoMachines, result.getLhMachineCode());
+                            this.refreshEmbryoMachines(context, embryoMachines, code);
                         }
                     }
+                    log.info("专供转产分班统计, batchNo={}, date={}, shift={}, target={}, actual={}",
+                            context.getBatchNo(), day.getScheduleDate(), shift.getShiftType(), targets, shiftActual);
                 }
             }
         } finally {
+            // 前置成功组合的消费和提前生产计划继续交给新增，保留本次新增的补偿身份。
+            Set<SkuScheduleDTO> knownCandidates = Collections.newSetFromMap(new IdentityHashMap<>());
+            knownCandidates.addAll(originalPending);
+            knownCandidates.addAll(pool);
+            context.getNewSpecSkuList().stream().filter(knownCandidates::add).forEach(originalPending::add);
             context.setNewSpecSkuList(originalPending);
+            context.rebuildStructureSkuMapFromPending(originalPending);
             context.setCurrentScheduleDate(originalDate);
-            context.setEarlyProductionRuntimePlanMap(originalEarlyPlans);
             log.info("专供转产结束, factoryCode={}, batchNo={}, success={}, elapsedMs={}",
                     context.getFactoryCode(), context.getBatchNo(), succeeded,
                     (System.nanoTime() - started) / 1_000_000L);
         }
+    }
+
+    /**
+     * 计算当前结构的单班目标，首日中班采用固定目标，次日使用此前实际数量。
+     *
+     * @param machines 首日月计划最大硫化机台数
+     * @param dayIndex 从零开始的业务日偏移
+     * @param shiftType 当前班别
+     * @param actual 此前已成功下机数量
+     * @return 本班最多允许下机的物理机台数
+     */
+    int shiftTarget(int machines, int dayIndex, ShiftEnum shiftType, int actual) {
+        if (shiftType == ShiftEnum.NIGHT_SHIFT || machines <= 0 || dayIndex > 1) {
+            return 0;
+        }
+        int firstMorning = (int) ((machines + 3L) / 4);
+        if (dayIndex == 0) {
+            return shiftType == ShiftEnum.MORNING_SHIFT ? firstMorning
+                    : (int) ((machines + 1L) / 2) - firstMorning;
+        }
+        int remaining = Math.max(0, machines - actual);
+        return shiftType == ShiftEnum.MORNING_SHIFT ? (int) ((remaining + 1L) / 2) : remaining;
+    }
+
+    /**
+     * 按入口末段最后正量班次和实际释放时间核对当班收尾，班末结束归属生产班。
+     *
+     * @param context 完整窗口
+     * @param rows 同物理机当前末段
+     * @param shift 当前早班或中班
+     * @return 全部运行侧均在本班结束时为真
+     */
+    boolean endsInShift(LhScheduleContext context, List<LhScheduleResult> rows, LhShiftConfigVO shift) {
+        return rows.stream().allMatch(row -> {
+            LhShiftConfigVO last = context.getScheduleWindowShifts().stream()
+                    .filter(item -> ShiftFieldUtil.getShiftPlanQty(row, item.getShiftIndex()) != null
+                            && ShiftFieldUtil.getShiftPlanQty(row, item.getShiftIndex()) > 0)
+                    .max(Comparator.comparing(LhShiftConfigVO::getShiftStartDateTime)).orElse(null);
+            return last == shift && row.getSpecEndTime() != null
+                    && row.getSpecEndTime().after(shift.getShiftStartDateTime())
+                    && !row.getSpecEndTime().after(shift.getShiftEndDateTime());
+        });
     }
 
     /**
@@ -335,10 +423,15 @@ public class DedicatedSupplyTransferService {
      * @param rows 原料末段
      * @param pool 冻结候选身份
      * @param days 有序业务日
+     * @param dayIndex 当前下机业务日偏移
+     * @param shift 当前下机班次
      * @return 原子提交成功时为真
      */
-    private boolean tryMachine(LhScheduleContext context, List<LhScheduleResult> rows,
-            List<SkuScheduleDTO> pool, List<DayScheduleContext> days) {
+    boolean tryMachine(LhScheduleContext context, List<LhScheduleResult> rows,
+            List<SkuScheduleDTO> pool, List<DayScheduleContext> days, int dayIndex, LhShiftConfigVO shift) {
+        if (!NewProductionDateAdmissionPolicy.isAllowed(context, days.get(dayIndex).getScheduleDate())) {
+            return false;
+        }
         SkuScheduleDTO source = this.source(context, rows);
         String machineCode = rows.get(0).getLhMachineCode();
         String physical = LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode);
@@ -352,13 +445,24 @@ public class DedicatedSupplyTransferService {
         Date supply = NewSpecEmbryoAvailableTimeResolver.resolveEarliestAvailableTime(context, source);
         // 不撤销本段已经完成的换模/首检，最早从本段首个完整硫化周期结束后下机。
         Date floor = rows.stream().map(row -> context.getScheduleWindowShifts().stream()
-                .map(shift -> ShiftFieldUtil.getShiftStartTime(row, shift.getShiftIndex()))
+                .map(windowShift -> ShiftFieldUtil.getShiftStartTime(row, windowShift.getShiftIndex()))
                 .filter(Objects::nonNull).min(Date::compareTo).orElse(null))
                 .filter(Objects::nonNull).max(Date::compareTo).orElse(null);
         if (floor != null && source.getLhTimeSeconds() > 0) {
             floor = new Date(floor.getTime() + source.getLhTimeSeconds() * 1000L);
         }
         if (floor == null || days.isEmpty() || !supply.before(days.get(days.size() - 1).getDayEndTime())) {
+            return false;
+        }
+        DayScheduleContext day = days.get(dayIndex);
+        Date originalEnd = rows.stream().map(LhScheduleResult::getSpecEndTime)
+                .max(Date::compareTo).get();
+        Date initialCut = originalEnd;
+        if (shift.resolveShiftTypeEnum() == ShiftEnum.AFTERNOON_SHIFT) {
+            Date preferred = StructureEndingContinuationPolicy.firstDeadline(shift);
+            initialCut = originalEnd.before(preferred) ? originalEnd : preferred;
+        }
+        if (initialCut.before(floor) || initialCut.before(shift.getShiftStartDateTime())) {
             return false;
         }
         List<SkuScheduleDTO> captured = new ArrayList<>(pool);
@@ -368,95 +472,92 @@ public class DedicatedSupplyTransferService {
         context.getDailyMouldChangeCountMap().forEach((date, counts) -> beforeCounts.put(date, counts.clone()));
         boolean committed = false;
         try {
-            for (int dayIndex = 0; dayIndex < days.size(); dayIndex++) {
-                DayScheduleContext day = days.get(dayIndex);
-                Date initialCut = StructureSwitchSchedulingPolicy.later(floor, day.getDayStartTime());
-                Date cut = initialCut;
-                Set<String> rejected = new HashSet<>();
-                while (cut.before(day.getDayEndTime())) {
-                    snapshot.restore(context);
-                    context.setCurrentScheduleDate(day.getDayShifts().get(0).getWorkDate());
-                    ContinuationCutoverResult cutover = cutoverService.cutoverResults(context, source,
-                            physical, cut, rows, TRANSFER_ANALYSIS);
-                    Date offline = cut;
-                    rows.forEach(row -> {
-                        row.setSpecEndTime(offline);
-                        if (cutover.getRemovedQty() > 0) {
-                            row.setIsEnd("0");
-                            ShiftFieldUtil.applyLastPlannedShiftEndMark(row, false);
-                        }
-                        context.getMachineScheduleMap().get(row.getLhMachineCode()).setEstimatedEndTime(offline);
-                    });
-                    if (context.getMouldResourceContext() != null) {
-                        context.getMouldResourceContext().refreshAvailability(context);
+            Date cut = initialCut;
+            Set<String> rejected = new HashSet<>();
+            while (!cut.after(shift.getShiftEndDateTime())) {
+                snapshot.restore(context);
+                context.setCurrentScheduleDate(day.getDayShifts().get(0).getWorkDate());
+                ContinuationCutoverResult cutover = cutoverService.cutoverResults(context, source,
+                        physical, cut, rows, TRANSFER_ANALYSIS);
+                Date offline = cut;
+                rows.forEach(row -> {
+                    row.setSpecEndTime(offline);
+                    if (cutover.getRemovedQty() > 0) {
+                        row.setIsEnd("0");
+                        ShiftFieldUtil.applyLastPlannedShiftEndMark(row, false);
                     }
-                    capsuleReplacementRuleService.rebuildRuntimeState(context, null);
-                    context.rebuildScheduledMachineCountMaps(context.getScheduleWindowShifts());
-                    alignmentService.prepareStructureEndingAlignmentIndex(context);
-                    NewSpecScheduleProposal proposal = this.select(context, day, rows, source, pool, supply, rejected);
-                    if (proposal == null) {
-                        log.debug("专供转产无合法后料, batchNo={}, machine={}, sourceSku={}, date={}, supply={}",
-                                context.getBatchNo(), machineCode, StructureSwitchCandidateScope.skuKey(source),
-                                day.getScheduleDate(), supply);
-                        break;
-                    }
-                    Date actualCut = proposal.getAvailabilityPlan().getChangeoverStartTime();
-                    if (actualCut == null || actualCut.before(cut) || !actualCut.before(day.getDayEndTime())) {
-                        rejected.add(proposal.getCandidate().getSkuKey());
-                        cut = initialCut;
-                        continue;
-                    }
-                    if (actualCut.after(cut)) {
-                        cut = actualCut;
-                        continue;
-                    }
-                    Set<LhScheduleResult> before = Collections.newSetFromMap(new IdentityHashMap<>());
-                    before.addAll(context.getScheduleResultList());
-                    int bindingStart = context.getPreScheduledMachineBindingList().size();
-                    NewSpecMachineAssignmentPlan assignment = proposal.getAssignmentPlan().forPostProcessing();
-                    day.setCurrentPhase(assignment.getCandidate().hasReason(DailyCandidateReason.EARLY_PRODUCTION)
-                            ? DailySchedulePhase.EARLY_PRODUCTION : DailySchedulePhase.NORMAL_RESOURCE_COMPETITION);
-                    boolean scheduled = this.withCandidateScope(context, assignment.getCandidate().getSku(),
-                            () -> productionStrategy.executeMachineAssignment(context, day, assignment,
-                                    strategyFactory.getMachineMatchStrategy(), strategyFactory.getMouldChangeBalanceStrategy(),
-                                    strategyFactory.getFirstInspectionBalanceStrategy(), strategyFactory.getCapacityCalculateStrategy()));
-                    if (!scheduled) {
-                        rejected.add(proposal.getCandidate().getSkuKey());
-                        cut = initialCut;
-                        continue;
-                    }
-                    List<ActiveMachineBinding> bindings = new ArrayList<>(context.getPreScheduledMachineBindingList()
-                            .subList(bindingStart, context.getPreScheduledMachineBindingList().size()));
-                    for (int next = dayIndex + 1; next < days.size(); next++) {
-                        DayScheduleContext nextDay = days.get(next);
-                        context.setCurrentScheduleDate(nextDay.getDayShifts().get(0).getWorkDate());
-                        this.withCandidateScope(context, assignment.getCandidate().getSku(),
-                                () -> productionStrategy.continueSpecifiedMachines(context, nextDay, bindings));
-                    }
-                    List<LhScheduleResult> added = context.getScheduleResultList().stream()
-                            .filter(result -> !before.contains(result) && ShiftFieldUtil.resolveScheduledQty(result) > 0)
-                            .collect(Collectors.toList());
-                    if (!this.validResults(context, added, supply, cut, beforeCounts)) {
-                        rejected.add(proposal.getCandidate().getSkuKey());
-                        cut = initialCut;
-                        continue;
-                    }
-                    context.getDedicatedSupplyTransferResults().addAll(added);
-                    int remaining = quantityResolver.previewUnfulfilledProductionRemainingQty(context, source);
-                    if (cutover.getRemovedQty() > 0 && remaining > 0) {
-                        unscheduledCollector.addOrReplace(context, source, unscheduledCollector.buildResult(context,
-                                source, remaining, unscheduledCollector.resolveReasonCode(TRANSFER_ANALYSIS),
-                                TRANSFER_ANALYSIS, "原料截断量已恢复共享需求账本"));
-                    }
-                    this.reconcileTargetUnscheduled(context, assignment.getCandidate().getSku());
-                    unscheduledCollector.finalizeResults(context);
-                    committed = true;
-                    log.info("专供转产成功, factoryCode={}, batchNo={}, machine={}, beforeSku={}, afterSku={}, offline={}, supply={}, restoredQty={}",
-                            context.getFactoryCode(), context.getBatchNo(), machineCode,
-                            StructureSwitchCandidateScope.skuKey(source), proposal.getCandidate().getSkuKey(),
-                            cut, supply, cutover.getRemovedQty());
-                    return true;
+                    context.getMachineScheduleMap().get(row.getLhMachineCode()).setEstimatedEndTime(offline);
+                });
+                if (context.getMouldResourceContext() != null) {
+                    context.getMouldResourceContext().refreshAvailability(context);
                 }
+                capsuleReplacementRuleService.rebuildRuntimeState(context, null);
+                context.rebuildScheduledMachineCountMaps(context.getScheduleWindowShifts());
+                alignmentService.prepareStructureEndingAlignmentIndex(context);
+                NewSpecScheduleProposal proposal = this.select(context, day, rows, source, pool, supply, rejected);
+                if (proposal == null) {
+                    log.debug("专供转产无合法后料, batchNo={}, machine={}, sourceSku={}, date={}, supply={}",
+                            context.getBatchNo(), machineCode, StructureSwitchCandidateScope.skuKey(source),
+                            day.getScheduleDate(), supply);
+                    break;
+                }
+                Date actualCut = proposal.getAvailabilityPlan().getChangeoverStartTime();
+                if (actualCut == null || actualCut.before(cut)
+                        || !this.changeStartsInShift(context, shift, actualCut)) {
+                    rejected.add(proposal.getCandidate().getSkuKey());
+                    cut = initialCut;
+                    continue;
+                }
+                if (actualCut.after(cut)) {
+                    cut = actualCut;
+                    continue;
+                }
+                Set<LhScheduleResult> before = Collections.newSetFromMap(new IdentityHashMap<>());
+                before.addAll(context.getScheduleResultList());
+                int bindingStart = context.getPreScheduledMachineBindingList().size();
+                NewSpecMachineAssignmentPlan assignment = proposal.getAssignmentPlan().forPostProcessing();
+                day.setCurrentPhase(assignment.getCandidate().hasReason(DailyCandidateReason.EARLY_PRODUCTION)
+                        ? DailySchedulePhase.EARLY_PRODUCTION : DailySchedulePhase.NORMAL_RESOURCE_COMPETITION);
+                boolean scheduled = this.withCandidateScope(context, assignment.getCandidate().getSku(),
+                        () -> productionStrategy.executeMachineAssignment(context, day, assignment,
+                                strategyFactory.getMachineMatchStrategy(), strategyFactory.getMouldChangeBalanceStrategy(),
+                                strategyFactory.getFirstInspectionBalanceStrategy(), strategyFactory.getCapacityCalculateStrategy()));
+                if (!scheduled) {
+                    rejected.add(proposal.getCandidate().getSkuKey());
+                    cut = initialCut;
+                    continue;
+                }
+                List<ActiveMachineBinding> bindings = new ArrayList<>(context.getPreScheduledMachineBindingList()
+                        .subList(bindingStart, context.getPreScheduledMachineBindingList().size()));
+                for (int next = dayIndex + 1; next < days.size(); next++) {
+                    DayScheduleContext nextDay = days.get(next);
+                    context.setCurrentScheduleDate(nextDay.getDayShifts().get(0).getWorkDate());
+                    this.withCandidateScope(context, assignment.getCandidate().getSku(),
+                            () -> productionStrategy.continueSpecifiedMachines(context, nextDay, bindings));
+                }
+                List<LhScheduleResult> added = context.getScheduleResultList().stream()
+                        .filter(result -> !before.contains(result) && ShiftFieldUtil.resolveScheduledQty(result) > 0)
+                        .collect(Collectors.toList());
+                if (!this.validResults(context, added, supply, cut, beforeCounts)) {
+                    rejected.add(proposal.getCandidate().getSkuKey());
+                    cut = initialCut;
+                    continue;
+                }
+                context.getDedicatedSupplyTransferResults().addAll(added);
+                int remaining = quantityResolver.previewUnfulfilledProductionRemainingQty(context, source);
+                if (cutover.getRemovedQty() > 0 && remaining > 0) {
+                    unscheduledCollector.addOrReplace(context, source, unscheduledCollector.buildResult(context,
+                            source, remaining, unscheduledCollector.resolveReasonCode(TRANSFER_ANALYSIS),
+                            TRANSFER_ANALYSIS, "原料截断量已恢复共享需求账本"));
+                }
+                this.reconcileTargetUnscheduled(context, assignment.getCandidate().getSku());
+                unscheduledCollector.finalizeResults(context);
+                committed = true;
+                log.info("专供转产成功, factoryCode={}, batchNo={}, machine={}, beforeSku={}, afterSku={}, offline={}, supply={}, restoredQty={}",
+                        context.getFactoryCode(), context.getBatchNo(), machineCode,
+                        StructureSwitchCandidateScope.skuKey(source), proposal.getCandidate().getSkuKey(),
+                        cut, supply, cutover.getRemovedQty());
+                return true;
             }
             return false;
         } finally {
@@ -464,6 +565,20 @@ public class DedicatedSupplyTransferService {
                 snapshot.restore(context);
             }
         }
+    }
+
+    /**
+     * 按公共禁换模起点规则校验本班接续，含预热的准备时长继续由公共时间轴处理。
+     *
+     * @param context 换模时间参数
+     * @param shift 当前下机班次
+     * @param start 换模开始
+     * @return 在当前班释放且换模开始时间合法时为真
+     */
+    boolean changeStartsInShift(LhScheduleContext context, LhShiftConfigVO shift, Date start) {
+        return start != null && !start.before(shift.getShiftStartDateTime())
+                && !start.after(shift.getShiftEndDateTime())
+                && !LhScheduleTimeUtil.isNoMouldChangeTime(context, start);
     }
 
     /**
@@ -523,7 +638,7 @@ public class DedicatedSupplyTransferService {
         BigDecimal dimension = new BigDecimal(info.getDimensionSize().trim());
         for (SkuScheduleDTO sku : pool) {
             String key = StructureSwitchCandidateScope.skuKey(sku);
-            if (key.equals(StructureSwitchCandidateScope.skuKey(source)) || rejected.contains(key)
+            if (StringUtils.equals(sku.getMaterialCode(), source.getMaterialCode()) || rejected.contains(key)
                     || quantityResolver.previewUnfulfilledProductionRemainingQty(context, sku) <= 0) {
                 continue;
             }
@@ -616,7 +731,7 @@ public class DedicatedSupplyTransferService {
                 && Objects.equals(cut, result.getMouldChangeStartTime())
                 && context.getScheduleWindowShifts().stream().allMatch(shift -> {
                     Date start = ShiftFieldUtil.getShiftStartTime(result, shift.getShiftIndex());
-                    return start == null || !start.before(supply);
+                    return start == null || (!start.before(supply) && !start.before(cut));
                 })) && context.getDailyMouldChangeCountMap().entrySet().stream().allMatch(entry -> {
                     int[] count = entry.getValue();
                     int[] previous = beforeCounts.getOrDefault(entry.getKey(), new int[]{0, 0});

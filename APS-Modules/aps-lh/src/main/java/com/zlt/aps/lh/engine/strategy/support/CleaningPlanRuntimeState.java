@@ -10,6 +10,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.stream.Collectors;
 /**
  * 当前批次独立的清洗运行态，接管原清洗回填、喷砂交接和回流余量容器。
@@ -21,6 +23,10 @@ import java.util.stream.Collectors;
 @Getter
 @Setter
 public final class CleaningPlanRuntimeState {
+    /**
+     * 按原计划主键冻结的机台来源身份；值不可变，业务快照只复制索引容器。
+     */
+    private final Map<Long, DeviceStopMachineSource> machineSourceMap = new LinkedHashMap<>();
     /**
      * 清洗日期回填候选，成功安排及初始化收尾跳过分别保留实际清洗日或收尾业务日。
      * 配对侧不重复回填，最终由结果落库事务按来源主键去重；取消清洗不自动删除回填项。
@@ -56,9 +62,24 @@ public final class CleaningPlanRuntimeState {
      */
     private Map<String, Date> replacementQuotaReservationMap = new LinkedHashMap<>();
     /**
+     * 纯喷砂置换已登记的首检班次起点，物理事件身份与换模额度一致。
+     * 取消时只回退本事件一次首检计数，候选快照与公共计数器共同恢复。
+     */
+    private final Map<String, Date> replacementInspectionReservationMap = new LinkedHashMap<>();
+    /**
      * 仅喷砂释放后的真实回流余量，数量仍由生产策略维护。
      */
     private Map<String, Integer> remainingQtyMap = new LinkedHashMap<>();
+    /**
+     * 已实际下机且仍待恢复的来源运行侧，成功恢复或需求归零时移除。
+     * 来源事件继续保存在releaseWindowMap，供最终计划和原因追溯。
+     */
+    private final Set<String> pendingRecoveryMachineCodes = new LinkedHashSet<>();
+    /**
+     * 当前恢复预演或提交的来源运行侧，仅在独立恢复作用域内允许领取其原模。
+     */
+    private String activeRecoverySourceMachineCode;
+
     /**
      * 已发布的各来源运行侧处置；只读候选不写入。
      */
@@ -90,6 +111,7 @@ public final class CleaningPlanRuntimeState {
      */
     public CleaningPlanRuntimeState copy() {
         CleaningPlanRuntimeState target = new CleaningPlanRuntimeState();
+        target.machineSourceMap.putAll(machineSourceMap);
         target.scheduleDateFillList = scheduleDateFillList.stream()
                 .map(item -> BeanUtil.copyProperties(item, CleaningScheduleDateFillItem.class))
                 .collect(Collectors.toCollection(ArrayList::new));
@@ -105,7 +127,11 @@ public final class CleaningPlanRuntimeState {
                 copies.computeIfAbsent(window, CleaningPlanRuntimeState::copyWindow)));
         replacementQuotaReservationMap.forEach((key, time) ->
                 target.replacementQuotaReservationMap.put(key, copyDate(time)));
+        replacementInspectionReservationMap.forEach((key, time) ->
+                target.replacementInspectionReservationMap.put(key, copyDate(time)));
         target.remainingQtyMap.putAll(remainingQtyMap);
+        target.pendingRecoveryMachineCodes.addAll(pendingRecoveryMachineCodes);
+        target.activeRecoverySourceMachineCode = activeRecoverySourceMachineCode;
         target.appliedEventMap.putAll(appliedEventMap);
         target.constraintVersion = constraintVersion;
         return target;

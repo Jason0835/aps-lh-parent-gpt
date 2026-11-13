@@ -420,28 +420,41 @@ public class UnscheduledResultCollector {
         }
         // 指定试制量试完成实机和虚拟补量后，按最终全部产量补齐未排。
         this.reconcilePreviousAlternateTrials(context);
-        this.reconcileHandoverStoppedWithoutStock(context);
+        this.reconcileEndingWithoutStock(context);
         this.finalizeResults(context, true);
         // 先归并已有原因，再按最终八班结果补齐或清除本批余量收尾需求的真实缺口。
         this.reconcileRemainderFinishGroups(context);
     }
 
     /**
-     * 按原始需求补齐交班停产无库存的未排说明，避免零硬目标被当作排完而删除。
+     * 按原始需求补齐交班停产及胎胚收尾无库存的未排说明，避免零硬目标被当作排完而删除。
      * 同源多机副本只保留一条，独立日调整需求仍各自登记，不修改任何生产或资源账本。
+     * 已提交正量虚拟结果的同源需求由虚拟补量收口，保留其完成或容量不足结论。
      *
      * @param context 全部后置处理完成的排程上下文
      */
-    private void reconcileHandoverStoppedWithoutStock(LhScheduleContext context) {
+    private void reconcileEndingWithoutStock(LhScheduleContext context) {
         if (Objects.isNull(context)) {
             return;
         }
         Set<String> processedDemands = new LinkedHashSet<>();
         context.getUnscheduledResultRuntime().getDemandKeyBySku().forEach((sku, demandKey) -> {
-            if (PendingSkuUnscheduledRule.isHandoverStoppedWithoutStock(context, sku)
+            if (PendingSkuUnscheduledRule.isEndingWithoutStock(context, sku)
                     && processedDemands.add(demandKey)) {
+                // 虚拟补量按硫化需求执行，已提交的同源结果不能被实机零库存说明覆盖。
+                boolean virtualDemandScheduled = context.getScheduleResultList().stream()
+                        .filter(Objects::nonNull)
+                        .filter(result -> LhSingleControlMachineUtil.isVirtualMachineCode(result.getLhMachineCode()))
+                        .filter(result -> ShiftFieldUtil.resolveScheduledQty(result) > 0)
+                        .map(context.getScheduleResultSourceSkuMap()::get)
+                        .filter(PendingSkuUnscheduledRule::isTrialOrMassTrialSku)
+                        .anyMatch(sourceSku -> StringUtils.equals(demandKey,
+                                context.getUnscheduledResultRuntime().getDemandKeyBySku().get(sourceSku)));
+                if (virtualDemandScheduled) {
+                    return;
+                }
                 LhUnscheduledResult result =
-                        PendingSkuUnscheduledRule.evaluateHandoverStoppedWithoutStock(context, sku);
+                        PendingSkuUnscheduledRule.evaluateEndingWithoutStock(context, sku);
                 this.addOrReplace(context, sku, result);
             }
         });
@@ -516,7 +529,7 @@ public class UnscheduledResultCollector {
             }
             SkuScheduleDTO sku = group.getSourceSku();
             // 零库存禁排不等于原需求已完成，不能按零合法目标删除其未排说明。
-            if (PendingSkuUnscheduledRule.isHandoverStoppedWithoutStock(context, sku)) {
+            if (PendingSkuUnscheduledRule.isEndingWithoutStock(context, sku)) {
                 continue;
             }
             int scheduledQty = context.getScheduleResultList().stream()
@@ -635,14 +648,24 @@ public class UnscheduledResultCollector {
 
     /**
      * 用最终八班产量收敛续作零结果诊断，避免后续补排成功仍保留阶段未排量。
+     * 同源试制量试的虚拟窗口容量缺口按独立硫化余额保留，其他来源按各自实机目标裁量。
      *
      * @param context 全部排产及后置裁量已完成的上下文
      * @param result 待收口未排记录
      * @return 已无剩余需求、应移除此记录时返回true
      */
     private boolean reconcileContinuationZeroPlan(LhScheduleContext context, LhUnscheduledResult result) {
+        boolean virtualTrialCapacity = StringUtils.equals(
+                UnscheduledReasonEnum.VIRTUAL_MACHINE_CAPACITY_INSUFFICIENT.getCode(),
+                result.getUnscheduledReasonCode())
+                && context.getUnscheduledResultRuntime().getDemandKeyBySku().keySet().stream()
+                .anyMatch(sku -> PendingSkuUnscheduledRule.isTrialOrMassTrialSku(sku)
+                        && this.isSameDemand(context, sku, result));
         if (StringUtils.equals(UnscheduledReasonEnum.HANDOVER_STOPPED_NO_EMBRYO_STOCK.getCode(),
-                result.getUnscheduledReasonCode())) {
+                result.getUnscheduledReasonCode())
+                || StringUtils.equals(UnscheduledReasonEnum.EMBRYO_ENDING_NO_STOCK.getCode(),
+                result.getUnscheduledReasonCode())
+                || virtualTrialCapacity) {
             return false;
         }
         UnscheduledDemandSnapshot snapshot = this.findSnapshot(context, result);
