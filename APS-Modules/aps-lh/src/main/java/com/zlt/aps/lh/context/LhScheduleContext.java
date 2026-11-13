@@ -577,6 +577,12 @@ public class LhScheduleContext {
      * T日排程班次完成量Map, key=materialCode+产品状态, value=T日class1FinishQty按物料汇总值
      */
     private Map<String, Integer> materialScheDayFinishQtyMap = new HashMap<>();
+
+    /**
+     * T日夜班完成量的物理机台明细，外层键为物料及状态，内层键为物理机台编码。
+     * 与SKU聚合完成量同次加载，仅供日目标分配扣除实际完成事实。
+     */
+    private Map<String, Map<String, Integer>> materialMachineScheDayFinishQtyMap = new HashMap<>();
     /**
      * 物料信息Map, key=materialCode
      */
@@ -940,6 +946,33 @@ public class LhScheduleContext {
                 machines.add(LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode));
             }
         });
+        return machines;
+    }
+
+    /**
+     * 获取日目标完成后不再承担后日需求的原物理机台，供新增与换活字块共用。
+     * 当日参与量继续保留，后日同料已重新上机时复用原重上机检查恢复有效承载。
+     *
+     * @param sku 当前需求物料及状态
+     * @param businessDate 当前需求业务日
+     * @return 后日已经失效且未重新上机的物理机台
+     */
+    public Set<String> resolveDailyQuantityReleasedMachines(SkuScheduleDTO sku, LocalDate businessDate) {
+        Set<String> machines = new LinkedHashSet<>(4);
+        for (TimedMachineOffRequest request : timedMachineOffRequests) {
+            if (!request.hasDailyQuantityTarget() || !businessDate.isAfter(request.getStartDate())
+                    || !StringUtils.equals(sku.getMaterialCode(), request.getSourceSku().getMaterialCode())
+                    || !StringUtils.equals(sku.getProductStatus(), request.getSourceSku().getProductStatus())) {
+                continue;
+            }
+            for (LhScheduleResult original : request.getProfile().getOriginals()) {
+                OffMachineDecision decision = timedMachineOffDecisionMap.get(original);
+                if (decision != null && !this.hasPreviousAlternateReplacementResult(sku, original.getLhMachineCode(),
+                        decision.getOccupancyEndTime(), businessDate)) {
+                    machines.add(LhSingleControlMachineUtil.resolvePhysicalMachineCode(original.getLhMachineCode()));
+                }
+            }
+        }
         return machines;
     }
 

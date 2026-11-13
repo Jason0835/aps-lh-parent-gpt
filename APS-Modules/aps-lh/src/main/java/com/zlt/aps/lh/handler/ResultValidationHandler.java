@@ -4334,8 +4334,12 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             if (Objects.isNull(recorded)) {
                 continue;
             }
-            Date zeroAvailable = TimedMachineOffReleaseResolver.resolveProductionStartShift(
-                    context.getScheduleWindowShifts(), request.getStartDate()).getShiftStartDateTime();
+            LhShiftConfigVO productionStart = TimedMachineOffReleaseResolver.resolveProductionStartShift(
+                    context.getScheduleWindowShifts(), request);
+            if (productionStart == null) {
+                continue;
+            }
+            Date zeroAvailable = productionStart.getShiftStartDateTime();
             OffMachineDecision expected = releaseResolver.resolve(request, recorded,
                     context.getScheduleWindowShifts(), zeroAvailable);
             if (!Objects.equals(recorded.getProductionEndTime(), expected.getProductionEndTime())

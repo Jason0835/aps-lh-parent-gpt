@@ -1,6 +1,8 @@
 package com.zlt.aps.lh.engine.strategy.support;
 
 import cn.hutool.core.bean.BeanUtil;
+import com.ruoyi.common.i18n.utils.I18nUtil;
+import lombok.extern.slf4j.Slf4j;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
@@ -18,6 +20,7 @@ import java.util.Objects;
  * @author APS-LH
  * @date 2026-10-13
  */
+@Slf4j
 public final class TimedMachineOffReleaseResolver {
     /**
      * 根据实际生产结果生成新的释放事实，保留原规则节点和快照对象。
@@ -33,6 +36,9 @@ public final class TimedMachineOffReleaseResolver {
      */
     public OffMachineDecision resolve(TimedMachineOffRequest request, OffMachineDecision ruleDecision,
             List<LhShiftConfigVO> shifts, Date zeroQuantityAvailableTime) {
+        if (request.hasDailyQuantityTarget()) {
+            validateDailyQuantity(request, shifts);
+        }
         Date completed = null;
         int totalQuantity = 0;
         for (LhScheduleResult result : request.getProfile().getOriginals()) {
@@ -52,6 +58,10 @@ public final class TimedMachineOffReleaseResolver {
             }
         }
         Date available = Objects.nonNull(completed) ? completed : zeroQuantityAvailableTime;
+        // 零目标日仍保留此前生产前缀，最早释放不能倒退到目标业务日之前。
+        if (request.hasDailyQuantityTarget() && available.before(zeroQuantityAvailableTime)) {
+            available = zeroQuantityAvailableTime;
+        }
         Date released = request.getProfile().physicalReadyTime(available, ruleDecision.getRuleOffMachineTime());
         OffMachineDecision resolved = BeanUtil.copyProperties(ruleDecision, OffMachineDecision.class);
         resolved.setScheduledQty(totalQuantity);
@@ -72,20 +82,79 @@ public final class TimedMachineOffReleaseResolver {
     }
 
     /**
+     * 校验冻结日目标和后续零量，扣账或硬约束改变数量时阻止发布错误的完成事实。
+     *
+     * @param request 已冻结日目标请求
+     * @param shifts 完整窗口班次
+     * @throws IllegalStateException 当日目标未完成或目标日后仍有前料产量时抛出
+     */
+    private static void validateDailyQuantity(TimedMachineOffRequest request, List<LhShiftConfigVO> shifts) {
+        long dayQty = 0;
+        long laterQty = 0;
+        for (LhScheduleResult result : request.getProfile().getOriginals()) {
+            for (LhShiftConfigVO shift : shifts) {
+                LocalDate workDate = shift.getWorkDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+                Integer quantity = ShiftFieldUtil.getShiftPlanQty(result, shift.getShiftIndex());
+                int plannedQty = quantity == null ? 0 : quantity;
+                if (workDate.equals(request.getStartDate())) {
+                    dayQty += plannedQty;
+                } else if (workDate.isAfter(request.getStartDate())) {
+                    laterQty += plannedQty;
+                }
+            }
+        }
+        if (dayQty != request.requiredDayPlanQty() || laterQty != 0) {
+            log.error("续作日目标下机数量冲突, machine={}, date={}, target={}, actual={}, later={}",
+                    request.getProfile().getOriginals().get(0).getLhMachineCode(), request.getStartDate(),
+                    request.requiredDayPlanQty(), dayQty, laterQty);
+            throw new IllegalStateException(
+                    I18nUtil.getMessage("ui.data.column.lhScheduleResult.scheduleExecuteError"));
+        }
+    }
+
+    /**
+     * 按请求类型解析生产区间起点，日目标请求包含该业务日所有可排班次。
+     *
+     * @param shifts 本次真实排程窗口
+     * @param request 已冻结的下机请求
+     * @return 目标日的生产起始班次，缺失时输出日志并返回空，由调用方跳过本次调整
+     */
+    public static LhShiftConfigVO resolveProductionStartShift(List<LhShiftConfigVO> shifts,
+            TimedMachineOffRequest request) {
+        if (!request.hasDailyQuantityTarget()) {
+            return resolveProductionStartShift(shifts, request.getStartDate());
+        }
+        LhShiftConfigVO start = shifts.stream()
+                .filter(shift -> request.getStartDate().equals(shift.getWorkDate().toInstant()
+                        .atZone(ZoneId.systemDefault()).toLocalDate()))
+                .min(Comparator.comparing(LhShiftConfigVO::getShiftStartDateTime))
+                .orElse(null);
+        if (start == null) {
+            log.warn("日目标下机需求日缺少班次配置，跳过本次下机调整, productionDate={}, materialCode={}, machineCode={}",
+                    request.getStartDate(), request.getSourceSku().getMaterialCode(),
+                    request.getProfile().getOriginals().get(0).getLhMachineCode());
+        }
+        return start;
+    }
+
+    /**
      * 解析需求日最早配置的早班或中班，缺早班时允许从中班继续；此前班次属于保留前缀。
      *
      * @param shifts 本次真实排程窗口
      * @param startDate 前置确定的需求业务日
-     * @return 需求日首个已配置的早班或中班
-     * @throws IllegalStateException 需求日没有早班或中班配置时抛出
+     * @return 需求日首个已配置的早班或中班，缺失时输出日志并返回空
      */
     public static LhShiftConfigVO resolveProductionStartShift(List<LhShiftConfigVO> shifts, LocalDate startDate) {
-        return shifts.stream()
+        LhShiftConfigVO start = shifts.stream()
                 .filter(shift -> shift.isMorningShift() || shift.isAfternoonShift())
                 .filter(shift -> startDate.equals(shift.getWorkDate().toInstant()
                         .atZone(ZoneId.systemDefault()).toLocalDate()))
                 .min(Comparator.comparing(LhShiftConfigVO::getShiftStartDateTime))
-                .orElseThrow(() -> new IllegalStateException("按时间下机需求日缺少早班或中班配置"));
+                .orElse(null);
+        if (start == null) {
+            log.warn("按时间下机需求日缺少早班或中班配置，跳过本次下机调整, productionDate={}", startDate);
+        }
+        return start;
     }
 
     /**

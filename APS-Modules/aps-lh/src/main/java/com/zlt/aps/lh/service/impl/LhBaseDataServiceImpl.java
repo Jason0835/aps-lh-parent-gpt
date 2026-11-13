@@ -4063,7 +4063,8 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     /**
      * 加载T日排程班次完成量（来自LhScheFinishQty表），按物料编码和一班产品状态汇总class1FinishQty。
      * <p>同一业务SKU在同一T日可能有多条机台记录，需要共享本状态完成量账本；
-     * 同物料其他产品状态的完成量不得参与本状态月计划及日计划扣减。</p>
+     * 同物料其他产品状态的完成量不得参与本状态月计划及日计划扣减。
+     * 同次保留物理机台完成量，供续作日目标下机扣除各机台已经完成的夜班量。</p>
      *
      * @param context      排程上下文
      * @param factoryCode  分厂编号
@@ -4083,6 +4084,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                                 .isNull(LhScheFinishQty::getIsDelete)));
 
         Map<String, Integer> materialScheDayFinishQtyMap = new HashMap<>(64);
+        Map<String, Map<String, Integer>> materialMachineFinishQtyMap = new HashMap<>(64);
         if (!CollectionUtils.isEmpty(scheFinishQtyList)) {
             for (LhScheFinishQty scheFinishQty : scheFinishQtyList) {
                 if (StringUtils.isEmpty(scheFinishQty.getMaterialCode())) {
@@ -4094,10 +4096,21 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                         materialStatusKey,
                         resolveFinishQtyValue(scheFinishQty.getClass1FinishQty()),
                         Integer::sum);
+                // 同次查询保留物理机台明细，T日部分生产退出时不能把SKU总完成量重复扣到每台。
+                if (StringUtils.isNotBlank(scheFinishQty.getLhMachineCode())) {
+                    String quantityKey = MonthPlanDateResolver.buildMaterialStatusKey(
+                            scheFinishQty.getMaterialCode(), scheFinishQty.getLhType());
+                    String physicalCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(
+                            scheFinishQty.getLhMachineCode());
+                    materialMachineFinishQtyMap.computeIfAbsent(quantityKey, key -> new HashMap<>(4))
+                            .merge(physicalCode, resolveFinishQtyValue(scheFinishQty.getClass1FinishQty()),
+                                    Integer::sum);
+                }
             }
         }
 
         context.setMaterialScheDayFinishQtyMap(materialScheDayFinishQtyMap);
+        context.setMaterialMachineScheDayFinishQtyMap(materialMachineFinishQtyMap);
         log.debug("T日排程班次完成量加载完成, 数量: {}, T日: {}",
                 materialScheDayFinishQtyMap.size(),
                 LhScheduleTimeUtil.formatDate(tDay));
