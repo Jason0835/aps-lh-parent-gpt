@@ -2201,9 +2201,11 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
             plan.setCleanType(null);
         }
         Boolean replaceBlock = this.parseCleaningImportOption(plan.getIsReplaceBlock());
+        boolean hasBothMaterials = StringUtils.isNotBlank(plan.getBeforeMaterialCode())
+                && StringUtils.isNotBlank(plan.getAfterMaterialCode());
         boolean changeMouldTypeBlank = StringUtils.isBlank(plan.getChangeMouldType());
         boolean cleaningSelected = sandBlastingSelected || dryIceSelected;
-        if (changeMouldTypeBlank && cleaningSelected && !Boolean.TRUE.equals(replaceBlock)) {
+        if (!hasBothMaterials && changeMouldTypeBlank && cleaningSelected && !Boolean.TRUE.equals(replaceBlock)) {
             plan.setChangeMouldType(null);
         } else {
             plan.setChangeMouldType(Boolean.TRUE.equals(replaceBlock)

@@ -26,6 +26,10 @@ import java.util.Set;
  */
 public final class ResultDowntimeSummaryUtil {
 
+    /**
+     * 强制精度停产及准备区间覆盖班次追加的原因。
+     */
+    private static final String FORCED_PRECISION_PLAN_ANALYSIS = "强制精度计划";
     /** 精度保养结束时间所在班次必须写入的固定原因 */
     private static final String PRECISION_PLAN_ANALYSIS = "精度计划";
     /** 正规换模与精度计划重叠时写入班次分析的组合原因 */
@@ -62,6 +66,7 @@ public final class ResultDowntimeSummaryUtil {
     private static final Set<String> PRECISION_ANALYSIS_ITEMS = Collections.unmodifiableSet(
             new HashSet<>(Arrays.asList(
                     PRECISION_PLAN_ANALYSIS,
+                    FORCED_PRECISION_PLAN_ANALYSIS,
                     PRECISION_MOULD_CHANGE_ANALYSIS,
                     PRECISION_TYPE_BLOCK_ANALYSIS,
                     MOULD_CHANGE_PRECISION_PLAN_ANALYSIS)));
@@ -217,6 +222,7 @@ public final class ResultDowntimeSummaryUtil {
         result.setMaintenanceEndTime(null);
         for (int shiftIndex = 1; shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
             ShiftFieldUtil.removeShiftAnalysis(result, shiftIndex, PRECISION_PLAN_ANALYSIS);
+            ShiftFieldUtil.removeShiftAnalysis(result, shiftIndex, FORCED_PRECISION_PLAN_ANALYSIS);
             ShiftFieldUtil.removeShiftAnalysis(result, shiftIndex, MOULD_CHANGE_PRECISION_PLAN_ANALYSIS);
             ShiftFieldUtil.removeShiftAnalysis(result, shiftIndex, PRECISION_MOULD_CHANGE_ANALYSIS);
             ShiftFieldUtil.removeShiftAnalysis(result, shiftIndex, PRECISION_TYPE_BLOCK_ANALYSIS);
@@ -259,6 +265,7 @@ public final class ResultDowntimeSummaryUtil {
         if (Objects.isNull(result) || CollectionUtils.isEmpty(maintenanceWindowList)) {
             return false;
         }
+        appendForcedPrecisionAnalysis(result, maintenanceWindowList, scheduleWindowShifts);
         Date earliestStartTime = null;
         Date latestEndTime = null;
         for (MachineMaintenanceWindowDTO maintenanceWindow : maintenanceWindowList) {
@@ -286,6 +293,33 @@ public final class ResultDowntimeSummaryUtil {
         appendMaintenanceEndShiftAnalysis(
                 result, maintenanceWindowList, scheduleWindowShifts, mouldChangeHours);
         return true;
+    }
+
+    /**
+     * 向强制精度及胶囊准备占用到的每个标准班次追加原因，重复绑定不覆盖其他原因。
+     *
+     * @param result 最终选定的物理机台结果
+     * @param windows 机台精度窗口
+     * @param shifts 本轮标准班次
+     */
+    private static void appendForcedPrecisionAnalysis(LhScheduleResult result,
+            List<MachineMaintenanceWindowDTO> windows, List<LhShiftConfigVO> shifts) {
+        if (CollectionUtils.isEmpty(shifts)) {
+            return;
+        }
+        for (MachineMaintenanceWindowDTO window : windows) {
+            if (Objects.isNull(window) || !window.isForceDown()) {
+                continue;
+            }
+            Date endTime = Objects.nonNull(window.getProductionResumeTime())
+                    ? window.getProductionResumeTime() : window.getMaintenanceEndTime();
+            for (LhShiftConfigVO shift : shifts) {
+                if (Objects.nonNull(shift) && isWindowOverlap(window.getMaintenanceStartTime(), endTime,
+                        shift.getShiftStartDateTime(), shift.getShiftEndDateTime())) {
+                    ShiftFieldUtil.appendShiftAnalysis(result, shift.getShiftIndex(), FORCED_PRECISION_PLAN_ANALYSIS);
+                }
+            }
+        }
     }
 
     private static void fillMaintenanceSummary(LhScheduleResult result,

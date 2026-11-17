@@ -17,7 +17,8 @@ import java.util.function.Function;
  *
  * <p>采集规则：</p>
  * <ul>
- *     <li>余量为空表示未配置，该产品当日整批退回原口径（不建立不完整额度）；</li>
+ *     <li>余量为空时按 0 处理，纳入额度计算；</li>
+ *     <li>同一胎胚存在多个成型余量时，空值按 0 处理并取最大值；</li>
  *     <li>余量为负表示数据异常，该产品当日不启用额度，保持既有行为；</li>
  *     <li>成型连续停产收尾来源不参与额度，避免把 0 余量当成额度耗尽；</li>
  *     <li>单位长度无效的来源不参与额度；</li>
@@ -126,10 +127,12 @@ public class ScheduleTailQuotaSourceCollector {
         Map<String, BigDecimal> bucketUnitLengthMap = new LinkedHashMap<>();
         // 胎胚 -> 已归属的产品编码，用于多产品告警与去重
         Map<String, String> embryoProductMap = new LinkedHashMap<>();
+        // 胎胚 -> 最大余量（空值按 0 处理）
+        Map<String, BigDecimal> embryoMaxRemainMap = new LinkedHashMap<>();
+        // 胎胚 -> 归属桶键
+        Map<String, String> embryoBucketKeyMap = new LinkedHashMap<>();
         // 出现负余量的产品，当日整体不启用额度
         java.util.Set<String> disabledProductSet = new java.util.LinkedHashSet<>();
-        // 存在未配置余量来源的产品，当日整批退回原口径，不能用部分来源建立不完整额度
-        java.util.Set<String> incompleteProductSet = new java.util.LinkedHashSet<>();
 
         for (K sourceTask : sourceTaskList) {
             if (sourceTask == null) {
@@ -139,21 +142,14 @@ public class ScheduleTailQuotaSourceCollector {
             if (Boolean.TRUE.equals(sourceTask.getFormingShutdownCloseOutFlag())) {
                 continue;
             }
-            BigDecimal remainQty = remainQtyResolver.apply(sourceTask);
-            if (remainQty == null) {
-                // 未知余量不能被当作「不存在」：同产品只要有一行未配置，整批退回原口径
-                incompleteProductSet.add(productCode);
-                continue;
-            }
+            BigDecimal rawRemainQty = remainQtyResolver.apply(sourceTask);
+            BigDecimal remainQty = rawRemainQty == null ? BigDecimal.ZERO : rawRemainQty;
             BigDecimal unitLength = unitLengthResolver.apply(sourceTask);
             if (unitLength == null || unitLength.compareTo(BigDecimal.ZERO) <= 0) {
                 continue;
             }
-            if (remainQty.compareTo(BigDecimal.ZERO) < 0) {
-                disabledProductSet.add(productCode);
-                continue;
-            }
             String unitLengthKey = this.normalizeScale(unitLength);
+            String bucketKey = buildBucketKey(factoryCode, datePart, productCode, unitLengthKey);
             // 胎胚编码必须先去除首尾空格，否则 "EMB-A" 与 "EMB-A " 会被当成两个胎胚重复计入
             String embryoCode = sourceTask.getEmbryoCode() == null
                     ? null : sourceTask.getEmbryoCode().trim();
@@ -168,24 +164,39 @@ public class ScheduleTailQuotaSourceCollector {
                     }
                     // 已计入其他产品，本来源不再重复计入
                     continue;
-                } else {
-                    // 同一胎胚同一产品重复出现：只计一次
-                    continue;
                 }
+                BigDecimal currentMax = embryoMaxRemainMap.get(embryoCode);
+                embryoMaxRemainMap.put(embryoCode,
+                        currentMax == null ? remainQty : currentMax.max(remainQty));
+                embryoBucketKeyMap.putIfAbsent(embryoCode, bucketKey);
+                bucketUnitLengthMap.putIfAbsent(bucketKey, unitLength);
+                continue;
             }
-            String bucketKey = buildBucketKey(factoryCode, datePart, productCode, unitLengthKey);
+            if (remainQty.compareTo(BigDecimal.ZERO) < 0) {
+                disabledProductSet.add(productCode);
+                continue;
+            }
             bucketRemainMap.merge(bucketKey, remainQty, BigDecimal::add);
             bucketUnitLengthMap.put(bucketKey, unitLength);
         }
 
-        if (!incompleteProductSet.isEmpty() && !result.getWarningList().contains(SOURCE_INCOMPLETE)) {
-            result.getWarningList().add(SOURCE_INCOMPLETE);
+        for (Map.Entry<String, BigDecimal> embryoEntry : embryoMaxRemainMap.entrySet()) {
+            String embryoCode = embryoEntry.getKey();
+            BigDecimal remainQty = embryoEntry.getValue();
+            String bucketKey = embryoBucketKeyMap.get(embryoCode);
+            String productCode = this.resolveProductCodeFromBucketKey(bucketKey);
+            if (remainQty.compareTo(BigDecimal.ZERO) < 0) {
+                disabledProductSet.add(productCode);
+                continue;
+            }
+            bucketRemainMap.merge(bucketKey, remainQty, BigDecimal::add);
         }
+
         for (Map.Entry<String, BigDecimal> entry : bucketRemainMap.entrySet()) {
             String bucketKey = entry.getKey();
             String productCode = this.resolveProductCodeFromBucketKey(bucketKey);
-            if (disabledProductSet.contains(productCode) || incompleteProductSet.contains(productCode)) {
-                // 同产品存在负余量或未配置余量来源：当日整体不启用额度
+            if (disabledProductSet.contains(productCode)) {
+                // 同产品存在负余量来源：当日整体不启用额度
                 continue;
             }
             BigDecimal totalQuota = entry.getValue()

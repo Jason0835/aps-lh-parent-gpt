@@ -355,6 +355,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         repairPlanScheduleService.prepareContinuationEvents(context);
         // 班次产能计算前优先落实同 SKU 模具置换，避免把离机清洗继续作为机台停机扣量。
         cleaningScheduleService.prepareBeforeContinuous(context);
+        // 强制精度资格只依赖冻结的机台历史和到期日；先发布停产窗口，再计算续作容量和账本。
+        this.equipmentPlanScheduleService.prepareBeforeContinuousCommit(context);
         // continuationGroupMachineCountMap 用于区分同一物料/账本是否多机台续作，决定单机满排还是交给降模分摊。
         List<SkuScheduleDTO> continuousCandidates = this.resolveContinuousProductionCandidates(context);
         Map<String, Integer> continuationGroupMachineCountMap = this.buildContinuationGroupMachineCountMap(
@@ -11846,8 +11848,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                             && !ProductionQuantityPolicy.from(this.resolveResultSourceSku(context, result),
                             "1".equals(result.getIsEnd())).isStrictUpperLimit());
             MachineScheduleDTO machine = context.getMachineScheduleMap().get(machineCode);
-            boolean forcedMaintenance = Objects.nonNull(machine) && machine.getMaintenanceWindowList().stream()
-                    .anyMatch(MachineMaintenanceWindowDTO::isForceDown);
+            boolean forcedMaintenance = Objects.nonNull(machine) && Objects.nonNull(
+                    this.getMaintenanceScheduleService().resolveForceDownCutoffTime(machine));
             // 喷砂与有效历史正规换模重叠时沿用历史释放，交给关联预演和正式提交落实动作。
             // 此处不撤销清洗；只有后续实际换模提交后，统一清洗处置才取消该窗口。
             if (CleaningDispositionResolver.isHistoricalRegularChangeOverlappingSandBlast(context, event)) {

@@ -154,7 +154,7 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
                 strategyFactory.getMachineMatchStrategy(), strategyFactory.getMouldChangeBalanceStrategy(),
                 strategyFactory.getFirstInspectionBalanceStrategy(), strategyFactory.getCapacityCalculateStrategy());
 
-        // S4.4.5 收尾后换活字块衔接排产：只读取均衡后的最终机台可用时间。
+        // S4.4.5 先按最终释放时间尝试共模换活字块（含结构候选），再将真实剩余需求交给结构切换。
         typeBlockProductionStrategy.scheduleTypeBlockChange(context);
 
         // 换活字块可能移出或回写待新增SKU，需重新构建结构视图供 S4.5 新增排序使用。
@@ -190,7 +190,7 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
         // 普通精度只在真实收尾稳定后集中判断；若复评产生新强制约束，先按消费记录恢复并重算受影响续作。
         equipmentPlanScheduleService.reviewConfirmedEndings(context);
 
-        // 只冻结结构切换身份；正式切换统一在换活字块结束后的独立步骤执行。
+        // 冻结身份保留供胚及结构约束；历史承接、前置共模换活字块后，剩余需求进入独立步骤。
         // 确定结构切换候选及来源
         StructureSwitchCandidateScope.freeze(context);
 

@@ -67,8 +67,8 @@ public class LhEquipmentPlanScheduleService {
     private ContinuousProductionStrategy continuousProductionStrategy;
 
     /**
-     * 续作准备、裁量和降模完成后，正式扣账前集中建立长期在机强制约束。
-     * 仅抽取准备结果，不重新运行续作，也不把机台初始化时间作为确认收尾。
+     * 续作容量计算前建立长期在机强制精度停产窗口，扣账前再次调用时复用已接受安排。
+     * 资格来自冻结的历史在机天数和精度到期日，不依赖续作准备结果或自然收尾。
      * @param context 已形成待提交续作结果的上下文
      * @return 是否发布了新的约束
      */
@@ -607,7 +607,7 @@ public class LhEquipmentPlanScheduleService {
                         + "，保养结束=" + LhScheduleTimeUtil.formatDateTime(timeline.getMaintenanceEndTime())
                         + "，上胶囊及预热完成=" + LhScheduleTimeUtil.formatDateTime(timeline.getMaintenanceReadyTime())
                         + "，首检=待明确SKU后按当班参数分配"
-                        + "，强制下机=" + timeline.isForceDown());
+                        + "，强制精度=" + timeline.isForceDown());
     }
 
     /**
@@ -762,7 +762,7 @@ public class LhEquipmentPlanScheduleService {
             MachineScheduleDTO machine = context.getMachineScheduleMap().get(result.getLhMachineCode());
             EquipmentPlanArrangement arrangement = context.getEquipmentPlanRuntimeState().getArrangementMap().get(timeline.getPrecisionPlanId());
             Date lastEnd = ShiftFieldUtil.getShiftEndTime(result, ShiftFieldUtil.resolveLastPlannedShiftIndex(result));
-            if (arrangement.constrainsSourceResult(result) && Objects.nonNull(lastEnd)
+            if (!timeline.isForceDown() && arrangement.constrainsSourceResult(result) && Objects.nonNull(lastEnd)
                     && lastEnd.after(timeline.getMaintenanceStartTime())) {
                 log.warn("原生产结果在设备安排接受后穿透维护截止, 批次: {}, 工厂: {}, 物理机台: {}, 机台: {}, 物料: {}, "
                                 + "产品状态: {}, 排程类型: {}, 计划主键: {}, 最后班次结束: {}, 保养开始: {}, 强制下机: {}",

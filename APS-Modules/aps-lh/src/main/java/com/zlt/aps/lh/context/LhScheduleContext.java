@@ -611,6 +611,10 @@ public class LhScheduleContext {
      */
     private Map<String, LhMachineOnlineInfo> machineOnlineInfoMap = new HashMap<>();
     /**
+     * 本轮只读的物理机台连续硫化在机已满天数，-1表示T日在机事实缺失。
+     */
+    private Map<String, Integer> machineContinuousOnlineDaysMap = new HashMap<>();
+    /**
      * 本轮因模具全部转移而移除的旧MES来源，仅供历史身份追溯，不参与续作或资源占用。
      */
     private Map<String, LhMachineOnlineInfo> transferredMouldOnlineSourceMap = new HashMap<>();

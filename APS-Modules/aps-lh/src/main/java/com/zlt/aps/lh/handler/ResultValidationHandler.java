@@ -1,5 +1,7 @@
 package com.zlt.aps.lh.handler;
 
+import com.zlt.aps.lh.engine.strategy.support.FirstInspectionAllocationPlan;
+
 import com.zlt.aps.lh.engine.strategy.support.StructureEndingContinuationPolicy;
 
 import com.zlt.aps.lh.service.impl.LhPlannedRepairResolver;
@@ -422,7 +424,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
      * 将保养及预热结束后才能生产的班次开始时间对齐到最早开产时间。
      * <p>统一产能计算已经扣除了不可生产分钟数，本方法不修改班次计划量、日计划量、库存或账本；
      * 只修正“标准班次从14:00开始、实际因预热只能17:30开产”这类结果展示时间。保养前已经开始
-     * 生产的班次保持原开始时间，避免抹掉08:00前的真实可生产时段。</p>
+     * 生产的班次保持原开始时间，避免抹掉08:00前的真实可生产时段；同一精度的计件首检保留主链时间。</p>
      *
      * @param context 排程上下文
      * @param machine 运行态机台
@@ -431,7 +433,6 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                                                         MachineScheduleDTO machine) {
         for (MachineMaintenanceWindowDTO window : machine.getMaintenanceWindowList()) {
             if (Objects.isNull(window)
-                    || window.isEquipmentPlanManaged()
                     || Objects.isNull(window.getMaintenanceStartTime())
                     || Objects.isNull(window.getProductionResumeTime())) {
                 continue;
@@ -441,7 +442,13 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                         || !StringUtils.equals(machine.getMachineCode(), result.getLhMachineCode())) {
                     continue;
                 }
-                alignResultShiftStartAfterMaintenance(result, window);
+                // 同一精度的计件首检属于真实生产，保留主链已冻结的首检开始时间。
+                FirstInspectionAllocationPlan inspection = context.getFirstInspectionResultPlanMap().get(result);
+                if (window.isEquipmentPlanManaged() && Objects.nonNull(inspection)
+                        && Objects.equals(window.getPrecisionPlanId(), inspection.getEquipmentPlanId())) {
+                    continue;
+                }
+                this.alignResultShiftStartAfterMaintenance(result, window);
             }
         }
     }

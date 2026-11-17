@@ -1,5 +1,7 @@
 package com.zlt.aps.lh.service.impl;
 
+import com.zlt.aps.lh.component.LhMachineOnlineDurationResolver;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -4567,18 +4569,27 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         int safeLookbackDays = Math.max(1, lookbackDays);
         Date tDay = LhScheduleTimeUtil.clearTime(scheduleTDay);
         Date lookbackStartDay = LhScheduleTimeUtil.addDays(tDay, -safeLookbackDays);
+        // 精度时长至少需要T-30至T的事实；最新在机身份仍遵守原配置回溯范围。
+        Date durationStartDay = LhScheduleTimeUtil.addDays(tDay,
+                -Math.max(safeLookbackDays, LhMachineOnlineDurationResolver.LONG_ONLINE_DAYS));
 
         // 在 [T-lookbackDays, T] 内加载窗口数据，并按机台保留距离T最近的一条记录。
         List<LhMachineOnlineInfo> machineOnlineInfoList = lhMachineOnlineInfoMapper.selectList(
                 buildMachineOnlineBaseQuery(factoryCode)
                         .isNotNull(LhMachineOnlineInfo::getOnlineDate)
-                        .ge(LhMachineOnlineInfo::getOnlineDate, lookbackStartDay)
+                        .ge(LhMachineOnlineInfo::getOnlineDate, durationStartDay)
                         .le(LhMachineOnlineInfo::getOnlineDate, tDay)
                         .orderByDesc(LhMachineOnlineInfo::getOnlineDate)
                         // ONLINE_DATE 为 date 类型；同日多条记录时按更新时间和MES版本号取最近同步版本。
                         .orderByDesc(LhMachineOnlineInfo::getUpdateTime)
                         .orderByDesc(LhMachineOnlineInfo::getDataVersion)
                         .orderByAsc(LhMachineOnlineInfo::getLhCode));
+        context.setMachineContinuousOnlineDaysMap(new LhMachineOnlineDurationResolver()
+                .resolveContinuousOnlineDays(machineOnlineInfoList, tDay));
+        log.info("物理机台连续硫化在机天数加载完成, 工厂: {}, T日: {}, 已满天数: {}",
+                factoryCode, LhScheduleTimeUtil.formatDate(tDay), context.getMachineContinuousOnlineDaysMap());
+        machineOnlineInfoList = machineOnlineInfoList.stream()
+                .filter(record -> !record.getOnlineDate().before(lookbackStartDay)).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(machineOnlineInfoList)) {
             context.setMachineOnlineInfoMap(new HashMap<>(16));
             log.info("MES硫化在机信息未命中, 回溯窗口: [{} ~ {}], 回溯天数: {}, 命中机台: 0",

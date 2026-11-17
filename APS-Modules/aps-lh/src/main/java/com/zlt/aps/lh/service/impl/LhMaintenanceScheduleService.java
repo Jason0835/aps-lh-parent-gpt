@@ -7,7 +7,7 @@ import com.zlt.aps.lh.api.domain.dto.MachineMaintenanceWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.PrecisionMaintenanceJudgeDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
-import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
+import com.zlt.aps.lh.component.LhMachineOnlineDurationResolver;
 import com.zlt.aps.lh.api.domain.entity.LhPrecisionPlan;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
@@ -71,8 +71,10 @@ public class LhMaintenanceScheduleService {
             "正日计划优先，普通精度延后至计划日前最后合规日";
     /** 3天内精度计划强制下机触发原因 */
     public static final String TRIGGER_REASON_FORCE_DOWN = "精度计划到期强制下机";
-    /** 长期在机天数阈值 */
-    private static final int LONG_ONLINE_DAYS = 30;
+    /**
+     * 物理机台硫化在机历史判定器，所有精度入口共用同一阈值。
+     */
+    private final LhMachineOnlineDurationResolver onlineDurationResolver = new LhMachineOnlineDurationResolver();
     /** 启用配置值 */
     private static final int ENABLED = 1;
     /** 每日最多保养一台物理硫化机 */
@@ -585,14 +587,15 @@ public class LhMaintenanceScheduleService {
     }
 
     /**
-     * 获取3天内精度计划的强制下机截止时间。
+     * 获取旧兼容精度窗口的强制下机截止时间；公共精度仅扣除停产区间。
      *
      * @param machine 机台
-     * @return 判定契约的维护开始边界；非强制计划返回null
+     * @return 旧窗口永久下机边界；公共精度或非强制计划返回null
      */
     public Date resolveForceDownCutoffTime(MachineScheduleDTO machine) {
         MachineMaintenanceWindowDTO window = resolveFirstMaintenanceWindow(machine);
-        return Objects.nonNull(window) && window.isForceDown()
+        // 公共精度强制的是维护时点；生产只暂停至准备完成，不发布永久下机截止。
+        return Objects.nonNull(window) && window.isForceDown() && !window.isEquipmentPlanManaged()
                 ? window.getProductionCutoffTime() : null;
     }
 
@@ -958,7 +961,7 @@ public class LhMaintenanceScheduleService {
      *
      * @param context 排程上下文
      * @param machine 机台
-     * @param predictedNaturalEndingTime 按真实班次产能预测的物理机台最晚自然收尾时间；无法证明时传 null
+     * @param predictedNaturalEndingTime 兼容旧调用的预测参数，强制资格不再依赖预测
      * @return true-已安排保养；false-未安排保养
      */
     @Deprecated
@@ -980,38 +983,12 @@ public class LhMaintenanceScheduleService {
         if (!isPlanDateEligible(context, plan)) {
             return false;
         }
-        int onlineDays = resolvePhysicalOnlineDays(context, machine);
-        if (onlineDays < 0) {
+        if (!this.shouldCheckLongOnlineMaintenance(context, machine)) {
             return false;
         }
-        int forceCheckDays = getParamInt(context, LhScheduleParamConstant.MAINTENANCE_FORCE_CHECK_DAYS,
-                LhScheduleConstant.MAINTENANCE_FORCE_CHECK_DAYS);
-        if (onlineDays <= LONG_ONLINE_DAYS || daysToDue > forceCheckDays) {
-            appendMaintenanceProcessLog(context, MAINTENANCE_PROCESS_LOG_TITLE, lookupMachineCode, plan,
-                    null, "长期在机天数=" + onlineDays + "，提前检查天数=" + forceCheckDays,
-                    "未触发强制检查");
-            return false;
-        }
-        Date candidateDate = resolveAvailableMaintenanceDate(context,
-                LhScheduleTimeUtil.clearTime(context.getScheduleDate()), lookupMachineCode, plan);
-        Date candidateStartTime = buildMaintenanceStartTime(context, candidateDate);
-        boolean canEndNaturally = Objects.nonNull(predictedNaturalEndingTime)
-                && !predictedNaturalEndingTime.after(candidateStartTime);
-        log.info("硫化机长期在机触发保养检查, 机台: {}, 在机天数: {}, 距到期天数: {}, 提前检查天数: {}, "
-                        + "预测自然收尾: {}, 候选保养开始: {}, 可自然收尾: {}",
-                machine.getMachineCode(), onlineDays, daysToDue, forceCheckDays,
-                LhScheduleTimeUtil.formatDateTime(predictedNaturalEndingTime),
-                LhScheduleTimeUtil.formatDateTime(candidateStartTime), canEndNaturally);
-        appendMaintenanceProcessLog(context, MAINTENANCE_PROCESS_LOG_TITLE, lookupMachineCode, plan,
-                candidateStartTime,
-                "长期在机天数=" + onlineDays + "，预测自然收尾="
-                        + PriorityTraceLogHelper.formatDateTime(predictedNaturalEndingTime),
-                canEndNaturally ? "等待自然收尾" : "强制下机");
-        if (canEndNaturally) {
-            return false;
-        }
-        return attachMaintenanceWindow(context, machine, plan, candidateDate,
-                true, false, TRIGGER_REASON_FORCE_DOWN);
+        PrecisionMaintenanceJudgeDTO decision = this.resolveForceDownJudgeResult(context, machine, plan, null);
+        return decision.getDurationHours() > 0 && this.attachMaintenanceWindow(context, machine, plan,
+                LhScheduleTimeUtil.clearTime(decision.getPrecisionStartTime()), true, false, TRIGGER_REASON_FORCE_DOWN);
     }
 
     /**
@@ -1020,7 +997,7 @@ public class LhMaintenanceScheduleService {
      *
      * @param context 排程上下文
      * @param machine 运行态机台
-     * @return true-连续在机超过30天且已进入到期前检查窗口；false-无需检查
+     * @return true-连续硫化在机满30天且已进入到期前检查窗口；false-无需检查
      */
     public boolean shouldCheckLongOnlineMaintenance(LhScheduleContext context, MachineScheduleDTO machine) {
         if (!isBasicValid(context, machine) || !CollectionUtils.isEmpty(machine.getMaintenanceWindowList())) {
@@ -1032,10 +1009,9 @@ public class LhMaintenanceScheduleService {
                 || !isPlanDateEligible(context, plan)) {
             return false;
         }
-        int forceCheckDays = getParamInt(context, LhScheduleParamConstant.MAINTENANCE_FORCE_CHECK_DAYS,
-                LhScheduleConstant.MAINTENANCE_FORCE_CHECK_DAYS);
-        return resolvePhysicalOnlineDays(context, machine) > LONG_ONLINE_DAYS
-                && daysToDue <= forceCheckDays;
+        int forceCheckDays = LhScheduleConstant.MAINTENANCE_FORCE_CHECK_DAYS;
+        return this.onlineDurationResolver.isLongOnlineMachine(this.resolvePhysicalOnlineDays(context, machine))
+                && daysToDue >= 0 && daysToDue <= forceCheckDays;
     }
 
     /**
@@ -2025,37 +2001,19 @@ public class LhMaintenanceScheduleService {
     }
 
     /**
-     * 解析单控物理机台连续在机天数。
-     * <p>任一侧超过阈值即按整台物理机进入长期在机检查，避免仅检查触发侧而遗漏配对侧。</p>
+     * 读取初始化阶段按物理机台每日历史计算的连续硫化在机已满天数。
+     * 不再把最新快照日期当作首次上机日期，L/R已在历史汇总时去重。
      *
-     * @param context 排程上下文
+     * @param context 含本轮只读历史事实的排程上下文
      * @param machine 当前运行态机台
-     * @return 物理机台最大连续在机天数；缺少有效在机日期时返回 -1
+     * @return 连续在机天数；缺少有效事实时返回-1
      */
     private int resolvePhysicalOnlineDays(LhScheduleContext context, MachineScheduleDTO machine) {
-        int currentOnlineDays = resolveOnlineDays(context, machine);
-        MachineScheduleDTO pairMachine = LhSingleControlMachineUtil.resolvePairMachine(context,
-                machine.getMachineCode());
-        int pairOnlineDays = resolveOnlineDays(context, pairMachine);
-        return Math.max(currentOnlineDays, pairOnlineDays);
-    }
-
-    /**
-     * 解析单侧运行态机台连续在机天数。
-     *
-     * @param context 排程上下文
-     * @param machine 运行态机台
-     * @return 连续在机天数；无有效在机记录返回 -1
-     */
-    private int resolveOnlineDays(LhScheduleContext context, MachineScheduleDTO machine) {
-        if (Objects.isNull(context) || Objects.isNull(machine) || Objects.isNull(context.getScheduleDate())) {
+        if (Objects.isNull(context) || Objects.isNull(machine)) {
             return -1;
         }
-        LhMachineOnlineInfo onlineInfo = context.getMachineOnlineInfoMap().get(machine.getMachineCode());
-        if (Objects.isNull(onlineInfo) || Objects.isNull(onlineInfo.getOnlineDate())) {
-            return -1;
-        }
-        return diffDays(onlineInfo.getOnlineDate(), context.getScheduleDate());
+        return context.getMachineContinuousOnlineDaysMap().getOrDefault(
+                LhSingleControlMachineUtil.resolvePhysicalMachineCode(machine.getMachineCode()), -1);
     }
 
     /**
@@ -2760,14 +2718,12 @@ public class LhMaintenanceScheduleService {
                     null, "距到期天数=" + daysToDue + "，预警阈值=" + warningDays, "未进入预警范围，返回0");
             return judgeDTO;
         }
-        int forceCheckDays = this.getParamInt(context, LhScheduleParamConstant.MAINTENANCE_FORCE_CHECK_DAYS,
-                LhScheduleConstant.MAINTENANCE_FORCE_CHECK_DAYS);
-        boolean withinForceWindow = daysToDue <= forceCheckDays;
-        // 处理条件2：在机超过30天且进入3天提前检查期，预测无法在保养开始前自然收尾时强制下机保证精度。
+        int forceCheckDays = LhScheduleConstant.MAINTENANCE_FORCE_CHECK_DAYS;
+        boolean withinForceWindow = daysToDue >= 0 && daysToDue <= forceCheckDays;
+        // 处理条件2：在机满30天且进入3天提前检查期时强制插入精度停产区间。
         int onlineDays = this.resolvePhysicalOnlineDays(context, machine);
-        if (onlineDays > LONG_ONLINE_DAYS && withinForceWindow) {
-            return this.resolveForceDownJudgeResult(context, machine, plan,
-                    endingTime, predictedNaturalEndingTime, batchAllocatedMachineMap);
+        if (this.onlineDurationResolver.isLongOnlineMachine(onlineDays) && withinForceWindow) {
+            return this.resolveForceDownJudgeResult(context, machine, plan, batchAllocatedMachineMap);
         }
         // 常规路径必须依赖真实收尾时间；续作尚未收尾时无法证明满足8点前收尾，等待下一轮再判。
         if (Objects.isNull(endingTime)) {
@@ -2791,75 +2747,50 @@ public class LhMaintenanceScheduleService {
         }
         // 处理条件1：前SKU须在保养开始（默认08:00）前收尾；晚于08:00收尾的从下一自然日开始找候选。
         Date candidateDate = this.resolveJudgeCandidateDate(context, endingTime);
-        boolean ordinaryPrecision = daysToDue > Math.max(forceCheckDays,
-                LhScheduleConstant.MAINTENANCE_FORCE_CHECK_DAYS);
         Date executeDate = this.searchAvailableJudgeDate(context, candidateDate, plan, machineCode,
-                batchAllocatedMachineMap, ordinaryPrecision);
+                batchAllocatedMachineMap);
         if (Objects.isNull(executeDate)) {
             this.appendMaintenanceProcessLog(context, MAINTENANCE_PROCESS_LOG_TITLE, machineCode, plan,
-                    candidateDate, ordinaryPrecision ? "普通精度本次收尾机会无可用额度或计划日前无合规日"
-                            : "到计划日期前不存在满足每日台数、周日、盘点日、节假日约束的合规执行日",
-                    ordinaryPrecision ? "本次不挂窗，等待真实收尾或额度变化后复评，返回0" : "超期舍去，返回0");
+                    candidateDate, "计划日前无满足每日额度及日历约束的执行日", "本轮未安排，返回0");
             return judgeDTO;
         }
         return this.buildSuccessJudgeDTO(context, machine, plan, executeDate, false, batchAllocatedMachineMap);
     }
 
     /**
-     * 长期在机强制下机判定。
-     *
-     * <p>在机超过30天且进入3天提前检查期后，若预测自然收尾不晚于候选保养开始时间，
-     * 则等待自然收尾（返回0，由主流程下一轮以真实收尾时间再判）；否则强制下机保证精度。
-     * 候选日从排程T日起逐日顺延循环搜索，直到计划日期为止，仍无合规执行日则舍去。</p>
+     * 连续硫化在机满30天且到期3天内时强制安排精度，不等待预测或真实自然收尾。
+     * 从T日起寻找计划日期内的合规日；安排只暂停原续作，不释放机台或模具。
      *
      * @param context 排程上下文
      * @param machine 机台运行态
-     * @param plan 精度计划
-     * @param endingTime 已确认的物理机台真实收尾时间
-     * @param predictedNaturalEndingTime 预测自然收尾时间；传null视为无法证明能自然收尾
-     * @param batchAllocatedMachineMap 批内每日台数额度记账；单机调用传null
-     * @return 判定结果
+     * @param plan 有效精度计划
+     * @param batchAllocatedMachineMap 本次判定已占用的物理机台日额度
+     * @return 强制精度安排；无合规日期时返回零时长判定
      */
     private PrecisionMaintenanceJudgeDTO resolveForceDownJudgeResult(
-            LhScheduleContext context,
-            MachineScheduleDTO machine,
-            LhPrecisionPlan plan,
-            Date endingTime,
-            Date predictedNaturalEndingTime,
+            LhScheduleContext context, MachineScheduleDTO machine, LhPrecisionPlan plan,
             Map<String, Set<String>> batchAllocatedMachineMap) {
         String machineCode = machine.getMachineCode();
-        PrecisionMaintenanceJudgeDTO judgeDTO = this.buildZeroJudgeDTO(machineCode);
-        // 候选日从排程T日开始搜索；到计划日期仍无合规执行日则舍去，禁止延后执行。
         Date executeDate = this.searchAvailableJudgeDate(context,
                 LhScheduleTimeUtil.clearTime(context.getScheduleDate()), plan, machineCode,
-                batchAllocatedMachineMap, false);
+                batchAllocatedMachineMap);
         if (Objects.isNull(executeDate)) {
             this.appendMaintenanceProcessLog(context, MAINTENANCE_PROCESS_LOG_TITLE, machineCode, plan,
-                    null, "长期在机强制检查期内到计划日期前无合规执行日", "超期舍去，返回0");
-            return judgeDTO;
-        }
-        Date candidateStartTime = this.buildMaintenanceStartTime(context, executeDate);
-        if (Objects.nonNull(endingTime) && !endingTime.after(candidateStartTime)) {
-            return this.buildSuccessJudgeDTO(context, machine, plan, executeDate,
-                    false, batchAllocatedMachineMap);
-        }
-        // 确认收尾晚于候选开始时，不再让旧预测覆盖事实。
-        boolean canEndNaturally = Objects.isNull(endingTime) && Objects.nonNull(predictedNaturalEndingTime)
-                && !predictedNaturalEndingTime.after(candidateStartTime);
-        if (canEndNaturally) {
-            this.appendMaintenanceProcessLog(context, MAINTENANCE_PROCESS_LOG_TITLE, machineCode, plan,
-                    candidateStartTime, "长期在机检查命中，但预测自然收尾不晚于保养开始", "等待自然收尾，返回0");
-            return judgeDTO;
+                    null, "强制精度到计划日期前无合规执行日", "本轮未安排，返回0");
+            return this.buildZeroJudgeDTO(machineCode);
         }
         this.appendMaintenanceProcessLog(context, MAINTENANCE_PROCESS_LOG_TITLE, machineCode, plan,
-                candidateStartTime, "长期在机超过30天且进入3天检查期，预测无法自然收尾", "强制下机保证精度");
+                this.buildMaintenanceStartTime(context, executeDate),
+                "连续硫化在机已满天数=" + this.resolvePhysicalOnlineDays(context, machine)
+                        + "，到期3天内，不受自然收尾和08:00前收尾限制",
+                "强制精度计划，完成准备后原模原料续作");
         return this.buildSuccessJudgeDTO(context, machine, plan, executeDate, true, batchAllocatedMachineMap);
     }
 
     /**
      * 从候选日开始逐日搜索第一个满足判定约束的精度执行日。
      *
-     * <p>普通精度在额度满时结束本次机会，不得预约次日；硬优先和强制检查可以继续搜索。
+     * <p>按紧急度分配后的后续机台在额度不足时向后搜索，不能抢占前序机台的精度时段。
      * 周日、盘点日和节假日继续按既有日历规则跳过，搜索上限仍是计划日期。
      * 与换模、清洗、停机的重叠由排程主流程判断。</p>
      *
@@ -2868,15 +2799,13 @@ public class LhMaintenanceScheduleService {
      * @param plan 精度计划
      * @param machineCode 运行态机台编码
      * @param batchAllocatedMachineMap 批内每日台数额度记账；单机调用传null
-     * @param waitOnQuotaExhaustion 普通精度额度满时是否等待新事实复评
-     * @return 合规执行日；普通精度错过额度或计划日期前无合规日返回null
+     * @return 最早合规执行日；计划日期前无合规日返回null
      */
     private Date searchAvailableJudgeDate(LhScheduleContext context,
                                           Date candidateDate,
                                           LhPrecisionPlan plan,
                                           String machineCode,
-                                          Map<String, Set<String>> batchAllocatedMachineMap,
-                                          boolean waitOnQuotaExhaustion) {
+                                          Map<String, Set<String>> batchAllocatedMachineMap) {
         if (Objects.isNull(candidateDate) || Objects.isNull(plan) || Objects.isNull(plan.getPlanDate())) {
             return null;
         }
@@ -2885,14 +2814,6 @@ public class LhMaintenanceScheduleService {
         while (!cursorDate.after(planDateLimit)) {
             String quotaReason = this.resolveJudgeQuotaUnavailableReason(
                     context, cursorDate, machineCode, batchAllocatedMachineMap);
-            if (waitOnQuotaExhaustion && StringUtils.isNotEmpty(quotaReason)) {
-                this.appendMaintenanceProcessLog(context, MAINTENANCE_PROCESS_LOG_TITLE, machineCode, plan,
-                        cursorDate, quotaReason, "普通精度错过本次机会，不顺延预约，等待复评");
-                log.info("普通精度等待下次触发机会, 工厂: {}, 批次: {}, 机台: {}, 距到期天数: {}, 候选日: {}, 原因: {}",
-                        context.getFactoryCode(), context.getBatchNo(), machineCode, this.resolveDaysToDue(plan),
-                        LhScheduleTimeUtil.formatDate(cursorDate), quotaReason);
-                return null;
-            }
             String unavailableReason = StringUtils.isNotEmpty(quotaReason) ? quotaReason
                     : this.resolveJudgeCalendarUnavailableReason(context, cursorDate);
             if (StringUtils.isEmpty(unavailableReason)) {

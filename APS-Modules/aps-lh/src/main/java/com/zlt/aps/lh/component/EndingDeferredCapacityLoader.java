@@ -149,6 +149,7 @@ public class EndingDeferredCapacityLoader {
         projection.setLhParamsMap(new LinkedHashMap<>(source.getLhParamsMap()));
         projection.setMachineInfoMap(new LinkedHashMap<>(source.getMachineInfoMap()));
         projection.setMachineOnlineInfoMap(new LinkedHashMap<>(source.getMachineOnlineInfoMap()));
+        projection.setMachineContinuousOnlineDaysMap(new LinkedHashMap<>(source.getMachineContinuousOnlineDaysMap()));
         projection.setSkuMouldRelMap(new LinkedHashMap<>(source.getSkuMouldRelMap()));
         projection.setSkuLhCapacityMap(new LinkedHashMap<>(source.getSkuLhCapacityMap()));
         projection.setMaterialInfoMap(new LinkedHashMap<>(source.getMaterialInfoMap()));

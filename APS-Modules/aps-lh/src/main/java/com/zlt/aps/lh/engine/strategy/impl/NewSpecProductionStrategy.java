@@ -11411,6 +11411,19 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         // 比较探针只要求合法首检起点；跨日场景当天没有正式产能，不能抹掉已就绪的准备事实。
         // 是否能实际生产已由actualPlan独立验证，探针不得成为第二套正式生产准入。
         Date selectionStart = NewSpecEmbryoAvailableTimeResolver.resolveSelectionInspectionStartTime(selectionPlan);
+        if (log.isInfoEnabled()) {
+            log.info("结构切换选机比较时间冻结, factoryCode={}, batchNo={}, businessDate={}, sku={}, status={}, "
+                            + "machine={}, releaseTime={}, machineReadyTime={}, selectionChangeoverStart={}, "
+                            + "selectionChangeoverEnd={}, selectionInspectionStart={}, actualChangeoverStart={}, "
+                            + "actualInspectionStart={}, embryoTime={}",
+                    context.getFactoryCode(), context.getBatchNo(), dayContext.getScheduleDate(),
+                    sku.getMaterialCode(), sku.getProductStatus(), machine.getMachineCode(),
+                    actualPlan.getOccupationEndTime(), actualPlan.getMachineReadyTime(),
+                    Objects.isNull(selectionPlan) ? null : selectionPlan.getChangeoverStartTime(),
+                    Objects.isNull(selectionPlan) ? null : selectionPlan.getChangeoverEndTime(), selectionStart,
+                    actualPlan.getChangeoverStartTime(), actualPlan.getProductionOccupationStartTime(),
+                    supplySource.getEarliestLhTime());
+        }
         return StructureSwitchSchedulingPolicy.attachSupplyDelayEvidence(context, sku, supplySource,
                 actualPlan.withSkuSelectionStartTime(selectionStart));
     }
@@ -11532,6 +11545,10 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             boolean sourceDayCrossDayPreparationAllowed,
             Date productionOccupationNotBeforeTime,
             boolean earliestLegalPreparation) {
+        // 只有结构切换的只读比较探针回看原始准备窗口；普通选料及正式提案仍执行新增日期限制。
+        boolean structureSwitchSelectionProbe = earliestLegalPreparation
+                && context.isStructureSwitchSelectionProbe()
+                && (context.isStructureSwitchScheduling() || StructureSwitchCandidateScope.owns(context, sku));
         LhShiftConfigVO adjacentNextShift = sourceDayCrossDayPreparationAllowed
                 ? this.resolveAdjacentNextShift(context, dayContext) : null;
         List<LhShiftConfigVO> planningShifts =
@@ -11576,9 +11593,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                         context, dayContext, sku, planningShifts,
                         candidateProductionNotBeforeTime,
                         addMachineProductionDate);
-        boolean preparationLookbackAllowed = this.isProductionPreparationLookbackAllowed(
-                context, dayContext, sku, machine.getMachineCode(), switchReadyTime, switchDurationHours,
-                productionPreparationNotBeforeTime);
+        boolean preparationLookbackAllowed = structureSwitchSelectionProbe
+                || this.isProductionPreparationLookbackAllowed(context, dayContext, sku, machine.getMachineCode(),
+                switchReadyTime, switchDurationHours, productionPreparationNotBeforeTime);
         // 历史前料未排或已经真实收尾时，均从释放时刻尝试，禁止为贴近未来生产日主动延后准备。
         boolean earliestPreviousAlternatePreparation = context.isPreviousAlternateAction(sku, machine.getMachineCode());
         // 历史正常需求使用原始需求起点；供胚、结构和设备门禁继续取较晚值。
@@ -11597,8 +11614,11 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         // 仅喷砂回流必须携带离机原模具，换模或换活字块准备不能早于原模具清洗结束时刻。
         switchReadyTime = this.resolveLaterTime(
                 switchReadyTime, context.resolveOnlySandBlastRequeueNotBeforeTime(sku));
-        switchReadyTime = this.resolveLaterTime(switchReadyTime,
-                this.resolveNewProductionNotBeforeTime(context, sku, machine.getMachineCode()));
+        // T+1新增日期下限只限制真实准备，不能反向抬高比较基准并缩短供胚等待差值。
+        if (!structureSwitchSelectionProbe) {
+            switchReadyTime = this.resolveLaterTime(switchReadyTime,
+                    this.resolveNewProductionNotBeforeTime(context, sku, machine.getMachineCode()));
+        }
         // 普通补机同样校验原模喷砂资源；其他模具已可用时不增加等待，不锁定原机。
         switchReadyTime = this.resolveMouldResourceContext(context).resolveSandBlastAvailableTime(
                 sku.getMaterialCode(), machine.getMachineCode(), switchReadyTime);
@@ -11663,7 +11683,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         Date currentSwitchReadyTime = switchReadyTime;
         boolean inspectionResourceMatched = takeoverWithoutMouldChange;
         Date originalOccupationNotBeforeTime = productionOccupationNotBeforeTime;
-        Date selectionProductionNotBeforeTime = dayContext.getSelectionProductionNotBeforeTime();
+        Date selectionProductionNotBeforeTime = structureSwitchSelectionProbe
+                ? null : dayContext.getSelectionProductionNotBeforeTime();
         for (int attempt = 0; attempt < NEW_SPEC_CHANGEOVER_PROBE_LIMIT; attempt++) {
             if (takeoverWithoutMouldChange) {
                 changeoverStartTime = currentSwitchReadyTime;
