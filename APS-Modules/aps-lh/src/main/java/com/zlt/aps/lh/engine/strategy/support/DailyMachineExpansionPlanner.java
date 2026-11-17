@@ -15,7 +15,6 @@ import com.zlt.aps.lh.handler.SkuMonthPlanCalculator;
 import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
 import com.zlt.aps.lh.service.impl.LhDailyMouldCalcServiceImpl;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
-import com.zlt.aps.lh.util.MonthPlanDayQtyUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.lh.util.SkuDailyPlanQuotaUtil;
@@ -108,7 +107,6 @@ public final class DailyMachineExpansionPlanner {
                 context.resolveForcedReleasedPhysicalMachineCodes(sku, productionDate));
         if (Objects.nonNull(productionDate)) {
             machines.addAll(context.resolvePreviousAlternateReleasedMachines(sku, productionDate));
-            machines.addAll(context.resolveDailyQuantityReleasedMachines(sku, productionDate));
         }
         return machines;
     }
@@ -746,8 +744,7 @@ public final class DailyMachineExpansionPlanner {
         }
         if (Objects.isNull(dailyMouldCalcService) || Objects.isNull(context) || Objects.isNull(sku)
                 || StringUtils.isEmpty(sku.getMaterialCode()) || StringUtils.isEmpty(sku.getProductStatus())
-                || (Math.max(0, activeMachineCount) <= 0 && !hasDailyQuantityRelease(context, sku))
-                || Objects.isNull(context.getScheduleDate())
+                || Math.max(0, activeMachineCount) <= 0 || Objects.isNull(context.getScheduleDate())
                 || Objects.isNull(context.getWindowEndDate())) {
             return null;
         }
@@ -772,120 +769,19 @@ public final class DailyMachineExpansionPlanner {
             }
             int targetMachineCount = dailyMouldCalcService.getRequiredMachineCount(
                     context, sku.getMaterialCode(), sku.getProductStatus(), productionDate);
-            int dailyActiveMachineCount = resolveDailyQuantityActiveMachineCount(
-                    context, sku, productionDate, activeMachineCount);
-            boolean addMachine = !isDailyQuantityDemandCovered(context, sku, productionDate)
-                    && targetMachineCount > dailyActiveMachineCount
+            boolean addMachine = targetMachineCount > Math.max(0, activeMachineCount)
                     && isNextDayMachineDemandUnmet(dailyMouldCalcService, context, sku,
-                    productionDate, dailyActiveMachineCount, null);
+                    productionDate, activeMachineCount, null);
             log.info("统一Map增机台逐日判断, factoryCode: {}, batchNo: {}, materialCode: {}, productStatus: {}, "
                             + "scheduleType: {}, productionDate: {}, targetMachineCount: {}, "
                             + "currentEffectiveMachineCount: {}, addMachine: {}",
                     context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(), sku.getProductStatus(),
-                    scheduleType, productionDate, targetMachineCount, dailyActiveMachineCount, addMachine);
+                    scheduleType, productionDate, targetMachineCount, activeMachineCount, addMachine);
             if (addMachine) {
                 return productionDate;
             }
         }
         return null;
-    }
-
-    /**
-     * 判断当前物料及状态是否已冻结按日目标量退出的原机。
-     *
-     * @param context 排程上下文
-     * @param sku 当前需求
-     * @return 是否存在本SKU日目标请求
-     */
-    public static boolean hasDailyQuantityRelease(LhScheduleContext context, SkuScheduleDTO sku) {
-        if (context == null || sku == null) {
-            return false;
-        }
-        return context.getTimedMachineOffRequests().stream().anyMatch(request -> request.hasDailyQuantityTarget()
-                && StringUtils.equals(sku.getMaterialCode(), request.getSourceSku().getMaterialCode())
-                && StringUtils.equals(sku.getProductStatus(), request.getSourceSku().getProductStatus()));
-    }
-
-    /**
-     * 对日目标下机组按业务日统计仍能承担整日生产的物理机台，保留旧组原计数口径。
-     *
-     * @param context 本批上下文
-     * @param sku 当前物料及状态
-     * @param date 需求业务日
-     * @param originalCount 原补偿入口的有效机台数
-     * @return 当天仍有效的整日续作台数
-     */
-    public static int resolveDailyQuantityActiveMachineCount(LhScheduleContext context, SkuScheduleDTO sku,
-            LocalDate date, int originalCount) {
-        if (date == null || !hasDailyQuantityRelease(context, sku)) {
-            return Math.max(0, originalCount);
-        }
-        Set<String> machines = new LinkedHashSet<>();
-        context.getScheduleResultList().stream()
-                .filter(result -> ScheduleTypeEnum.CONTINUOUS.getCode().equals(result.getScheduleType()))
-                .filter(result -> StringUtils.equals(sku.getMaterialCode(), result.getMaterialCode())
-                        && StringUtils.equals(sku.getProductStatus(), result.getProductStatus()))
-                .forEach(result -> machines.add(LhSingleControlMachineUtil.resolvePhysicalMachineCode(
-                        result.getLhMachineCode())));
-        Set<String> released = new LinkedHashSet<>();
-        for (TimedMachineOffRequest request : context.getTimedMachineOffRequests()) {
-            if (!StringUtils.equals(sku.getMaterialCode(), request.getSourceSku().getMaterialCode())
-                    || !StringUtils.equals(sku.getProductStatus(), request.getSourceSku().getProductStatus())) {
-                continue;
-            }
-            for (LhScheduleResult result : request.getProfile().getOriginals()) {
-                String physicalCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode());
-                machines.add(physicalCode);
-                OffMachineDecision decision = context.getTimedMachineOffDecisionMap().get(result);
-                LocalDate releaseDate = request.getStartDate();
-                // 日目标完成后不再承担后日生产，清洗导致的物理占用延长不增加前料产能。
-                if (!request.hasDailyQuantityTarget() && decision != null) {
-                    releaseDate = TimedMachineOffReleaseResolver.resolveReleaseBusinessDate(
-                            context.getScheduleWindowShifts(), decision.getOccupancyEndTime());
-                }
-                if (!date.isBefore(releaseDate)) {
-                    released.add(physicalCode);
-                }
-            }
-        }
-        machines.removeAll(released);
-        machines.removeAll(context.resolveForcedReleasedPhysicalMachineCodes(sku, date));
-        return machines.size();
-    }
-
-    /**
-     * 用实际完成量及当日已排量确认日目标组是否覆盖原始需求，避免退出当日虚假补机。
-     *
-     * @param context 本批上下文
-     * @param sku 当前物料及状态
-     * @param date 需求业务日
-     * @return 当日日计划确实存在且已经覆盖时为true
-     */
-    public static boolean isDailyQuantityDemandCovered(LhScheduleContext context, SkuScheduleDTO sku,
-            LocalDate date) {
-        if (date == null || !hasDailyQuantityRelease(context, sku)) {
-            return false;
-        }
-        Integer planQty = MonthPlanDayQtyUtil.resolveNullableDayQty(
-                MonthPlanDateResolver.resolvePlan(context, sku.getMaterialCode(), sku.getProductStatus(), date),
-                date.getDayOfMonth());
-        if (planQty == null || planQty < 0) {
-            return false;
-        }
-        long scheduled = context.getScheduleResultList().stream()
-                .filter(result -> StringUtils.equals(sku.getMaterialCode(), result.getMaterialCode())
-                        && StringUtils.equals(sku.getProductStatus(), result.getProductStatus()))
-                .mapToLong(result -> context.getScheduleWindowShifts().stream()
-                        .filter(shift -> date.equals(shift.getWorkDate().toInstant()
-                                .atZone(ZoneId.systemDefault()).toLocalDate()))
-                        .mapToLong(shift -> {
-                            Integer quantity = ShiftFieldUtil.getShiftPlanQty(result, shift.getShiftIndex());
-                            return quantity == null ? 0 : quantity;
-                        }).sum()).sum();
-        if (date.equals(context.getScheduleDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate())) {
-            scheduled += Math.max(0, sku.getScheduleDayFinishQty());
-        }
-        return scheduled >= planQty;
     }
 
     /**
@@ -925,9 +821,7 @@ public final class DailyMachineExpansionPlanner {
         }
         int nextTargetMachineCount = service.getRequiredMachineCount(
                 context, sku.getMaterialCode(), sku.getProductStatus(), nextDate);
-        boolean unmet = !isDailyQuantityDemandCovered(context, sku, nextDate)
-                && nextTargetMachineCount > resolveDailyQuantityActiveMachineCount(
-                        context, sku, nextDate, activeMachineCount);
+        boolean unmet = nextTargetMachineCount > activeMachineCount;
         if (!unmet && log.isInfoEnabled()) {
             log.info("普通增机次日需求已满足，保留已有机台, factoryCode: {}, batchNo: {}, materialCode: {}, "
                             + "productStatus: {}, productionDate: {}, nextDate: {}, "

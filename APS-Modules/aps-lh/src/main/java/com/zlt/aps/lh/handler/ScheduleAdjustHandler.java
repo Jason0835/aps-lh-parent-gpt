@@ -71,6 +71,12 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     private PreviousAlternateTrialDemandService previousAlternateTrialDemandService;
 
     /**
+     * 在续作与新增分类前核对前段欠产的MES下机证据。
+     */
+    @Resource
+    private OverdueSurplusAdmissionPolicy overdueSurplusAdmissionPolicy;
+
+    /**
      * 无排产目标量未排产提示
      */
     private static final String NO_PLAN_QTY_REASON_TEMPLATE = "物料：%s 没有排产目标量，不进行排产";
@@ -414,11 +420,47 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
             validScheduleSkuList.add(dto);
         }
 
+        // 胎胚活跃集合和历史前料激活之前统一出队，防止已结束前段借未来计划再次上机。
+        this.filterCompletedOverdueSurplusSkus(context, validScheduleSkuList, structureSkuMap);
         context.setMaterialSharedEmbryoMap(buildMaterialSharedEmbryoMap(validScheduleSkuList));
         context.setActiveEmbryoSkuMap(buildActiveEmbryoSkuMap(context, validScheduleSkuList));
         context.setStructureSkuMap(structureSkuMap);
         int totalSkuCount = structureSkuMap.values().stream().mapToInt(List::size).sum();
         log.info("SKU按结构归集完成, 结构数量: {}, SKU总数: {}", structureSkuMap.size(), totalSkuCount);
+    }
+
+    /**
+     * 批量剔除窗口无计划且全部原机台已更新的前段欠产候选。
+     * 清理仅影响候选与提前生产视图，保留原始余量、未排需求快照及MES和模具事实。
+     *
+     * @param context       当前批次及运行态
+     * @param validSkus     尚未建立共享胎胚分配的有效候选
+     * @param structureSkus 本次归集的结构候选集合
+     */
+    private void filterCompletedOverdueSurplusSkus(LhScheduleContext context,
+                                                   List<SkuScheduleDTO> validSkus,
+                                                   Map<String, List<SkuScheduleDTO>> structureSkus) {
+        Map<String, String> completedEvidence =
+                overdueSurplusAdmissionPolicy.findCompletedStageEvidence(context, validSkus);
+        if (completedEvidence.isEmpty()) {
+            return;
+        }
+        Set<SkuScheduleDTO> blockedSkus = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (SkuScheduleDTO sku : validSkus) {
+            LhUnscheduledResult result = PendingSkuUnscheduledRule.evaluateCompletedOverdueSurplus(
+                    context, sku, completedEvidence.get(sku.getMaterialCode()));
+            if (Objects.isNull(result)) {
+                continue;
+            }
+            unscheduledResultCollector.addOrReplace(context, sku, result);
+            context.removeEarlyProductionRuntimePlan(sku);
+            sku.setTargetScheduleQty(0);
+            sku.setRemainingScheduleQty(0);
+            blockedSkus.add(sku);
+        }
+        validSkus.removeIf(blockedSkus::contains);
+        structureSkus.values().forEach(skus -> skus.removeIf(blockedSkus::contains));
+        structureSkus.entrySet().removeIf(entry -> entry.getValue().isEmpty());
     }
 
     /**
@@ -1258,12 +1300,13 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     }
 
     /**
-     * 新的余量计算方式处理
-     * 40天计划余量
+     * 使用原余量数据计算四十天计划余量，并传入本轮匹配的窗口外首个正计划量日期。
+     * <p>日期非空时沿用计算器已有的后段分支；无匹配保持原前后段判断。
+     * 原计划范围、完成量和调整量均不因日期接入而改写。</p>
      *
-     * @param context
-     * @param plan
-     * @return
+     * @param context 已加载月计划、余量数据及提前日期索引的排程上下文
+     * @param plan 当前物料与产品状态的月计划
+     * @return 硫化余量、完成量及前后段标识
      */
     private SurplusCalculation calculateLhSurplusQty(LhScheduleContext context, FactoryMonthPlanProductionFinalResult plan) {
         List<Date> allProductionDate = Lists.newArrayList(context.getAllProductionDateInfo());
@@ -1279,7 +1322,14 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         Integer actualFinishedQty = lhSkuSurplusDataInfo.getFinishQty(plan);
         Integer nightFinishQty = lhSkuSurplusDataInfo.getNightFinishQty(plan);
         LhSkuSurplusControlParam productionDateInfo = new LhSkuSurplusControlParam(lhSkuSurplusDataInfo.getPlanStartDate(), false, allProductionDate, extendDays, skuMaxDiscontinueDays);
-        LhSurplusSkuInfo calculateSkuInfo = new LhSurplusSkuInfo(plan, lhSkuSurplusDataInfo.getAllMonthPlanList(), Collections.emptyMap(), actualFinishedQty, lhSkuSurplusDataInfo.getAllLhDayPlanAdjustList());
+        LocalDate firstPlanDate = context.getEarlyProductionFirstPlanDateMap().get(
+                MonthPlanDateResolver.buildMaterialStatusKey(plan.getMaterialCode(), plan.getProductStatus()));
+        Date firstDateByBefore = Objects.isNull(firstPlanDate)
+                ? null : MonthPlanSurplusCalculator.getDate(firstPlanDate);
+        // 命中窗口外正计划时沿用计算器已有的后段分支，不改写原余量计划、完成量或调整量。
+        LhSurplusSkuInfo calculateSkuInfo = new LhSurplusSkuInfo(plan, firstDateByBefore,
+                lhSkuSurplusDataInfo.getAllMonthPlanList(), Collections.emptyMap(), actualFinishedQty,
+                lhSkuSurplusDataInfo.getAllLhDayPlanAdjustList());
         LhSurplusResultVo lhSurplusResult = LhSkuSurplusCalculator.getSurplusInfo(productionDateInfo, calculateSkuInfo);
         //月计划量 当前计划量 总计划量 余量
         int totalPlanQty = lhSurplusResult.getPlanQty();
@@ -1287,12 +1337,32 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         int remainingDemandQty = lhSurplusResult.getSurplusQty();
         log.info("40天月计划硫化余量计算完成, materialCode: {}, monthPlanQty: {}, monthFinishedAndScheDayQty: {}, "
                         + "scheDayFinishQty: {}, surplusQty: {}, "
-                        + "monthPlanTotalQty: {}, 欠产余量标识: {}",
+                        + "monthPlanTotalQty: {}, 欠产余量标识: {}, productStatus: {}, firstDateByBefore: {}",
                 plan.getMaterialCode(), totalPlanQty, actualFinishedQty, nightFinishQty,
-                remainingDemandQty, monthPlanTotalQty, lhSurplusResult.isOverdueSurplusFlag());
+                remainingDemandQty, monthPlanTotalQty, lhSurplusResult.isOverdueSurplusFlag(),
+                plan.getProductStatus(), firstPlanDate);
         return new SurplusCalculation(remainingDemandQty, actualFinishedQty, BigDecimal.ZERO.intValue(),
-                BigDecimal.ZERO.intValue(), totalPlanQty, monthPlanTotalQty, Collections.emptyMap(), lhSurplusResult.isOverdueSurplusFlag());
+                BigDecimal.ZERO.intValue(), totalPlanQty, monthPlanTotalQty, Collections.emptyMap(),
+                lhSurplusResult.isOverdueSurplusFlag(), lhSurplusResult);
     }
+
+    /**
+     * 计算指定月计划记录的硫化余量及余量段（只读计算，不修改上下文）。
+     *
+     * <p>供基础数据阶段按胎胚维度做「断点合并」使用：{@link LhSurplusResultVo#getSegmentStart()} /
+     * {@link LhSurplusResultVo#getSegmentEnd()} 与余量同源，表示该账户窗口后的连续需求段，
+     * 段与段之间断开（如次月/更远的未来段）说明不是同一次连续生产。</p>
+     *
+     * @param context 排程上下文
+     * @param plan    月生产计划记录
+     * @return 硫化余量结果（含余量段，可能为空）
+     */
+    public LhSurplusResultVo resolvePlanSurplusInfo(LhScheduleContext context,
+                                                    FactoryMonthPlanProductionFinalResult plan) {
+        SurplusCalculation surplusCalculation = this.calculateLhSurplusQty(context, plan);
+        return null == surplusCalculation ? null : surplusCalculation.getSurplusInfo();
+    }
+
     /**
      * 计算SKU的硫化余量
      * <p>
@@ -1330,7 +1400,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         }
         List<LhDayPlanAdjustVo> allLhDayPlanAdjustList = context.getAllLhDayPlanAdjustList();
         LhSurplusProductionDayInfo productionDayInfo = new LhSurplusProductionDayInfo(productionYearMonth, startDay, monthStartInfo.isAddLastMonthOverdueQty(), allProductionDate, extendDays, skuMaxDiscontinueDays);
-        LhSurplusSkuInfo lhSurplusSkuInfo = new LhSurplusSkuInfo(plan, allMonthPlanList, monthOverdueQtyMap, actualFinishedQty, allLhDayPlanAdjustList);
+        LhSurplusSkuInfo lhSurplusSkuInfo = new LhSurplusSkuInfo(plan, null, allMonthPlanList, monthOverdueQtyMap, actualFinishedQty, allLhDayPlanAdjustList);
         LhSurplusResultVo lhSurplusResult = MonthPlanSurplusCalculator.getSurplusInfo(productionDayInfo, lhSurplusSkuInfo);
         boolean isCrossMonth = context.isCrossMonthByProductionDateInfo();
         //20260817+ 月计划量包含(硫化日计划调整量)
@@ -1350,7 +1420,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                 plan.getLastMonthValidFlag(), lastMonthOverdueQty, remainingDemandQty,
                 isCrossMonth, monthPlanTotalQty, lhSurplusResult.isOverdueSurplusFlag());
         return new SurplusCalculation(remainingDemandQty, actualFinishedQty, ignoredOverProductionQty,
-                lastMonthOverdueQty, totalPlanQty, monthPlanTotalQty, monthOverdueQtyMap, lhSurplusResult.isOverdueSurplusFlag());
+                lastMonthOverdueQty, totalPlanQty, monthPlanTotalQty, monthOverdueQtyMap,
+                lhSurplusResult.isOverdueSurplusFlag(), lhSurplusResult);
     }
 
 
@@ -2645,7 +2716,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * 虚拟目标在实机零目标之外保存，历史指定来源后续冻结不得将其覆盖为0。
      *
      * @param context 本轮实机及虚拟需求上下文
-     * @param sku 因无库存退出实机的来源
+     * @param sku     因无库存退出实机的来源
      */
     private void preserveNoStockTrialVirtualCandidate(LhScheduleContext context, SkuScheduleDTO sku) {
         if (!PendingSkuUnscheduledRule.isTrialOrMassTrialSku(sku) || sku.getSurplusQty() <= 0) {
@@ -3494,10 +3565,15 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
          * 欠产余量标识
          */
         private boolean overdueSurplusFlag;
+        /**
+         * 余量计算结果（含余量段，供胎胚维度断点合并使用）
+         */
+        private final LhSurplusResultVo surplusInfo;
 
         private SurplusCalculation(int surplusQty, int actualFinishedQty, int ignoredOverProductionQty,
                                    int lastMonthOverdueQty, int monthPlanTotal, int monthPlanSumTotal,
-                                   Map<YearMonth, Integer> monthOverdueQtyMap, boolean overdueSurplusFlag) {
+                                   Map<YearMonth, Integer> monthOverdueQtyMap, boolean overdueSurplusFlag,
+                                   LhSurplusResultVo surplusInfo) {
             this.surplusQty = surplusQty;
             this.actualFinishedQty = Math.max(0, actualFinishedQty);
             this.ignoredOverProductionQty = Math.max(0, ignoredOverProductionQty);
@@ -3506,6 +3582,11 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
             this.monthPlanSumTotal = Math.max(BigDecimal.ZERO.intValue(), monthPlanSumTotal);
             this.monthOverdueQtyMap = monthOverdueQtyMap;
             this.overdueSurplusFlag = overdueSurplusFlag;
+            this.surplusInfo = surplusInfo;
+        }
+
+        public LhSurplusResultVo getSurplusInfo() {
+            return surplusInfo;
         }
 
         public int getSurplusQty() {

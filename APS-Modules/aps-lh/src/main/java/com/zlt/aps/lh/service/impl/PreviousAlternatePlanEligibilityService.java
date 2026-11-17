@@ -8,12 +8,15 @@ import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.enums.SkuScheduleSourceTypeEnum;
 import com.zlt.aps.lh.engine.strategy.support.NewSpecCandidatePoolBuilder;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
+import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.ShiftEnum;
 import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
 import com.zlt.aps.lh.component.EarlyProductionQuantityCalculator;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.DailyMachineExpansionPlanner;
 import com.zlt.aps.lh.engine.strategy.support.DailyNewSpecCandidate;
+import com.zlt.aps.lh.engine.strategy.support.DayScheduleContext;
+import com.zlt.aps.lh.engine.strategy.support.PreviousAlternateAdditionalMachinePolicy;
 import com.zlt.aps.lh.engine.strategy.support.PreviousAlternatePlanReleaseEvent;
 import com.zlt.aps.lh.service.ILhDailyMouldCalcService;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
@@ -329,16 +332,34 @@ public class PreviousAlternatePlanEligibilityService {
      * @param context 排程上下文
      * @param plan 历史交替计划，提供后物料及对应产品状态
      * @param businessDateList 本次排程窗口业务日期
-     * @return 是否存在有效资格且目标机台仍有缺口
+     * @return 是否存在合法普通缺口或独立历史指定资格
      */
     private boolean hasEligibleAfterMaterialDemand(LhScheduleContext context,
                                                    LhMouldChangePlan plan,
                                                    List<LocalDate> businessDateList) {
-        List<SkuScheduleDTO> candidateSkuList = context.getPreviousAlternateNewSpecCandidates().stream()
+        return this.hasEligibleAfterMaterialDemand(context, plan, businessDateList,
+                context.getPreviousAlternateNewSpecCandidates());
+    }
+
+    /**
+     * 在指定来源范围内共用后料资格和机台需求判断，支持续作补机尚未回流前的模具预留。
+     *
+     * @param context 已冻结历史组合的上下文
+     * @param plan 本次历史交替计划
+     * @param businessDateList 本窗口业务日期
+     * @param sources 与正式承接一致的原需求来源
+     * @return 存在合法普通缺口或独立历史指定资格时返回true
+     */
+    public boolean hasEligibleAfterMaterialDemand(LhScheduleContext context, LhMouldChangePlan plan,
+            List<LocalDate> businessDateList, List<SkuScheduleDTO> sources) {
+        List<SkuScheduleDTO> candidateSkuList = sources.stream()
                 .filter(Objects::nonNull)
                 .filter(sku -> context.matchesPreviousAlternateAfterMaterial(
                         plan, sku.getMaterialCode(), sku.getProductStatus()))
                 .collect(Collectors.toList());
+        // 只在普通台数已满足的精确历史预检中按需创建八班切片，不向普通选机热路径增加扫描。
+        Map<LocalDate, List<LhShiftConfigVO>> shiftsByDate = null;
+        PreviousAlternatePlanReleaseEvent event = context.getActivePreviousAlternateEvent();
         for (SkuScheduleDTO sku : candidateSkuList) {
             for (LocalDate businessDate : businessDateList) {
                 DailyNewSpecCandidate candidate = this.materialEligibilityService.resolvePreviousAlternateCandidate(
@@ -349,6 +370,19 @@ public class PreviousAlternatePlanEligibilityService {
                 this.fillMachineDemand(context, businessDate, candidate);
                 if (candidate.getTargetMachineCount() > candidate.getScheduledMachineCount()) {
                     return true;
+                }
+                if (event != null && event.getPlan() == plan
+                        && context.isPreviousAlternateAction(sku, event.getMachineCode())) {
+                    if (shiftsByDate == null) {
+                        shiftsByDate = LhScheduleTimeUtil.groupByWorkDate(context.getScheduleWindowShifts());
+                    }
+                    List<LhShiftConfigVO> shifts = shiftsByDate.get(businessDate);
+                    if (!CollectionUtils.isEmpty(shifts)
+                            && PreviousAlternateAdditionalMachinePolicy.preview(context,
+                            new DayScheduleContext(businessDate, shifts, false, false),
+                            event, sku, candidate) != null) {
+                        return true;
+                    }
                 }
             }
         }

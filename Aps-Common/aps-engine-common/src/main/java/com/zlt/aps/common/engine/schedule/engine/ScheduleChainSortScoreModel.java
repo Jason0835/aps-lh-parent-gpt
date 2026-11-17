@@ -12,15 +12,27 @@ public class ScheduleChainSortScoreModel implements Comparable<ScheduleChainSort
     public static final ScheduleChainSortScoreModel ZERO = new ScheduleChainSortScoreModel(0, 0, 0,
             BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
 
+    /**
+     * 主胶料连续匹配标识（1 表示匹配，0 表示不匹配）。
+     */
     private final int mainGlueMatched;
+    /** 基部胶连续匹配数量（匹配度越高值越大）。 */
     private final int baseGlueMatched;
+    /** 口型板连续匹配标识（1 表示匹配，0 表示不匹配）。 */
     private final int mouthPlateMatched;
+    /** 业务维度汇总得分（产能评分 + 切换成本评分 + 定点机台评分）。 */
     private final BigDecimal businessScore;
+    /** 剩余产能适配维度得分。 */
     private final BigDecimal capacityScore;
+    /** 主胶料连续性维度得分。 */
     private final BigDecimal mainGlueScore;
+    /** 基部胶相似性维度得分。 */
     private final BigDecimal baseGlueScore;
+    /** 口型板连续性维度得分。 */
     private final BigDecimal mouthPlateScore;
+    /** 换型切换成本维度得分。 */
     private final BigDecimal switchCostScore;
+    /** 定点机台维度得分。 */
     private final BigDecimal fixedScore;
 
     /**

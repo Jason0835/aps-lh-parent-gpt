@@ -294,7 +294,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     /**
      * 校正单条结果在计划性维修预热后的首个生产班次，并追加可对账的组合原因。
      * <p>维修开始班次固定排产量的结束时间已在主链截到维修开始，因此不会被当作维修后结果；
-     * 独立维修对齐到预热完成，真实切换组合对齐到维修及预热与切换的最晚完成点，保留主链冻结的首检区间。
+     * 正规换模内首检对齐维修预热下限，其他组合沿原准备下限，保留主链冻结的首检区间。
      * 若该结果属于换模或换活字块，则原因中同步体现切换类型。</p>
      *
      * @param context 排程上下文
@@ -318,7 +318,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                     || !shiftEndTime.after(repairWindow.getProductionResumeTime())) {
                 continue;
             }
-            // 主链已从组合准备完成后正向首检；这里只校验同一边界，不再追加预热或首检时长。
+            // 主链已按实际维修边界完成首检；这里只对齐相同禁产下限，不追加预热或首检时长。
             ShiftFieldUtil.alignShiftStartTimeNotBefore(
                     result, shiftIndex, repairWindow.getProductionResumeTime());
             String analysis = "计划性维修+预热";
@@ -1194,9 +1194,9 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
 //            if (result.getSpecEndTime() == null) {
 //                throwValidationFailure(context, result, I18nUtil.getMessage("ui.data.column.lhScheduleResult.specEndTimeMissing"));
 //            }
-            if ("1".equals(result.getIsChangeMould()) && StringUtils.isBlank(result.getMouldCode())) {
-                throwValidationFailure(context, result, I18nUtil.getMessage("ui.data.column.lhScheduleResult.mouldCodeMissingInChangeMould"));
-            }
+//            if ("1".equals(result.getIsChangeMould()) && StringUtils.isBlank(result.getMouldCode())) {
+//                throwValidationFailure(context, result, I18nUtil.getMessage("ui.data.column.lhScheduleResult.mouldCodeMissingInChangeMould"));
+//            }
         }
         /*
          * 调用保存前模具时间轴强校验。置换协调器和各排产主链虽然都会维护模具占用账本，
@@ -4334,12 +4334,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             if (Objects.isNull(recorded)) {
                 continue;
             }
-            LhShiftConfigVO productionStart = TimedMachineOffReleaseResolver.resolveProductionStartShift(
-                    context.getScheduleWindowShifts(), request);
-            if (productionStart == null) {
-                continue;
-            }
-            Date zeroAvailable = productionStart.getShiftStartDateTime();
+            Date zeroAvailable = TimedMachineOffReleaseResolver.resolveProductionStartShift(
+                    context.getScheduleWindowShifts(), request.getStartDate()).getShiftStartDateTime();
             OffMachineDecision expected = releaseResolver.resolve(request, recorded,
                     context.getScheduleWindowShifts(), zeroAvailable);
             if (!Objects.equals(recorded.getProductionEndTime(), expected.getProductionEndTime())

@@ -904,7 +904,8 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
      * 本侧在机模具号，双模机台按物理机台整机口径取；未匹配到有效在机模具号时，保留并
      * 归一化计划原模具号作为兜底；
      * 正规换模计划从后物料对应的共享模具配置中排除在机模具号后，稳定随机选择最多两副
-     * 模具并直接覆盖原模具号；喷砂清洗和干冰清洗计划不填写模具号，其他类型继续沿用共享
+     * 模具并直接覆盖原模具号；后物料没有共用模具配置时，保留月计划备注已解析的原模具号，
+     * 不覆盖为空字符串；喷砂清洗和干冰清洗计划不填写模具号，其他类型继续沿用共享
      * 模具配置和原有合并逻辑；交替类型为空且清洗类型为03/04的纯清洗计划跳过模具匹配，
      * 并仅生成清洗备注。</p>
      *
@@ -1370,14 +1371,16 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
      * 解析正规换模计划的模具号。
      *
      * <p>候选模具按模具号去重并稳定排序后，使用计划记录自身生成的随机种子打乱顺序，
-     * 最多选择两副。没有候选模具时返回空字符串，避免原模具号或在机模具号重新进入结果。</p>
+     * 最多选择两副。后物料没有共用模具配置时，保留计划上已由月计划备注解析出的原模具号，
+     * 不返回空字符串。共用模具存在但候选被在机或本批次占用过滤完时，仍返回空字符串，
+     * 避免原模具号或在机模具号重新进入结果。</p>
      *
      * @param plan              模具交替计划
      * @param onlineInfoMap     机台前缀到在机信息的映射
      * @param sharedMouldPatMap 后物料描述到共享模具配置的映射
      * @param usedMoulds 本批次已经选择的模具号
      * @param usedPatterns 本批次已经选择的非空花纹块
-     * @return 排除在机模具后的随机模具号和花纹块，多个配置以换行分隔
+     * @return 排除在机模具后的随机模具号和花纹块，多个配置以换行分隔；没有共用模具时返回原模具号
      */
     private String resolveRegularMouldCode(LhMouldChangePlan plan,
                                            Map<String, List<LhMachineOnlineInfo>> onlineInfoMap,
@@ -1385,7 +1388,8 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
                                            Set<String> usedMoulds, Set<String> usedPatterns) {
         List<LhSharedMouldPat> sharedMouldPatList = sharedMouldPatMap.get(plan.getAfterMaterialDesc());
         if (CollectionUtils.isEmpty(sharedMouldPatList)) {
-            return "";
+            // 没有共用模具时沿用月计划备注已解析的模具号，禁止把第一步结果覆盖为空。
+            return StringUtils.defaultString(plan.getMouldCode());
         }
 
         Set<String> inMachineMouldCodeSet = LhMouldCodeUtil.splitMouldCode(

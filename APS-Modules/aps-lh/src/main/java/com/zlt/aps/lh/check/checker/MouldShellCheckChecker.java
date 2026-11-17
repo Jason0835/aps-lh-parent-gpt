@@ -23,6 +23,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * 检查项6：模壳数量检查（强控），复刻月度计划侧 checkMouldShellLimit 的两阶段算法。
@@ -59,6 +60,12 @@ public class MouldShellCheckChecker implements LhScheduleChecker {
     /** 多值分隔符 */
     private static final String MULTI_VALUE_SEPARATOR = ",";
 
+    /** 数据来源：导入（与硫化日计划导入落库的 DATA_SOURCE 一致） */
+    private static final String DATA_SOURCE_IMPORT = "2";
+
+    /** 壳池判定标识：只判总数，不判具体壳 */
+    private static final String JUDGE_MODE_GROUP_TOTAL = "GROUP_TOTAL";
+
     @Override
     public String getCode() {
         return CODE_MOULD_SHELL;
@@ -88,9 +95,12 @@ public class MouldShellCheckChecker implements LhScheduleChecker {
         Map<String, Integer> shellTotalQtyMap = this.buildShellTotalQtyMap(context.getMouldShellInfoList());
         Map<String, List<MdmSkuMouldRel>> materialRelMap = this.buildMaterialRelMap(context.getSkuMouldRelList());
 
-        // 单壳占用（壳 → 班次 → 数量）与组合壳占用（组合键 → 班次 → 数量）
+        // 单壳占用（壳 → 班次 → 数量）、组合壳占用（组合键 → 班次 → 数量）、
+        // 导入行壳池占用（壳池键 → 班次 → 数量，仅「导入且无模具号」的行使用）
         Map<String, Map<Integer, Integer>> singleUsageMap = new LinkedHashMap<>(16);
         Map<String, Map<Integer, Integer>> comboUsageMap = new LinkedHashMap<>(16);
+        Map<String, Map<Integer, Integer>> groupUsageMap = new LinkedHashMap<>(16);
+        int importGroupRowCount = 0;
         for (LhScheduleResult result : context.getResults()) {
             Set<String> shells = this.resolveRowShells(result, mouldCodeShellMap, specPatternShellMap, materialRelMap);
             if (shells.isEmpty()) {
@@ -107,6 +117,11 @@ public class MouldShellCheckChecker implements LhScheduleChecker {
             if (shells.size() == 1) {
                 String shell = shells.iterator().next();
                 this.accumulateUsage(singleUsageMap, shell, planShiftIndexes, mouldQty);
+            } else if (this.isImportRowWithoutMouldCode(result)) {
+                // 导入行没有模具号，壳标准只能来自 SKU 模具关系，无法确定实际装的是哪一种壳：
+                // 每台机每班只计一次模数，进壳池做总量校验，避免把候选壳各扣一遍造成误报
+                this.accumulateUsage(groupUsageMap, this.buildGroupKey(shells), planShiftIndexes, mouldQty);
+                importGroupRowCount++;
             } else {
                 String comboKey = String.join(MULTI_VALUE_SEPARATOR, shells);
                 this.accumulateUsage(comboUsageMap, comboKey, planShiftIndexes, mouldQty);
@@ -158,7 +173,64 @@ public class MouldShellCheckChecker implements LhScheduleChecker {
                 }
             }
         }
+
+        // ===== 阶段4：导入行壳池总量校验（只判总数，不判具体壳） =====
+        for (Map.Entry<String, Map<Integer, Integer>> entry : groupUsageMap.entrySet()) {
+            String groupKey = entry.getKey();
+            List<String> memberShells = Arrays.asList(groupKey.split(MULTI_VALUE_SEPARATOR));
+            // 成员壳未全部建账时无法判定池容量，跳过
+            boolean allMembersKnown = memberShells.stream().allMatch(shellTotalQtyMap::containsKey);
+            if (!allMembersKnown) {
+                continue;
+            }
+            for (Map.Entry<Integer, Integer> usageEntry : entry.getValue().entrySet()) {
+                int shiftIndex = usageEntry.getKey();
+                int demand = usageEntry.getValue();
+                int poolCapacity = 0;
+                int poolUsed = 0;
+                for (String shell : memberShells) {
+                    poolCapacity += shellTotalQtyMap.getOrDefault(shell, 0);
+                    Map<Integer, Integer> shiftUsage = singleUsageMap.get(shell);
+                    if (shiftUsage != null && shiftUsage.get(shiftIndex) != null) {
+                        poolUsed += shiftUsage.get(shiftIndex);
+                    }
+                }
+                int poolAvailable = Math.max(0, poolCapacity - poolUsed);
+                if (demand > poolAvailable) {
+                    abnormalList.add(this.buildGroupAbnormal(
+                            groupKey, shiftIndex, demand, poolCapacity, poolUsed, demand - poolAvailable));
+                }
+            }
+        }
+        if (importGroupRowCount > 0) {
+            log.info("模壳数量检查：导入行无模具号且解析出多种壳，按壳池总量校验, 行数: {}, 壳池数: {}",
+                    importGroupRowCount, groupUsageMap.size());
+        }
         return abnormalList;
+    }
+
+    /**
+     * 判断是否为「导入产生且没有模具号」的排程结果行。
+     *
+     * <p>这类行的壳标准只能从 SKU 模具关系推出来，无法确定机台实际装的是哪一副模具，
+     * 因此只做壳池总量校验。</p>
+     *
+     * @param result 排程结果行
+     * @return true-导入行且无模具号
+     */
+    private boolean isImportRowWithoutMouldCode(LhScheduleResult result) {
+        return DATA_SOURCE_IMPORT.equals(StringUtils.trimToEmpty(result.getDataSource()))
+                && StringUtils.isBlank(result.getMouldCode());
+    }
+
+    /**
+     * 构建壳池键：壳标准排序后用英文逗号拼接，保证同一组壳落到同一个池。
+     *
+     * @param shells 壳标准集合
+     * @return 壳池键
+     */
+    private String buildGroupKey(Set<String> shells) {
+        return String.join(MULTI_VALUE_SEPARATOR, new TreeSet<>(shells));
     }
 
     /**
@@ -404,6 +476,36 @@ public class MouldShellCheckChecker implements LhScheduleChecker {
         detail.put("shiftIndex", shiftIndex);
         detail.put("demandQty", demand);
         detail.put("overflowQty", overflow);
+        abnormal.setDetailJson(JSONUtil.toJsonStr(detail));
+        return abnormal;
+    }
+
+    /**
+     * 构建壳池总量异常记录（导入行无模具号、解析出多种壳时只判总数）。
+     *
+     * @param groupKey 壳池键（成员壳排序拼接）
+     * @param shiftIndex 班次序号
+     * @param demand 池占用
+     * @param poolCapacity 池容量（成员壳总数之和）
+     * @param poolUsed 池内已被单壳判定占用的数量
+     * @param overflow 超出数量
+     * @return 异常记录
+     */
+    private LhScheduleCheckResult buildGroupAbnormal(String groupKey, int shiftIndex, int demand,
+                                                     int poolCapacity, int poolUsed, int overflow) {
+        LhScheduleCheckResult abnormal = new LhScheduleCheckResult();
+        abnormal.setCheckCode(this.getCode());
+        abnormal.setDimensionKey(groupKey);
+        abnormal.setMessage(MessageFormat.format(
+                I18nUtil.getMessage(MESSAGE_KEY), groupKey, shiftIndex, demand, overflow));
+        Map<String, Object> detail = new LinkedHashMap<>(8);
+        detail.put("shellStandard", groupKey);
+        detail.put("shiftIndex", shiftIndex);
+        detail.put("demandQty", demand);
+        detail.put("overflowQty", overflow);
+        detail.put("judgeMode", JUDGE_MODE_GROUP_TOTAL);
+        detail.put("poolCapacity", poolCapacity);
+        detail.put("poolUsed", poolUsed);
         abnormal.setDetailJson(JSONUtil.toJsonStr(detail));
         return abnormal;
     }

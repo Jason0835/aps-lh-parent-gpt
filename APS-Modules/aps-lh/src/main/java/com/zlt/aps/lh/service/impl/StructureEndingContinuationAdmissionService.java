@@ -50,7 +50,7 @@ public class StructureEndingContinuationAdmissionService {
     public void freezeHistoricalEligibility(LhScheduleContext context, StructureEndingContinuationState state) {
         SkuScheduleDTO source = state.getSourceSku();
         if (state.isOriginalRemainderEnding()) {
-            // 原收尾分组本来就会建立严格目标，前置只读预判不能借尚未登记的时序取得额外例外。
+            // 提前模拟严格控量，但普通余量身份仍允许历史指定独立承接，不修改正式来源。
             source = BeanUtil.copyProperties(source, SkuScheduleDTO.class);
             source.setStrictTargetQty(true);
         }
@@ -80,7 +80,8 @@ public class StructureEndingContinuationAdmissionService {
                             context, source, entry.getKey(), plan, plan.getLhMachineCode());
                     historicalEligibilityService.fillMachineDemand(context, entry.getKey(), candidate);
                     PreviousAlternateAdditionalMachineDemand additional =
-                            PreviousAlternateAdditionalMachinePolicy.preview(context, day, event, source, candidate);
+                            PreviousAlternateAdditionalMachinePolicy.preview(context, day, event, source, candidate,
+                                    state.isOriginalRemainderEnding());
                     if (additional != null) {
                         state.getHistoricalPlanIds().add(plan.getId());
                         state.getHistoricalAdditionalDemands().put(plan.getId(), additional);

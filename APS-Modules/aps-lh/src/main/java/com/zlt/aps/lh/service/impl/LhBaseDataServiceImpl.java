@@ -5,8 +5,10 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.zlt.aps.common.engine.domain.LhDayPlanAdjustVo;
 import com.zlt.aps.common.engine.domain.LhMonthStartDayResult;
+import com.zlt.aps.common.engine.domain.LhSurplusResultVo;
+import com.zlt.aps.common.engine.domain.dto.MonthPlanFirstDateDTO;
+import com.zlt.aps.common.engine.service.IMonthPlanEarlyProductionService;
 import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
-import com.zlt.aps.cx.constant.ScheduleConstants;
 import com.zlt.aps.cx.entity.CxStock;
 import com.zlt.aps.cx.entity.config.CxEmbryoLhTime;
 import com.zlt.aps.cx.entity.schedule.CxEmbryoEndingShift;
@@ -19,6 +21,7 @@ import com.zlt.aps.lh.component.EmbryoEndingStructureMachineExemptionPolicy;
 import com.zlt.aps.lh.component.LhMachineSupplyStructureRule;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.component.SkuDecrementChecker;
+import com.zlt.aps.lh.context.LhScheduleConfig;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.exception.ScheduleDomainExceptionHelper;
 import com.zlt.aps.lh.exception.ScheduleErrorCode;
@@ -121,6 +124,12 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
      * 交班在机标识：仍在产（MES 6 点交班版本同步时置 '1'，与成型侧 CxMachineOnlineInfo.HANDOVER_ONLINE 同源）
      */
     private static final String HANDOVER_ONLINE_FLAG_ON = "1";
+
+    /**
+     * 交班收尾未完成的胎胚余量上限（条）：余量 &gt; 0 且 &lt;= 该值才判收尾未完成，
+     * 超过该值按正常任务继续排（2026-11 由「一车」改为「2 条」，与成型侧同源）
+     */
+    private static final int HANDOVER_ENDING_REMAINDER_MAX = 2;
 
     /**
      * 前结构判定月份回溯上限（含排程日所在月）：
@@ -253,6 +262,12 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
 
     @Resource
     private LhSkuSurplusDataLoadHandler lhSkuSurplusDataLoadHandler;
+
+    /**
+     * 月计划首个可提前日期公共能力，复用本轮定稿快照，不重复查询数据库。
+     */
+    @Resource
+    private IMonthPlanEarlyProductionService monthPlanEarlyProductionService;
 
     /**
      * 按工厂及收尾班次归属日批量加载T至T+2的成型收尾输入，仅按胎胚代码建立索引，不区分产品状态。
@@ -549,6 +564,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         //      因此此处只需等待顶层 Future 完成即可（底层依赖链会自动传递完成状态）。
         waitForDataInitTasks(
                 monthPlanFuture,
+                runAfterDataInitTask(monthPlanFuture, "喷砂共模未来计划",
+                        () -> this.loadSandBlastFuturePlans(context, factoryCode, monthPlanRequiredMonthMap),
+                        () -> sizeOf(context.getSandBlastFuturePlanList())),
                 this.runDataInitTaskAsync("成型胎胚收尾班次",
                         () -> this.loadCxEmbryoEndingShifts(context, factoryCode, startDate),
                         () -> this.sizeOf(context.getCxEmbryoEndingShiftIndex())),
@@ -1744,7 +1762,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
      *
      * @param context          排程上下文
      * @param factoryCode      分厂编号
-     * @param requiredMonthMap
+     * @param requiredMonthMap 需要加载的年月
+     * @param scheduleWindowEndDate 排程窗口结束自然日
+     * @param earlyProductionRangeEndDate 已按提前阈值固化的范围截止日，包含当天
      */
     private void loadMonthPlan(LhScheduleContext context,
                                String factoryCode,
@@ -1783,6 +1803,8 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
          * （含同物料多状态续作切换）。参数=0 对新增排产的拦截统一收口在S4.5新增排产入口。
          */
         context.setLoadedMonthPlanList(loadedPlanList);
+        this.loadEarlyProductionFirstPlanDates(context, factoryCode,
+                scheduleWindowEndDate, earlyProductionRangeEndDate);
         context.setMonthPlanByMaterialMonthMap(
                 MonthPlanDateResolver.buildMaterialMonthPlanMap(loadedPlanList));
         context.setMonthPlanList(selectSchedulingMonthPlanList(
@@ -1883,6 +1905,14 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         return findAdjust4List;
     }
 
+    /**
+     * 加载指定月份月计划，并同步窗口外首个正计划量日期索引。
+     *
+     * @param context 排程上下文
+     * @param factoryCode 工厂编码
+     * @param year 年份
+     * @param month 月份
+     */
     private void loadMonthPlan(LhScheduleContext context, String factoryCode, int year, int month) {
         List<FactoryMonthPlanProductionFinalResult> monthPlanList = queryMonthPlan(context, factoryCode, year, month);
         /*
@@ -1891,10 +1921,99 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
          * （含同物料多状态续作切换）。参数=0 对新增排产的拦截统一收口在S4.5新增排产入口。
          */
         context.setLoadedMonthPlanList(monthPlanList);
+        Date windowEndDate = LhScheduleTimeUtil.addDays(context.getScheduleDate(),
+                LhScheduleTimeUtil.getScheduleDays(context) - 1);
+        Date earlyRangeEndDate = Objects.nonNull(context.getEarlyProductionMaxDate())
+                ? context.getEarlyProductionMaxDate()
+                : LhScheduleTimeUtil.addDays(windowEndDate, this.resolveEarlyProductionDaysThreshold(context));
+        this.loadEarlyProductionFirstPlanDates(context, factoryCode, windowEndDate, earlyRangeEndDate);
         context.setMonthPlanByMaterialMonthMap(
                 MonthPlanDateResolver.buildMaterialMonthPlanMap(monthPlanList));
         context.setMonthPlanList(monthPlanList);
         log.debug("月生产计划加载完成, 数量: {}", context.getMonthPlanList().size());
+    }
+
+    /**
+     * 依据已固化的提前范围，从本轮定稿快照一次生成物料与产品状态日期索引。
+     * <p>初始化时班次窗口可能尚未写回上下文，因此使用加载流程传入的窗口末日。
+     * 每次替换完整索引，避免重载后保留已经无计划的旧日期。</p>
+     *
+     * @param context 排程上下文
+     * @param factoryCode 工厂编码
+     * @param windowEndDate 排程窗口结束自然日
+     * @param earlyRangeEndDate 参数解析后固化的提前范围截止日，包含当天
+     */
+    private void loadEarlyProductionFirstPlanDates(LhScheduleContext context, String factoryCode,
+                                                  Date windowEndDate, Date earlyRangeEndDate) {
+        LocalDate windowEnd = this.toLocalDate(windowEndDate);
+        LocalDate rangeEnd = this.toLocalDate(earlyRangeEndDate);
+        int advanceDays = Math.toIntExact(java.time.temporal.ChronoUnit.DAYS.between(windowEnd, rangeEnd));
+        List<MonthPlanFirstDateDTO> firstDates = monthPlanEarlyProductionService.calculateFirstPlanDates(
+                factoryCode, windowEnd, advanceDays, context.getLoadedMonthPlanList());
+        Map<String, LocalDate> firstDateMap = firstDates.stream().collect(Collectors.toMap(
+                result -> MonthPlanDateResolver.buildMaterialStatusKey(
+                        result.getMaterialCode(), result.getProductStatus()),
+                MonthPlanFirstDateDTO::getFirstPlanDate,
+                (existingDate, candidateDate) -> existingDate.isBefore(candidateDate) ? existingDate : candidateDate,
+                LinkedHashMap::new));
+        context.setEarlyProductionFirstPlanDateMap(Collections.unmodifiableMap(firstDateMap));
+        log.info("提前生产首个计划日期加载完成, factoryCode: {}, batchNo: {}, windowEndDate: {}, "
+                        + "advanceDays: {}, rangeEndDate: {}, matchedSkuCount: {}",
+                factoryCode, context.getBatchNo(), windowEnd, advanceDays, rangeEnd, firstDateMap.size());
+    }
+
+    /**
+     * 加载喷砂置换保护的两个月原始证据，禁止扩大正式月计划和模具资源集合。
+     * 仅采纳T所属自然月内的原始抓取日；缺失时观察至本月底，不借用上月日期。
+     *
+     * @param context 已完成通用月计划加载的批次上下文
+     * @param factoryCode 当前工厂
+     * @param loadedMonths 通用月计划已完整查询的月份
+     */
+    private void loadSandBlastFuturePlans(LhScheduleContext context, String factoryCode,
+            Map<String, LocalDate> loadedMonths) {
+        YearMonth currentMonth = YearMonth.from(this.toLocalDate(context.getScheduleDate()));
+        List<FactoryMonthPlanProductionFinalResult> plans = new ArrayList<>();
+        for (YearMonth month : Arrays.asList(currentMonth, currentMonth.plusMonths(1))) {
+            String version = this.resolveProductionVersion(context, month.getYear(), month.getMonthValue());
+            if (loadedMonths.containsKey(MonthPlanDateResolver.buildYearMonthKey(
+                    month.getYear(), month.getMonthValue()))) {
+                context.getLoadedMonthPlanList().stream().filter(Objects::nonNull)
+                        .filter(plan -> Objects.equals(plan.getYear(), month.getYear())
+                                && Objects.equals(plan.getMonth(), month.getMonthValue()))
+                        .forEach(plans::add);
+            } else {
+                if (StringUtils.isBlank(version)) {
+                    version = this.resolveContinuationReduceDimensionProductionVersion(
+                            factoryCode, month.getYear(), month.getMonthValue());
+                }
+                if (StringUtils.isNotBlank(version)) {
+                    plans.addAll(this.queryMonthPlanByProductionVersion(
+                            factoryCode, month.getYear(), month.getMonthValue(), version));
+                }
+            }
+        }
+        context.setSandBlastStockCaptureDate(plans.stream()
+                .map(FactoryMonthPlanProductionFinalResult::getStockCaptureDate).filter(Objects::nonNull)
+                .map(this::toLocalDate).filter(captureDate -> YearMonth.from(captureDate).equals(currentMonth))
+                .max(LocalDate::compareTo).orElse(null));
+        Set<String> materials = plans.stream().map(FactoryMonthPlanProductionFinalResult::getMaterialCode)
+                .filter(StringUtils::isNotBlank).collect(Collectors.toSet());
+        List<MdmSkuMouldRel> relations = materials.isEmpty() ? Collections.emptyList()
+                : skuMouldRelMapper.selectList(new LambdaQueryWrapper<MdmSkuMouldRel>()
+                        .eq(MdmSkuMouldRel::getFactoryCode, factoryCode)
+                        .in(MdmSkuMouldRel::getMaterialCode, materials));
+        Map<String, List<MdmSkuMouldRel>> relationMap = new LinkedHashMap<>();
+        if (relations != null) {
+            relations.stream().filter(Objects::nonNull).forEach(relation -> relationMap
+                    .computeIfAbsent(relation.getMaterialCode(), key -> new ArrayList<>()).add(relation));
+        }
+        relationMap.replaceAll((material, values) -> Collections.unmodifiableList(values));
+        context.setSandBlastFutureMouldRelMap(Collections.unmodifiableMap(relationMap));
+        context.setSandBlastFuturePlanList(Collections.unmodifiableList(plans));
+        log.info("喷砂共模观察数据加载, factoryCode: {}, batchNo: {}, T: {}, stockCaptureDate: {}, planCount: {}, relationCount: {}",
+                factoryCode, context.getBatchNo(), context.getScheduleDate(), context.getSandBlastStockCaptureDate(),
+                plans.size(), relationMap.size());
     }
 
     /**
@@ -2640,7 +2759,10 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     /**
      * 加载胎胚收尾标识Map。
      * <p>以胎胚维度合并硫化余量（口径与排程阶段 {@link ScheduleAdjustHandler#calculatePlanSurplusQty} 一致），
-     * 结合胎胚实时库存计算胎胚余量，按主销产品参与情况判定收尾标识：
+     * 合并前先按「余量段」做<b>断点过滤</b>（与成型 S5.1.R {@code resolveContinuousEmbryoSurplusKeys} 同源）：
+     * 计划段与当前排产周期断开的账户（典型是次月或更远未来才生产的物料）不计入胎胚余量，
+     * 否则胎胚余量会被未来段长期顶在阈值之上、永远判不了收尾。</p>
+     * <p>结合胎胚实时库存计算胎胚余量，按主销产品参与情况判定收尾标识：
      * <ul>
      *   <li>合并余量中含主销产品：胎胚余量 &lt;= 0 标识收尾(1)</li>
      *   <li>合并余量全为非主销：胎胚余量 &lt;= 2 标识收尾(1)</li>
@@ -2687,15 +2809,25 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         PrevStructureEndedResult prevStructureEndedResult = this.detectPrevStructureEndedStructures(context);
 
         // 2. 以胎胚维度合并硫化余量，并记录该胎胚下是否含主销产品
+        //    合并前先按「余量段」做断点过滤（与成型 S5.1.R 同源）：
+        //    计划段与当前排产周期断开的账户（典型是次月或更远未来才开始生产的物料）不计入胎胚余量，
+        //    否则这类账户会把胎胚余量长期顶在阈值之上，胎胚永远判不了收尾。
         Map<String, Integer> embryoSurplusMap = new LinkedHashMap<>();
         Map<String, Boolean> embryoHasMainMap = new LinkedHashMap<>();
+        long[] productionCycleRange = this.resolveProductionCycleRange(context);
+        int skuMaxDiscontinueDays = this.resolveSkuMaxDiscontinueDays(context);
+        // 账户键（物料|*|状态）→ 硫化余量、余量段、所属胎胚
+        Map<String, Integer> accountSurplusMap = new LinkedHashMap<>();
+        Map<String, long[]> accountSegmentMap = new LinkedHashMap<>();
+        Map<String, String> accountEmbryoMap = new LinkedHashMap<>();
         for (FactoryMonthPlanProductionFinalResult plan : monthPlanList) {
             String embryoCode = plan.getEmbryoCode();
-            if (StringUtils.isEmpty(embryoCode)) {
+            if (StringUtils.isEmpty(embryoCode) || StringUtils.isEmpty(plan.getMaterialCode())) {
                 continue;
             }
             // 复用排程阶段余量计算口径，保证基础数据与排程判定一致
-            int rawSurplusQty = scheduleAdjustHandler.calculatePlanSurplusQty(context, plan);
+            LhSurplusResultVo surplusInfo = scheduleAdjustHandler.resolvePlanSurplusInfo(context, plan);
+            int rawSurplusQty = surplusInfo == null ? BigDecimal.ZERO.intValue() : surplusInfo.getSurplusQty();
             // 胎胚维度合并时，单个物料超产形成的负余量不能抵减同胎胚其它物料的欠产余量，
             // 否则会出现“一个物料超产、一个物料还欠，胎胚却被判收尾”的假收尾。
             int surplusQty = Math.max(0, rawSurplusQty);
@@ -2703,7 +2835,15 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 log.info("胎胚收尾余量合并: 物料负数按0, 胎胚={}, 物料={}, 原始余量={}",
                         embryoCode, plan.getMaterialCode(), rawSurplusQty);
             }
-            embryoSurplusMap.merge(embryoCode, surplusQty, Integer::sum);
+            String accountKey = plan.getMaterialStatusKey();
+            accountSurplusMap.put(accountKey, surplusQty);
+            accountEmbryoMap.put(accountKey, embryoCode);
+            if (Objects.nonNull(surplusInfo) && Objects.nonNull(surplusInfo.getSegmentStart())
+                    && Objects.nonNull(surplusInfo.getSegmentEnd())) {
+                accountSegmentMap.put(accountKey, new long[]{
+                        surplusInfo.getSegmentStart().toEpochDay(),
+                        surplusInfo.getSegmentEnd().toEpochDay()});
+            }
             // 任一主销参与合并即标记为含主销，否则保持默认false
             if (mainProductCodes.contains(plan.getMaterialCode())) {
                 embryoHasMainMap.put(embryoCode, Boolean.TRUE);
@@ -2712,18 +2852,43 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
             }
         }
 
+        // 2.1 胎胚维度断点合并：与排产周期连续的账户纳入，断开的账户剔除并留日志
+        Map<String, List<String>> embryoAccountKeysMap = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : accountEmbryoMap.entrySet()) {
+            embryoAccountKeysMap.computeIfAbsent(entry.getValue(), key -> new ArrayList<>()).add(entry.getKey());
+        }
+        for (Map.Entry<String, List<String>> entry : embryoAccountKeysMap.entrySet()) {
+            String embryoCode = entry.getKey();
+            List<String> accountKeys = entry.getValue();
+            Set<String> includedKeys = filterContinuousAccountKeys(accountKeys, accountSegmentMap,
+                    productionCycleRange, skuMaxDiscontinueDays);
+            int mergedSurplusQty = includedKeys.stream()
+                    .map(accountSurplusMap::get)
+                    .filter(Objects::nonNull)
+                    .mapToInt(Integer::intValue)
+                    .sum();
+            embryoSurplusMap.put(embryoCode, mergedSurplusQty);
+            if (includedKeys.size() < accountKeys.size()) {
+                List<String> skippedKeys = accountKeys.stream()
+                        .filter(accountKey -> !includedKeys.contains(accountKey))
+                        .collect(Collectors.toList());
+                log.info("【胎胚余量断开过滤】胎胚={} 已纳入={} 断点跳过={} 纳入余量合计={}",
+                        embryoCode, formatAccountKeysWithRange(includedKeys, accountSegmentMap),
+                        formatAccountKeysWithRange(skippedKeys, accountSegmentMap), mergedSurplusQty);
+            }
+        }
+
         // 2.5 交班收尾同步（与成型 filterHandoverStoppedEndings 判定同源）：
         //     ② 上一批窗口 1-3 班已排程收尾行、③ 交班不在产（已在基础数据阶段加载为证据集合），
-        //     ① 胎胚余量 ∈ (0, 一车)（严格小于一车；等于一车按正常整车继续排）。
+        //     ① 胎胚余量 ∈ (0, 2 条]（余量 2 条以内，含正好 2 条；超过 2 条按正常任务继续排）。
         //     三条同时成立 → 强制胎胚收尾=1，并让硫化按胎胚库存严格排产（只消耗库存）。
         Map<String, Integer> embryoRemainMap = new LinkedHashMap<>();
         for (Map.Entry<String, Integer> entry : embryoSurplusMap.entrySet()) {
             int stockQty = context.getEmbryoRealtimeStockMap().getOrDefault(entry.getKey(), 0);
             embryoRemainMap.put(entry.getKey(), entry.getValue() - stockQty);
         }
-        Map<String, Integer> tripCapMap = this.buildEmbryoTripCapMap(context);
         Set<String> handoverStoppedEndingEmbryoSet = resolveHandoverStoppedEndingEmbryos(
-                embryoRemainMap, tripCapMap,
+                embryoRemainMap,
                 context.getCxHandoverEndingEmbryoSet(), context.getCxHandoverInProdEmbryoSet());
         context.setCxHandoverStoppedEndingEmbryoSet(handoverStoppedEndingEmbryoSet);
         log.info("【交班收尾同步】命中胎胚 {} 个: {}, 证据集合: 上一批收尾行胎胚={}, 交班在产胎胚={}",
@@ -2762,19 +2927,167 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     }
 
     /**
+     * 解析当前排产周期区间（epochDay 起止）。
+     *
+     * <p>与硫化余量计算使用的 {@code realProductionCycleList} 同源，作为胎胚维度断点合并的锚：
+     * 账户余量段与周期相接（含允许间隔）才算同一次连续生产。</p>
+     *
+     * @param context 排程上下文
+     * @return [周期首日, 周期末日] 的 epochDay；无排产日返回 null
+     */
+    private long[] resolveProductionCycleRange(LhScheduleContext context) {
+        Set<Date> productionDates = context.getAllProductionDateInfo();
+        if (CollectionUtils.isEmpty(productionDates)) {
+            return null;
+        }
+        long firstDay = Long.MAX_VALUE;
+        long lastDay = Long.MIN_VALUE;
+        for (Date productionDate : productionDates) {
+            if (Objects.isNull(productionDate)) {
+                continue;
+            }
+            long epochDay = productionDate.toInstant().atZone(ZoneId.systemDefault())
+                    .toLocalDate().toEpochDay();
+            firstDay = Math.min(firstDay, epochDay);
+            lastDay = Math.max(lastDay, epochDay);
+        }
+        return firstDay == Long.MAX_VALUE ? null : new long[]{firstDay, lastDay};
+    }
+
+    /**
+     * 解析 SKU 连续排产最大间隔天数（SYS0304038）。
+     *
+     * @param context 排程上下文
+     * @return 允许断开的自然日数，空/非正按 0
+     */
+    private int resolveSkuMaxDiscontinueDays(LhScheduleContext context) {
+        LhScheduleConfig scheduleConfig = context.getScheduleConfig();
+        if (Objects.isNull(scheduleConfig)) {
+            return 0;
+        }
+        Integer skuMaxDiscontinueDays = scheduleConfig.getSkuMaxDiscontinueDays();
+        return Objects.isNull(skuMaxDiscontinueDays) || skuMaxDiscontinueDays <= 0 ? 0 : skuMaxDiscontinueDays;
+    }
+
+    /**
+     * 胎胚维度断点合并：返回与当前排产周期连续的账户键。
+     *
+     * <p>规则与成型 {@code resolveContinuousEmbryoSurplusKeys} 同源：</p>
+     * <ol>
+     *   <li>无可靠余量段的账户无法判定断点，沿用旧口径纳入；</li>
+     *   <li>余量段与排产周期相接（允许 {@code skuMaxDiscontinueDays} 天间隔）的账户作为种子纳入；</li>
+     *   <li>剩余账户与已纳入账户的余量段相接时链式纳入，直到无新增；</li>
+     *   <li>始终接不上的账户视为断点（未来另起一段或历史独立段），不计入胎胚余量。</li>
+     * </ol>
+     *
+     * @param accountKeys           同一胎胚下的账户键列表
+     * @param segmentMap            账户键 → 余量段 [起始日, 断点日]（epochDay）
+     * @param anchorRange           排产周期区间 [首日, 末日]（epochDay），可空
+     * @param skuMaxDiscontinueDays 允许断开的自然日数
+     * @return 纳入胎胚余量的账户键
+     */
+    static Set<String> filterContinuousAccountKeys(List<String> accountKeys,
+                                                   Map<String, long[]> segmentMap,
+                                                   long[] anchorRange,
+                                                   int skuMaxDiscontinueDays) {
+        Set<String> includedKeys = new LinkedHashSet<>();
+        if (CollectionUtils.isEmpty(accountKeys)) {
+            return includedKeys;
+        }
+        int maxGapDays = Math.max(0, skuMaxDiscontinueDays);
+        Map<String, long[]> includedRanges = new LinkedHashMap<>();
+        List<String> pendingKeys = new ArrayList<>();
+        for (String accountKey : accountKeys) {
+            long[] range = Objects.isNull(segmentMap) ? null : segmentMap.get(accountKey);
+            if (Objects.isNull(range)) {
+                // 无可靠余量段：无法判定断点，沿用旧口径纳入
+                includedKeys.add(accountKey);
+                continue;
+            }
+            pendingKeys.add(accountKey);
+        }
+        // 与排产周期相接的账户先纳入；无周期锚（数据异常）时全部纳入，避免误判收尾
+        Iterator<String> iterator = pendingKeys.iterator();
+        while (iterator.hasNext()) {
+            String accountKey = iterator.next();
+            long[] range = segmentMap.get(accountKey);
+            if (Objects.isNull(anchorRange) || rangesConnected(range, anchorRange, maxGapDays)) {
+                includedKeys.add(accountKey);
+                includedRanges.put(accountKey, range);
+                iterator.remove();
+            }
+        }
+        // 链式扩展：与已纳入区间相接的账户继续纳入，直到无新增
+        boolean expanded = true;
+        while (expanded && !pendingKeys.isEmpty()) {
+            expanded = false;
+            Iterator<String> pendingIterator = pendingKeys.iterator();
+            while (pendingIterator.hasNext()) {
+                String accountKey = pendingIterator.next();
+                long[] range = segmentMap.get(accountKey);
+                boolean connected = includedRanges.values().stream()
+                        .anyMatch(includedRange -> rangesConnected(range, includedRange, maxGapDays));
+                if (connected) {
+                    includedKeys.add(accountKey);
+                    includedRanges.put(accountKey, range);
+                    pendingIterator.remove();
+                    expanded = true;
+                }
+            }
+        }
+        return includedKeys;
+    }
+
+    /**
+     * 判断两个余量段是否相接/重叠（允许 {@code maxGapDays} 天间隔）。
+     *
+     * @param leftRange  待判断余量段
+     * @param rightRange 已纳入余量段
+     * @param maxGapDays 允许断开的自然日数
+     * @return true=相接（同一段连续生产）
+     */
+    private static boolean rangesConnected(long[] leftRange, long[] rightRange, int maxGapDays) {
+        return leftRange[0] <= rightRange[1] + maxGapDays + 1
+                && leftRange[1] >= rightRange[0] - maxGapDays - 1;
+    }
+
+    /**
+     * 格式化「账户键[余量段]」串，用于断点合并日志定位。
+     *
+     * @param accountKeys 账户键集合
+     * @param segmentMap  账户键 → 余量段（epochDay）
+     * @return 格式化串；空集合返回“无”
+     */
+    private static String formatAccountKeysWithRange(Collection<String> accountKeys,
+                                                     Map<String, long[]> segmentMap) {
+        if (CollectionUtils.isEmpty(accountKeys)) {
+            return "无";
+        }
+        return accountKeys.stream()
+                .map(accountKey -> {
+                    long[] range = Objects.isNull(segmentMap) ? null : segmentMap.get(accountKey);
+                    if (Objects.isNull(range)) {
+                        return accountKey + "[无段]";
+                    }
+                    return accountKey + "[" + LocalDate.ofEpochDay(range[0]) + "~"
+                            + LocalDate.ofEpochDay(range[1]) + "]";
+                })
+                .collect(Collectors.joining(", "));
+    }
+
+    /**
      * 交班收尾命中判定（与成型侧 {@code ScheduleServiceImpl#filterHandoverStoppedEndings} 三条件同源）。
      *
-     * <p>命中条件：胎胚余量 &gt; 0 且<b>严格小于一车</b> + 上一批窗口 1-3 班有已排程收尾行 + 交班不在产。
-     * 余量正好等于一车时不判定：成型侧按正常整车继续排，硫化侧也不强制收尾。</p>
+     * <p>命中条件：胎胚余量 &gt; 0 且<b>不超过 2 条</b> + 上一批窗口 1-3 班有已排程收尾行 + 交班不在产。
+     * 余量超过 2 条不判定：成型侧按正常任务继续排，硫化侧也不强制收尾。
+     * 2026-11 客户口径由「一车」改为「2 条」，上限见 {@link #HANDOVER_ENDING_REMAINDER_MAX}。</p>
      *
      * @param embryoRemainMap 胎胚余量（Σ硫化余量 − 胎胚库存）
-     * @param tripCapMap      胎胚一车条数（结构+胎胚配置，缺失按默认 12）
      * @param endingEmbryoSet 上一批已安排收尾的胎胚集合
      * @param inProdEmbryoSet 交班仍在产的胎胚集合
      * @return 命中强制收尾的胎胚集合
      */
     static Set<String> resolveHandoverStoppedEndingEmbryos(Map<String, Integer> embryoRemainMap,
-                                                           Map<String, Integer> tripCapMap,
                                                            Set<String> endingEmbryoSet,
                                                            Set<String> inProdEmbryoSet) {
         Set<String> handoverStoppedEndingEmbryos = new LinkedHashSet<>();
@@ -2789,10 +3102,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
             if (StringUtils.isEmpty(embryoCode) || Objects.isNull(remainQty) || remainQty <= 0) {
                 continue;
             }
-            Integer configuredTripCap = Objects.isNull(tripCapMap) ? null : tripCapMap.get(embryoCode);
-            int tripCap = Objects.nonNull(configuredTripCap) && configuredTripCap > 0
-                    ? configuredTripCap : ScheduleConstants.DEFAULT_TRIP_CAPACITY;
-            if (remainQty < tripCap && endingEmbryoSet.contains(embryoCode)
+            if (remainQty <= HANDOVER_ENDING_REMAINDER_MAX && endingEmbryoSet.contains(embryoCode)
                     && !inProdEmbryos.contains(embryoCode)) {
                 handoverStoppedEndingEmbryos.add(embryoCode);
             }
@@ -2817,32 +3127,6 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
             return EMBRYO_ENDING_FLAG_YES;
         }
         return embryoRemainQty <= threshold ? EMBRYO_ENDING_FLAG_YES : EMBRYO_ENDING_FLAG_NO;
-    }
-
-    /**
-     * 构建胎胚一车条数映射：结构+胎胚匹配 {@code T_CX_STRUCTURE_TREAD_CONFIG}，缺失时由判定方按默认 12 兜底。
-     *
-     * @param context 排程上下文
-     * @return 胎胚编码 → 一车条数
-     */
-    private Map<String, Integer> buildEmbryoTripCapMap(LhScheduleContext context) {
-        Map<String, Integer> tripCapMap = new LinkedHashMap<>();
-        Map<String, Map<String, Integer>> structureTreadCountMap = context.getStructureTreadCountMap();
-        if (CollectionUtils.isEmpty(structureTreadCountMap)) {
-            return tripCapMap;
-        }
-        Map<String, String> embryoStructureMap = this.buildEmbryoStructureMap(context);
-        for (Map.Entry<String, String> entry : embryoStructureMap.entrySet()) {
-            Map<String, Integer> embryoTreadCountMap = structureTreadCountMap.get(entry.getValue());
-            if (CollectionUtils.isEmpty(embryoTreadCountMap)) {
-                continue;
-            }
-            Integer treadCount = embryoTreadCountMap.get(entry.getKey());
-            if (Objects.nonNull(treadCount) && treadCount > 0) {
-                tripCapMap.put(entry.getKey(), treadCount);
-            }
-        }
-        return tripCapMap;
     }
 
     /**
@@ -4063,8 +4347,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     /**
      * 加载T日排程班次完成量（来自LhScheFinishQty表），按物料编码和一班产品状态汇总class1FinishQty。
      * <p>同一业务SKU在同一T日可能有多条机台记录，需要共享本状态完成量账本；
-     * 同物料其他产品状态的完成量不得参与本状态月计划及日计划扣减。
-     * 同次保留物理机台完成量，供续作日目标下机扣除各机台已经完成的夜班量。</p>
+     * 同物料其他产品状态的完成量不得参与本状态月计划及日计划扣减。</p>
      *
      * @param context      排程上下文
      * @param factoryCode  分厂编号
@@ -4084,7 +4367,6 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                                 .isNull(LhScheFinishQty::getIsDelete)));
 
         Map<String, Integer> materialScheDayFinishQtyMap = new HashMap<>(64);
-        Map<String, Map<String, Integer>> materialMachineFinishQtyMap = new HashMap<>(64);
         if (!CollectionUtils.isEmpty(scheFinishQtyList)) {
             for (LhScheFinishQty scheFinishQty : scheFinishQtyList) {
                 if (StringUtils.isEmpty(scheFinishQty.getMaterialCode())) {
@@ -4096,21 +4378,10 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                         materialStatusKey,
                         resolveFinishQtyValue(scheFinishQty.getClass1FinishQty()),
                         Integer::sum);
-                // 同次查询保留物理机台明细，T日部分生产退出时不能把SKU总完成量重复扣到每台。
-                if (StringUtils.isNotBlank(scheFinishQty.getLhMachineCode())) {
-                    String quantityKey = MonthPlanDateResolver.buildMaterialStatusKey(
-                            scheFinishQty.getMaterialCode(), scheFinishQty.getLhType());
-                    String physicalCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(
-                            scheFinishQty.getLhMachineCode());
-                    materialMachineFinishQtyMap.computeIfAbsent(quantityKey, key -> new HashMap<>(4))
-                            .merge(physicalCode, resolveFinishQtyValue(scheFinishQty.getClass1FinishQty()),
-                                    Integer::sum);
-                }
             }
         }
 
         context.setMaterialScheDayFinishQtyMap(materialScheDayFinishQtyMap);
-        context.setMaterialMachineScheDayFinishQtyMap(materialMachineFinishQtyMap);
         log.debug("T日排程班次完成量加载完成, 数量: {}, T日: {}",
                 materialScheDayFinishQtyMap.size(),
                 LhScheduleTimeUtil.formatDate(tDay));

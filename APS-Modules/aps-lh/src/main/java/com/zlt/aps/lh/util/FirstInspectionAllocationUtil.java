@@ -1,5 +1,7 @@
 package com.zlt.aps.lh.util;
 
+import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
+import com.zlt.aps.lh.api.enums.UnscheduledReasonEnum;
 import com.zlt.aps.lh.service.impl.LhInventoryOverlapResolver;
 import com.zlt.aps.cx.entity.config.CxEmbryoLhTime;
 import com.zlt.aps.lh.engine.strategy.support.HistoricalStructureHandoffPolicy;
@@ -152,7 +154,7 @@ public final class FirstInspectionAllocationUtil {
     }
 
     /**
-     * 按显式时间模式构建首检分摊计划。
+     * 按显式时间模式构建首检分摊计划，原机原模恢复及精确历史旧模接收沿用喷砂的固定首检时长和条数。
      *
      * @param context 排程上下文
      * @param sku 当前SKU
@@ -179,8 +181,19 @@ public final class FirstInspectionAllocationUtil {
             String machineCode,
             Map<Integer, Integer> availableCapacityMap,
             FirstInspectionTimingMode timingMode) {
+        MachineCleaningWindowDTO transfer = SandBlastChangeoverSupport.resolveInspectionSource(
+                context, sku, machineCode);
+        long fixedSeconds = transfer == null ? 0L
+                : (transfer.getReadyTime().getTime() - transfer.getCleanEndTime().getTime()) / MILLIS_PER_SECOND;
+        // 原模恢复与历史接收承担同一次喷砂固定首检，任何倒推结果均不得早于原模清洗完成。
+        if (transfer != null && changeoverEndTime != null
+                && changeoverEndTime.getTime() - fixedSeconds * MILLIS_PER_SECOND
+                < transfer.getCleanEndTime().getTime()) {
+            return FirstInspectionAllocationPlan.invalid(
+                    UnscheduledReasonEnum.NO_AVAILABLE_MOULD.getDescription(), null, changeoverEndTime);
+        }
         return buildPlan(context, sku, shifts, changeoverEndTime, inspectionNotBeforeTime,
-                shiftCapacity, remainingQty, scheduleType, machineCode, availableCapacityMap, timingMode, 0L);
+                shiftCapacity, remainingQty, scheduleType, machineCode, availableCapacityMap, timingMode, fixedSeconds);
     }
 
     /**
@@ -401,6 +414,10 @@ public final class FirstInspectionAllocationUtil {
                 ? FirstInspectionQtyUtil.resolveAttributionShift(orderedShifts, inspectionReferenceTime)
                 : FirstInspectionQtyUtil.resolveFirstInspectionAttributionShift(
                         context, sku, orderedShifts, inspectionReferenceTime, scheduleType);
+        if (timingMode == FirstInspectionTimingMode.INCLUDED_IN_CHANGEOVER_AFTER_REPAIR) {
+            // 维修换模首检位于切换尾段，班末完成的首检按该班顺序取参数，不能借用下一夜班顺序。
+            countingShift = FirstInspectionQtyUtil.resolveChangeoverCompletionShift(orderedShifts, changeoverEndTime);
+        }
         // 倒推首检的结束是区间右边界。恰好在窗口末端结束时，计数归属末班而非不存在的下一班。
         if (!forwardInspection && Objects.isNull(countingShift) && !orderedShifts.isEmpty()) {
             LhShiftConfigVO lastShift = orderedShifts.get(orderedShifts.size() - 1);
@@ -429,8 +446,11 @@ public final class FirstInspectionAllocationUtil {
                     new Date(inspectionReferenceTime.getTime() + fixedDurationSeconds * MILLIS_PER_SECOND),
                     countingShift, new ArrayList<FirstInspectionShiftAllocation>(0));
         }
-        int configuredQty = FirstInspectionQtyUtil.resolveAdjustedFirstInspectionQty(
-                context, sequence, machineCode, false);
+        MachineCleaningWindowDTO transfer = SandBlastChangeoverSupport.resolveInspectionSource(
+                context, sku, machineCode);
+        int configuredQty = transfer != null && transfer.getSandBlastFirstInspectionQty() != null
+                ? transfer.getSandBlastFirstInspectionQty()
+                : FirstInspectionQtyUtil.resolveAdjustedFirstInspectionQty(context, sequence, machineCode, false);
         int inspectionQty = Math.min(Math.max(0, configuredQty), Math.max(0, remainingQty));
         if (inspectionQty <= 0) {
             FirstInspectionAllocationPlan emptyPlan = FirstInspectionAllocationPlan.valid(
@@ -465,6 +485,14 @@ public final class FirstInspectionAllocationUtil {
         Date inspectionEndTime = forwardInspection
                 ? new Date(inspectionStartTime.getTime() + durationMillis)
                 : inspectionReferenceTime;
+
+        if (timingMode == FirstInspectionTimingMode.INCLUDED_IN_CHANGEOVER_AFTER_REPAIR
+                && inspectionNotBeforeTime != null && inspectionStartTime.before(inspectionNotBeforeTime)) {
+            // 尾段放不下完整首检时保留原正向规则；不拆分首检来提前计量，也不重新换模。
+            return buildPlan(context, sku, shifts, changeoverEndTime, inspectionNotBeforeTime,
+                    shiftCapacity, remainingQty, scheduleType, machineCode, availableCapacityMap,
+                    FirstInspectionTimingMode.START_AT_PRODUCTION_READY, fixedDurationSeconds, changeoverQuantity);
+        }
 
         // 仅切换计件首检适用盘点后移；设备精度及清洗固定首检保留原契约。
         Date inventoryReady = changeoverQuantity && fixedDurationSeconds == 0L
@@ -661,15 +689,32 @@ public final class FirstInspectionAllocationUtil {
                 sku, scheduleType, changeoverAction, businessScene,
                 productionReadyTime, changeoverEndTime,
                 productionOccupationNotBeforeTime, previousAlternateNormalMode);
-        Date combinedReadyTime = LhRepairPlanScheduleService.resolveForwardInspectionReady(
+        Date includedRepairReady = LhRepairPlanScheduleService.resolveIncludedInspectionReady(
+                context, sku, machineCode, scheduleType, changeoverStartTime, changeoverEndTime);
+        Date combinedReadyTime = includedRepairReady != null ? includedRepairReady
+                : LhRepairPlanScheduleService.resolveForwardInspectionReady(
                 context, machineCode, scheduleType, changeoverStartTime, changeoverEndTime);
         if (combinedReadyTime != null) {
-            productionReadyTime = resolveLaterTime(productionReadyTime, combinedReadyTime);
-            decision = FirstInspectionTimingModeDecision.of(FirstInspectionTimingMode.START_AT_PRODUCTION_READY,
-                    "维修切换或已有清洗组合准备完成后正向首检，首检与生产共用首班上限");
+            if (includedRepairReady != null) {
+                // 换模完成是正常生产下限，不能把它当成换模内首检的硬门禁。
+                productionReadyTime = Objects.equals(productionReadyTime, changeoverEndTime)
+                        ? combinedReadyTime : resolveLaterTime(productionReadyTime, combinedReadyTime);
+                FirstInspectionTimingMode repairMode = productionOccupationNotBeforeTime != null
+                        ? FirstInspectionTimingMode.START_AT_OCCUPATION_BOUNDARY
+                        : FirstInspectionTimingMode.INCLUDED_IN_CHANGEOVER_AFTER_REPAIR;
+                decision = FirstInspectionTimingModeDecision.of(repairMode,
+                        "维修正规换模总时长包含首检，首检不得早于维修预热及真实生产门禁");
+            } else {
+                productionReadyTime = resolveLaterTime(productionReadyTime, combinedReadyTime);
+                decision = FirstInspectionTimingModeDecision.of(FirstInspectionTimingMode.START_AT_PRODUCTION_READY,
+                        "维修切换或已有清洗组合准备完成后正向首检，首检与生产共用首班上限");
+            }
         }
         Date inspectionNotBeforeTime = Objects.nonNull(productionOccupationNotBeforeTime)
                 ? productionOccupationNotBeforeTime : productionReadyTime;
+        if (includedRepairReady != null) {
+            inspectionNotBeforeTime = resolveLaterTime(inspectionNotBeforeTime, productionReadyTime);
+        }
         inspectionNotBeforeTime = resolveLaterTime(inspectionNotBeforeTime, combinedReadyTime);
         FirstInspectionAllocationPlan allocationPlan = buildPlan(
                 context, sku, shifts, changeoverEndTime, inspectionNotBeforeTime,
@@ -692,12 +737,13 @@ public final class FirstInspectionAllocationUtil {
             allocationPlan = buildPlan(context, sku, shifts, changeoverEndTime, inspectionNotBeforeTime,
                     shiftCapacity, remainingQty, scheduleType, machineCode, availableCapacityMap, decision.getTimingMode());
         }
-        // 普通倒推计划只有盘点适配会越过原切换终点；冻结实际模式，不能按新班次时长反推旧区间。
+        // 盘点或维修预热可使倒推首检越过切换终点；冻结实际模式，不能按新班次反推旧区间。
         if (!isForwardTimingMode(decision.getTimingMode()) && allocationPlan.isValid()
                 && allocationPlan.getInspectionEndTime() != null
                 && allocationPlan.getInspectionEndTime().after(changeoverEndTime)) {
             decision = FirstInspectionTimingModeDecision.of(FirstInspectionTimingMode.START_AT_OCCUPATION_BOUNDARY,
-                    "盘点禁产，受影响的同一次首检在盘点后执行，不重新换模");
+                    includedRepairReady != null ? "维修预热或真实门禁后完整首检，不重新换模"
+                            : "盘点禁产，受影响的同一次首检在盘点后执行，不重新换模");
         }
         Date formalProductionStartTime = isForwardTimingMode(decision.getTimingMode())
                         ? resolveLaterTime(

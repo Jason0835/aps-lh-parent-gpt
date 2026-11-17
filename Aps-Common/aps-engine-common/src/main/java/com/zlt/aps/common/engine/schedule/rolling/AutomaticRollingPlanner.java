@@ -4,7 +4,6 @@ import com.zlt.aps.common.core.domain.vo.AutomaticRollingDecision;
 import com.zlt.aps.common.core.domain.vo.AutomaticRollingDemandWindowResult;
 import com.zlt.aps.common.core.utils.AutomaticRollingCalculationUtils;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -708,8 +707,9 @@ public class AutomaticRollingPlanner {
      * @return 可补量返回true
      */
     private boolean fillable(RollingPlanningInput input, RollingMaterialSnapshot material) {
-        // 业务阻断、未绑定机台、纯试制量试及收尾规格不参与填谷。
-        if (material.getReason() != null || material.getBoundMachine() == null || material.isWholeRollExempt()) {
+        // 业务阻断、未绑定机台、纯试制量试、收尾及已触发下修的规格不参与填谷，避免下修后又被补回。
+        if (material.getReason() != null || material.getBoundMachine() == null
+                || material.isWholeRollExempt() || "DOWN".equals(material.getDirection())) {
             return false;
         }
         RollingTaskSnapshot template = material.getTemplate();
@@ -720,9 +720,20 @@ public class AutomaticRollingPlanner {
         if (this.actualQty(input, material.getMaterialCode()).signum() <= 0) {
             return false;
         }
-        // 供应班数已达到需求窗口长度时不再补量。
-        return this.liveCoverage(input, material)
-                .compareTo(BigDecimalUtils.valueOf(material.getFutureDemand().size())) < 0;
+        // 供应班数已达到下修阈值或需求窗口长度时不再补量，防止触发下一轮下修震荡。
+        return this.liveCoverage(input, material).compareTo(this.fillCoverageLimit(input, material)) < 0;
+    }
+
+    /**
+     * 计算余量填谷允许达到的最高供应班数上限。
+     *
+     * @param input    当前账本
+     * @param material 物料快照
+     * @return 供应班数上限
+     */
+    private BigDecimal fillCoverageLimit(RollingPlanningInput input, RollingMaterialSnapshot material) {
+        BigDecimal windowLimit = BigDecimalUtils.valueOf(material.getFutureDemand().size());
+        return positive(input.getDownThreshold()) ? input.getDownThreshold().min(windowLimit) : windowLimit;
     }
 
     /**
@@ -805,6 +816,11 @@ public class AutomaticRollingPlanner {
             return false;
         }
         targetRow.setPlanQty(after);
+        BigDecimal coverageAfter = this.liveCoverage(input, material);
+        if (positive(input.getDownThreshold()) && coverageAfter.compareTo(input.getDownThreshold()) > 0) {
+            targetRow.setPlanQty(before);
+            return false;
+        }
         Map<String, Object> record = new LinkedHashMap<>();
         record.put("rowKey", targetRow.getKey());
         record.put("machineCode", machine.getMachineCode());
@@ -815,7 +831,7 @@ public class AutomaticRollingPlanner {
         record.put("beforePlanQty", before);
         record.put("afterPlanQty", after);
         record.put("coverageBefore", coverageBefore);
-        record.put("coverageAfter", this.liveCoverage(input, material));
+        record.put("coverageAfter", coverageAfter);
         Object existing = material.getEvidence().get("remainingCapacityFill");
         List<Map<String, Object>> records = existing instanceof List
                 ? (List<Map<String, Object>>) existing : new ArrayList<>();

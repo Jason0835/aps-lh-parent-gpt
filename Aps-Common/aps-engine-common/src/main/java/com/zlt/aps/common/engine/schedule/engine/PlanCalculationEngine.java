@@ -458,6 +458,9 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
         return sourceSnapshot;
     }
 
+    /**
+     * 构建任务所属计划组的唯一业务键。
+     */
     private String buildPlanGroupKey(C context, T task) {
         String dateText = context.getScheduleDate() == null ? null
                 : context.getScheduleDate().toString();
@@ -472,6 +475,7 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
                 ? groupKey + "|FORMING_SHUTDOWN_CLOSE_OUT" : groupKey;
     }
 
+    /** 对任务列表中的指定数值字段求和。 */
     private BigDecimal sum(List<T> taskList, Function<ScheduleTaskDraftModel, BigDecimal> valueGetter) {
         return taskList.stream().map(valueGetter).map(this::nvl)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -578,6 +582,7 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
                 this.buildPlanGroupEvidence(taskGroup));
     }
 
+    /** 将计划组汇总字段回填到任务对象。 */
     private void fillGroupFields(T task, G taskGroup) {
         task.setPlanGroupKey(taskGroup.getPlanGroupKey());
         task.setGroupSourceCount(taskGroup.getSourceTaskList().size());
@@ -626,6 +631,7 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
                         BigDecimal::add, LinkedHashMap::new));
     }
 
+    /** 空字符串兜底转换。 */
     private String defaultString(String value) {
         return value == null ? "" : value;
     }
@@ -658,6 +664,13 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
         }
     }
 
+    /**
+     * 解析计划组内的保证需求量（新规格组按逻辑班次窗口去重求和，普通组直接累加）。
+     *
+     * @param sourceTaskList        组内来源任务列表
+     * @param currentShiftDemandQty 当班需求量
+     * @return 组级保证需求量（米）
+     */
     public BigDecimal resolveGroupGuardDemandQty(List<T> sourceTaskList, BigDecimal currentShiftDemandQty) {
         return this.resolveGroupGuardDemandQty(sourceTaskList, currentShiftDemandQty,
                 this.resolveGroupGuardWindowQtyMap(sourceTaskList));
@@ -1098,11 +1111,25 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
         return resultMap;
     }
 
+    /**
+     * 将超出最大班次数的逻辑班次映射回工厂标准物理班次（1~3 班循环）。
+     *
+     * @param logicalShiftOrder 逻辑班次序号
+     * @param maxShiftOrder     最大排程班次数
+     * @return 映射后的物理班次序号
+     */
     public int mapGuardLogicalShiftOrder(int logicalShiftOrder, int maxShiftOrder) {
         return logicalShiftOrder <= maxShiftOrder ? logicalShiftOrder
                 : ((logicalShiftOrder - maxShiftOrder - 1) % 3) + 1;
     }
 
+    /**
+     * 合并来源任务中去重后的非空白文本（逗号分隔）。
+     *
+     * @param sourceTaskList 来源任务列表
+     * @param valueGetter    字段提取器
+     * @return 合并后的逗号分隔文本，全为空时返回 null
+     */
     public String mergeDistinctText(List<T> sourceTaskList, Function<T, String> valueGetter) {
         String merged = sourceTaskList.stream().map(valueGetter).filter(this::isNotBlank)
                 .flatMap(value -> Arrays.stream(value.split("[,，]"))).map(String::trim)
@@ -1110,20 +1137,47 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
         return this.isNotBlank(merged) ? merged : null;
     }
 
+    /**
+     * 比较两个数量是否数值相等（null 视为 0）。
+     *
+     * @param first  第一个数量
+     * @param second 第二个数量
+     * @return 数值相等返回 true
+     */
     public boolean quantityEquals(BigDecimal first, BigDecimal second) {
         return this.nvl(first).compareTo(this.nvl(second)) == 0;
     }
 
+    /**
+     * 按小时偏移量计算目标时间。
+     *
+     * @param source        基准时间
+     * @param hours         偏移小时数
+     * @param millisPerHour 每小时毫秒数
+     * @return 偏移后的新时间对象
+     */
     public Date offsetHours(Date source, BigDecimal hours, long millisPerHour) {
         long offsetMillis = hours.multiply(BigDecimal.valueOf(millisPerHour))
                 .setScale(0, java.math.RoundingMode.HALF_UP).longValue();
         return new Date(source.getTime() + offsetMillis);
     }
 
+    /**
+     * 格式化展示数量值。
+     *
+     * @param quantity 数量值
+     * @return 去除尾随零的字符串，为空时返回“未计算”
+     */
     public String displayQuantity(BigDecimal quantity) {
         return quantity == null ? "未计算" : quantity.stripTrailingZeros().toPlainString();
     }
 
+    /**
+     * 获取任务未经前移或停产调整前的原始当班需求量。
+     *
+     * @param task 当前任务
+     * @return 原始当班需求量
+     */
     public BigDecimal resolveOriginalCurrentShiftDemandQty(T task) {
         if (task == null) {
             return BigDecimal.ZERO;
@@ -1132,6 +1186,12 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
                 ? this.nvl(task.getCurrentShiftDemandQty()) : task.getOriginalCurrentShiftDemandQty();
     }
 
+    /**
+     * 将需求计算结果模型回填到任务对象。
+     *
+     * @param task   当前任务
+     * @param result 需求计算结果
+     */
     public void applyDemandQtyResult(T task, ScheduleDemandQtyResultModel result) {
         if (result == null) {
             return;
@@ -1190,6 +1250,7 @@ public final class PlanCalculationEngine<C extends PlanCalculationContext<T, F, 
                 && task.getPlanGroupKey().contains("|PRESET|");
     }
 
+    /** 判断字符串是否非空白。 */
     private boolean isNotBlank(String value) {
         return value != null && !value.trim().isEmpty();
     }

@@ -212,6 +212,9 @@ public final class ScheduleSortSnapshotSupport {
         }
     }
 
+    /**
+     * 构建任务业务键到 1 基顺序位置的映射。
+     */
     private static Map<String, Integer> indexMap(List<? extends ScheduleTaskDraftModel> taskList) {
         Map<String, Integer> result = new LinkedHashMap<>();
         for (int index = 0; index < taskList.size(); index++) {
@@ -223,6 +226,7 @@ public final class ScheduleSortSnapshotSupport {
         return result;
     }
 
+    /** 生成任务排序关键字段的规范化摘要串用于哈希计算。 */
     private static String canonicalTask(ScheduleTaskDraftModel task) {
         return String.join("|", value(task.getBusinessKey()), value(task.getProcessCode()),
                 value(task.getShiftOrder()), value(task.getGlueCode()), value(task.getBaseGlueCode()),
@@ -230,6 +234,7 @@ public final class ScheduleSortSnapshotSupport {
                 value(task.getLatestStartTime() == null ? null : task.getLatestStartTime().getTime()));
     }
 
+    /** 构建任务基础身份标识快照。 */
     private static Map<String, Object> buildTaskIdentity(ScheduleTaskDraftModel task) {
         Map<String, Object> result = new LinkedHashMap<>();
         if (task == null) {
@@ -249,6 +254,7 @@ public final class ScheduleSortSnapshotSupport {
         return result;
     }
 
+    /** 构建任务排序输入字段快照。 */
     private static Map<String, Object> buildInputValues(ScheduleTaskDraftModel task) {
         Map<String, Object> result = buildTaskIdentity(task);
         result.put("supplyHours", task.getSupplyHours());
@@ -265,6 +271,7 @@ public final class ScheduleSortSnapshotSupport {
         return result;
     }
 
+    /** 构建任务排序输出字段快照。 */
     private static Map<String, Object> buildOutputValues(ScheduleTaskDraftModel task) {
         Map<String, Object> result = new LinkedHashMap<>();
         if (task == null) {
@@ -278,6 +285,7 @@ public final class ScheduleSortSnapshotSupport {
         return result;
     }
 
+    /** 提取比较键列表中的排序规则元数据。 */
     private static List<Map<String, Object>> copyKeyRules(List<Map<String, Object>> keys) {
         if (keys == null) {
             return Collections.emptyList();
@@ -295,6 +303,7 @@ public final class ScheduleSortSnapshotSupport {
         }).collect(Collectors.toList());
     }
 
+    /** 构建机台分配取任务阶段的比较键列表。 */
     private static List<Map<String, Object>> buildAssignmentKeys(ScheduleTaskDraftModel task) {
         List<Map<String, Object>> result = new ArrayList<>();
         result.add(key("planCalcOrderIndex", task == null ? null : task.getPlanCalcOrderIndex(),
@@ -306,6 +315,7 @@ public final class ScheduleSortSnapshotSupport {
         return result;
     }
 
+    /** 构建无值的排序规则描述节点。 */
     private static Map<String, Object> rule(String field, String direction, String nullRule) {
         return key(field, null, direction, nullRule, "UNKNOWN", null);
     }
@@ -333,6 +343,7 @@ public final class ScheduleSortSnapshotSupport {
         return result;
     }
 
+    /** 查找当前任务与前一位任务首个存在差异的排序比较条件。 */
     private static <T extends ScheduleTaskDraftModel> List<Map<String, Object>> resolveFirstDifferentCondition(
             List<T> sortedTaskList, Integer position,
             Function<T, List<Map<String, Object>>> keyProvider) {
@@ -360,14 +371,17 @@ public final class ScheduleSortSnapshotSupport {
         return Collections.emptyList();
     }
 
+    /** 将日期格式化为 UTC ISO 字符串。 */
     private static String formatTime(Date value) {
         return value == null ? null : UTC_FORMATTER.format(Instant.ofEpochMilli(value.getTime()).atOffset(ZoneOffset.UTC));
     }
 
+    /** 将对象转换为安全文本，空值返回 <null>。 */
     private static String value(Object value) {
         return value == null ? "<null>" : String.valueOf(value);
     }
 
+    /** 将 BigDecimal 转换为去尾零文本，空值返回 <null>。 */
     private static String decimal(BigDecimal value) {
         return value == null ? "<null>" : value.stripTrailingZeros().toPlainString();
     }

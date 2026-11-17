@@ -2861,7 +2861,8 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
     /**
      * 执行原换活字块提交内核，供胚新增名额及结构切换失败由外层恢复资源与账本。
      *
-     * <p>后半段无计划正库存收尾走正常结果主链，仍保留续作增机日期与真实资源约束。</p>
+     * <p>同模具未来需求在本环节通过共享提前生产准入后直接排产，不再统一后置到普通新增。
+     * 无计划正库存收尾仍走正常结果主链，续作增机资格与真实资源约束保持不变。</p>
      *
      * @param context 排程上下文
      * @param machine 当前机台
@@ -2911,39 +2912,24 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             earlyProductionSourceDate = continuationEarlyProduction
                     ? sku.getFirstAddMachineProductionDate()
                     : EarlyProductionChecker.resolveFirstFuturePlanDate(context, sku, productionWorkDate);
-            if (this.shouldDeferEarlyProductionToDailyNewSpec(
-                    context, earlyProductionSourceDate)) {
-                String deferredReason = "提前生产必须等待当前业务日正常新增任务完成后执行";
-                earlyProductionRuntimePlanService.recordDecisionSnapshot(
-                        context, sku, productionWorkDate,
-                        EarlyProductionDecision.earlyProduction(
-                                false, EarlyProductionDecision.SCENE_NORMAL,
-                                earlyProductionSourceDate, Collections.<Integer>emptyList(),
-                                deferredReason));
-                this.recordTypeBlockAppendFailure(failureReason, deferredReason);
-                log.info("换活字块提前生产后置到按日新增主链, factoryCode: {}, batchNo: {}, "
-                                + "materialCode: {}, productionWorkDate: {}, futurePlanDate: {}, "
-                                + "windowEndDate: {}, reason: {}",
-                        context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(),
-                        productionWorkDate, earlyProductionSourceDate,
-                        this.resolveScheduleTargetLocalDate(context), deferredReason);
-                success = false;
+            /*
+             * 前料已经释放且同模具匹配通过时，在 S4.4 直接尝试提前承接，避免原机原模
+             * 被普通新增先占用。日期、结构机台数和临时日计划仍由共享提前生产中心校验，
+             * 不能仅凭换活字块关系跳过准入；失败继续走本方法的配额回滚及后续新增链。
+             */
+            boolean structureSwitchEarlyProduction =
+                    EarlyProductionChecker.isStructureSwitchEarlyProduction(
+                            context, sku, productionWorkDate, earlyProductionSourceDate);
+            if (structureSwitchEarlyProduction) {
+                // 结构切换还需等待配对侧释放及胎胚时间，实际开产日的准入由结果追加主链处理。
+                structureSwitchEarlyProductionCandidateDate = productionWorkDate;
             } else {
-                boolean structureSwitchEarlyProduction =
-                        EarlyProductionChecker.isStructureSwitchEarlyProduction(
-                                context, sku, productionWorkDate, earlyProductionSourceDate);
-                if (structureSwitchEarlyProduction) {
-                    structureSwitchEarlyProductionCandidateDate = productionWorkDate;
-                } else {
-                    // 非结构切换提前严格复用本次需求调整前的运行视图准备时点和失败回滚路径。
-                    String earlyProductionRejectReason = this.prepareTypeBlockEarlyProduction(
-                            context, machine, sku, productionWorkDate,
-                            switchStartTime, startTime);
-                    success = StringUtils.isEmpty(earlyProductionRejectReason);
-                    if (!success) {
-                        this.recordTypeBlockAppendFailure(
-                                failureReason, earlyProductionRejectReason);
-                    }
+                String earlyProductionRejectReason = this.prepareTypeBlockEarlyProduction(
+                        context, machine, sku, productionWorkDate,
+                        switchStartTime, startTime);
+                success = StringUtils.isEmpty(earlyProductionRejectReason);
+                if (!success) {
+                    this.recordTypeBlockAppendFailure(failureReason, earlyProductionRejectReason);
                 }
             }
         }
@@ -2971,24 +2957,6 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                             ? null : attemptShift.getShiftIndex());
         }
         return success;
-    }
-
-    /**
-     * 判断换活字块提前生产是否应统一后置到 S4.5 提前生产阶段。
-     *
-     * <p>S4.4 位于 S4.5 按日正常新增之前，原始日计划为0的未来SKU或尚未到首次增机日
-     * 的续作补偿SKU若在这里直接落地，都会先于对应业务日正常任务占用机台，并可能在跨日续排后突破结构计划机台数。
-     * 因此只要存在未来来源计划日，就保留 SKU 在新增队列中；S4.5 每日正常任务完成后，
-     * 再复用同一换活字块关系、选机排序和提前生产中心运行视图使用真实剩余资源。</p>
-     *
-     * @param context 排程上下文
-     * @param futurePlanDate 提前生产最近来源日
-     * @return true-后置到正常任务之后；false-保持现有 S4.4 处理
-     */
-    private boolean shouldDeferEarlyProductionToDailyNewSpec(
-            LhScheduleContext context,
-            LocalDate futurePlanDate) {
-        return Objects.nonNull(context) && Objects.nonNull(futurePlanDate);
     }
 
     /**

@@ -47,6 +47,11 @@ public enum UnscheduledReasonEnum {
     SKU_DECREMENT_HIT("SKU_DECREMENT_HIT", "S4.3", "命中SKU减量清单", 200, true),
     TRIAL_MASS_TRIAL_BLOCKED("TRIAL_MASS_TRIAL_BLOCKED", "S4.3/S4.5", "试制量试准入拦截", 190, true),
     HISTORY_SHORTAGE_SKIPPED("HISTORY_SHORTAGE_SKIPPED", "S4.4/S4.5", "仅历史欠产不排产", 175, false),
+    /**
+     * 窗口无计划的前段欠产已在全部原机台结束，复用既有欠产摘要并独立保留MES证据。
+     */
+    OVERDUE_SURPLUS_STAGE_COMPLETED("OVERDUE_SURPLUS_STAGE_COMPLETED", "S4.3",
+            HISTORY_SHORTAGE_SKIPPED.getSummary(), 190, true),
     CONTINUATION_LOCKED_REMAINING("CONTINUATION_LOCKED_REMAINING", "S4.4", "同物料多状态续作跨窗口延续", 155, false),
     SINGLE_CONTROL_CONTINUATION_BLOCKED("SINGLE_CONTROL_CONTINUATION_BLOCKED", "S4.4", "单控整机续作条件不满足", 175, false),
     TARGET_CLEARED_BY_RULE("TARGET_CLEARED_BY_RULE", "S4.3/S4.4", "排产目标被规则清零", 170, true),

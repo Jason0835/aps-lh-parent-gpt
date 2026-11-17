@@ -79,7 +79,7 @@ public class SkuLhSurplusCalculatorController {
             FactoryMonthPlanProductionFinalResult plan = planList.get(BigDecimal.ZERO.intValue());
             Integer actualFinishedQty = dataInfo.getFinishQty(plan);
             LhSkuSurplusControlParam productionDateInfo = new LhSkuSurplusControlParam(dataInfo.getPlanStartDate(), false, allProductionDate, realExtendDays, realSkuMaxDiscontinueDays);
-            LhSurplusSkuInfo calculateSkuInfo = new LhSurplusSkuInfo(plan, allMonthPlanList, Collections.emptyMap(), actualFinishedQty, dataInfo.getAllLhDayPlanAdjustList());
+            LhSurplusSkuInfo calculateSkuInfo = new LhSurplusSkuInfo(plan, null, allMonthPlanList, Collections.emptyMap(), actualFinishedQty, dataInfo.getAllLhDayPlanAdjustList());
             LhSurplusResultVo lhSurplusResult = LhSkuSurplusCalculator.getSurplusInfo(productionDateInfo, calculateSkuInfo);
             skuSurplusResultList.add(lhSurplusResult);
         });

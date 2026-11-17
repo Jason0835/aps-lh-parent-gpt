@@ -121,22 +121,6 @@ public final class ContinuationEndingMachineProfile {
     }
 
     /**
-     * 截取目标业务日真实容量，保留原时间换算基数、物理占用和交接硬截止。
-     *
-     * @param dayShifts 目标业务日在本窗口内可排的完整班次
-     * @return 独立容量数组的日级画像，其余日期容量为零
-     */
-    public ContinuationEndingMachineProfile copyForDay(List<LhShiftConfigVO> dayShifts) {
-        ContinuationEndingMachineProfile copy = this.copyForCalculation();
-        for (int position = 0; position < shifts.size(); position++) {
-            if (!dayShifts.contains(shifts.get(position))) {
-                copy.capacities[position] = 0;
-            }
-        }
-        return copy;
-    }
-
-    /**
      * 校验数量是否能由连续满班前缀与一个合法归整尾班组成。
      * @param quantity 物理机台合计量
      * @return 是否属于真实容量时间轴的合法连续数量

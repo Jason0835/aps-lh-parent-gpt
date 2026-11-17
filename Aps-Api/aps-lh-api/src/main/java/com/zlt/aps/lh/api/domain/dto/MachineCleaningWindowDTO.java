@@ -45,6 +45,14 @@ public class MachineCleaningWindowDTO implements Serializable {
      */
     private String sourceProductStatus;
     /**
+     * 明确卸下本次喷砂原模的历史换料计划主键，普通清洗为空。
+     */
+    private Long historicalSourceChangePlanId;
+    /**
+     * 历史来源机台换入的物料，用于核实已离机事实，不能作为旧模清洗物料。
+     */
+    private String historicalSourceAfterMaterialCode;
+    /**
      * 未指定模具的物理整机清洗，在执行时按真实运行侧占用确定物料，不能沿用已离机前料。
      */
     private boolean sourceFollowsMachineOccupation;

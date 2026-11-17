@@ -99,7 +99,6 @@ import com.zlt.aps.lh.util.LeftRightMouldUtil;
 import com.zlt.aps.lh.util.LhMouldCodeUtil;
 import com.zlt.aps.lh.util.LhMultiMachineDistributionUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
-import com.zlt.aps.lh.util.MonthPlanDayQtyUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.LhSpecialMaterialUtil;
 import com.zlt.aps.lh.util.LhSpecifyMachineUtil;
@@ -1055,8 +1054,6 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 continue;
             }
             if (skuResults.size() <= 1) {
-                // 单机同样可能仅需完成当日部分数量，普通单机的旧降模分支仍由日循环跳过。
-                this.reduceContinuationMachinesByWorkDate(context, sourceSku, skuResults, shifts, timedReductionPlan);
                 continue;
             }
 
@@ -4749,18 +4746,6 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             }
             LocalDate productionDate = entry.getKey();
             List<LhShiftConfigVO> dayShifts = entry.getValue();
-            List<LhScheduleResult> quantityKeptResults = this.tryApplyDailyQuantityReduction(
-                    context, sourceSku, activeResults, productionDate, dayShifts, shifts);
-            if (quantityKeptResults != null) {
-                int actualDayQty = this.sumScheduledQtyByShifts(activeResults, dayShifts);
-                remainingTargetQty = Math.max(0, remainingTargetQty - actualDayQty);
-                activeResults = quantityKeptResults;
-                rollingDiffQty = 0;
-                continue;
-            }
-            if (skuResults.size() <= 1) {
-                continue;
-            }
             int dayPlanQty = resolveContinuationDayPlanQtyByDate(sourceSku, productionDate);
             int demandQty = ending
                     ? resolveContinuationDayDemandQtyByDate(sourceSku, productionDate)
@@ -4825,218 +4810,6 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             log.info("续作多机台每日排后差额, materialCode: {}, 日期: {}, actualTodayQty: {}, rollingDiffQty: {}, nextActiveMachines: {}",
                     sourceSku.getMaterialCode(), productionDate, actualTodayQty, rollingDiffQty, joinMachineCodes(activeResults));
         }
-    }
-
-    /**
-     * 在等目标台数的普通续作日先确定整组数量，再沿原下机优先级冻结日目标请求。
-     * 所有副本通过容量、完成事实、固定占用和共享预算校验后一次提交，失败保留原流程。
-     *
-     * @param context 批次上下文
-     * @param sourceSku 来源物料及状态
-     * @param activeResults 当日有效原机结果
-     * @param productionDate 目标业务日
-     * @param dayShifts 当日可排班次，T日已完成夜班不在其中
-     * @param shifts 完整窗口班次
-     * @return 成功时返回后续仍在机结果，未命中或不可行时为空引用
-     */
-    private List<LhScheduleResult> tryApplyDailyQuantityReduction(LhScheduleContext context,
-            SkuScheduleDTO sourceSku, List<LhScheduleResult> activeResults, LocalDate productionDate,
-            List<LhShiftConfigVO> dayShifts, List<LhShiftConfigVO> shifts) {
-        if (this.hasEndingResult(activeResults) || sourceSku.isStrictTargetQty()
-                || ProductionQuantityPolicy.from(sourceSku, false).isStrictUpperLimit()
-                || StructureEndingContinuationPolicy.state(context, sourceSku) != null
-                || this.getTargetScheduleQtyResolver().isEmbryoStockEnding(context, sourceSku)
-                || !this.lhDailyMouldCalcService.hasRequiredMachineCount(context,
-                        sourceSku.getMaterialCode(), sourceSku.getProductStatus(), productionDate)) {
-            return null;
-        }
-        FactoryMonthPlanProductionFinalResult monthPlan = MonthPlanDateResolver.resolvePlan(
-                context, sourceSku.getMaterialCode(), sourceSku.getProductStatus(), productionDate);
-        Integer dayPlanQty = MonthPlanDayQtyUtil.resolveNullableDayQty(
-                monthPlan, productionDate.getDayOfMonth());
-        int machineCount = this.countDistinctPhysicalMachineCount(activeResults);
-        int targetCount = this.lhDailyMouldCalcService.getRequiredMachineCount(context,
-                sourceSku.getMaterialCode(), sourceSku.getProductStatus(), productionDate);
-        int dailyCapacity = this.resolveContinuationDailyStandardQty(context, sourceSku);
-        List<Integer> releaseTargets = this.resolveDailyQuantityReleaseTargets(
-                machineCount, targetCount, dailyCapacity, dayPlanQty);
-        if (releaseTargets.isEmpty()) {
-            return null;
-        }
-        ReductionResult reduction = this.continuationMachineReducer.select(context, sourceSku,
-                activeResults, releaseTargets.size(), Collections.emptySet());
-        if (reduction.getMachines().size() != releaseTargets.size()) {
-            return null;
-        }
-        Map<String, Integer> targets = new LinkedHashMap<>(machineCount);
-        for (int position = 0; position < releaseTargets.size(); position++) {
-            targets.put(reduction.getMachines().get(position).getMachineCode(), releaseTargets.get(position));
-        }
-        Map<String, List<LhScheduleResult>> physicalGroups = activeResults.stream().collect(Collectors.groupingBy(
-                result -> LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode()),
-                LinkedHashMap::new, Collectors.toList()));
-        boolean firstDay = productionDate.equals(context.getScheduleDate().toInstant()
-                .atZone(ZoneId.systemDefault()).toLocalDate());
-        Map<String, Integer> completedByMachine = firstDay
-                ? context.getMaterialMachineScheDayFinishQtyMap().getOrDefault(
-                        MonthPlanDateResolver.buildMaterialStatusKey(sourceSku.getMaterialCode(),
-                                sourceSku.getProductStatus()), Collections.emptyMap())
-                : Collections.emptyMap();
-        long completedGroupQty = physicalGroups.keySet().stream()
-                .mapToLong(code -> completedByMachine.getOrDefault(code, 0)).sum();
-        if (firstDay && completedGroupQty != Math.max(0, sourceSku.getScheduleDayFinishQty())) {
-            this.logDailyQuantityReductionConflict(context, sourceSku, productionDate,
-                    "T日完成量缺少对应原机明细，无法确定每机剩余目标");
-            return null;
-        }
-        Map<LhScheduleResult, LhScheduleResult> proposed = new IdentityHashMap<>(activeResults.size());
-        List<TimedMachineOffRequest> requests = new ArrayList<>(targets.size());
-        for (Map.Entry<String, List<LhScheduleResult>> group : physicalGroups.entrySet()) {
-            int target = targets.getOrDefault(group.getKey(), dailyCapacity);
-            int completed = completedByMachine.getOrDefault(group.getKey(), 0);
-            Map<String, Date> cutoffs = this.resolveSurplusEndingOccupiedCutoffs(
-                    context, group.getValue(), shifts, new HashMap<>());
-            ContinuationEndingMachineProfile profile = cutoffs == null ? null
-                    : this.buildSurplusEndingMachineProfile(context, group.getValue(), shifts,
-                            cutoffs, Collections.emptySet(), false);
-            if (profile == null || completed > target) {
-                this.logDailyQuantityReductionConflict(context, sourceSku, productionDate,
-                        "完成量超过日目标或原机容量画像不完整");
-                return null;
-            }
-            ContinuationEndingMachineProfile releaseCapacityProfile = profile;
-            profile = profile.copyForDay(dayShifts);
-            int plannedQty = target - completed;
-            TimedMachineOffRequest request = new TimedMachineOffRequest();
-            request.setSourceSku(sourceSku);
-            request.setStartDate(productionDate);
-            request.setProfile(profile);
-            request.setReleaseCapacityProfile(releaseCapacityProfile);
-            request.setDailyTargetQty(target);
-            request.setCompletedDayQty(completed);
-            if (!profile.isLegalQuantity(plannedQty)
-                    || this.timedMachineOffShiftService.hasFixedRelease(context, request)) {
-                this.logDailyQuantityReductionConflict(context, sourceSku, productionDate,
-                        "日目标与真实产能、数量单位或固定占用冲突");
-                return null;
-            }
-            Date completedTime = plannedQty > 0 ? profile.completionTime(plannedQty)
-                    : dayShifts.get(0).getShiftStartDateTime();
-            if (profile.getReleaseDeadline() != null
-                    && profile.physicalReadyTime(completedTime, completedTime).after(profile.getReleaseDeadline())) {
-                this.logDailyQuantityReductionConflict(context, sourceSku, productionDate,
-                        "完成后的物理释放越过既定交接截止");
-                return null;
-            }
-            List<LhScheduleResult> copies = group.getValue().stream()
-                    .map(result -> BeanUtil.copyProperties(result, LhScheduleResult.class))
-                    .collect(Collectors.toList());
-            profile.writePlan(copies, plannedQty);
-            boolean released = targets.containsKey(group.getKey());
-            for (int side = 0; side < group.getValue().size(); side++) {
-                LhScheduleResult original = group.getValue().get(side);
-                LhScheduleResult copy = copies.get(side);
-                for (LhShiftConfigVO shift : shifts) {
-                    boolean keepAllocation = dayShifts.contains(shift) || (released && shift.getShiftStartDateTime()
-                            .after(dayShifts.get(dayShifts.size() - 1).getShiftStartDateTime()));
-                    if (!keepAllocation) {
-                        ShiftFieldUtil.setShiftPlanQty(copy, shift.getShiftIndex(),
-                                ShiftFieldUtil.getShiftPlanQty(original, shift.getShiftIndex()),
-                                ShiftFieldUtil.getShiftStartTime(original, shift.getShiftIndex()),
-                                ShiftFieldUtil.getShiftEndTime(original, shift.getShiftIndex()));
-                    }
-                }
-                proposed.put(original, copy);
-            }
-            if (released) {
-                requests.add(request);
-            }
-        }
-        long proposedGroupQty = context.getScheduleResultList().stream()
-                .filter(result -> StringUtils.equals(sourceSku.getMaterialCode(), result.getMaterialCode())
-                        && StringUtils.equals(sourceSku.getProductStatus(), result.getProductStatus()))
-                .mapToLong(result -> ShiftFieldUtil.resolveScheduledQty(proposed.getOrDefault(result, result))).sum();
-        if (proposedGroupQty > this.getTargetScheduleQtyResolver().previewProductionRemainingQty(context, sourceSku)) {
-            this.logDailyQuantityReductionConflict(context, sourceSku, productionDate, "共享真实可生产余量不足");
-            return null;
-        }
-        // 到此整组试算已通过，保持原对象身份，日账本继续由统一入口消费一次。
-        proposed.forEach((original, copy) -> {
-            BeanUtil.copyProperties(copy, original);
-            this.refreshResultSummary(context, original, shifts);
-        });
-        List<String> releaseOrder = new ArrayList<>(targets.keySet());
-        requests.sort(Comparator.comparingInt(request -> releaseOrder.indexOf(
-                LhSingleControlMachineUtil.resolvePhysicalMachineCode(
-                        request.getProfile().getOriginals().get(0).getLhMachineCode()))));
-        context.getTimedMachineOffRequests().addAll(requests);
-        this.registerReducedContinuationMachineBeforeSku(context, sourceSku, reduction.getResults());
-        String groupKey = this.buildReducedContinuationKey(sourceSku);
-        context.getReducedContinuationGroupKeySet().add(groupKey);
-        context.registerReducedContinuationGroupLastReleaseDate(groupKey, productionDate);
-        for (LhScheduleResult result : reduction.getResults()) {
-            context.registerContinuousReducedMachineReleaseBoundary(result.getLhMachineCode(),
-                    Math.max(0, this.resolveLastPlannedShiftIndex(result)));
-        }
-        this.logContinuationReduction(context, sourceSku, productionDate, reduction);
-        String detail = String.format("工厂=%s, 批次=%s, 物料=%s, 状态=%s, 业务日=%s, "
-                        + "日计划=%s, 日标准=%s, 有效台数=%s, 目标台数=%s, 下机日目标=%s, 已完成=%s",
-                context.getFactoryCode(), context.getBatchNo(), sourceSku.getMaterialCode(),
-                sourceSku.getProductStatus(), productionDate, dayPlanQty, dailyCapacity,
-                machineCount, targetCount, targets, completedGroupQty);
-        PriorityTraceLogHelper.appendProcessLog(context, "续作按日目标量下机", detail);
-        if (log.isInfoEnabled()) {
-            log.info("续作按日目标量下机, {}", detail);
-        }
-        return this.resolveProductionResultsAfterReduction(context, sourceSku, activeResults, reduction);
-    }
-
-    /**
-     * 将等台数条件下的整组产能差额拆为有序零量退出与末台尾量退出。
-     *
-     * @param machineCount 当日有效物理续作台数
-     * @param targetCount 真实月计划目标台数
-     * @param dailyCapacity 单物理机台日标准产量
-     * @param dayPlanQty 原始日计划量，缺失保持为空
-     * @return 按原下机优先级对应的完整日目标量，未触发时为空集合
-     */
-    private List<Integer> resolveDailyQuantityReleaseTargets(int machineCount, int targetCount,
-            int dailyCapacity, Integer dayPlanQty) {
-        if (machineCount <= 0 || machineCount != targetCount || dailyCapacity <= 0
-                || dayPlanQty == null || dayPlanQty < 0) {
-            return Collections.emptyList();
-        }
-        long difference = (long) dailyCapacity * machineCount - dayPlanQty;
-        if (difference <= 0) {
-            return Collections.emptyList();
-        }
-        int zeroCount = (int) (difference / dailyCapacity);
-        List<Integer> targets = new ArrayList<>(zeroCount + 1);
-        for (int position = 0; position < zeroCount; position++) {
-            targets.add(0);
-        }
-        int remainder = (int) (difference % dailyCapacity);
-        if (remainder > 0) {
-            targets.add(dailyCapacity - remainder);
-        }
-        return targets;
-    }
-
-    /**
-     * 记录整组日目标未提交原因，失败时原结果、账本及资源占用保持原状态。
-     *
-     * @param context 批次上下文
-     * @param sku 来源物料及状态
-     * @param date 业务日
-     * @param reason 不可行的具体约束
-     */
-    private void logDailyQuantityReductionConflict(LhScheduleContext context, SkuScheduleDTO sku,
-            LocalDate date, String reason) {
-        String detail = String.format("工厂=%s, 批次=%s, 物料=%s, 状态=%s, 业务日=%s, 原因=%s",
-                context.getFactoryCode(), context.getBatchNo(), sku.getMaterialCode(),
-                sku.getProductStatus(), date, reason);
-        PriorityTraceLogHelper.appendProcessLog(context, "续作日目标下机未提交", detail);
-        log.warn("续作日目标下机未提交, {}", detail);
     }
 
     /**
@@ -10190,9 +9963,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             }
             // 新场景的日标准有效产能已在整窗试算中计入，禁止后处理再次补量或重新分摊。
             if (context.getSharedEmbryoStockEndingMachineQuotaMap().containsKey(result)
-                    || context.getContinuationSurplusEndingAllocatedResults().contains(result)
-                    || context.getTimedMachineOffRequests().stream().anyMatch(request ->
-                            request.hasDailyQuantityTarget() && request.getProfile().getOriginals().contains(result))) {
+                    || context.getContinuationSurplusEndingAllocatedResults().contains(result)) {
                 continue;
             }
             int shiftCapacity = Objects.isNull(result.getSingleMouldShiftQty())
@@ -11796,12 +11567,6 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             LocalDate firstAddMachineProductionDate =
                     resolveContinuationAddMachineProductionDate(context, sourceSku, reducedGroupReleaseDate);
             int activeMachineCount = resolveContinuousMachineCount(context, sourceSku);
-            activeMachineCount = DailyMachineExpansionPlanner.resolveDailyQuantityActiveMachineCount(
-                    context, sourceSku, firstAddMachineProductionDate, activeMachineCount);
-            if (DailyMachineExpansionPlanner.hasDailyQuantityRelease(context, sourceSku)
-                    && firstAddMachineProductionDate == null) {
-                continue;
-            }
             if (Objects.nonNull(reducedGroupReleaseDate)
                     && isReducedGroupDayNSatisfiedFromReleaseDate(
                     context, sourceSku, reducedGroupReleaseDate, activeMachineCount)) {
@@ -13243,16 +13008,6 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     private LocalDate resolveContinuationAddMachineProductionDate(LhScheduleContext context,
                                                                   SkuScheduleDTO sourceSku,
                                                                   LocalDate startDate) {
-        // 日目标结束后的清洗等占用可能延后物理释放，需求扫描仍从前料停止生产的业务日开始。
-        LocalDate quantityReleaseDate = context.getTimedMachineOffRequests().stream()
-                .filter(TimedMachineOffRequest::hasDailyQuantityTarget)
-                .filter(request -> StringUtils.equals(
-                        sourceSku.getMaterialCode(), request.getSourceSku().getMaterialCode())
-                        && StringUtils.equals(sourceSku.getProductStatus(), request.getSourceSku().getProductStatus()))
-                .map(TimedMachineOffRequest::getStartDate).min(LocalDate::compareTo).orElse(null);
-        if (quantityReleaseDate != null && (startDate == null || quantityReleaseDate.isBefore(startDate))) {
-            startDate = quantityReleaseDate;
-        }
         int activeMachineCount = resolveContinuousMachineCount(context, sourceSku);
         LocalDate earlyProductionMaxDate = EarlyProductionChecker.resolveEarlyProductionMaxDate(
                 context, null);
@@ -13313,9 +13068,6 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                                                                SkuScheduleDTO sourceSku,
                                                                LocalDate releaseDate,
                                                                int activeMachineCount) {
-        if (DailyMachineExpansionPlanner.hasDailyQuantityRelease(context, sourceSku)) {
-            return this.resolveContinuationAddMachineProductionDate(context, sourceSku, releaseDate) == null;
-        }
         if (Objects.isNull(context) || Objects.isNull(sourceSku) || Objects.isNull(releaseDate)
                 || activeMachineCount <= 0
                 || CollectionUtils.isEmpty(sourceSku.getDailyPlanQuotaMap())) {

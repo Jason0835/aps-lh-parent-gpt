@@ -1,5 +1,6 @@
 package com.zlt.aps.lh.service.impl;
 
+import com.zlt.aps.lh.util.HistoricalMouldCleaningTransferSupport;
 import com.zlt.aps.lh.api.constant.*;
 import com.zlt.aps.lh.api.domain.dto.*;
 import com.zlt.aps.lh.api.domain.entity.*;
@@ -638,6 +639,17 @@ public class LhCleaningPlanFinalizer {
                 || Objects.isNull(plan.getPlanDate())) {
             return null;
         }
+        MachineCleaningWindowDTO historical = HistoricalMouldCleaningTransferSupport.sources(context)
+                .filter(source -> HistoricalMouldCleaningTransferSupport.isDetached(context, source))
+                .filter(source -> StringUtils.equals(source.getLhCode(), plan.getLhMachineCode())
+                        && StringUtils.equals(source.getSourceMaterialCode(), plan.getBeforeMaterialCode())
+                        && StringUtils.equals(source.getHistoricalSourceAfterMaterialCode(),
+                        plan.getAfterMaterialCode())
+                        && !plan.getPlanDate().after(source.getCleanStartTime()))
+                .findFirst().orElse(null);
+        if (historical != null) {
+            return HistoricalMouldCleaningTransferSupport.projectDetached(context, historical);
+        }
         MachineCleaningWindowDTO event = context.getOnlySandBlastContinuationReleaseWindowMap()
                 .get(plan.getLhMachineCode());
         return Objects.nonNull(event)
@@ -661,13 +673,14 @@ public class LhCleaningPlanFinalizer {
             LhScheduleContext context, LhMouldChangePlan plan, String productStatus) {
         if (Objects.isNull(context) || Objects.isNull(plan)
                 || StringUtils.isEmpty(plan.getLhMachineCode())
-                || Objects.isNull(plan.getPlanDate())
-                || CollectionUtils.isEmpty(context.getOnlySandBlastContinuationReleaseWindowMap())) {
+                || Objects.isNull(plan.getPlanDate())) {
             return null;
         }
-        return context.getOnlySandBlastContinuationReleaseWindowMap().entrySet().stream()
-                .filter(entry -> Objects.nonNull(entry.getValue()))
-                .map(Map.Entry::getValue)
+        return java.util.stream.Stream.concat(
+                context.getOnlySandBlastContinuationReleaseWindowMap().values().stream(),
+                HistoricalMouldCleaningTransferSupport.sources(context)
+                        .filter(source -> HistoricalMouldCleaningTransferSupport.isDetached(context, source)))
+                .filter(Objects::nonNull)
                 .filter(event -> Objects.nonNull(event.getCleanEndTime())
                         && !plan.getPlanDate().before(event.getCleanEndTime()))
                 .filter(event -> StringUtils.equals(
@@ -1417,6 +1430,16 @@ public class LhCleaningPlanFinalizer {
                 }
             }
         }
+        // 历史旧模离线事件保存在来源快照，独立于当前在机后料和续作恢复候选。
+        HistoricalMouldCleaningTransferSupport.sources(context)
+                .filter(source -> HistoricalMouldCleaningTransferSupport.isDetached(context, source))
+                .forEach(source -> {
+                    itemList.removeIf(item -> Objects.equals(
+                            item.getValue().getSourcePlanId(), source.getSourcePlanId())
+                            && StringUtils.equals(item.getValue().getLhCode(), source.getLhCode()));
+                    itemList.add(new AbstractMap.SimpleEntry<>(context.getMachineScheduleMap().get(source.getLhCode()),
+                            HistoricalMouldCleaningTransferSupport.projectDetached(context, source)));
+                });
         // 离机清洗不再位于机台停机列表，但仍须生成交替计划及回填来源计划日期。
         for (Map.Entry<String, MachineCleaningWindowDTO> entry
                 : context.getContinuationSandBlastWindowMap().entrySet()) {
@@ -1429,6 +1452,9 @@ public class LhCleaningPlanFinalizer {
         // 初始化收尾跳过的来源只有在正式三项组合兑现后才加入输出，不补造独立清洗。
         context.getCleaningPlanRuntimeState().getSourceWindowMap().forEach((machineCode, sources) -> {
             for (MachineCleaningWindowDTO source : sources) {
+                if (HistoricalMouldCleaningTransferSupport.isDetached(context, source)) {
+                    continue;
+                }
                 LhScheduleResult result = LhCleaningRepairOverlapPolicy.resolveCommittedSwitch(
                         context, machineCode, source);
                 if (result == null) {

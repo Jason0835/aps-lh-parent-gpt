@@ -34,9 +34,12 @@ public class ScheduleExtraCreateWindowProof {
      */
     private String mouthPlateProofMode = "STATIC_ALLOW_LIST";
     /**
-     * 实际采用的窗口配置，供解释核对，不是另行计算的参数默认值。
+     * 实际采用的当前成型逻辑班次，供解释核对。
      */
     private Integer currentFormingLogicalShiftOrder;
+    /**
+     * 实际采用的库存保证班数，供解释核对。
+     */
     private Integer guardShiftCount;
     /**
      * 静态白名单核对的口型编码。

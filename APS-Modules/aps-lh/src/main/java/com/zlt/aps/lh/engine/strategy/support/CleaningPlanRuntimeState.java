@@ -81,6 +81,17 @@ public final class CleaningPlanRuntimeState {
     private String activeRecoverySourceMachineCode;
 
     /**
+     * 历史指定承接优先保护的空闲模具，按指定运行侧保存，喷砂置换不得提前领取。
+     * 正式历史阶段结束后清除，实际已提交占用继续由共享模具账本维护。
+     */
+    private final Map<String, List<String>> historicalMouldReservationMap = new LinkedHashMap<>();
+
+    /**
+     * 因历史模具预留失去完整替换组的喷砂来源，历史阶段结束后按真实剩余资源复评。
+     */
+    private final Set<String> historicalReservationBlockedMachines = new LinkedHashSet<>();
+
+    /**
      * 已发布的各来源运行侧处置；只读候选不写入。
      */
     private final Map<String, CleaningPlanResult.Event> appliedEventMap = new LinkedHashMap<>();
@@ -132,6 +143,9 @@ public final class CleaningPlanRuntimeState {
         target.remainingQtyMap.putAll(remainingQtyMap);
         target.pendingRecoveryMachineCodes.addAll(pendingRecoveryMachineCodes);
         target.activeRecoverySourceMachineCode = activeRecoverySourceMachineCode;
+        historicalMouldReservationMap.forEach((machine, moulds) ->
+                target.historicalMouldReservationMap.put(machine, new ArrayList<>(moulds)));
+        target.historicalReservationBlockedMachines.addAll(historicalReservationBlockedMachines);
         target.appliedEventMap.putAll(appliedEventMap);
         target.constraintVersion = constraintVersion;
         return target;

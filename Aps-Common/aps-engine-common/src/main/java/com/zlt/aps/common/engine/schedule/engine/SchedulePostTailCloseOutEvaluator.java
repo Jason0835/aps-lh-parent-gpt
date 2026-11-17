@@ -121,6 +121,13 @@ public final class SchedulePostTailCloseOutEvaluator {
         });
     }
 
+    /**
+     * 判断任务在指定班次是否满足收尾承接候选条件。
+     *
+     * @param task       任务草稿
+     * @param shiftOrder 目标逻辑班次
+     * @return 满足收尾承接条件返回 true
+     */
     private static boolean isCloseOutCandidate(ScheduleTaskDraftModel task, Integer shiftOrder) {
         if (task == null || !Objects.equals(task.getShiftOrder(), shiftOrder)) {
             return false;
@@ -150,6 +157,12 @@ public final class SchedulePostTailCloseOutEvaluator {
                 && task.getFormingCoverageShiftKeySet().contains(productDecision.getFinalFormingTailShiftKey());
     }
 
+    /**
+     * 校验产品关联的成型收尾来源信息是否完整且无冲突。
+     *
+     * @param taskList 产品任务列表
+     * @return 校验失败时返回原因编码，通过返回 null
+     */
     private static String validateSourceTail(List<ScheduleTaskDraftModel> taskList) {
         List<ScheduleFormingTailSourceModel> sourceList = taskList.stream()
                 .filter(Objects::nonNull)
@@ -210,6 +223,9 @@ public final class SchedulePostTailCloseOutEvaluator {
                 && tailShiftKey.getShiftOrder() != null && tailShiftKey.getShiftOrder() > 0;
     }
 
+    /**
+     * 获取指定产品在指定班次的已关账短缺量（非负）。
+     */
     private static BigDecimal resolveCurrentShortage(Map<String, BigDecimal> shortageMap,
                                                      String processCode, Integer shiftOrder) {
         if (shortageMap == null || shortageMap.isEmpty()) {
@@ -218,6 +234,7 @@ public final class SchedulePostTailCloseOutEvaluator {
         return nvl(shortageMap.get(processCode + "|" + shiftOrder)).max(BigDecimal.ZERO);
     }
 
+    /** 计算当前已关账班次之后仍待覆盖的收尾需求总量。 */
     private static BigDecimal resolveRemainingCloseOutDemand(
             List<ScheduleTaskDraftModel> taskList, Integer shiftOrder) {
         ScheduleProductTailDecisionModel productDecision = taskList.stream()
@@ -272,6 +289,7 @@ public final class SchedulePostTailCloseOutEvaluator {
                 && task.getFormingCoverageShiftKeySet().contains(finalTailShiftKey);
     }
 
+    /** 对任务列表中的未来需求前移分配记录去重。 */
     private static List<ScheduleFutureDemandAllocationModel> deduplicateAllocations(
             List<ScheduleTaskDraftModel> taskList) {
         Map<String, ScheduleFutureDemandAllocationModel> allocationMap = new LinkedHashMap<>();
@@ -285,6 +303,7 @@ public final class SchedulePostTailCloseOutEvaluator {
         return allocationMap.values().stream().collect(Collectors.toList());
     }
 
+    /** 生成前移需求分配记录的去重唯一标识。 */
     private static String resolveAllocationIdentity(ScheduleFutureDemandAllocationModel allocation) {
         return String.valueOf(allocation.getSourceKey()) + "|"
                 + String.valueOf(allocation.getSourceDemandShiftKeys()) + "|"
@@ -293,6 +312,7 @@ public final class SchedulePostTailCloseOutEvaluator {
                 + String.valueOf(allocation.getAllocatedQty());
     }
 
+    /** 汇总任务列表关联的成型来源唯一键摘要。 */
     private static String resolveSourceKeySummary(List<ScheduleTaskDraftModel> taskList) {
         Set<String> sourceKeySet = new LinkedHashSet<>();
         taskList.stream().filter(Objects::nonNull).forEach(task -> {
@@ -310,11 +330,13 @@ public final class SchedulePostTailCloseOutEvaluator {
         return String.join(",", sourceKeySet);
     }
 
+    /** 读取指定产品的运行态库存量，缺失时返回 0。 */
     private static BigDecimal resolveStock(Map<String, BigDecimal> runtimeStockMap, String processCode) {
         return runtimeStockMap == null ? BigDecimal.ZERO
                 : nvl(runtimeStockMap.get(processCode));
     }
 
+    /** 判断前移需求分配记录是否为已分配且正数。 */
     private static boolean isPositiveAllocation(ScheduleFutureDemandAllocationModel allocation) {
         return allocation != null
                 && ScheduleFutureDemandAllocationModel.STATUS_ALLOCATED.equals(allocation.getAllocationStatus())
@@ -322,10 +344,12 @@ public final class SchedulePostTailCloseOutEvaluator {
                 && allocation.getAllocatedQty().compareTo(BigDecimal.ZERO) > 0;
     }
 
+    /** 空值转零。 */
     private static BigDecimal nvl(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
     }
 
+    /** 判断字符串是否包含非空白文本。 */
     private static boolean hasText(String value) {
         return value != null && !value.trim().isEmpty();
     }

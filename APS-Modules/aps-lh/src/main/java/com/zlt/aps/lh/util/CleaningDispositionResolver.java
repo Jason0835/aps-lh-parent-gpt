@@ -126,6 +126,10 @@ public final class CleaningDispositionResolver {
         if (Objects.isNull(context) || Objects.isNull(window) || StringUtils.isEmpty(machineCode)) {
             return new Decision(Disposition.INDEPENDENT, null, null);
         }
+        // 历史换料只解除原机停机，已卸下指定旧模的离线喷砂仍是独立资源事实。
+        if (HistoricalMouldCleaningTransferSupport.isDetached(context, window)) {
+            return new Decision(Disposition.INDEPENDENT, null, null);
+        }
         LhScheduleResult combinedSwitch = LhCleaningRepairOverlapPolicy.resolveCommittedSwitch(
                 context, machineCode, window);
         if (combinedSwitch != null) {
@@ -168,6 +172,7 @@ public final class CleaningDispositionResolver {
             return Collections.emptyList();
         }
         return windows.stream().filter(Objects::nonNull)
+                .filter(window -> !HistoricalMouldCleaningTransferSupport.isDetached(context, window))
                 .filter(window -> resolve(context, machineCode, window).getDisposition() == Disposition.INDEPENDENT)
                 .collect(Collectors.toList());
     }
@@ -186,6 +191,11 @@ public final class CleaningDispositionResolver {
             String machineCode, List<MachineCleaningWindowDTO> windows, Date changeStart) {
         if (Objects.isNull(windows)) {
             return Collections.emptyList();
+        }
+        if (windows.stream().anyMatch(window -> HistoricalMouldCleaningTransferSupport.isDetached(context, window))) {
+            windows = windows.stream()
+                    .filter(window -> !HistoricalMouldCleaningTransferSupport.isDetached(context, window))
+                    .collect(Collectors.toList());
         }
         boolean candidate = Objects.nonNull(changeStart)
                 && changeStart.equals(context.getTimedMachineOffCleaningCandidateMap().get(machineCode));

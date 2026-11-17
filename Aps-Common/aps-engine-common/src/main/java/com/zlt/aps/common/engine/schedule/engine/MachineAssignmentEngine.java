@@ -382,6 +382,9 @@ public final class MachineAssignmentEngine<C extends MachineAssignmentContext<T>
         context.setRemainingStockMap(new java.util.HashMap<>(runtimeStockMap));
     }
 
+    /**
+     * 将班次序号规范化到 [1, maxShiftOrder] 范围内。
+     */
     private Integer normalizeShiftOrder(Integer shiftOrder, int maxShiftOrder) {
         if (shiftOrder == null || shiftOrder < 1) {
             return 1;
@@ -390,10 +393,17 @@ public final class MachineAssignmentEngine<C extends MachineAssignmentContext<T>
         return Math.min(shiftOrder, normalizedMaxShiftOrder);
     }
 
+    /** 判断字符串是否非空白。 */
     private boolean isNotBlank(String value) {
         return !this.isBlank(value);
     }
 
+    /**
+     * 判断任务是否需要参与机台分配。
+     *
+     * @param task 待排程任务
+     * @return 需要选机分配返回 true
+     */
     public boolean isMachineAssignmentRequired(T task) {
         return task != null && (this.nvl(task.getPlanQty()).compareTo(BigDecimal.ZERO) > 0
                 || this.nvl(task.getToolOverflowQty()).compareTo(BigDecimal.ZERO) > 0)
@@ -402,6 +412,12 @@ public final class MachineAssignmentEngine<C extends MachineAssignmentContext<T>
                 && this.isBlank(task.getUnplannedReasonCode());
     }
 
+    /**
+     * 清理同班重复产品任务的旧计划与库存覆盖判定状态。
+     *
+     * @param task         同班重复任务
+     * @param openingStock 班初可用库存
+     */
     public void clearDuplicateProductShiftPlan(T task, BigDecimal openingStock) {
         // 同班重复任务不重新计算覆盖规则，清除旧判定避免后续解释沿用过期状态。
         task.setStockCoverageStockGapQty(null);
@@ -414,10 +430,26 @@ public final class MachineAssignmentEngine<C extends MachineAssignmentContext<T>
         task.setPlanStockQty(openingStock);
     }
 
+    /**
+     * 从原数量中扣减指定数量（最小归零）。
+     *
+     * @param value       原数量
+     * @param deductedQty 扣减数量
+     * @return 扣减后的非负数量，原值为 null 时返回 null
+     */
     public BigDecimal deductQty(BigDecimal value, BigDecimal deductedQty) {
         return value == null ? null : value.subtract(this.nvl(deductedQty)).max(BigDecimal.ZERO);
     }
 
+    /**
+     * 根据产能溢出和工装溢出情况解析顺延来源类型标签。
+     *
+     * @param capacityOverflowQty 产能溢出量
+     * @param toolOverflowQty     工装溢出量
+     * @param capacitySource      产能溢出标识
+     * @param toolSource          工装溢出标识
+     * @return 顺延来源类型文本
+     */
     public String resolveCarryoverSourceType(BigDecimal capacityOverflowQty, BigDecimal toolOverflowQty,
                                               String capacitySource, String toolSource) {
         boolean capacityOverflow = this.nvl(capacityOverflowQty).compareTo(BigDecimal.ZERO) > 0;
@@ -428,11 +460,24 @@ public final class MachineAssignmentEngine<C extends MachineAssignmentContext<T>
         return toolOverflow ? toolSource : capacitySource;
     }
 
+    /**
+     * 从候选机台证据映射中读取 BigDecimal 字段，缺失或非数值时返回 0。
+     *
+     * @param evidence 证据映射
+     * @param key      字段键
+     * @return BigDecimal 数值
+     */
     public BigDecimal getCandidateEvidenceDecimal(Map<String, Object> evidence, String key) {
         Object value = evidence.get(key);
         return value instanceof BigDecimal ? (BigDecimal) value : BigDecimal.ZERO;
     }
 
+    /**
+     * 规范化业务键片段，保留可读前缀并附加哈希后缀保证唯一性。
+     *
+     * @param value 原始业务值
+     * @return 规范化后的业务键片段
+     */
     public String normalizeBusinessKeyToken(String value) {
         if (this.isBlank(value)) {
             return null;
@@ -442,6 +487,16 @@ public final class MachineAssignmentEngine<C extends MachineAssignmentContext<T>
         return prefix + "_" + Integer.toHexString(value.hashCode());
     }
 
+    /**
+     * 将机台产能拆分结果回写到任务对象。
+     *
+     * @param task           当前任务
+     * @param beforeAssignQty 分配前计划量
+     * @param assignedQty    实际分配计划量
+     * @param remainCapacity 机台分配后剩余产能
+     * @param machineSpeed   机台生产速度
+     * @param splitDesc      拆分计算说明
+     */
     public void applyCapacitySplitResult(T task, BigDecimal beforeAssignQty, BigDecimal assignedQty,
                                          BigDecimal remainCapacity, BigDecimal machineSpeed, String splitDesc) {
         task.setPlanQty(assignedQty);
@@ -452,6 +507,13 @@ public final class MachineAssignmentEngine<C extends MachineAssignmentContext<T>
         task.setCalcFormulaDesc(this.appendFormulaDesc(task.getCalcFormulaDesc(), splitDesc));
     }
 
+    /**
+     * 向已有计算公式说明追加新步骤（自动去重）。
+     *
+     * @param current  当前公式说明
+     * @param addition 新增步骤说明
+     * @return 拼接后的公式说明
+     */
     public String appendFormulaDesc(String current, String addition) {
         if (this.isBlank(current)) {
             return addition;
@@ -459,6 +521,13 @@ public final class MachineAssignmentEngine<C extends MachineAssignmentContext<T>
         return current.contains(addition) ? current : current + "->" + addition;
     }
 
+    /**
+     * 按机台编码从候选机台列表中查找对应候选对象。
+     *
+     * @param candidates  候选机台列表
+     * @param machineCode 机台编码
+     * @return 匹配的候选机台，未找到返回 null
+     */
     public M findCandidateByMachineCode(List<M> candidates, String machineCode) {
         if (candidates == null || candidates.isEmpty() || this.isBlank(machineCode)) {
             return null;
@@ -467,15 +536,37 @@ public final class MachineAssignmentEngine<C extends MachineAssignmentContext<T>
                 .findFirst().orElse(null);
     }
 
+    /**
+     * 判断非空集合中是否包含指定非空白字符串。
+     *
+     * @param values 字符串集合
+     * @param value  待检查字符串
+     * @return 包含返回 true
+     */
     public boolean contains(Set<String> values, String value) {
         return values != null && !this.isBlank(value) && values.contains(value);
     }
 
+    /**
+     * 判断前后两个胶料编码是否发生换胶。
+     *
+     * @param previousGlueCode 前序胶料编码
+     * @param currentGlueCode  当前胶料编码
+     * @return 均非空白且不一致时返回 true
+     */
     public boolean isGlueSwitch(String previousGlueCode, String currentGlueCode) {
         return !this.isBlank(previousGlueCode) && !this.isBlank(currentGlueCode)
                 && !Objects.equals(previousGlueCode.trim(), currentGlueCode.trim());
     }
 
+    /**
+     * 解析任务在候选机台对应班次的检修时长（小时）。
+     *
+     * @param task          当前任务
+     * @param candidate     候选机台
+     * @param maxShiftOrder 最大排程班次
+     * @return 检修时长（小时）
+     */
     public BigDecimal resolveMaintenanceHours(T task, M candidate, int maxShiftOrder) {
         Map<Integer, BigDecimal> hoursByShift = candidate.getMaintenanceHoursByShift();
         if (hoursByShift != null && !hoursByShift.isEmpty()) {
@@ -486,10 +577,12 @@ public final class MachineAssignmentEngine<C extends MachineAssignmentContext<T>
         return this.nvl(candidate.getMaintenanceHours());
     }
 
+    /** 空值转零。 */
     private BigDecimal nvl(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
     }
 
+    /** 判断字符串是否为空白。 */
     private boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
     }

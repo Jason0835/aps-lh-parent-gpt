@@ -182,6 +182,23 @@ public class LhScheduleContext {
      */
     private List<FactoryMonthPlanProductionFinalResult> loadedMonthPlanList = new ArrayList<>();
     /**
+     * 喷砂置换保护观察的原始定稿月计划，不参与普通待排归集和数量账本。
+     */
+    private List<FactoryMonthPlanProductionFinalResult> sandBlastFuturePlanList = Collections.emptyList();
+    /**
+     * 喷砂保护专用物料模具关系，包含窗口外候选，不扩大正式资源集合。
+     */
+    private Map<String, List<MdmSkuMouldRel>> sandBlastFutureMouldRelMap = Collections.emptyMap();
+    /**
+     * T所属自然月内的最近原始库存抓取日；为空时仅观察至本月底。
+     */
+    private LocalDate sandBlastStockCaptureDate;
+    /**
+     * 窗口外允许提前范围内的首个正计划量日期，key 为物料编码与产品状态。
+     * <p>由本轮定稿月计划快照一次生成，供共享胎胚余量及 SKU 归集共同使用。</p>
+     */
+    private Map<String, LocalDate> earlyProductionFirstPlanDateMap = Collections.emptyMap();
+    /**
      * 月-硫化日计划调整信息
      */
     private List<LhDayPlanAdjustVo> allLhDayPlanAdjustList = Lists.newArrayList();
@@ -355,10 +372,6 @@ public class LhScheduleContext {
      * 物理硫化机 → 专供成型机集合，支持多对多关系。
      */
     private Map<String, Set<String>> supplyFormingMachinesByLhMachineMap = new LinkedHashMap<>(16);
-    /**
-     * 胎胚最近在机日期的实际成型来源，只读输入，候选预演和回滚不得修改。
-     */
-    private Map<String, Set<String>> embryoFormingMachineMap = Collections.emptyMap();
     /**
      * 新增排产机台资源作用域。
      * <p>空集合表示沿用原主流程全部机台；班次9独立上下文写入班次8真实释放机台编码，
@@ -545,7 +558,7 @@ public class LhScheduleContext {
     private Set<String> cxHandoverInProdEmbryoSet = new LinkedHashSet<>();
 
     /**
-     * 交班收尾命中：上一批已安排收尾 + 交班停产 + 胎胚余量∈(0, 一车) 同时成立、强制胎胚收尾=1 的胎胚集合。
+     * 交班收尾命中：上一批已安排收尾 + 交班停产 + 胎胚余量∈(0, 2 条] 同时成立、强制胎胚收尾=1 的胎胚集合。
      * <p>供 {@code TargetScheduleQtyResolver} 按胎胚库存严格排产（只消耗库存，不再按硫化余量放大）。</p>
      */
     private Set<String> cxHandoverStoppedEndingEmbryoSet = new LinkedHashSet<>();
@@ -577,12 +590,6 @@ public class LhScheduleContext {
      * T日排程班次完成量Map, key=materialCode+产品状态, value=T日class1FinishQty按物料汇总值
      */
     private Map<String, Integer> materialScheDayFinishQtyMap = new HashMap<>();
-
-    /**
-     * T日夜班完成量的物理机台明细，外层键为物料及状态，内层键为物理机台编码。
-     * 与SKU聚合完成量同次加载，仅供日目标分配扣除实际完成事实。
-     */
-    private Map<String, Map<String, Integer>> materialMachineScheDayFinishQtyMap = new HashMap<>();
     /**
      * 物料信息Map, key=materialCode
      */
@@ -946,33 +953,6 @@ public class LhScheduleContext {
                 machines.add(LhSingleControlMachineUtil.resolvePhysicalMachineCode(machineCode));
             }
         });
-        return machines;
-    }
-
-    /**
-     * 获取日目标完成后不再承担后日需求的原物理机台，供新增与换活字块共用。
-     * 当日参与量继续保留，后日同料已重新上机时复用原重上机检查恢复有效承载。
-     *
-     * @param sku 当前需求物料及状态
-     * @param businessDate 当前需求业务日
-     * @return 后日已经失效且未重新上机的物理机台
-     */
-    public Set<String> resolveDailyQuantityReleasedMachines(SkuScheduleDTO sku, LocalDate businessDate) {
-        Set<String> machines = new LinkedHashSet<>(4);
-        for (TimedMachineOffRequest request : timedMachineOffRequests) {
-            if (!request.hasDailyQuantityTarget() || !businessDate.isAfter(request.getStartDate())
-                    || !StringUtils.equals(sku.getMaterialCode(), request.getSourceSku().getMaterialCode())
-                    || !StringUtils.equals(sku.getProductStatus(), request.getSourceSku().getProductStatus())) {
-                continue;
-            }
-            for (LhScheduleResult original : request.getProfile().getOriginals()) {
-                OffMachineDecision decision = timedMachineOffDecisionMap.get(original);
-                if (decision != null && !this.hasPreviousAlternateReplacementResult(sku, original.getLhMachineCode(),
-                        decision.getOccupancyEndTime(), businessDate)) {
-                    machines.add(LhSingleControlMachineUtil.resolvePhysicalMachineCode(original.getLhMachineCode()));
-                }
-            }
-        }
         return machines;
     }
 

@@ -38,10 +38,26 @@ public class ScheduleRuleResult {
         this.evidence = evidence;
     }
 
+    /**
+     * 创建规则通过结果。
+     *
+     * @param reasonCode 原因编码
+     * @param reasonDesc 原因描述
+     * @param evidence   规则证据
+     * @return 通过状态的规则结果
+     */
     public static ScheduleRuleResult pass(String reasonCode, String reasonDesc, Object evidence) {
         return new ScheduleRuleResult(true, reasonCode, reasonDesc, evidence);
     }
 
+    /**
+     * 创建规则拒绝结果。
+     *
+     * @param reasonCode 原因编码
+     * @param reasonDesc 原因描述
+     * @param evidence   规则证据
+     * @return 拒绝状态的规则结果
+     */
     public static ScheduleRuleResult reject(String reasonCode, String reasonDesc, Object evidence) {
         return new ScheduleRuleResult(false, reasonCode, reasonDesc, evidence);
     }

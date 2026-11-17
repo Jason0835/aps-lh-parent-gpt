@@ -12,6 +12,11 @@ public enum FirstInspectionTimingMode {
      */
     INCLUDED_IN_CHANGEOVER,
 
+    /**
+     * 正规换模与维修重叠：首检包含在换模尾段，并受维修预热及真实生产门禁约束。
+     */
+    INCLUDED_IN_CHANGEOVER_AFTER_REPAIR,
+
     /** 正规换模与精度并行：精度完整时长已含首检，不再追加首检产量和时长。 */
     INCLUDED_IN_MAINTENANCE,
 

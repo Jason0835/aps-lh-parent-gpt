@@ -1,6 +1,10 @@
 package com.zlt.aps.lh.service.impl;
 
 import com.zlt.aps.lh.component.NewProductionDateAdmissionPolicy;
+import com.zlt.aps.lh.engine.strategy.support.SharedMouldFuturePlanPolicy;
+import com.zlt.aps.lh.component.MonthPlanDateResolver;
+import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import cn.hutool.core.bean.BeanUtil;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
@@ -157,8 +161,14 @@ public class ContinuationSandBlastDispositionService {
             event.setContinuationProductStatus(StringUtils.defaultIfBlank(online.getProductStatus(), "S"));
             event.setContinuationMaterialDesc(machine.getCurrentMaterialDesc());
             event.setMouldCode(LhMouldCodeUtil.joinMouldCode(originalMoulds));
-            List<String> freeMoulds = this.resolveIdleReplacementMoulds(context, event, originalMoulds);
             int requiredQty = ShiftCapacityResolverUtil.resolveMachineMouldQty(machine);
+            List<String> freeMoulds = this.resolveIdleReplacementMoulds(context, event, originalMoulds, requiredQty);
+            if (freeMoulds.size() >= requiredQty && this.isReplacementProtected(context,
+                    online.getMaterialCode(), online.getProductStatus(), originalMoulds,
+                    Collections.singletonList(machine.getMachineCode()))) {
+                // 保留原机清洗，不将禁止置换伪装为无模具离机事件。
+                continue;
+            }
             event.setIdleSandBlastRecoveryRequired(freeMoulds.size() < requiredQty);
             if (!event.isIdleSandBlastRecoveryRequired()) {
                 event.setDeferredReplacementMouldCode(LhMouldCodeUtil.joinMouldCode(
@@ -190,15 +200,17 @@ public class ContinuationSandBlastDispositionService {
      * @param context 当前资源上下文
      * @param event 原机同料喷砂来源
      * @param originalMoulds 应排除的原模具组
+     * @param requiredQty 当前运行侧所需模数
      * @return 当时有效且未占用的备用模具
      */
     private List<String> resolveIdleReplacementMoulds(LhScheduleContext context,
-            MachineCleaningWindowDTO event, Set<String> originalMoulds) {
+            MachineCleaningWindowDTO event, Set<String> originalMoulds, int requiredQty) {
         Date previousDate = context.getCurrentScheduleDate();
         try {
             context.setCurrentScheduleDate(LhScheduleTimeUtil.clearTime(event.getCleanStartTime()));
-            return MouldResourceContext.from(context).resolveFreeValidMouldCodes(
-                    event.getContinuationMaterialCode(), originalMoulds, event.getCleanStartTime());
+            return this.resolveReplacementMoulds(context, MouldResourceContext.from(context),
+                    event.getContinuationMaterialCode(), originalMoulds, event.getCleanStartTime(),
+                    Collections.singletonList(event.getLhCode()), requiredQty);
         } finally {
             context.setCurrentScheduleDate(previousDate);
         }
@@ -300,8 +312,15 @@ public class ContinuationSandBlastDispositionService {
             oldMoulds.addAll(LhMouldCodeUtil.resolveInMachineMouldCodeSet(context, side));
             requiredQty += ShiftCapacityResolverUtil.resolveMachineMouldQty(context.getMachineScheduleMap().get(side));
         }
-        List<String> freeMoulds = resources.resolveFreeValidMouldCodes(materialCode, oldMoulds, startTime);
+        List<String> freeMoulds = this.resolveReplacementMoulds(
+                context, resources, materialCode, oldMoulds, startTime, sides, requiredQty);
         boolean replacement = freeMoulds.size() >= requiredQty;
+        SkuScheduleDTO originalSku = sources.get(sides.get(0));
+        if (replacement && this.isReplacementProtected(context, materialCode,
+                originalSku.getProductStatus(), oldMoulds, sides)) {
+            // 必须在延期预留、换模额度及模具领取之前退出，普通喷砂仍由原窗口驱动。
+            return;
+        }
         LhShiftConfigVO triggerShift = LhScheduleTimeUtil.resolveShiftByTime(context.getScheduleWindowShifts(), startTime);
         if (replacement && Objects.nonNull(triggerShift)
                 && !NewProductionDateAdmissionPolicy.isAllowed(context, triggerShift.getWorkDate().toInstant()
@@ -396,6 +415,150 @@ public class ContinuationSandBlastDispositionService {
                     event.getMouldCode(), event.getReplacementMouldCode(),
                     replacement ? REPLACEMENT_ANALYSIS : "SKU下机重新排产");
         }
+    }
+
+    /**
+     * 以来源身份和冻结装机组调用公共保护规则，并关联实际运行侧。
+     *
+     * @param context 当前批次观察数据
+     * @param materialCode 来源物料
+     * @param productStatus 来源产品状态
+     * @param originals 实际原装机组
+     * @param sides 同源运行侧
+     * @return 命中未来共模保护时返回true
+     */
+    private boolean isReplacementProtected(LhScheduleContext context, String materialCode,
+            String productStatus, Set<String> originals, List<String> sides) {
+        FactoryMonthPlanProductionFinalResult plan = MonthPlanDateResolver.resolvePlan(context,
+                materialCode, productStatus, context.getScheduleDate().toInstant()
+                        .atZone(java.time.ZoneId.systemDefault()).toLocalDate());
+        MdmMaterialInfo material = context.getMaterialInfoMap().get(materialCode);
+        String structure = null;
+        String pattern = null;
+        if (plan != null) {
+            structure = plan.getStructureName();
+            pattern = plan.getMainPattern();
+        } else if (material != null) {
+            structure = material.getStructureName();
+            pattern = material.getMainPattern();
+        }
+        boolean blocked = SharedMouldFuturePlanPolicy.isReplacementProhibited(
+                context, materialCode, structure, pattern, originals);
+        log.info("仅喷砂模具置换资格, factoryCode: {}, batchNo: {}, machineCodes: {}, materialCode: {}, "
+                        + "productStatus: {}, originalMoulds: {}, futurePlanBlocked: {}",
+                context.getFactoryCode(), context.getBatchNo(), sides, materialCode, productStatus, originals, blocked);
+        return blocked;
+    }
+
+    /**
+     * 各喷砂来源统一扣除历史指定的预留组，记录因此失去完整替换组的来源。
+     *
+     * @param context 当前批次清洗运行态
+     * @param resources 当前资源视图
+     * @param materialCode 喷砂来源物料
+     * @param originalMoulds 原模具集合
+     * @param startTime 喷砂实际触发时刻
+     * @param sides 必须一起决策的运行侧
+     * @param requiredQty 整组所需模数
+     * @return 扣除指定预留后的空闲模具
+     */
+    private List<String> resolveReplacementMoulds(LhScheduleContext context, MouldResourceContext resources,
+            String materialCode, Set<String> originalMoulds, Date startTime, List<String> sides, int requiredQty) {
+        List<String> available = resources.resolveSandBlastReplacementMouldCodes(materialCode, originalMoulds, startTime);
+        if (available.size() < requiredQty
+                && !context.getCleaningPlanRuntimeState().getHistoricalMouldReservationMap().isEmpty()
+                && resources.resolveFreeValidMouldCodes(materialCode, originalMoulds, startTime).size() >= requiredQty) {
+            context.getCleaningPlanRuntimeState().getHistoricalReservationBlockedMachines().addAll(sides);
+            PriorityTraceLogHelper.appendProcessLog(context, "喷砂置换让位历史指定", String.format(
+                    "工厂=%s, 批次=%s, 机台=%s, 物料=%s, 喷砂开始=%s, 所需模数=%s, 剩余空闲模具=%s, 历史预留=%s",
+                    context.getFactoryCode(), context.getBatchNo(), sides, materialCode, startTime, requiredQty,
+                    available, context.getCleaningPlanRuntimeState().getHistoricalMouldReservationMap()));
+        }
+        return available;
+    }
+
+    /**
+     * 历史阶段结束后复评曾让位的喷砂来源，完整空闲组交由原机恢复内核提交。
+     * 原续作已按喷砂节点截断，恢复段独立保存实际模具和产量，避免重算或重复扣账。
+     *
+     * @param context 已结束历史预留并完成续作扣账的上下文
+     */
+    public void reconcileHistoricalReservations(LhScheduleContext context) {
+        Set<String> blocked = context.getCleaningPlanRuntimeState().getHistoricalReservationBlockedMachines();
+        if (blocked.isEmpty()) {
+            return;
+        }
+        Date previousDate = context.getCurrentScheduleDate();
+        Set<String> processed = new LinkedHashSet<>();
+        try {
+            for (String source : new ArrayList<>(blocked)) {
+                MachineCleaningWindowDTO event = context.getOnlySandBlastContinuationReleaseWindowMap().get(source);
+                if (processed.contains(source) || event == null
+                        || !context.getCleaningPlanRuntimeState().getPendingRecoveryMachineCodes().contains(source)) {
+                    continue;
+                }
+                List<String> sides = blocked.stream().filter(side -> {
+                    MachineCleaningWindowDTO other = context.getOnlySandBlastContinuationReleaseWindowMap().get(side);
+                    return other != null && Objects.equals(event.getSourcePlanId(), other.getSourcePlanId())
+                            && Objects.equals(event.getCleanStartTime(), other.getCleanStartTime())
+                            && StringUtils.equals(event.getContinuationMaterialCode(), other.getContinuationMaterialCode())
+                            && StringUtils.equals(event.getContinuationProductStatus(), other.getContinuationProductStatus())
+                            && StringUtils.equals(LhSingleControlMachineUtil.resolvePhysicalMachineCode(source),
+                                    LhSingleControlMachineUtil.resolvePhysicalMachineCode(side));
+                }).collect(Collectors.toList());
+                processed.addAll(sides);
+                this.restoreAvailableReplacement(context, sides, event);
+            }
+        } finally {
+            blocked.clear();
+            context.setCurrentScheduleDate(previousDate);
+            context.setMouldResourceContext(MouldResourceContext.from(context));
+        }
+    }
+
+    /**
+     * 只为仍待原机恢复且整组空闲的来源登记替换组合，实际次数和首检由恢复提交消费。
+     *
+     * @param context 历史阶段后的实时资源
+     * @param sides 同源物理运行侧
+     * @param sourceEvent 来源喷砂窗口
+     */
+    private void restoreAvailableReplacement(LhScheduleContext context, List<String> sides,
+            MachineCleaningWindowDTO sourceEvent) {
+        Set<String> originals = new LinkedHashSet<>();
+        int requiredQty = 0;
+        for (String side : sides) {
+            MachineScheduleDTO machine = context.getMachineScheduleMap().get(side);
+            MachineCleaningWindowDTO event = context.getOnlySandBlastContinuationReleaseWindowMap().get(side);
+            if (machine == null || !context.getCleaningPlanRuntimeState().getPendingRecoveryMachineCodes().contains(side)
+                    || StringUtils.isNotBlank(event.getDeferredReplacementMouldCode())
+                    || StringUtils.isNotBlank(machine.getCurrentMaterialCode())
+                    || CleaningDispositionResolver.resolve(context, side, event).getDisposition()
+                            != CleaningDispositionResolver.Disposition.INDEPENDENT) {
+                return;
+            }
+            originals.addAll(LhMouldCodeUtil.splitMouldCode(event.getMouldCode()));
+            requiredQty += ShiftCapacityResolverUtil.resolveMachineMouldQty(machine);
+        }
+        context.setCurrentScheduleDate(LhScheduleTimeUtil.clearTime(sourceEvent.getCleanStartTime()));
+        List<String> available = MouldResourceContext.from(context).resolveFreeValidMouldCodes(
+                sourceEvent.getContinuationMaterialCode(), originals, sourceEvent.getCleanStartTime());
+        if (available.size() < requiredQty || this.isReplacementProtected(context,
+                sourceEvent.getContinuationMaterialCode(), sourceEvent.getContinuationProductStatus(),
+                originals, sides)) {
+            return;
+        }
+        int offset = 0;
+        for (String side : sides) {
+            int mouldQty = ShiftCapacityResolverUtil.resolveMachineMouldQty(context.getMachineScheduleMap().get(side));
+            context.getOnlySandBlastContinuationReleaseWindowMap().get(side).setDeferredReplacementMouldCode(
+                    LhMouldCodeUtil.joinMouldCode(available.subList(offset, offset + mouldQty)));
+            offset += mouldQty;
+        }
+        PriorityTraceLogHelper.appendProcessLog(context, "历史指定后喷砂模具复评", String.format(
+                "工厂=%s, 批次=%s, 机台=%s, 物料=%s, 状态=%s, 替换模具=%s, 处置=原机恢复入口重新校验换模首检与正量",
+                context.getFactoryCode(), context.getBatchNo(), sides, sourceEvent.getContinuationMaterialCode(),
+                sourceEvent.getContinuationProductStatus(), available.subList(0, requiredQty)));
     }
 
     /**

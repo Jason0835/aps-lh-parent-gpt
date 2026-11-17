@@ -1,6 +1,7 @@
 package com.zlt.aps.common.engine.utils;
 
 import cn.hutool.core.date.DateUtil;
+import com.ruoyi.common.core.utils.DateUtils;
 import com.zlt.aps.common.engine.domain.*;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import lombok.extern.slf4j.Slf4j;
@@ -72,6 +73,7 @@ public class LhSkuSurplusCalculator {
         if (CollectionUtils.isEmpty(cycleDateList)) {
             return null;
         }
+        Date firstDateByBefore = calculateSkuInfo.getFirstDateByBefore();
         //步骤1、2：忽略超欠产；取同Sku月计划并拆分成"日期-计划量"
         SkuLhMonthPlanInfoHelper monthPlanInfoHelper = buildSkuMonthPlanInfo(skuInfo, calculateSkuInfo.getAllMonthPlanList());
         Map<LocalDate, Integer> dayPlanQtyMap = getDayPlanQtyMap(monthPlanInfoHelper);
@@ -90,6 +92,11 @@ public class LhSkuSurplusCalculator {
         //步骤6：排产周期的排产日是否有计划量
         boolean cycleHasPlanQty = cycleDateList.stream()
                 .anyMatch(cycleDate -> hasPlanQty(dayPlanQtyMap.get(cycleDate)));
+        //20261116+ ZLT 提前排产首日有值，则无需计算前段余量
+        if (null != firstDateByBefore) {
+            log.info(String.format("Sku40天余量计算: %s %s 提前排产[%s]", skuInfo.getMaterialCode(), skuInfo.getProductStatus(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD, firstDateByBefore)));
+            cycleHasPlanQty = true;
+        }
         if (!cycleHasPlanQty) {
             //6.1 排产周期内都没有计划量：先按前段余量（planStartDate~firstScheduleDate）计算
             Integer beforePlanQty = sumPlanQty(dayPlanQtyMap, planStartDate, firstScheduleDate) + lhDayAdjustQty;
@@ -106,7 +113,7 @@ public class LhSkuSurplusCalculator {
             LocalDate forwardStartDate = findFirstHasPlanQtyDate(lastCycleDate, dayPlanQtyMap);
             //6.1.3 从起始日往后查找终止日
             LocalDate forwardEndDate = findPlanEndDate(forwardStartDate, skuMaxDiscontinueDays, dayPlanQtyMap);
-            if(null == forwardEndDate){
+            if (null == forwardEndDate) {
                 //表示后面都没有计划量
                 forwardEndDate = lastCycleDate;
             }
@@ -120,6 +127,10 @@ public class LhSkuSurplusCalculator {
         //6.2 往后看skuMaxDiscontinueDays+1天的计划量，确定查找起始日
         LocalDate forwardStartDate = findPlanQtyStartDate(maxCyclePlanDate, skuMaxDiscontinueDays, dayPlanQtyMap);
         //6.2.1 从起始日往后查找终止日
+        if (null != firstDateByBefore) {
+            //20261116+ ZLT 直接看后续余量
+            forwardStartDate = toLocalDate(firstDateByBefore);
+        }
         LocalDate forwardEndDate = findPlanEndDate(forwardStartDate, skuMaxDiscontinueDays, dayPlanQtyMap);
         //6.2.2 后段余量：按planStartDate~终止日汇总计划量
         Integer forwardPlanQty = sumPlanQty(dayPlanQtyMap, planStartDate, forwardEndDate) + lhDayAdjustQty;
@@ -451,22 +462,6 @@ public class LhSkuSurplusCalculator {
             return null;
         }
         return Collections.max(dayPlanQtyMap.keySet());
-    }
-
-    /**
-     * 组装硫化余量结果
-     *
-     * @param skuInfo     Sku信息
-     * @param planQty     当前计划量（已含日硫化计划调整量）
-     * @param sumPlanQty  总计划量（已含日硫化计划调整量）
-     * @param finishedQty 已完成量
-     * @return 硫化余量结果
-     */
-    private static LhSurplusResultVo buildSurplusResult(FactoryMonthPlanProductionFinalResult skuInfo,
-                                                        Integer planQty,
-                                                        Integer sumPlanQty,
-                                                        Integer finishedQty) {
-        return buildSurplusResult(skuInfo, planQty, sumPlanQty, finishedQty, null, null);
     }
 
     /**

@@ -383,6 +383,9 @@ public final class SchedulePhysicalShiftTimeUtils {
         }
     }
 
+    /**
+     * 解析 HH:mm 或 HH:mm:ss 格式的时间字符串为 LocalTime。
+     */
     private static LocalTime parseTime(String timeText) {
         String normalizedTime = timeText.trim();
         String[] timeParts = normalizedTime.split(":");

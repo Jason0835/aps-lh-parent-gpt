@@ -2474,14 +2474,22 @@ public class TargetScheduleQtyResolver {
         Date combinedInspectionReady = precisionOverlap.isSupported() ? null
                 : LhRepairPlanScheduleService.resolveForwardInspectionReady(
                         context, machine.getMachineCode(), scheduleType, switchStartTime, mouldChangeCompleteTime);
+        Date includedRepairReady = precisionOverlap.isSupported() ? null
+                : LhRepairPlanScheduleService.resolveIncludedInspectionReady(
+                        context, sku, machine.getMachineCode(), scheduleType, switchStartTime, mouldChangeCompleteTime);
         if (combinedInspectionReady != null) {
-            // 预演与正式分配都从组合准备完成或更晚门禁开始首检，不能用倒推首检高估后料产能。
-            Date inspectionReadyTime = firstProductionStartTime.after(combinedInspectionReady)
-                    ? firstProductionStartTime : combinedInspectionReady;
+            // 正常生产从换模完成开始不代表首检必须等到该点；较晚的真实生产门禁仍然保留。
+            Date inspectionReadyTime = includedRepairReady != null ? includedRepairReady : combinedInspectionReady;
+            if (includedRepairReady == null || firstProductionStartTime.after(mouldChangeCompleteTime)) {
+                inspectionReadyTime = firstProductionStartTime.after(inspectionReadyTime)
+                        ? firstProductionStartTime : inspectionReadyTime;
+            }
             firstInspectionAllocationPlan = FirstInspectionAllocationUtil.buildPlan(
                     context, sku, inspectionShifts, mouldChangeCompleteTime, inspectionReadyTime,
                     shiftCapacity, Math.max(sku.resolveTargetScheduleQty(), shiftCapacity),
-                    scheduleType, machine.getMachineCode(), null, FirstInspectionTimingMode.START_AT_PRODUCTION_READY);
+                    scheduleType, machine.getMachineCode(), null, includedRepairReady != null
+                            ? FirstInspectionTimingMode.INCLUDED_IN_CHANGEOVER_AFTER_REPAIR
+                            : FirstInspectionTimingMode.START_AT_PRODUCTION_READY);
         }
         if ((precisionOverlap.isSupported() || combinedInspectionReady != null)
                 && !firstInspectionAllocationPlan.isValid()) {

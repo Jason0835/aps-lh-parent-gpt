@@ -59,6 +59,9 @@ public final class ScheduleProcessEvidenceFormatter {
         return StrUtil.isBlank(chineseName) ? "补充证据（" + fieldName + "）" : chineseName + "（" + fieldName + "）";
     }
 
+    /**
+     * 格式化 Map 类型结构化证据为中文键值对拼接文本。
+     */
     private static String formatMap(Map<?, ?> evidenceMap) {
         if (evidenceMap == null || evidenceMap.isEmpty()) {
             return "未提供（证据集合为空）";
@@ -68,6 +71,7 @@ public final class ScheduleProcessEvidenceFormatter {
                 .collect(Collectors.joining("；"));
     }
 
+    /** 格式化集合类型证据。 */
     private static String formatCollection(Collection<?> values) {
         if (values == null || values.isEmpty()) {
             return "空集合";
@@ -76,6 +80,7 @@ public final class ScheduleProcessEvidenceFormatter {
                 .collect(Collectors.joining("，", "[", "]"));
     }
 
+    /** 格式化数组类型证据。 */
     private static String formatArray(Object array) {
         int length = Array.getLength(array);
         if (length == 0) {
@@ -88,11 +93,13 @@ public final class ScheduleProcessEvidenceFormatter {
         return Arrays.stream(values).collect(Collectors.joining("，", "[", "]"));
     }
 
+    /** 判断证据对象是否为基础简单值（字符串、数字、布尔、枚举或时间）。 */
     private static boolean isSimpleValue(Object value) {
         return value instanceof CharSequence || value instanceof Number || value instanceof Boolean
                 || value instanceof Enum || value instanceof Date || value instanceof TemporalAccessor;
     }
 
+    /** 格式化单个基础值证据。 */
     private static String formatValue(Object value) {
         if (value == null) {
             return "未提供";
@@ -104,6 +111,7 @@ public final class ScheduleProcessEvidenceFormatter {
         return StrUtil.isBlank(text) || "null".equalsIgnoreCase(text.trim()) ? "未提供" : text;
     }
 
+    /** 构建证据字段编码到中文名称的只读字典。 */
     private static Map<String, String> buildFieldNames() {
         Map<String, String> fieldNames = new LinkedHashMap<>();
         fieldNames.put("batchNo", "批次号");

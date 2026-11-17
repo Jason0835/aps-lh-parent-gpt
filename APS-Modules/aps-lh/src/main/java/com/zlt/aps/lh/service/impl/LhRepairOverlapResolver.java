@@ -111,6 +111,22 @@ public final class LhRepairOverlapResolver {
      */
     public static List<MachineMaintenanceWindowDTO> adaptCapacityWindowsForSwitch(
             List<MachineMaintenanceWindowDTO> windows, Date switchStartTime, Date switchEndTime) {
+        return adaptCapacityWindowsForSwitch(windows, switchStartTime, switchEndTime, false);
+    }
+
+    /**
+     * 按首检时间契约构造当前切换的独立维修容量副本。
+     * 换模内首检仅保留维修及一次预热禁产，正常生产仍由切换完成时间约束。
+     *
+     * @param windows 原始容量窗口
+     * @param switchStartTime 真实切换开始
+     * @param switchEndTime 真实切换完成
+     * @param inspectionIncluded 首检是否允许位于换模总时长内
+     * @return 不修改固定来源的候选容量窗口
+     */
+    public static List<MachineMaintenanceWindowDTO> adaptCapacityWindowsForSwitch(
+            List<MachineMaintenanceWindowDTO> windows, Date switchStartTime, Date switchEndTime,
+            boolean inspectionIncluded) {
         if (CollectionUtils.isEmpty(windows)) {
             return Collections.emptyList();
         }
@@ -119,9 +135,9 @@ public final class LhRepairOverlapResolver {
                     window.getMaintenanceType())
                     && overlaps(switchStartTime, switchEndTime,
                     window.getMaintenanceStartTime(), window.getMaintenanceEndTime())) {
-                // 组合后料不继承维修前固定量；维修及预热不能被含首检切换时长抵消。
+                // 组合后料不继承维修前固定量；含首检时保留真实预热，不延长到换模末端。
                 window.setRepairCombinedWithSwitch(true);
-                if (switchEndTime.after(window.getProductionResumeTime())) {
+                if (!inspectionIncluded && switchEndTime.after(window.getProductionResumeTime())) {
                     window.setProductionResumeTime(RepairPlanRuntimeState.copyDate(switchEndTime));
                 }
             }

@@ -8,6 +8,7 @@ import com.zlt.aps.lh.api.enums.UnscheduledReasonEnum;
 import com.zlt.aps.lh.component.EarlyProductionQuantityCalculator;
 import com.zlt.aps.lh.component.EmbryoEndingStockAdmissionPolicy;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
+import com.zlt.aps.lh.component.OverdueSurplusAdmissionPolicy;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.PriorityTraceLogHelper;
@@ -24,7 +25,7 @@ import java.util.Objects;
  * 待排SKU前置未排规则。
  *
  * <p>统一处理新增SKU日计划准入、窗口无计划且无欠产余量未排、纯遗留SKU静默出队、
- * 交班停产无胎胚、收尾小余量和仅历史欠产规则，
+ * 交班停产无胎胚、前段欠产已下机、收尾小余量和仅历史欠产规则，
  * 以及硫化参数SYS0311004=0时新增排产链路试制量试SKU的参数拦截。
  * 换活字块和新增排产必须复用本规则，避免SKU在S4.4被提前消费后绕过S4.5判断。</p>
  *
@@ -61,6 +62,38 @@ public final class PendingSkuUnscheduledRule {
     private static final String AUTO_DATA_SOURCE = "0";
 
     private PendingSkuUnscheduledRule() {
+    }
+
+    /**
+     * 根据已冻结的MES下机证据登记前段欠产净余量未排。
+     * 未来计划不能恢复已完成前段的生产资格，原始余量和资源事实保持不变。
+     *
+     * @param context 本轮工厂、日期及批次
+     * @param sku 原始窗口计划与前段余量来源
+     * @param onlineEvidence 物料d1及全部来源机台d2证据，空值表示未证明完成
+     * @return 命中时返回净余量未排，否则返回null
+     */
+    public static LhUnscheduledResult evaluateCompletedOverdueSurplus(
+            LhScheduleContext context, SkuScheduleDTO sku, String onlineEvidence) {
+        if (!OverdueSurplusAdmissionPolicy.requiresOnlineEvidence(context, sku)
+                || StringUtils.isBlank(onlineEvidence)) {
+            return null;
+        }
+        UnscheduledReasonEnum reason = UnscheduledReasonEnum.OVERDUE_SURPLUS_STAGE_COMPLETED;
+        String detail = String.format("factoryCode=%s,batchNo=%s,scheduleDate=%s,T=%s,materialCode=%s,"
+                        + "productStatus=%s,overdueSurplusFlag=true,originalWindowPlanQty=%d,surplusQty=%d,%s",
+                context.getFactoryCode(), context.getBatchNo(),
+                LhScheduleTimeUtil.formatDate(context.getScheduleTargetDate()),
+                LhScheduleTimeUtil.formatDate(context.getScheduleDate()), sku.getMaterialCode(),
+                sku.getProductStatus(), sku.getOriginalWindowPlanQty(), Math.max(0, sku.getSurplusQty()),
+                onlineEvidence);
+        log.info("前段欠产已下机且窗口无计划，禁止二次上机, {}", detail);
+        PriorityTraceLogHelper.appendProcessLog(context, "前段欠产已下机准入拦截", detail);
+        LhUnscheduledResult result = buildUnscheduledResult(
+                context, sku, sku.getSurplusQty(), reason.getSummary(), reason, detail);
+        result.setMonthPlanVersion(sku.getMonthPlanVersion());
+        result.setProductionVersion(sku.getProductionVersion());
+        return result;
     }
 
     /**

@@ -29,7 +29,6 @@ import com.zlt.aps.maindata.mapper.FactoryParamMapper;
 import com.zlt.aps.maindata.mapper.LhMachineInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
 import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
-import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.aps.mp.api.domain.entity.FactoryParam;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialConsumeDetail;
@@ -127,9 +126,6 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
 
     @Resource
     private MdmMaterialConsumeDetailMapper mdmMaterialConsumeDetailMapper;
-
-    @Resource
-    private MdmMaterialInfoMapper mdmMaterialInfoMapper;
 
     /**
      * SKU与施工关系表Mapper（T_MDM_SKU_CONSTRUCTION_REF）：按物料+胎胚+示方类型取制造示方书号
@@ -978,7 +974,8 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
      *   <li>按制造示方书号从原材料消耗明细表取用量最大的AQT胶种，作为该物料该示方类型的唯一TD胶种</li>
      *   <li>仅保留配置内的胶种，未配置或未解析到的物料不展示并输出告警日志</li>
      *   <li>按胶种分组，组内按示方类型（正规/量试/试制）展示规格+花纹，多个用"，"隔开</li>
-     *   <li>按示方类型（正规/量试/试制）在物料级别分组，每组规格花纹前加标题前缀，不同组用换行隔开</li>
+     *   <li>规格/花纹统一从排程结果的胎胚描述(MAIN_MATERIAL_DESC)解析，与成型日计划"胎胚描述"列同源</li>
+     *   <li>按示方类型（正规/量试/试制）在胎胚级别分组，每组规格花纹前加标题前缀，不同组用换行隔开</li>
      * </ol>
      *
      * <p>通过 keySuffix 区分 T+1/T+2 的班次过滤：
@@ -1018,41 +1015,38 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         // 按 物料+示方类型 → 制造示方书号 → BOM主胶料 解析唯一TD胶种。
         // 不再按"胎胚是否含AQT101"做存在性归类：同一胎胚的不同示方书版本可能使用不同TD胶种，
         // 必须按排程记录的示方类型匹配对应版本，避免正规排产被量试版本的胶种误命中。
-        Map<String, Map<String, Set<String>>> rubberTypeMaterialMap = this.buildRubberTypeMaterialMap(
+        Map<String, Map<String, Set<String>>> rubberTypeEmbryoMap = this.buildRubberTypeEmbryoMap(
                 shiftResults, factoryCode, materialRecipeTypeMap, new HashSet<>(rubberTypeCodes));
-        if (rubberTypeMaterialMap.isEmpty()) {
+        if (rubberTypeEmbryoMap.isEmpty()) {
             log.info("小胶种[keySuffix={}]未解析到任何已配置的TD胶种数据", keySuffix);
             return smallRubberList;
         }
 
-        // 查询本次命中的物料主数据，规格/花纹优先取物料主数据字段，缺失时回退胎胚描述解析
-        Set<String> resultMaterialCodes = rubberTypeMaterialMap.values().stream()
-                .flatMap(typeMap -> typeMap.values().stream())
-                .flatMap(Set::stream)
-                .collect(Collectors.toSet());
-        Map<String, MdmMaterialInfo> materialInfoMap = this.loadMaterialInfoByMaterialCode(resultMaterialCodes);
-        log.info("小胶种[keySuffix={}]命中胶种数: {}, 物料数: {}",
-                keySuffix, rubberTypeMaterialMap.size(), resultMaterialCodes.size());
+        // 胎胚编码→胎胚描述：直接取排程结果的主物料描述(MAIN_MATERIAL_DESC)，
+        // 与成型日计划"胎胚描述"列同源，避免物料主数据胎胚描述与排程结果不一致导致花纹取错
+        Map<String, String> embryoDescMap = this.buildEmbryoDescMap(cxResults);
+        log.info("小胶种[keySuffix={}]命中胶种数: {}, 胎胚数: {}",
+                keySuffix, rubberTypeEmbryoMap.size(), embryoDescMap.size());
 
         // 按胶种分组构建列表数据：胶种 → 示方类型 → 规格/花纹
         List<String> recipeTypeOrder = Arrays.asList("S", "T", "X");
         for (String rubberType : rubberTypeCodes) {
-            Map<String, Set<String>> recipeTypeMaterials = rubberTypeMaterialMap.get(rubberType);
-            if (recipeTypeMaterials == null || recipeTypeMaterials.isEmpty()) {
+            Map<String, Set<String>> recipeTypeEmbryos = rubberTypeEmbryoMap.get(rubberType);
+            if (recipeTypeEmbryos == null || recipeTypeEmbryos.isEmpty()) {
                 continue;
             }
 
             List<String> groupParts = new ArrayList<>();
             for (String recipeType : recipeTypeOrder) {
-                Set<String> materialCodes = recipeTypeMaterials.get(recipeType);
-                if (materialCodes == null || materialCodes.isEmpty()) {
+                Set<String> embryoCodes = recipeTypeEmbryos.get(recipeType);
+                if (embryoCodes == null || embryoCodes.isEmpty()) {
                     continue;
                 }
 
                 // 按规格分组收集花纹列表：规格1 花纹1/花纹2，规格2 花纹3（同规格多花纹用"/"隔开，不同规格用"，"隔开）
                 Map<String, LinkedHashSet<String>> specPatternsMap = new LinkedHashMap<>();
-                for (String materialCode : materialCodes) {
-                    String[] specPattern = this.resolveSpecAndPattern(materialInfoMap.get(materialCode));
+                for (String embryoCode : embryoCodes) {
+                    String[] specPattern = this.parseSpecAndPatternFromEmbryoDesc(embryoDescMap.get(embryoCode));
                     if (specPattern == null) {
                         continue;
                     }
@@ -1088,7 +1082,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
 
     /**
      * 按 物料+示方类型 → 制造示方书号 → BOM主胶料 解析TD胶种，并组装为
-     * 胶种 → 示方类型 → 物料编码集合。
+     * 胶种 → 示方类型 → 胎胚编码集合。
      *
      * <p>解析链路：</p>
      * <ol>
@@ -1099,19 +1093,20 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
      *   <li>物料对应的示方书版本取不到AQT明细时，回退到同胎胚+同示方类型下最新且有AQT明细的版本
      *       （应对部分正规示方书未同步TD胶种明细的数据情况）</li>
      *   <li>最终胶种不在SYS04010002配置内时不展示，并输出告警日志便于业务定位</li>
+     *   <li>分组维度为胎胚编码：规格/花纹按胎胚描述展示，不依赖物料主数据</li>
      * </ol>
      *
      * @param shiftResults          当前班次组有排计划量的排程记录
      * @param factoryCode           分厂编码
      * @param materialRecipeTypeMap 物料编码→示方类型集合
      * @param rubberTypeCodes       配置的TD胶种类型编码集合
-     * @return 胶种→示方类型→物料编码集合
+     * @return 胶种→示方类型→胎胚编码集合
      */
-    private Map<String, Map<String, Set<String>>> buildRubberTypeMaterialMap(
+    private Map<String, Map<String, Set<String>>> buildRubberTypeEmbryoMap(
             List<CxScheduleResult> shiftResults, String factoryCode,
             Map<String, Set<String>> materialRecipeTypeMap, Set<String> rubberTypeCodes) {
 
-        Map<String, Map<String, Set<String>>> rubberTypeMaterialMap = new LinkedHashMap<>();
+        Map<String, Map<String, Set<String>>> rubberTypeEmbryoMap = new LinkedHashMap<>();
 
         // 1. 收集 物料 → 胎胚代码集合（排程结果的物料编码可能是逗号分隔的多个物料）
         Map<String, Set<String>> materialEmbryoMap = new LinkedHashMap<>();
@@ -1126,7 +1121,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         }
         if (materialEmbryoMap.isEmpty()) {
             log.warn("成型排程结果中无有效物料/胎胚编码，无法解析TD胶种");
-            return rubberTypeMaterialMap;
+            return rubberTypeEmbryoMap;
         }
 
         // 2. 批量查询SKU与施工关系表（按胎胚维度查询，确保同一胎胚下其它示方书版本可用于缺失兜底）
@@ -1142,7 +1137,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         if (skuRefList.isEmpty()) {
             log.warn("SKU与施工关系表未命中数据, 物料数: {}, 胎胚数: {}",
                     materialEmbryoMap.size(), embryoCodes.size());
-            return rubberTypeMaterialMap;
+            return rubberTypeEmbryoMap;
         }
 
         // 索引：物料|胎胚|示方类型 → 关系（按更新时间倒序，putIfAbsent保留最新一条）
@@ -1189,13 +1184,13 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                                 materialCode, embryoCode, recipeType, rubberType);
                         continue;
                     }
-                    rubberTypeMaterialMap.computeIfAbsent(rubberType, k -> new LinkedHashMap<>())
+                    rubberTypeEmbryoMap.computeIfAbsent(rubberType, k -> new LinkedHashMap<>())
                             .computeIfAbsent(recipeType, k -> new LinkedHashSet<>())
-                            .add(materialCode);
+                            .add(embryoCode);
                 }
             }
         }
-        return rubberTypeMaterialMap;
+        return rubberTypeEmbryoMap;
     }
 
     /**
@@ -1280,53 +1275,25 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     }
 
     /**
-     * 按物料编码批量查询物料主数据，构建 物料编码→物料主数据 映射（同一物料保留第一条）。
+     * 构建 胎胚编码→胎胚描述 映射（同一胎胚取第一条非空描述）。
      *
-     * @param materialCodes 物料编码集合
-     * @return 物料编码→物料主数据
+     * <p>胎胚描述取排程结果的主物料描述(MAIN_MATERIAL_DESC)，
+     * 与成型日计划"胎胚描述"列完全同源。</p>
+     *
+     * @param results 排程结果列表
+     * @return 胎胚编码→胎胚描述
      */
-    private Map<String, MdmMaterialInfo> loadMaterialInfoByMaterialCode(Set<String> materialCodes) {
-        Map<String, MdmMaterialInfo> materialInfoMap = new HashMap<>();
-        if (materialCodes.isEmpty()) {
-            return materialInfoMap;
-        }
-        List<MdmMaterialInfo> materialInfoList = mdmMaterialInfoMapper.selectList(
-                new LambdaQueryWrapper<MdmMaterialInfo>()
-                        .in(MdmMaterialInfo::getMaterialCode, materialCodes)
-                        .and(w -> w.eq(MdmMaterialInfo::getIsDelete, 0)
-                                .or().isNull(MdmMaterialInfo::getIsDelete)));
-        for (MdmMaterialInfo materialInfo : materialInfoList) {
-            if (StringUtils.isNotBlank(materialInfo.getMaterialCode())) {
-                materialInfoMap.putIfAbsent(materialInfo.getMaterialCode().trim(), materialInfo);
+    private Map<String, String> buildEmbryoDescMap(List<CxScheduleResult> results) {
+        Map<String, String> embryoDescMap = new LinkedHashMap<>();
+        for (CxScheduleResult result : results) {
+            String embryoCode = StringUtils.trimToNull(result.getEmbryoCode());
+            String embryoDesc = StringUtils.trimToNull(result.getMainMaterialDesc());
+            if (embryoCode == null || embryoDesc == null) {
+                continue;
             }
+            embryoDescMap.putIfAbsent(embryoCode, embryoDesc);
         }
-        return materialInfoMap;
-    }
-
-    /**
-     * 解析物料的规格与花纹：优先取物料主数据的规格(SPECIFICATIONS)和主花纹(MAIN_PATTERN)，
-     * 字段缺失时回退到胎胚描述解析。
-     *
-     * @param materialInfo 物料主数据（可能为null）
-     * @return [规格, 花纹]，解析失败返回null
-     */
-    private String[] resolveSpecAndPattern(MdmMaterialInfo materialInfo) {
-        if (materialInfo == null) {
-            return null;
-        }
-        String specifications = StringUtils.trimToNull(materialInfo.getSpecifications());
-        String pattern = StringUtils.trimToNull(materialInfo.getMainPattern());
-        if (StringUtils.isNotBlank(specifications) && StringUtils.isNotBlank(pattern)) {
-            return new String[]{specifications, pattern};
-        }
-        String[] parsed = this.parseSpecAndPatternFromEmbryoDesc(
-                StringUtils.defaultString(materialInfo.getEmbryoDesc()).trim());
-        if (parsed == null) {
-            return null;
-        }
-        return new String[]{
-                StringUtils.isNotBlank(specifications) ? specifications : parsed[0],
-                StringUtils.isNotBlank(pattern) ? pattern : parsed[1]};
+        return embryoDescMap;
     }
 
     /**
@@ -1580,12 +1547,12 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     }
 
     /**
-     * 从胎胚描述中解析规格和花纹。
+     * 从排程结果的胎胚描述字段(MAIN_MATERIAL_DESC)中解析规格和花纹。
      *
-     * <p>胎胚描述格式样例：{@code 295/80R22.5 152/149L 18PR BA267 BL4HBL}</p>
+     * <p>胎胚描述格式样例：{@code 315/70R22.5 156/150L 18PR JF518 BL4EJY}</p>
      * <ul>
-     *   <li>规格：按空格分割后的第1段（如 295/80R22.5）</li>
-     *   <li>花纹：按空格分割后的第4段（如 BA267）</li>
+     *   <li>规格：按空格分割后的第1段（如 315/70R22.5）</li>
+     *   <li>花纹：按空格分割后的第4段（如 JF518）</li>
      * </ul>
      *
      * @param embryoDesc 胎胚描述

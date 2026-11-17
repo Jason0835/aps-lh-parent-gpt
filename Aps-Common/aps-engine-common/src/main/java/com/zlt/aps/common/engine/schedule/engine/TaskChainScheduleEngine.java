@@ -79,6 +79,14 @@ public final class TaskChainScheduleEngine<C extends TaskChainContextAccess<T>,
         return result;
     }
 
+    /**
+     * 从机台任务链中移除指定任务并刷新链状态。
+     *
+     * @param taskId  待移除任务 ID
+     * @param context 排程上下文
+     * @param policy  领域任务链策略
+     * @return 链变更结果
+     */
     public ScheduleChainChangeResult<T> removeTask(String taskId, C context, TaskChainPolicy<C, T> policy) {
         this.validateTaskId(taskId, policy);
         this.validateContextChain(context, policy);
@@ -191,6 +199,9 @@ public final class TaskChainScheduleEngine<C extends TaskChainContextAccess<T>,
                 settings.getShiftCodePrefix() + shiftOrder, shiftOrder, task.getPlanQty());
     }
 
+    /**
+     * 根据任务 ID 从索引或遍历任务链查找节点。
+     */
     private ScheduleTaskNode<T> findNode(String taskId, C context) {
         ScheduleTaskNode<T> node = context.getTaskNode(taskId);
         if (node != null) {
@@ -206,16 +217,19 @@ public final class TaskChainScheduleEngine<C extends TaskChainContextAccess<T>,
         return null;
     }
 
+    /** 获取节点所属的任务双向链表。 */
     @SuppressWarnings("unchecked")
     private ScheduleTaskLinkedList<T> ownerChain(ScheduleTaskNode<T> node) {
         return node != null && node.getOwnerList() instanceof ScheduleTaskLinkedList
                 ? (ScheduleTaskLinkedList<T>) node.getOwnerList() : null;
     }
 
+    /** 构建链变更操作上下文。 */
     private ScheduleOperationContext operationContext(C context, String reason) {
         return new ScheduleOperationContext(context.getOperator(), reason, context.getTraceId());
     }
 
+    /** 获取上下文中的排程基准日期，为空时抛出领域异常。 */
     private LocalDate toLocalDate(C context, TaskChainPolicy<C, T> policy) {
         if (context.getScheduleDate() == null) {
             throw policy.error(TaskChainErrorType.SCHEDULE_DATE_EMPTY, null);
@@ -223,6 +237,7 @@ public final class TaskChainScheduleEngine<C extends TaskChainContextAccess<T>,
         return context.getScheduleDate();
     }
 
+    /** 校验任务与上下文非空。 */
     private void validateTaskAndContext(T task, C context, TaskChainPolicy<C, T> policy) {
         if (task == null) {
             throw policy.error(TaskChainErrorType.TASK_NOT_FOUND, null);
@@ -232,24 +247,28 @@ public final class TaskChainScheduleEngine<C extends TaskChainContextAccess<T>,
         }
     }
 
+    /** 校验候选机台及机台编码非空。 */
     private void validateMachine(ScheduleQualityMachineCandidate machine, TaskChainPolicy<C, T> policy) {
         if (machine == null || this.isBlank(machine.getMachineCode())) {
             throw policy.error(TaskChainErrorType.MACHINE_EMPTY, null);
         }
     }
 
+    /** 校验任务 ID 非空白。 */
     private void validateTaskId(String taskId, TaskChainPolicy<C, T> policy) {
         if (this.isBlank(taskId)) {
             throw policy.error(TaskChainErrorType.TASK_NOT_FOUND, null);
         }
     }
 
+    /** 校验上下文及其任务链容器非空。 */
     private void validateContextChain(C context, TaskChainPolicy<C, T> policy) {
         if (context == null || context.getTaskChainGroup() == null) {
             throw policy.error(TaskChainErrorType.CONTEXT_EMPTY, null);
         }
     }
 
+    /** 判断字符串是否为空白。 */
     private boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
     }

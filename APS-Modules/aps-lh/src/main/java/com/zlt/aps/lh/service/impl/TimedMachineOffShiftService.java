@@ -3,7 +3,6 @@ package com.zlt.aps.lh.service.impl;
 import com.zlt.aps.lh.engine.strategy.support.StructureEndingContinuationPolicy;
 
 import cn.hutool.core.bean.BeanUtil;
-import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
@@ -14,7 +13,6 @@ import com.zlt.aps.lh.engine.strategy.support.K21K22EmbryoMatchPolicy;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.component.MonthPlanDateResolver;
 import com.zlt.aps.lh.engine.strategy.support.OffMachineDecision;
-import com.zlt.aps.lh.engine.strategy.support.ContinuationEndingMachineProfile;
 import com.zlt.aps.lh.engine.strategy.support.TimedMachineOffReleaseResolver;
 import com.zlt.aps.lh.engine.strategy.support.TimedMachineOffRequest;
 import com.zlt.aps.lh.engine.strategy.support.TimedMachineOffLoadPreview;
@@ -346,16 +344,6 @@ public class TimedMachineOffShiftService {
         List<TimedMachineOffRequest> orderedRequests = this.orderRequests(context);
         // 首轮逐请求迁移自己的成功交接事件，后续请求读取更新后的负荷和前序释放边界。
         for (TimedMachineOffRequest request : orderedRequests) {
-            if (TimedMachineOffReleaseResolver.resolveProductionStartShift(
-                    context.getScheduleWindowShifts(), request) == null) {
-                continue;
-            }
-            if (request.hasDailyQuantityTarget()) {
-                // 日目标已在选机时整组验证，后料负荷只消费完成事实，不反向决定前料排量。
-                OffMachineDecision decision = this.applyDailyQuantityBoundary(context, request);
-                this.movePreviewActions(context, ledger, request, decision);
-                continue;
-            }
             if (this.hasFixedRelease(context, request)) {
                 PriorityTraceLogHelper.appendProcessLog(context, "按时间下机硬边界保留",
                         "SKU=" + request.getSourceSku().getMaterialCode() + ", 机台="
@@ -375,9 +363,6 @@ public class TimedMachineOffShiftService {
         // 最多两次线性请求扫描，不再次调用候选选机、历史承接或整批排程。
         int adjustedCount = 0;
         for (TimedMachineOffRequest request : orderedRequests) {
-            if (request.hasDailyQuantityTarget()) {
-                continue;
-            }
             LhScheduleResult original = request.getProfile().getOriginals().get(0);
             OffMachineDecision current = context.getTimedMachineOffDecisionMap().get(original);
             if (Objects.isNull(current) || this.hasFixedRelease(context, request)) {
@@ -435,9 +420,6 @@ public class TimedMachineOffShiftService {
                     LhScheduleTimeUtil.formatDateTime(current.getOccupancyEndTime()),
                     LhScheduleTimeUtil.formatDateTime(candidate.getRuleOffMachineTime()));
             candidate = this.applyProductionBoundary(context, request, candidate);
-            if (candidate == null) {
-                return null;
-            }
             TimedMachineOffLoadPreview candidateLedger = ledger.copyForDecision();
             this.movePreviewActions(context, candidateLedger, request, candidate);
             String movements = candidateLedger.refreshStructureHandoffs(context);
@@ -551,7 +533,7 @@ public class TimedMachineOffShiftService {
      */
     private void movePreviewActions(LhScheduleContext context, TimedMachineOffLoadPreview ledger,
             TimedMachineOffRequest request, OffMachineDecision decision) {
-        if (Objects.isNull(ledger) || decision == null) {
+        if (Objects.isNull(ledger)) {
             return;
         }
         String movements = ledger.moveOwnActions(context, request.getProfile().getOriginals().stream()
@@ -576,9 +558,6 @@ public class TimedMachineOffShiftService {
             OffMachineDecision decision) {
         LhShiftConfigVO productionStart = TimedMachineOffReleaseResolver.resolveProductionStartShift(
                 context.getScheduleWindowShifts(), request.getStartDate());
-        if (productionStart == null) {
-            return false;
-        }
         int quantity = this.resolveProfileQuantity(context, request, productionStart, decision);
         Date completed = request.getProfile().completionTime(quantity);
         Date physicalReady = request.getProfile().physicalReadyTime(
@@ -593,7 +572,7 @@ public class TimedMachineOffShiftService {
      * @param context 上下文
      * @param request 已选物理机台及清零前画像
      * @param decision 日期循环计算出的规则边界
-     * @return 按最终生产量计算的独立物理释放决策，需求日班次缺失时为空
+     * @return 按最终生产量计算的独立物理释放决策
      */
     private OffMachineDecision applyProductionBoundary(LhScheduleContext context, TimedMachineOffRequest request,
             OffMachineDecision decision) {
@@ -602,10 +581,7 @@ public class TimedMachineOffShiftService {
                 .map(result -> BeanUtil.copyProperties(result, LhScheduleResult.class)).collect(Collectors.toList());
         List<LhShiftConfigVO> shifts = context.getScheduleWindowShifts();
         LhShiftConfigVO productionStart = TimedMachineOffReleaseResolver.resolveProductionStartShift(
-                shifts, request);
-        if (productionStart == null) {
-            return null;
-        }
+                shifts, request.getStartDate());
         // 原画像提供真实产能，SKU共享余量限制实际补量；不得挤占其他已保留机台或虚增尾量。
         int quantity = this.resolveProfileQuantity(context, request, productionStart, decision);
         request.getProfile().writePlan(proposed, quantity);
@@ -630,37 +606,6 @@ public class TimedMachineOffShiftService {
                 productionStart.getShiftStartDateTime());
         this.registerReleaseDecision(context, request, actual);
         return actual;
-    }
-
-    /**
-     * 由机台日目标反算实际完成，普通负荷均衡、历史可调整班次与换模等待不得改量。
-     *
-     * @param context 扣账前上下文
-     * @param request 已通过整组可行性校验的日目标请求
-     * @return 实际完成和物理释放决定，需求日班次缺失时为空
-     * @throws IllegalStateException 冻结后出现固定占用或非法数量时抛出
-     */
-    private OffMachineDecision applyDailyQuantityBoundary(LhScheduleContext context, TimedMachineOffRequest request) {
-        LhShiftConfigVO start = TimedMachineOffReleaseResolver.resolveProductionStartShift(
-                context.getScheduleWindowShifts(), request);
-        if (start == null) {
-            return null;
-        }
-        int quantity = request.requiredDayPlanQty();
-        if (this.hasFixedRelease(context, request) || !request.getProfile().isLegalQuantity(quantity)) {
-            log.error("续作日目标冻结后出现数量或固定占用冲突, factory={}, batch={}, machine={}, date={}, target={}",
-                    context.getFactoryCode(), context.getBatchNo(),
-                    request.getProfile().getOriginals().get(0).getLhMachineCode(), request.getStartDate(), quantity);
-            throw new IllegalStateException(
-                    I18nUtil.getMessage("ui.data.column.lhScheduleResult.scheduleExecuteError"));
-        }
-        Date completed = quantity > 0 ? request.getProfile().completionTime(quantity) : start.getShiftStartDateTime();
-        OffMachineDecision decision = new OffMachineDecision();
-        decision.setRuleOffMachineTime(completed);
-        decision.setOffMachineTime(completed);
-        decision.setOccupancyEndTime(completed);
-        decision.setReason("完成机台当日目标量后下机");
-        return this.applyProductionBoundary(context, request, decision);
     }
 
     /**
@@ -701,9 +646,6 @@ public class TimedMachineOffShiftService {
      */
     private int resolveProfileQuantity(LhScheduleContext context, TimedMachineOffRequest request,
             LhShiftConfigVO productionStart, OffMachineDecision decision) {
-        if (request.hasDailyQuantityTarget()) {
-            return request.requiredDayPlanQty();
-        }
         List<LhScheduleResult> own = request.getProfile().getOriginals();
         SkuScheduleDTO sku = request.getSourceSku();
         long otherQty = context.getScheduleResultList().stream().filter(result -> !own.contains(result))
@@ -730,7 +672,7 @@ public class TimedMachineOffShiftService {
      * @param request 已选物理机台
      * @return 是否有不能搬动的既定时间边界
      */
-    public boolean hasFixedRelease(LhScheduleContext context, TimedMachineOffRequest request) {
+    boolean hasFixedRelease(LhScheduleContext context, TimedMachineOffRequest request) {
         List<LhScheduleResult> own = request.getProfile().getOriginals();
         for (LhScheduleResult result : own) {
             String code = result.getLhMachineCode();
@@ -784,10 +726,7 @@ public class TimedMachineOffShiftService {
                 continue;
             }
             LhShiftConfigVO productionStart = TimedMachineOffReleaseResolver.resolveProductionStartShift(
-                    context.getScheduleWindowShifts(), request);
-            if (productionStart == null) {
-                continue;
-            }
+                    context.getScheduleWindowShifts(), request.getStartDate());
             OffMachineDecision decision = this.releaseResolver.resolve(request, previous,
                     context.getScheduleWindowShifts(), productionStart.getShiftStartDateTime());
             this.registerReleaseDecision(context, request, decision);
@@ -898,11 +837,9 @@ public class TimedMachineOffShiftService {
         int[] contextCapacity = context.getMachineShiftCapacityMap().get(result.getLhMachineCode());
         List<LhShiftConfigVO> shifts = context.getScheduleWindowShifts();
         int side = request.getProfile().getOriginals().indexOf(result);
-        ContinuationEndingMachineProfile capacityProfile = request.getReleaseCapacityProfile() == null
-                ? request.getProfile() : request.getReleaseCapacityProfile();
         for (int position = 0; position < shifts.size(); position++) {
             LhShiftConfigVO shift = shifts.get(position);
-            int remaining = capacityProfile.remainingCapacityAfter(side, position, decision.getOccupancyEndTime());
+            int remaining = request.getProfile().remainingCapacityAfter(side, position, decision.getOccupancyEndTime());
             int index = shift.getShiftIndex();
             if (Objects.nonNull(machineCapacity) && index < machineCapacity.length) {
                 machineCapacity[index] = remaining;

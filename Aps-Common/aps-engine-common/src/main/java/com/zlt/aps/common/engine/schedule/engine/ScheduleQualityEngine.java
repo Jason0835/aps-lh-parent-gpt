@@ -64,6 +64,9 @@ public final class ScheduleQualityEngine<C, T extends ScheduleQualityTask,
         return summary;
     }
 
+    /**
+     * 计算计划组总需求量的排程覆盖率。
+     */
     private double calculateCoverageRate(Map<String, G> planGroupMap,
                                          Map<String, BigDecimal> assignedQtyMap) {
         if (planGroupMap.isEmpty()) {
@@ -83,6 +86,7 @@ public final class ScheduleQualityEngine<C, T extends ScheduleQualityTask,
         return assignedQty.divide(totalQty, 6, RoundingMode.HALF_UP).doubleValue();
     }
 
+    /** 计算启用机台的总体产能利用率。 */
     private double calculateMachineUtilizationRate(List<M> candidateList,
                                                    Map<String, BigDecimal> assignedQtyMap,
                                                    Map<String, BigDecimal> switchDeductMap,
@@ -102,6 +106,7 @@ public final class ScheduleQualityEngine<C, T extends ScheduleQualityTask,
         return assignedQty.min(totalCapacity).divide(totalCapacity, 6, RoundingMode.HALF_UP).doubleValue();
     }
 
+    /** 统计已排任务中的换型（换规格、换胶、换口型）次数。 */
     private long calculateSwitchCount(List<T> scheduledTasks, ScheduleQualityPolicy<C, P, M> policy) {
         return scheduledTasks.stream()
                 .filter(task -> this.isPositive(task.getPreviousSpecSwitchHours())
@@ -111,6 +116,7 @@ public final class ScheduleQualityEngine<C, T extends ScheduleQualityTask,
                 .count();
     }
 
+    /** 计算库存保供达成率（无缺口的产品班次占比）。 */
     private double calculateStockGuaranteeRate(Map<String, BigDecimal> shortageMap) {
         if (shortageMap.isEmpty()) {
             return 1D;
@@ -119,6 +125,7 @@ public final class ScheduleQualityEngine<C, T extends ScheduleQualityTask,
         return (double) guaranteedCount / shortageMap.size();
     }
 
+    /** 计算收尾任务组的收尾完成率。 */
     private double calculateTailCompletionRate(Map<String, G> planGroupMap,
                                                Map<String, BigDecimal> assignedQtyMap) {
         List<G> tailGroupList = planGroupMap.values().stream()
@@ -136,6 +143,7 @@ public final class ScheduleQualityEngine<C, T extends ScheduleQualityTask,
         return (double) completedCount / tailGroupList.size();
     }
 
+    /** 计算各机台班次未超有效产能上限的达标率。 */
     private double calculateShiftCapacityHitRate(List<M> candidateList,
                                                  Map<String, BigDecimal> assignedQtyMap,
                                                  Map<String, BigDecimal> switchDeductMap,
@@ -154,6 +162,7 @@ public final class ScheduleQualityEngine<C, T extends ScheduleQualityTask,
         return (double) hitCount / (candidateList.size() * policy.getMaxShiftOrder());
     }
 
+    /** 判断单个收尾计划组是否已足额完成收尾排产。 */
     private boolean isTailCompleted(G group, BigDecimal assignedQty) {
         T task = group == null ? null : group.getAggregateTask();
         if (task == null) {
@@ -169,6 +178,7 @@ public final class ScheduleQualityEngine<C, T extends ScheduleQualityTask,
         return !this.isPositive(tailQty) || this.nvl(assignedQty).compareTo(tailQty) >= 0;
     }
 
+    /** 按计划组键汇总已分配计划量。 */
     private Map<String, BigDecimal> buildPlanGroupAssignedQtyMap(List<T> scheduledTasks) {
         return scheduledTasks.stream()
                 .filter(task -> task.getPlanGroupKey() != null)
@@ -177,6 +187,7 @@ public final class ScheduleQualityEngine<C, T extends ScheduleQualityTask,
                                 task -> this.nvl(task.getPlanQty()), BigDecimal::add)));
     }
 
+    /** 按机台与班次汇总已排产量及换型扣减产能。 */
     private void populateMachineShiftTaskSummary(List<T> scheduledTasks,
                                                  Map<String, BigDecimal> assignedQtyMap,
                                                  Map<String, BigDecimal> switchDeductMap) {
@@ -192,6 +203,7 @@ public final class ScheduleQualityEngine<C, T extends ScheduleQualityTask,
                 });
     }
 
+    /** 计算指定机台班次扣减检修与换型损失后的有效产能。 */
     private BigDecimal resolveEffectiveCapacity(M candidate, int shiftOrder,
                                                 Map<String, BigDecimal> switchDeductMap,
                                                 ScheduleQualityPolicy<C, P, M> policy) {
@@ -203,10 +215,12 @@ public final class ScheduleQualityEngine<C, T extends ScheduleQualityTask,
                 .subtract(switchDeduct).max(BigDecimal.ZERO);
     }
 
+    /** 判断数值是否严格大于零。 */
     private boolean isPositive(BigDecimal value) {
         return value != null && value.signum() > 0;
     }
 
+    /** 空值转零。 */
     private BigDecimal nvl(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
     }

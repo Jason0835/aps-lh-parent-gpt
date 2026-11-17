@@ -34,6 +34,14 @@ public final class ScheduleProcessLogFormatter {
                 + "米，数量阶段=" + task.getQuantityStage() + "。";
     }
 
+    /**
+     * 构建工装限制公式（使用默认标签“产品代码”）。
+     *
+     * @param task                  当前任务
+     * @param snapshotMap           工装账本快照映射
+     * @param disabledParameterCode 工装总量参数编码
+     * @return 工装限制公式文本
+     */
     public String buildToolUsageSummary(ScheduleTaskDraftModel task,
                                         Map<String, ScheduleToolLedgerSnapshot> snapshotMap,
                                         String disabledParameterCode) {
@@ -252,25 +260,56 @@ public final class ScheduleProcessLogFormatter {
         return task == null || this.isBlank(task.getProcessCode()) ? "未提供" : task.getProcessCode();
     }
 
+    /**
+     * 构建当前任务的可供应时长计算公式说明。
+     *
+     * @param task 当前任务
+     * @return 可供应时长公式文本
+     */
     public String buildSupplyHoursFormula(ScheduleTaskDraftModel task) {
         ScheduleSupplyDurationResult result = ScheduleSupplyDurationCalculator.calculate(task.getRollingStockQty(),
                 task.getFormingGuardWindowQtyMap(), task.getFormingGuardWindowHoursMap());
         return result.getCalculationDetail();
     }
 
+    /**
+     * 判断当前任务是否命中新规格规则。
+     *
+     * @param task 当前任务
+     * @return 命中新规格返回 true，否则返回 false
+     */
     public boolean isNewSpec(ScheduleTaskDraftModel task) {
         return task != null && task.getCommonNewSpecInfo() != null && task.getCommonNewSpecInfo().isNewSpecHit();
     }
 
+    /**
+     * 判断当前任务是否命中实验规格规则。
+     *
+     * @param task 当前任务
+     * @return 命中实验规格返回 true，否则返回 false
+     */
     public boolean isExperimentSpec(ScheduleTaskDraftModel task) {
         return task != null && task.getCommonExperimentSpecInfo() != null
                 && task.getCommonExperimentSpecInfo().isExperimentSpecHit();
     }
 
+    /**
+     * 格式化展示库存保证班数。
+     *
+     * @param count 库存保证班数
+     * @return 保证班数文本，为空时返回“未提供”
+     */
     public String displayGuardShiftCount(Integer count) {
         return count == null ? "未提供" : String.valueOf(count);
     }
 
+    /**
+     * 格式化展示机台集合摘要（含机台数量与编码列表）。
+     *
+     * @param machineText  逗号分隔的机台编码文本
+     * @param machineLabel 机台标签前缀
+     * @return 机台数量及编码列表文本
+     */
     public String displayMachineSummary(String machineText, String machineLabel) {
         List<String> codes = this.isBlank(machineText) ? Collections.emptyList()
                 : Arrays.stream(machineText.split("[,，]")).map(String::trim)
@@ -279,6 +318,12 @@ public final class ScheduleProcessLogFormatter {
                 + (codes.isEmpty() ? "未提供" : String.join(",", codes));
     }
 
+    /**
+     * 格式化展示可供应时长。
+     *
+     * @param hours 可供应时长（小时）
+     * @return 带单位 H 的时长文本，为空时返回“未提供”
+     */
     public String displaySupplyHours(BigDecimal hours) {
         return hours == null ? "未提供" : hours.stripTrailingZeros().toPlainString() + "H";
     }
@@ -336,29 +381,67 @@ public final class ScheduleProcessLogFormatter {
         return "库存供应计算窗口内成型需求合计=" + total.stripTrailingZeros().toPlainString() + "：" + detail;
     }
 
+    /**
+     * 向公式项列表追加带正负号的数值项。
+     *
+     * @param terms 公式项列表
+     * @param name  项名称
+     * @param value 数值（为 null 或 0 时忽略）
+     */
     public void appendSignedTerm(List<String> terms, String name, BigDecimal value) {
         if (value != null && value.compareTo(BigDecimal.ZERO) != 0) {
             terms.add((value.compareTo(BigDecimal.ZERO) > 0 ? "+" : "-") + name + value.abs().toPlainString());
         }
     }
 
+    /**
+     * 从评分明细映射中获取指定维度的分值字符串。
+     *
+     * @param scoreItems 评分明细映射
+     * @param scoreKey   维度键
+     * @return 分值字符串，为空时按 0 展示
+     */
     public String scoreValue(Map<String, BigDecimal> scoreItems, String scoreKey) {
         return this.nvl(scoreItems.get(scoreKey)).toPlainString();
     }
 
+    /**
+     * 格式化展示胎胚编码。
+     *
+     * @param embryoCode 胎胚编码
+     * @return 胎胚编码，为空时返回“未提供”
+     */
     public String displayEmbryoCode(String embryoCode) {
         return this.isBlank(embryoCode) ? "未提供" : embryoCode;
     }
 
+    /**
+     * 格式化展示新规格需求量（保留两位小数）。
+     *
+     * @param quantity 需求量（米）
+     * @return 格式化后的需求量文本
+     */
     public String formatNewSpecDemandQty(BigDecimal quantity) {
         return this.nvl(quantity).setScale(2, RoundingMode.HALF_UP).toPlainString();
     }
 
+    /**
+     * 格式化展示公式中的扣减工装数量（负数加括号）。
+     *
+     * @param quantity 工装套数
+     * @return 格式化后的工装套数文本
+     */
     public String displaySubtractedQuantity(BigDecimal quantity) {
         String text = this.displayQuantity(quantity) + "套";
         return quantity != null && quantity.compareTo(BigDecimal.ZERO) < 0 ? "(" + text + ")" : text;
     }
 
+    /**
+     * 格式化展示数量值。
+     *
+     * @param quantity 数量值
+     * @return 去除尾部无效零的数量文本，为空时返回“未计算”
+     */
     public String displayQuantity(BigDecimal quantity) {
         return quantity == null ? "未计算" : quantity.stripTrailingZeros().toPlainString();
     }
@@ -575,14 +658,19 @@ public final class ScheduleProcessLogFormatter {
         return shiftCount == null || shiftCount <= 0 ? 2 : shiftCount;
     }
 
+    /**
+     * 空值转零。
+     */
     private BigDecimal nvl(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
     }
 
+    /** 判断字符串是否为空白。 */
     private boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
     }
 
+    /** 判断字符串是否非空白。 */
     private boolean isNotBlank(String value) {
         return !this.isBlank(value);
     }

@@ -95,6 +95,21 @@ public class ScheduleProcessTraceBuffer {
     }
 
     /**
+     * 清空已累积的全部日志条目，保留当前日志级别配置。
+     *
+     * <p>供外部引擎（如胎圈班次级）把加载段正文前置拼接后清空原缓冲，
+     * 避免同一批加载日志在正文中重复输出。</p>
+     */
+    public void clearEntries() {
+        this.entries.clear();
+        this.shiftEntryMap.clear();
+        this.shiftSectionEntryMap.clear();
+        this.deferredShiftEntryMap.clear();
+        this.deferredShiftSectionEntryMap.clear();
+        this.tailEntries.clear();
+    }
+
+    /**
      * 配置过程日志级别。
      *
      * @param value 参数配置值

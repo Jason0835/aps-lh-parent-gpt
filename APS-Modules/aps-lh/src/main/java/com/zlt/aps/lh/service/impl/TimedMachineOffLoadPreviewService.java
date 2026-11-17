@@ -77,10 +77,7 @@ public class TimedMachineOffLoadPreviewService {
      */
     public TimedMachineOffLoadPreview preview(LhScheduleContext context) {
         List<TimedMachineOffRequest> requests = context.getTimedMachineOffRequests().stream()
-                .filter(request -> !timedMachineOffShiftService.hasFixedRelease(context, request))
-                .filter(request -> TimedMachineOffReleaseResolver.resolveProductionStartShift(
-                        context.getScheduleWindowShifts(), request.getStartDate()) != null)
-                .collect(Collectors.toList());
+                .filter(request -> !timedMachineOffShiftService.hasFixedRelease(context, request)).collect(Collectors.toList());
         if (requests.isEmpty()) {
             return null;
         }

@@ -22,9 +22,12 @@ public class ScheduleExtraCreateWindowRequest {
      */
     private Integer guardShiftCount;
     /**
-     * 当前来源口型及同工厂目标机台的静态适配白名单。
+     * 当前来源口型编码。
      */
     private String mouthPlateCode;
+    /**
+     * 同工厂目标机台支持的口型板静态适配白名单集合。
+     */
     private Set<String> allowedMouthPlateCodes;
     /**
      * 生产窗口对应的成型日历也必须明确开放；不沿用缺日历默认开放。

@@ -106,6 +106,8 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
         previousAlternatePlanReuseService.prepareReleaseEvents(context);
         targetScheduleQtyResolver.initializeRealMachineEmbryoAllocations(context);
         previousAlternateMachineOrderService.initializePreviousAlternateMachineOrder(context);
+        // 指定后料先保护空闲模具，后续喷砂置换只能使用未预留的完整组。
+        previousAlternatePlanReuseService.prepareSandBlastMouldReservations(context);
         ISkuPriorityStrategy priorityStrategy = strategyFactory.getSkuPriorityStrategy();
         /*
          * S4.4排序调用：排序策略从S4.2独立的结构排序日期快照读取最大END_DAY，按结构只计算一次
@@ -143,6 +145,9 @@ public class ContinuousProductionHandler extends AbsScheduleStepHandler {
 
         timedMachineOffCleaningHandoffService.execute(context,
                 () -> this.finalizeAndReuseContinuousProduction(context, strategy));
+
+        // 联合尝试确认后再释放预留，失败历史留下的空闲组交还受影响喷砂来源。
+        previousAlternatePlanReuseService.completeSandBlastMouldReservations(context);
 
         // 历史联合承接确认或回滚结束后再恢复，避免换活字块和结构切换先占用原机。
         newSpecProductionStrategy.schedulePrioritySandBlastRecoveries(context,

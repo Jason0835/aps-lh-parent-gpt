@@ -27,10 +27,14 @@ public class ScheduleScoreResult {
     /** 评分说明 */
     private String description;
 
+    /**
+     * 设置评分项明细，传入空值时兜底为空映射。
+     */
     public void setScoreItems(Map<String, BigDecimal> scoreItems) {
         this.scoreItems = scoreItems == null ? new LinkedHashMap<>() : scoreItems;
     }
 
+    /** 设置总分，传入空值时兜底为零。 */
     public void setTotalScore(BigDecimal totalScore) {
         this.totalScore = totalScore == null ? BigDecimal.ZERO : totalScore;
     }

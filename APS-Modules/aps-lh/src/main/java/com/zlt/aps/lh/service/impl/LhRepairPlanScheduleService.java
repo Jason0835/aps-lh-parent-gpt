@@ -15,6 +15,8 @@ import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.support.RepairPlanRequest;
 import com.zlt.aps.lh.engine.strategy.support.RepairPlanResult;
 import com.zlt.aps.lh.engine.strategy.support.RepairPlanRuntimeState;
+import com.zlt.aps.lh.util.FirstInspectionTimingMode;
+import com.zlt.aps.lh.util.FirstInspectionTimingModeResolver;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
@@ -162,6 +164,77 @@ public class LhRepairPlanScheduleService {
     }
 
     /**
+     * 解析正规换模内首检的真实维修预热下限，复用既有试制量试及历史指定正规化判断。
+     *
+     * @param context 当前批次
+     * @param sku 当前物料
+     * @param machineCode 当前运行侧
+     * @param scheduleType 实际切换类型
+     * @param switchStartTime 真实切换开始
+     * @param switchEndTime 真实切换完成
+     * @return 可在换模内首检时返回维修恢复下限，否则为空
+     */
+    public static Date resolveIncludedInspectionReady(LhScheduleContext context, SkuScheduleDTO sku,
+            String machineCode, String scheduleType, Date switchStartTime, Date switchEndTime) {
+        if (context == null || sku == null) {
+            return null;
+        }
+        FirstInspectionTimingMode normalMode = FirstInspectionTimingModeResolver.resolve(
+                sku, scheduleType, FirstInspectionTimingModeResolver.CHANGE_OVER_ACTION_MOULD_CHANGE,
+                FirstInspectionTimingModeResolver.BUSINESS_SCENE_PREVIEW, null, switchEndTime,
+                context.isPreviousAlternateAfterMaterialSku(sku)).getTimingMode();
+        if (normalMode != FirstInspectionTimingMode.INCLUDED_IN_CHANGEOVER) {
+            return null;
+        }
+        return resolveMouldRepairResume(context, machineCode, scheduleType, switchStartTime, switchEndTime);
+    }
+
+    /**
+     * 取得与正规换模本体真实相交的维修恢复点，已有清洗组合保持独立契约。
+     *
+     * @param context 当前批次
+     * @param machineCode 当前运行侧
+     * @param scheduleType 实际切换类型
+     * @param switchStartTime 真实切换开始
+     * @param switchEndTime 真实切换完成
+     * @return 相交维修合并预热后的最晚恢复点，没有适用组合时为空
+     */
+    private static Date resolveMouldRepairResume(LhScheduleContext context, String machineCode,
+            String scheduleType, Date switchStartTime, Date switchEndTime) {
+        if (context == null || StringUtils.isEmpty(machineCode) || switchStartTime == null || switchEndTime == null
+                || !ScheduleTypeEnum.NEW_SPEC.getCode().equals(scheduleType)
+                || LhCleaningRepairOverlapPolicy.resolveForwardInspectionReady(
+                context, machineCode, scheduleType, switchStartTime, switchEndTime) != null) {
+            return null;
+        }
+        return LhPlannedRepairResolver.resolveCapacityWindows(context, context.getDevicePlanShutList(), machineCode)
+                .stream().filter(window -> switchStartTime.before(window.getMaintenanceEndTime())
+                        && switchEndTime.after(window.getMaintenanceStartTime()))
+                .map(MachineMaintenanceWindowDTO::getProductionResumeTime).max(Date::compareTo)
+                .map(RepairPlanRuntimeState::copyDate).orElse(null);
+    }
+
+    /**
+     * 让正规换模首检和最终结果回裁共用真实维修禁产边界，其他切换沿原容量投影。
+     *
+     * @param context 当前批次
+     * @param machineCode 当前运行侧
+     * @param scheduleType 实际切换类型
+     * @param windows 原始容量窗口
+     * @param switchStartTime 真实切换开始
+     * @param switchEndTime 真实切换完成
+     * @return 当前候选或结果的独立容量窗口
+     */
+    public static List<MachineMaintenanceWindowDTO> adaptCapacityWindowsForSwitch(
+            LhScheduleContext context, String machineCode, String scheduleType,
+            List<MachineMaintenanceWindowDTO> windows, Date switchStartTime, Date switchEndTime) {
+        boolean inspectionIncluded = resolveMouldRepairResume(
+                context, machineCode, scheduleType, switchStartTime, switchEndTime) != null;
+        return LhRepairOverlapResolver.adaptCapacityWindowsForSwitch(
+                windows, switchStartTime, switchEndTime, inspectionIncluded);
+    }
+
+    /**
      * 统一维修切换及已有清洗组合的正向首检下限，供候选、正式排量和冻结时间轴共用。
      * 仅05本体与真实切换严格相交时启用维修组合；准备完成后首检仍受原有更晚门禁约束。
      *
@@ -207,7 +280,10 @@ public class LhRepairPlanScheduleService {
         int durationHours = "1".equals(result.getIsTypeBlock())
                 ? LhScheduleTimeUtil.getTypeBlockChangeTotalHours(context)
                 : LhScheduleTimeUtil.getMouldChangeTotalHours(context);
-        return adaptCapacityWindowsForSwitch(windows, result.getMouldChangeStartTime(),
+        String scheduleType = "1".equals(result.getIsTypeBlock())
+                ? ScheduleTypeEnum.TYPE_BLOCK.getCode() : ScheduleTypeEnum.NEW_SPEC.getCode();
+        return adaptCapacityWindowsForSwitch(context, result.getLhMachineCode(), scheduleType,
+                windows, result.getMouldChangeStartTime(),
                 LhScheduleTimeUtil.addHours(result.getMouldChangeStartTime(), durationHours));
     }
 

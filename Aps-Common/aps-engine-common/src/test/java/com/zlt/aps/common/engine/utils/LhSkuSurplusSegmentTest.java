@@ -164,7 +164,7 @@ public class LhSkuSurplusSegmentTest {
                 MonthPlanSurplusCalculator.getDate(LocalDate.of(2026, 10, 21)),
                 false, cycle, 0, maxDiscontinueDays);
         LhSurplusSkuInfo skuInfo = new LhSurplusSkuInfo(
-                sku, allMonthPlanList, Collections.emptyMap(), finishedQty, Collections.emptyList());
+                sku, null, allMonthPlanList, Collections.emptyMap(), finishedQty, Collections.emptyList());
         return LhSkuSurplusCalculator.getSurplusInfo(param, skuInfo);
     }
 }

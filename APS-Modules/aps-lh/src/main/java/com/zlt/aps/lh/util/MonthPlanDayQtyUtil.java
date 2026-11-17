@@ -135,23 +135,12 @@ public final class MonthPlanDayQtyUtil {
      * @return 计划量，缺失按 0
      */
     public static int resolveDayQty(FactoryMonthPlanProductionFinalResult plan, int dayOfMonth) {
-        Integer qty = resolveNullableDayQty(plan, dayOfMonth);
-        return qty != null ? qty : 0;
-    }
-
-    /**
-     * 读取原始日计划量并保留缺失状态，供需要区分明确零计划与缺失输入的决策使用。
-     *
-     * @param plan 月计划记录
-     * @param dayOfMonth 月内日序
-     * @return 原始计划量，记录、日序或字段缺失时为空
-     */
-    public static Integer resolveNullableDayQty(FactoryMonthPlanProductionFinalResult plan, int dayOfMonth) {
         if (Objects.isNull(plan) || dayOfMonth < MIN_DAY_OF_MONTH || dayOfMonth > MAX_DAY_OF_MONTH) {
-            return null;
+            return 0;
         }
         // DAY_1 对应下标 0，因此这里统一做 dayOfMonth - 1 的映射。
-        return DAY_QTY_GETTERS.get(dayOfMonth - 1).apply(plan);
+        Integer qty = DAY_QTY_GETTERS.get(dayOfMonth - 1).apply(plan);
+        return qty != null ? qty : 0;
     }
 
     /**

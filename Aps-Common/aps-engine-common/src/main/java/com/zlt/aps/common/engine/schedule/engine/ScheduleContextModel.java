@@ -31,7 +31,11 @@ public abstract class ScheduleContextModel<T extends ScheduleTaskDraftModel,
         PlanCalculationContext<T, F, SchedulePlanTaskGroup<T>>,
         TaskChainContextAccess<T>, MachineAssignmentContext<T> {
 
+    /**
+     * 工厂编码。
+     */
     protected String factoryCode;
+    /** 本次排程批次号。 */
     protected String batchNo;
     /**
      * 内部流水线模式；仅自动排程入口显式启用，人工和滚动默认关闭。
@@ -67,14 +71,19 @@ public abstract class ScheduleContextModel<T extends ScheduleTaskDraftModel,
      * 按原基础额度保存阶段事件，零生产/后班失败意图也可在最终解释查询。
      */
     protected Map<String, List<Map<String, Object>>> twoPhaseTaskEvents = new LinkedHashMap<>();
+    /** 排程运行链路追踪 ID。 */
     protected String traceId;
     /** 参数为空消息工厂，保持领域国际化消息在使用时读取。 */
     @Getter(AccessLevel.NONE)
     @EqualsAndHashCode.Exclude
     private final Supplier<String> paramEmptyMessageSupplier;
+    /** 批次过程日志缓冲器。 */
     protected ScheduleProcessTraceBuffer processTraceBuffer = new ScheduleProcessTraceBuffer();
+    /** 排程基准日期。 */
     protected LocalDate scheduleDate;
+    /** 操作人账号。 */
     protected String operator;
+    /** 工厂系统排程参数映射，键为参数编码。 */
     protected Map<String, ScheduleParamValueModel> paramMap = new HashMap<>();
     /**
      * 本批次固定使用的收尾后起排班次参数快照。
@@ -91,19 +100,31 @@ public abstract class ScheduleContextModel<T extends ScheduleTaskDraftModel,
     /** 最大班次配置。 */
     @EqualsAndHashCode.Exclude
     private final int maxShiftOrder;
+    /** 待排程任务草稿列表。 */
     protected List<T> taskDraftList = new ArrayList<>();
+    /** 原始加载的任务草稿列表（未经拆分或顺延复制）。 */
     protected List<T> sourceTaskDraftList = new ArrayList<>();
+    /** 计划任务组映射，键为组标识。 */
     protected Map<String, SchedulePlanTaskGroup<T>> planTaskGroupMap = new LinkedHashMap<>();
+    /** 按机台与班次组织的双向任务链容器。 */
     protected MachineShiftTaskChain<T> taskChainGroup = new MachineShiftTaskChain<>();
+    /** 任务 ID 到任务链节点的索引映射。 */
     protected Map<String, ScheduleTaskNode<T>> taskNodeIndex = new HashMap<>();
+    /** 任务解释快照映射，键为任务业务键或任务标识。 */
     protected Map<String, S> snapshotMap = new HashMap<>();
+    /** 任务规则轨迹映射，键为任务标识。 */
     protected Map<String, R> ruleTraceMap = new HashMap<>();
+    /** 过程日志规则轨迹游标映射。 */
     protected Map<String, Integer> processRuleTraceCursorMap = new HashMap<>();
+    /** 当前正在执行的排程步骤名称。 */
     protected String currentProcessStep;
+    /** 已完成的排程步骤名称列表。 */
     protected List<String> completedProcessSteps = new ArrayList<>();
     /** 本次异步自动排程任务编号。 */
     protected String taskId;
+    /** 排程质量与统计摘要映射。 */
     protected Map<String, Object> qualitySummary = new LinkedHashMap<>();
+    /** 产品库存预测快照映射，键为产品编码。 */
     protected Map<String, F> stockForecastMap = new HashMap<>();
     /** 加载阶段获取的前日六点净库存。 */
     protected Map<String, BigDecimal> sixClockStockSnapshot;
@@ -115,18 +136,27 @@ public abstract class ScheduleContextModel<T extends ScheduleTaskDraftModel,
     protected Map<String, BigDecimal> curlLengthMap = new HashMap<>();
     /** 用于库存预测和工装占用的产品集合，与可排任务集合严格分离。 */
     protected Set<String> inventoryProductCodeSet = new LinkedHashSet<>();
+    /** 各产品当前剩余可用库存映射，键为产品编码。 */
     protected Map<String, BigDecimal> remainingStockMap = new HashMap<>();
+    /** 各产品初始可用库存映射，键为产品编码。 */
     protected Map<String, BigDecimal> initialStockMap = new HashMap<>();
+    /** 按产品与班次记录的供料缺口映射。 */
     protected Map<String, BigDecimal> productShiftShortageMap = new LinkedHashMap<>();
+    /** 本次排程加载的候选机台列表。 */
     protected List<M> machineCandidateList = new ArrayList<>();
+    /** 工厂已配置口型板关系的口型板编码集合。 */
     protected Set<String> configuredMouthPlateCodeSet = new HashSet<>();
+    /** 工厂已配置机台关系的胶料编码集合。 */
     protected Set<String> configuredGlueCodeSet = new HashSet<>();
     /**
      * 兼容旧流程的实验规格映射；当前 TM/TC 任务按成型计划来源行字段直接判断。
      */
     protected Map<String, ScheduleExperimentSpecInfoModel> experimentSpecInfoMap = new LinkedHashMap<>();
+    /** 班初初始可用工装数量。 */
     protected BigDecimal initialAvailableToolQty;
+    /** 当前实时剩余可用工装数量。 */
     protected BigDecimal currentAvailableToolQty;
+    /** 工装台账占用与释放快照映射。 */
     protected Map<String, ScheduleToolLedgerSnapshot> toolLedgerSnapshotMap = new LinkedHashMap<>();
     /**
      * 当日成型总余量额度台账，按「工厂|排程日期|产品|单位长度」分桶。
@@ -140,29 +170,47 @@ public abstract class ScheduleContextModel<T extends ScheduleTaskDraftModel,
     protected boolean tailQuotaPrepared;
     /** 已完成当班成型释放的班次+产品键，避免同一产品重复释放。 */
     protected Set<String> settledToolDemandKeySet = new HashSet<>();
+    /** 全局工装账本递增序号。 */
     protected Integer toolLedgerSequence = 0;
+    /** 小料/小药胶料编码集合。 */
     protected Set<String> smallGlueCodeSet = new HashSet<>();
+    /** 小料/小药胶料到指定机台的映射。 */
     protected Map<String, String> smallGlueMachineMap = new HashMap<>();
     /** 本次排程使用的胶料组合顺序只读快照。 */
     protected Map<String, Long> glueCombinedOrderMap = Collections.emptyMap();
+    /** 排程进度监听器。 */
     protected ScheduleProgressListener progressListener;
+    /** 排程落库结果汇总模型。 */
     protected SchedulePersistResultModel persistResult;
+    /** 任务选机候选跟踪映射，键为任务标识。 */
     protected Map<String, List<M>> candidateTraceMap = new HashMap<>();
+    /** 各班次可用生产时长映射（小时），键为班次序号。 */
     protected Map<Integer, BigDecimal> shiftHoursMap = new HashMap<>();
+    /** 已启用的开班班次序号集合。 */
     protected Set<Integer> startupShiftOrderSet = new HashSet<>();
+    /** 工作日历停产的班次序号集合。 */
     protected Set<Integer> workCalendarStoppedShiftOrderSet = new HashSet<>();
+    /** 工作日历停产班次的证据详情映射，键为班次序号。 */
     protected Map<Integer, Map<String, Object>> workCalendarStoppedShiftEvidenceMap = new LinkedHashMap<>();
+    /** 当日停机班次的证据详情映射，键为班次序号。 */
     protected Map<Integer, Map<String, Object>> currentDayShutdownEvidenceMap = new LinkedHashMap<>();
+    /** 各排程班次的物理起止时间窗口映射，键为班次序号。 */
     protected Map<Integer, ScheduleShiftTimeWindowModel> shiftTimeWindowMap = new HashMap<>();
     /**
      * 当前来源日期轴CLASS1至CLASS8的成型日历快照；缺失不视为开放。
      */
     protected Map<Integer, Boolean> extraCreateFormingCalendarOpenMap = new LinkedHashMap<>();
+    /** 成型需求为空时的国际化提示信息。 */
     protected String emptyFormingTaskMessage;
+    /** 延后按最终展示顺序渲染的任务过程日志列表。 */
     protected List<ScheduleTaskProcessLogEntry> deferredTaskProcessLogList = new ArrayList<>();
+    /** 延后任务过程日志递增序号。 */
     protected Long deferredTaskProcessLogSequence = 0L;
+    /** 工艺损耗率规则列表。 */
     protected List<ScheduleLossRuleModel> lossRuleList = new ArrayList<>();
+    /** 排程异常与诊断问题收集器。 */
     protected ScheduleIssueCollector issueCollector = new ScheduleIssueCollector();
+    /** 各机台继承的前班尾任务前驱信息映射，键为机台编码。 */
     protected Map<String, ScheduleTaskPredecessorModel> machinePredecessorMap = new HashMap<>();
     /**
      * 前一排程日早班形成的产品机台初始绑定，键为工序产品编码，值为机台编码。
@@ -1056,6 +1104,7 @@ public abstract class ScheduleContextModel<T extends ScheduleTaskDraftModel,
     }
 
 
+    /** 设置工厂排程参数映射，传入空值时兜底为空映射。 */
     public void setParamMap(Map<String, ScheduleParamValueModel> paramMap) {
         this.paramMap = paramMap == null ? new HashMap<>() : paramMap;
     }
@@ -1069,18 +1118,22 @@ public abstract class ScheduleContextModel<T extends ScheduleTaskDraftModel,
         this.taskDraftList = taskDraftList == null ? new ArrayList<>() : new ArrayList<>(taskDraftList);
     }
 
+    /** 设置原始加载任务列表，传入空值时兜底为空列表。 */
     public void setSourceTaskDraftList(List<T> sourceTaskDraftList) {
         this.sourceTaskDraftList = sourceTaskDraftList == null ? new ArrayList<>() : sourceTaskDraftList;
     }
 
+    /** 设置计划任务组映射，传入空值时兜底为空映射。 */
     public void setPlanTaskGroupMap(Map<String, SchedulePlanTaskGroup<T>> planTaskGroupMap) {
         this.planTaskGroupMap = planTaskGroupMap == null ? new LinkedHashMap<>() : planTaskGroupMap;
     }
 
+    /** 设置机台班次任务链容器，传入空值时兜底为空容器。 */
     public void setTaskChainGroup(MachineShiftTaskChain<T> taskChainGroup) {
         this.taskChainGroup = taskChainGroup == null ? new MachineShiftTaskChain<>() : taskChainGroup;
     }
 
+    /** 设置任务链节点索引映射，传入空值时兜底为空映射。 */
     public void setTaskNodeIndex(Map<String, ScheduleTaskNode<T>> taskNodeIndex) {
         this.taskNodeIndex = taskNodeIndex == null ? new HashMap<>() : taskNodeIndex;
     }
@@ -1123,26 +1176,32 @@ public abstract class ScheduleContextModel<T extends ScheduleTaskDraftModel,
         taskNodeIndex.remove(taskId);
     }
 
+    /** 设置任务解释快照映射，传入空值时兜底为空映射。 */
     public void setSnapshotMap(Map<String, S> snapshotMap) {
         this.snapshotMap = snapshotMap == null ? new HashMap<>() : snapshotMap;
     }
 
+    /** 设置任务规则轨迹映射，传入空值时兜底为空映射。 */
     public void setRuleTraceMap(Map<String, R> ruleTraceMap) {
         this.ruleTraceMap = ruleTraceMap == null ? new HashMap<>() : ruleTraceMap;
     }
 
+    /** 设置产品库存预测映射，传入空值时兜底为空映射。 */
     public void setStockForecastMap(Map<String, F> stockForecastMap) {
         this.stockForecastMap = stockForecastMap == null ? new HashMap<>() : stockForecastMap;
     }
 
+    /** 设置各产品剩余库存映射，传入空值时兜底为空映射。 */
     public void setRemainingStockMap(Map<String, BigDecimal> remainingStockMap) {
         this.remainingStockMap = remainingStockMap == null ? new HashMap<>() : remainingStockMap;
     }
 
+    /** 设置小料/小药胶料编码集合，传入空值时兜底为空集合。 */
     public void setSmallGlueCodeSet(Set<String> smallGlueCodeSet) {
         this.smallGlueCodeSet = smallGlueCodeSet == null ? new HashSet<>() : smallGlueCodeSet;
     }
 
+    /** 设置小料/小药胶料机台映射，传入空值时兜底为空映射。 */
     public void setSmallGlueMachineMap(Map<String, String> smallGlueMachineMap) {
         this.smallGlueMachineMap = smallGlueMachineMap == null ? new HashMap<>() : smallGlueMachineMap;
     }
@@ -1156,6 +1215,7 @@ public abstract class ScheduleContextModel<T extends ScheduleTaskDraftModel,
         this.issueCollector = issueCollector == null ? new ScheduleIssueCollector() : issueCollector;
     }
 
+    /** 设置机台前驱任务映射，传入空值时兜底为空映射。 */
     public void setMachinePredecessorMap(Map<String, ScheduleTaskPredecessorModel> machinePredecessorMap) {
         this.machinePredecessorMap = machinePredecessorMap == null ? new HashMap<>() : machinePredecessorMap;
     }
@@ -1189,23 +1249,28 @@ public abstract class ScheduleContextModel<T extends ScheduleTaskDraftModel,
         });
     }
 
+    /** 设置候选机台跟踪映射，传入空值时兜底为空映射。 */
     public void setCandidateTraceMap(Map<String, List<M>> candidateTraceMap) {
         this.candidateTraceMap = candidateTraceMap == null ? new HashMap<>() : candidateTraceMap;
     }
 
+    /** 设置各班次可用生产时长映射，传入空值时兜底为空映射。 */
     public void setShiftHoursMap(Map<Integer, BigDecimal> shiftHoursMap) {
         this.shiftHoursMap = shiftHoursMap == null ? new HashMap<>() : shiftHoursMap;
     }
 
+    /** 设置已启用开班班次集合，传入空值时兜底为空集合。 */
     public void setStartupShiftOrderSet(Set<Integer> startupShiftOrderSet) {
         this.startupShiftOrderSet = startupShiftOrderSet == null ? new HashSet<>() : startupShiftOrderSet;
     }
 
+    /** 设置工作日历停产班次集合，传入空值时兜底为空集合。 */
     public void setWorkCalendarStoppedShiftOrderSet(Set<Integer> workCalendarStoppedShiftOrderSet) {
         this.workCalendarStoppedShiftOrderSet = workCalendarStoppedShiftOrderSet == null
                 ? new HashSet<>() : workCalendarStoppedShiftOrderSet;
     }
 
+    /** 设置工作日历停产班次证据映射，传入空值时兜底为空映射。 */
     public void setWorkCalendarStoppedShiftEvidenceMap(
             Map<Integer, Map<String, Object>> workCalendarStoppedShiftEvidenceMap) {
         this.workCalendarStoppedShiftEvidenceMap = workCalendarStoppedShiftEvidenceMap == null
@@ -1238,10 +1303,12 @@ public abstract class ScheduleContextModel<T extends ScheduleTaskDraftModel,
                 });
     }
 
+    /** 设置排程班次物理起止时间窗口映射，传入空值时兜底为空映射。 */
     public void setShiftTimeWindowMap(Map<Integer, ScheduleShiftTimeWindowModel> shiftTimeWindowMap) {
         this.shiftTimeWindowMap = shiftTimeWindowMap == null ? new HashMap<>() : shiftTimeWindowMap;
     }
 
+    /** 设置工艺损耗率规则列表，传入空值时兜底为空列表。 */
     public void setLossRuleList(List<ScheduleLossRuleModel> lossRuleList) {
         this.lossRuleList = lossRuleList == null ? new ArrayList<>() : lossRuleList;
     }

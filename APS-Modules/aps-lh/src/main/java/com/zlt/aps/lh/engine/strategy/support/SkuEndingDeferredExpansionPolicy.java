@@ -35,6 +35,10 @@ import java.util.Collections;
 @Slf4j
 public final class SkuEndingDeferredExpansionPolicy {
     /**
+     * 普通续作允许提前评估窗口后一天收尾的结构，不扩展更远期需求。
+     */
+    private static final int ENDING_LOOK_AHEAD_DAYS = 1;
+    /**
      * 只读消费余量入口，不调用会懒加载或同步数量账本的方法。
      */
     private static final TargetScheduleQtyResolver QUANTITY_READER = new TargetScheduleQtyResolver();
@@ -50,7 +54,7 @@ public final class SkuEndingDeferredExpansionPolicy {
     }
 
     /**
-     * 统一评估已收尾结构的普通续作需求，只读取稳定结果及独立产能快照。
+     * 统一评估已收尾及窗口后一天收尾结构的普通续作需求，只读取稳定结果及独立产能快照。
      *
      * @param context 正式排程上下文
      * @param sku 来源续作或已绑定本规则的补偿SKU
@@ -84,7 +88,8 @@ public final class SkuEndingDeferredExpansionPolicy {
             return decision;
         }
         LocalDate endingDate = context.getStructureMaxEndingDateMap().get(sku.getStructureName());
-        if (endingDate == null || endingDate.isAfter(toDate(context.getWindowEndDate()))
+        if (endingDate == null || endingDate.isAfter(
+                toDate(context.getWindowEndDate()).plusDays(ENDING_LOOK_AHEAD_DAYS))
                 || isContinuousMonthBoundary(context, sku, endingDate)
                 || !context.getMonthPlanList().stream().filter(Objects::nonNull)
                 .anyMatch(plan -> sameSku(sku, plan.getMaterialCode(), plan.getProductStatus()))
@@ -96,6 +101,8 @@ public final class SkuEndingDeferredExpansionPolicy {
         }
         decision.setApplicable(true);
         decision.setStructureEndingDate(endingDate);
+        // 收尾日期只决定准入，延期截止始终取窗口结束时间加配置天数，不随结构收尾后移。
+        Date deferredEnd = context.getEndingDeferredCapacitySnapshot().getDeferredEndTime();
         int remainingQty = resolveRemainingQty(context, sku);
         Map<String, LhScheduleResult> latestResults = resolveLatestMachineResults(context);
         StructureEndingContinuationState structureEnding = StructureEndingContinuationPolicy.state(context, sku);
@@ -120,7 +127,7 @@ public final class SkuEndingDeferredExpansionPolicy {
             String physicalCode = LhSingleControlMachineUtil.resolvePhysicalMachineCode(result.getLhMachineCode());
             physicalMachines.add(physicalCode);
             physicalCapacities.computeIfAbsent(physicalCode, key -> new ArrayList<>())
-                    .add(resolveRemainingCapacity(context, result, evaluationDate));
+                    .add(resolveRemainingCapacity(context, result, evaluationDate, deferredEnd));
             if (LhSingleControlMachineUtil.isConfiguredSingleControlMachine(context, result.getLhMachineCode())
                     && LhSingleControlMachineUtil.isWholeMachineGranularitySku(context, sku)) {
                 pairedMachines.add(physicalCode);
@@ -362,7 +369,8 @@ public final class SkuEndingDeferredExpansionPolicy {
                     context.getFactoryCode(), context.getBatchNo(), toDate(context.getScheduleDate()), sku.getMaterialCode(),
                     sku.getProductStatus(), sku.getStructureName(), decision.getStructureEndingDate(),
                     context.getScheduleConfig().getSkuEndingDeferredExpansionDays(), snapshot.getWindowEndTime(),
-                    snapshot.getDeferredEndTime(), decision.getRemainingQty(), decision.getCommittedMachineCount(),
+                    snapshot.getDeferredEndTime(),
+                    decision.getRemainingQty(), decision.getCommittedMachineCount(),
                     decision.getCommittedCapacityQty(), decision.getShortageQty(), decision.needsExpansion() ? 1 : 0,
                     resolveFirstProductionDate(context, sku));
         }
@@ -433,10 +441,11 @@ public final class SkuEndingDeferredExpansionPolicy {
      * @param context 正式上下文
      * @param result 该运行侧最新生产段
      * @param evaluationDate 当前尝试业务日，之前未利用的产能不得再计入
+     * @param deferredEnd 窗口结束时间加延期天数的固定截止，不随结构收尾日期移动
      * @return 后续各班可完成量，数据缺失时为空
      */
     private static Map<Integer, Integer> resolveRemainingCapacity(LhScheduleContext context, LhScheduleResult result,
-            LocalDate evaluationDate) {
+            LocalDate evaluationDate, Date deferredEnd) {
         if (result.getSingleMouldShiftQty() == null || result.getSingleMouldShiftQty() <= 0
                 || result.getLhTime() == null || result.getLhTime() <= 0
                 || result.getMouldQty() == null || result.getMouldQty() <= 0) {
@@ -462,6 +471,7 @@ public final class SkuEndingDeferredExpansionPolicy {
         List<LhShiftConfigVO> remainingShifts = new ArrayList<LhShiftConfigVO>();
         for (LhShiftConfigVO shift : projection.getScheduleWindowShifts()) {
             if (!shift.getShiftStartDateTime().before(coveredEnd)
+                    && !shift.getShiftEndDateTime().after(deferredEnd)
                     && !toDate(shift.getWorkDate()).isBefore(evaluationDate)) {
                 remainingShifts.add(shift);
             }
